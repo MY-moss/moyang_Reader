@@ -10,8 +10,10 @@ import { RelationGraph } from "./components/RelationGraph";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
+import { UpdateNotice } from "./components/UpdateNotice";
 import {
   chooseDocumentPath,
+  chooseSavePath,
   chooseWorkspacePath,
   createMarkdownFile,
   fileExists,
@@ -26,6 +28,15 @@ import {
   subscribeToOpenPaths,
   writeTextFile,
 } from "./bridge";
+import type { Update } from "@tauri-apps/plugin-updater";
+import {
+  checkForAppUpdate,
+  describeUpdateError,
+  getCurrentAppVersion,
+  installAppUpdate,
+  relaunchApp,
+  type UpdateStatus,
+} from "./updater";
 import type {
   DocumentKind,
   OpenDocument,
@@ -36,6 +47,7 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
+import { buildHtmlExport, fileNameWithExtension, pathWithExtension } from "./export";
 import {
   loadRecentFiles,
   loadWorkspacePath,
@@ -124,8 +136,8 @@ function readSavedTheme(): ThemeMode {
   }
 }
 
-function downloadText(name: string, contents: string): void {
-  const blob = new Blob([contents], { type: "text/markdown;charset=utf-8" });
+function downloadText(name: string, contents: string, mimeType = "text/markdown"): void {
+  const blob = new Blob([contents], { type: mimeType + ";charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -158,6 +170,14 @@ export function App() {
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
+  const updateRef = useRef<Update | null>(null);
+  const updateCheckInFlightRef = useRef(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
@@ -179,6 +199,144 @@ export function App() {
   useEffect(() => () => {
     previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
+
+  const closePendingUpdate = useCallback(async () => {
+    const pending = updateRef.current;
+    updateRef.current = null;
+    setAvailableUpdate(null);
+    if (pending) await pending.close().catch(() => undefined);
+  }, []);
+
+  const checkForUpdates = useCallback(async (manual = true) => {
+    if (!isTauriRuntime()) {
+      if (manual) {
+        setUpdateStatus("error");
+        setUpdateError("浏览器预览模式不支持应用更新。");
+        setUpdateNoticeVisible(true);
+      }
+      return;
+    }
+
+    if (updateCheckInFlightRef.current) return;
+    updateCheckInFlightRef.current = true;
+    setUpdateStatus("checking");
+    setUpdateError(null);
+    setUpdateProgress(null);
+    if (manual) setUpdateNoticeVisible(false);
+
+    try {
+      const version = await getCurrentAppVersion();
+      if (version) setCurrentVersion(version);
+      await closePendingUpdate();
+
+      const found = await checkForAppUpdate();
+      if (!found) {
+        setUpdateStatus(manual ? "up-to-date" : "idle");
+        setUpdateNoticeVisible(manual);
+        return;
+      }
+
+      updateRef.current = found;
+      setAvailableUpdate(found);
+      setUpdateStatus("available");
+      setUpdateNoticeVisible(true);
+    } catch (cause) {
+      if (manual) {
+        setUpdateStatus("error");
+        setUpdateError(describeUpdateError(cause));
+        setUpdateNoticeVisible(true);
+      } else {
+        setUpdateStatus("idle");
+        setUpdateError(null);
+        setUpdateNoticeVisible(false);
+      }
+    } finally {
+      updateCheckInFlightRef.current = false;
+    }
+  }, [closePendingUpdate]);
+
+  const installUpdate = useCallback(async () => {
+    const pending = updateRef.current;
+    if (!pending) return;
+
+    setUpdateStatus("downloading");
+    setUpdateNoticeVisible(true);
+    setUpdateError(null);
+    setUpdateProgress(0);
+
+    let downloaded = 0;
+    let contentLength: number | undefined;
+    try {
+      await installAppUpdate(pending, (event) => {
+        if (event.event === "Started") {
+          contentLength = event.data.contentLength;
+          setUpdateProgress(contentLength ? 0 : null);
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          if (contentLength) {
+            setUpdateProgress(Math.min(1, downloaded / contentLength));
+          }
+        } else {
+          setUpdateProgress(1);
+        }
+      });
+
+      updateRef.current = null;
+      setAvailableUpdate(null);
+      await pending.close().catch(() => undefined);
+      setUpdateStatus("ready");
+      try {
+        await relaunchApp();
+      } catch {
+        setUpdateError("更新已安装，但应用没有自动重启，请点击“重启应用”。");
+      }
+    } catch (cause) {
+      setUpdateStatus("error");
+      setUpdateError(describeUpdateError(cause));
+      setUpdateNoticeVisible(true);
+    }
+  }, []);
+
+  const relaunchUpdatedApp = useCallback(async () => {
+    try {
+      await relaunchApp();
+    } catch (cause) {
+      setUpdateStatus("error");
+      setUpdateError(describeUpdateError(cause));
+      setUpdateNoticeVisible(true);
+    }
+  }, []);
+
+  const dismissUpdateNotice = useCallback(() => {
+    setUpdateNoticeVisible(false);
+    void closePendingUpdate();
+  }, [closePendingUpdate]);
+
+  useEffect(() => () => {
+    const pending = updateRef.current;
+    updateRef.current = null;
+    if (pending) void pending.close().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    void getCurrentAppVersion()
+      .then((version) => {
+        if (active && version) setCurrentVersion(version);
+      })
+      .catch(() => undefined);
+
+    const timer = window.setTimeout(() => {
+      if (active) void checkForUpdates(false);
+    }, 1_200);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [checkForUpdates]);
 
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
@@ -546,6 +704,43 @@ export function App() {
     window.print();
   }, [documentState?.kind, documentState?.previewUrl]);
 
+  const handleExportMarkdown = useCallback(async () => {
+    if (!documentState || !isEditableDocument(documentState.kind)) return;
+
+    const extension = documentState.kind === "text" ? "txt" : "md";
+    const contents = sourceDraft;
+    try {
+      if (isTauriRuntime()) {
+        const path = await chooseSavePath(pathWithExtension(documentState.path, extension), "markdown");
+        if (!path) return;
+        await writeTextFile(path, contents);
+      } else {
+        downloadText(fileNameWithExtension(documentState.name, extension), contents);
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 Markdown 失败。");
+    }
+  }, [documentState, sourceDraft]);
+
+  const handleExportHtml = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    const contents = buildHtmlExport(documentState.name, documentState.rendered.html);
+    try {
+      if (isTauriRuntime()) {
+        const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");
+        if (!path) return;
+        await writeTextFile(path, contents);
+      } else {
+        downloadText(fileNameWithExtension(documentState.name, "html"), contents, "text/html");
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");
+    }
+  }, [documentState]);
+
   const handleBrowserFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
     const path = `browser://${file.name}`;
@@ -790,7 +985,14 @@ export function App() {
         onSave={() => void saveDocument()}
         onExport={handleExport}
         exportLabel={documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"}
+        canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
+        canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        onExportMarkdown={() => void handleExportMarkdown()}
+        onExportHtml={() => void handleExportHtml()}
         onToggleSearch={() => setSearchOpen((current) => !current)}
+        updateStatus={updateStatus}
+        updateVersion={availableUpdate?.version ?? null}
+        onCheckUpdates={() => void checkForUpdates(true)}
         onSearchQueryChange={(query) => {
           setSearchQuery(query);
           setSearchResultIndex(0);
@@ -803,14 +1005,26 @@ export function App() {
         }}
         onCycleTheme={cycleTheme}
       />
-
-      <Tabs
-        tabs={openTabs}
-        activePath={documentState?.path ?? null}
-        onSelect={(path) => void handleSelectTab(path)}
-        onClose={(path) => void handleCloseTab(path)}
-      />
-
+      <div className="navigation-strip">
+        {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (
+          <UpdateNotice
+            status={updateStatus}
+            version={availableUpdate?.version ?? null}
+            notes={availableUpdate?.body?.trim() || null}
+            progress={updateProgress}
+            error={updateError}
+            onInstall={() => void installUpdate()}
+            onRelaunch={() => void relaunchUpdatedApp()}
+            onDismiss={dismissUpdateNotice}
+          />
+        )}
+        <Tabs
+          tabs={openTabs}
+          activePath={documentState?.path ?? null}
+          onSelect={(path) => void handleSelectTab(path)}
+          onClose={(path) => void handleCloseTab(path)}
+        />
+      </div>
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
@@ -907,6 +1121,7 @@ export function App() {
       <footer className="statusbar">
         <span>{documentState?.path ?? "等待打开文件"}</span>
         {documentState && <span>{documentState.kind === "pdf" ? "PDF" : documentState.kind === "image" ? "图片" : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}</span>}
+        <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>
       </footer>
 
       <input

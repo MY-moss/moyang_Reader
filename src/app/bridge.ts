@@ -32,6 +32,20 @@ export async function chooseWorkspacePath(): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
+export async function chooseSavePath(defaultPath: string, format: "markdown" | "html"): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const options = format === "html"
+    ? { name: "HTML 网页", extensions: ["html", "htm"] }
+    : { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] };
+  return save({
+    title: format === "html" ? "导出 HTML" : "导出 Markdown",
+    defaultPath,
+    filters: [options],
+  });
+}
+
 export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]> {
   if (!isTauriRuntime()) return [];
   return invoke<WorkspaceFile[]>("list_workspace_files", { root });

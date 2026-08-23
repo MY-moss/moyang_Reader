@@ -25,6 +25,7 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-rows: 68px auto minmax(0, 1fr) 28px; }
+.navigation-strip { min-width: 0; }
 .topbar { position: relative; display: flex; align-items: center; gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 94%, transparent); }
 .brand-block { display: flex; align-items: center; gap: 10px; min-width: 178px; }
 .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--accent); color: var(--accent-deep); font-family: Georgia, serif; font-size: 19px; font-weight: 700; }
@@ -36,12 +37,32 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .toolbar-button { border: 1px solid var(--line); background: var(--surface-strong); color: var(--ink); padding: 8px 12px; font-size: 12px; }
 .toolbar-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-deep); }
 .toolbar-button.primary { border-color: var(--accent); background: var(--accent); color: white; }
+.export-menu { position: relative; }
+.export-menu summary { list-style: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu-panel { position: absolute; z-index: 7; top: calc(100% + 7px); right: 0; display: grid; min-width: 170px; padding: 5px; border: 1px solid var(--line); background: var(--surface-strong); box-shadow: 0 10px 24px rgba(31, 40, 37, 0.14); }
+.export-menu-panel button { border: 0; background: transparent; color: var(--ink); padding: 8px 10px; text-align: left; font-size: 12px; white-space: nowrap; }
+.export-menu-panel button:hover { background: var(--accent-soft); color: var(--accent-deep); }
+.toolbar-button.update-button.has-update { border-color: #c87848; color: #a24f2e; }
+.toolbar-button.update-button.has-update::before { content: "•"; margin-right: 4px; color: #c87848; }
+.toolbar-button.update-button:hover:not(:disabled) { border-color: var(--accent); }
 .toolbar-button:focus-visible, .findbar input:focus-visible, .find-button:focus-visible, .outline-list a:focus-visible, .tab-label:focus-visible, .tab-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .findbar { position: absolute; z-index: 5; top: 58px; right: 24px; display: flex; align-items: center; gap: 7px; padding: 8px; border: 1px solid var(--line); background: var(--surface-strong); box-shadow: 0 10px 24px rgba(31, 40, 37, 0.12); }
 .findbar input { width: 240px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 9px; outline: none; font-size: 12px; }
 .find-count { min-width: 48px; color: var(--muted); font-size: 11px; text-align: center; }
 .find-button { width: 25px; height: 25px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); line-height: 1; }
 .tab-strip { display: flex; min-width: 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--surface); }
+.update-notice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--accent-soft); color: var(--ink); font-size: 12px; }
+.update-notice-error { border-color: #d6a297; background: #fff5f2; color: var(--danger); }
+.update-notice-up-to-date { background: var(--surface); color: var(--muted); }
+.update-copy { min-width: 0; display: grid; gap: 3px; }
+.update-copy strong { color: var(--ink); font-size: 12px; }
+.update-copy span { color: var(--muted); line-height: 1.45; }
+.update-copy p { max-width: min(760px, 60vw); margin: 3px 0 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.update-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 12px; }
+.update-progress { width: min(360px, 42vw); height: 4px; overflow: hidden; margin-top: 4px; background: rgba(33, 78, 75, 0.16); }
+.update-progress span { display: block; height: 100%; background: var(--accent); transition: width 160ms ease; }
+.update-notice-error .quiet-button { color: var(--danger); }
 .tab-item { display: flex; align-items: center; min-width: 0; border-right: 1px solid var(--line); }
 .tab-item.active { background: var(--surface-strong); box-shadow: inset 0 -2px 0 var(--accent); }
 .tab-label { max-width: 180px; overflow: hidden; border: 0; background: transparent; color: var(--muted); padding: 9px 8px 8px 13px; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
@@ -192,6 +213,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   :root:not([data-theme]) .markdown-body code { background: #323a37; color: #f0b69f; }
   :root:not([data-theme]) .markdown-body th { background: #303734; }
   :root:not([data-theme]) .error-state { border-color: #70463e; background: #372522; }
+  :root:not([data-theme]) .update-notice-error { border-color: #70463e; background: #372522; }
   :root:not([data-theme]) .external-change-notice { border-color: #77613b; background: #3a3325; color: #e6c981; }
   :root:not([data-theme]) .external-change-notice strong { color: #f0d79a; }
   :root:not([data-theme]) .external-change-notice button { border-color: #987a43; background: #423a2a; color: #efd28b; }
@@ -211,6 +233,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 :root[data-theme="dark"] .markdown-body code { background: #323a37; color: #f0b69f; }
 :root[data-theme="dark"] .markdown-body th { background: #303734; }
 :root[data-theme="dark"] .error-state { border-color: #70463e; background: #372522; }
+:root[data-theme="dark"] .update-notice-error { border-color: #70463e; background: #372522; }
 :root[data-theme="dark"] .external-change-notice { border-color: #77613b; background: #3a3325; color: #e6c981; }
 :root[data-theme="dark"] .external-change-notice strong { color: #f0d79a; }
 :root[data-theme="dark"] .external-change-notice button { border-color: #987a43; background: #423a2a; color: #efd28b; }
@@ -227,7 +250,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 @media print {
   body { min-width: 0; background: white; }
   .app-shell { display: block; }
-  .topbar, .tab-strip, .sidebar, .statusbar, .graph-backdrop { display: none !important; }
+  .topbar, .navigation-strip, .tab-strip, .sidebar, .statusbar, .graph-backdrop { display: none !important; }
   .content-area { overflow: visible; background: white; }
   .reader-content { width: auto; margin: 0; padding: 0; }
   .pdf-preview { width: auto; height: auto; margin: 0; border: 0; }

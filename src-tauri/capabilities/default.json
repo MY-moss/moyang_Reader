@@ -8,6 +8,8 @@
     "dialog:default",
     "fs:default",
     "fs:allow-watch",
+    "process:default",
+    "updater:default",
     {
       "identifier": "fs:scope",
       "allow": ["**"]

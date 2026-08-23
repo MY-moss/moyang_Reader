@@ -7,3 +7,7 @@ src-tauri/gen/
 *.tsbuildinfo
 .idea/
 .vscode/
+*.key
+*.key.pub
+*.pem
+*.sig

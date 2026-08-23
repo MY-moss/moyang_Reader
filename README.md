@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-v0.4.0 关系增强版正在开发，并基于 v0.3.1 的稳定基础继续完善：
+v0.5.0 关系与发布增强版，继续基于轻量本地阅读核心完善：
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
 - 双击传入文件路径、单实例接收后续打开请求
@@ -30,6 +30,8 @@ v0.4.0 关系增强版正在开发，并基于 v0.3.1 的稳定基础继续完�
 - 写回前创建隐藏备份和临时文件
 - 打印样式，可通过系统打印对话框保存为 PDF
 - Windows Markdown 文件关联配置和应用图标
+- Markdown、纯文本和 DOCX 内容可另存为 HTML；Markdown/纯文本也可另存为源文件
+- 启动后静默检查 GitHub Release，顶部按钮可手动检查，签名更新包安装后自动重启
 
 生产构建会把 Markdown、DOCX 适配器拆成按需加载的 chunk：空白启动页不需要加载完整文档解析器，打开对应类型时才加载。
 
@@ -48,12 +50,15 @@ npm run tauri dev
 
 完整 NSIS 安装包也已生成：
 
-`src-tauri/target/release/bundle/nsis/Moyang Reader_0.4.0_x64-setup.exe`
+`src-tauri/target/release/bundle/nsis/Moyang Reader_0.5.0_x64-setup.exe`
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd` 文件关联。DOCX/PDF 当前支持在应用内选择、拖放和通过启动参数打开，但不会抢占 Word/PDF 的系统默认关联。
 
-后续版本建议按以下顺序推进：
+更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。当前版本的 PDF 交付方式是系统打印对话框中的“保存为 PDF”；真正的 PDF 模板和批量导出列入后续版本。
 
-1. v0.4：当前版本，关系图、标签筛选、标准本地链接和未解析链接创建。
-2. v0.5：Markdown/DOCX/PDF 导出模板、页眉页脚、分页预览、直接保存 PDF 和批量导出。
-3. v0.6：多工作区、大文件增量渲染、崩溃恢复、自动更新和可选插件系统。
+## 后续版本路线
+
+1. v0.5：当前版本，关系图、标签筛选、整个文件夹阅读库、Markdown/HTML 导出和签名自动更新。
+2. v0.6：PDF/Word 导出模板、页眉页脚、分页预览、批量导出和导出附件处理。
+3. v0.7：多工作区、超大文档增量渲染、索引缓存、崩溃恢复和更完整的打印设置。
+4. v0.8：插件/适配器机制、可选同步、版本回滚提示和跨平台打包。

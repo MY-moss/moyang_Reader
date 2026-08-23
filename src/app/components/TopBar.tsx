@@ -1,4 +1,5 @@
 import type { ThemeMode } from "../types";
+import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
   fileName: string | null;
@@ -15,6 +16,13 @@ type TopBarProps = {
   onSave: () => void;
   onExport: () => void;
   exportLabel?: string;
+  canExportMarkdown: boolean;
+  canExportHtml: boolean;
+  onExportMarkdown: () => void;
+  onExportHtml: () => void;
+  updateStatus: UpdateStatus;
+  updateVersion: string | null;
+  onCheckUpdates: () => void;
   onToggleSearch: () => void;
   onSearchQueryChange: (query: string) => void;
   onSearchPrevious: () => void;
@@ -38,6 +46,13 @@ export function TopBar({
   onSave,
   onExport,
   exportLabel = "打印 / PDF",
+  canExportMarkdown,
+  canExportHtml,
+  onExportMarkdown,
+  onExportHtml,
+  updateStatus,
+  updateVersion,
+  onCheckUpdates,
   onToggleSearch,
   onSearchQueryChange,
   onSearchPrevious,
@@ -46,6 +61,15 @@ export function TopBar({
   onCycleTheme,
 }: TopBarProps) {
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
+  const updateLabel =
+    updateStatus === "checking" ? "检查中…" :
+      updateStatus === "downloading" ? "下载中…" :
+        updateStatus === "available" ? "有更新" :
+          updateStatus === "ready" ? "已更新" :
+            updateStatus === "up-to-date" ? "已是最新" : "更新";
+  const updateTitle = updateVersion
+    ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
+    : "检查应用更新";
 
   return (
     <header className="topbar">
@@ -78,9 +102,31 @@ export function TopBar({
         <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
           {themeLabel}
         </button>
+        <button
+          type="button"
+          className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
+          onClick={onCheckUpdates}
+          disabled={updateStatus === "checking" || updateStatus === "downloading"}
+          title={updateTitle}
+        >
+          {updateLabel}
+        </button>
         <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
           {exportLabel}
         </button>
+        {(canExportMarkdown || canExportHtml) && (
+          <details className="export-menu">
+            <summary className="toolbar-button" title="导出文件">导出</summary>
+            <div className="export-menu-panel">
+              {canExportMarkdown && (
+                <button type="button" onClick={onExportMarkdown}>导出 Markdown / 文本</button>
+              )}
+              {canExportHtml && (
+                <button type="button" onClick={onExportHtml}>导出 HTML</button>
+              )}
+            </div>
+          </details>
+        )}
       </nav>
 
       {searchOpen && (
