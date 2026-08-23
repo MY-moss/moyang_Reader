@@ -1,4 +1,5 @@
 import type { RecentFile, WorkspaceFile, WorkspaceSearchResult } from "../types";
+import { WorkspaceTreeView } from "./WorkspaceTree";
 
 type WorkspacePanelProps = {
   workspacePath: string | null;
@@ -19,12 +20,6 @@ type WorkspacePanelProps = {
 
 function pathName(path: string): string {
   return path.split(/[\\/]/).pop() || path;
-}
-
-function formatSize(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function WorkspacePanel({
@@ -113,18 +108,7 @@ export function WorkspacePanel({
           {workspacePath && visibleFiles.length > 0 && (
             <div className="workspace-files" aria-label="工作区文件">
               <div className="workspace-subheading">文件</div>
-              {visibleFiles.slice(0, 80).map((file) => (
-                <button
-                  type="button"
-                  className={`workspace-file ${activePath === file.path ? "active" : ""}`}
-                  key={file.path}
-                  title={`${file.relativePath} · ${formatSize(file.size)}`}
-                  onClick={() => onOpenFile(file.path)}
-                >
-                  <span>{file.name}</span>
-                  <small>{file.relativePath === file.name ? "" : file.relativePath}</small>
-                </button>
-              ))}
+              <WorkspaceTreeView files={visibleFiles} activePath={activePath} onOpenFile={onOpenFile} />
               {visibleFiles.length > 80 && <p className="muted-copy">还有 {visibleFiles.length - 80} 项，可使用搜索定位。</p>}
             </div>
           )}
