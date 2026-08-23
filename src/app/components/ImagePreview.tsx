@@ -17,7 +17,9 @@ export function ImagePreview({ name, src }: ImagePreviewProps) {
     <section className="image-preview" aria-label={`${name} 图片预览`}>
       <div className="image-toolbar">
         <span>{name}</span>
-        <a href={src} target="_blank" rel="noreferrer">在新窗口打开</a>
+        <a href={src} target="_blank" rel="noreferrer">
+          在新窗口打开
+        </a>
       </div>
       <div className="image-canvas">
         <img src={src} alt={name} />

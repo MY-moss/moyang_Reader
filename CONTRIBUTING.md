@@ -16,6 +16,14 @@ Rust 命令层测试：
 ```powershell
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+```
+
+前端静态检查：
+
+```powershell
+npm run lint
+npm run format:check
 ```
 
 依赖审计需要 npm 官方 registry：
@@ -28,8 +36,8 @@ npm audit --audit-level=high
 ## 提交前检查
 
 - 开始新任务前先查看 [Issues](https://github.com/MY-moss/moyang_Reader/issues)，避免重复修复。
-- `npm test -- --run`、`npm run test:coverage`、`npm run build` 和 `npm run test:e2e` 全部通过。
-- Rust 格式检查和测试通过。
+- `npm run lint`、`npm run format:check`、`npm test -- --run`、`npm run test:coverage`、`npm run build` 和 `npm run test:e2e` 全部通过。
+- Rust 格式、clippy 和测试通过。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
 

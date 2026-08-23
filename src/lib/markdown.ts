@@ -87,7 +87,7 @@ export async function renderMarkdown(source: string): Promise<RenderedMarkdown> 
     .use(rehypeKatex)
     .use(rehypeStringify);
   const tree = processor.parse(source);
-  const processed = await processor.run(tree) as HastRoot;
+  const processed = (await processor.run(tree)) as HastRoot;
 
   return {
     html: processor.stringify(processed),

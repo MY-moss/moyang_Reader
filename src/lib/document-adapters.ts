@@ -52,7 +52,7 @@ export async function renderHtmlFragment(source: string): Promise<RenderedMarkdo
     .use(rehypeSanitize, docxSanitizeSchema)
     .use(rehypeSlug);
   const tree = processor.parse(source);
-  const processed = await processor.run(tree) as HastRoot;
+  const processed = (await processor.run(tree)) as HastRoot;
   const html = unified().use(rehypeStringify).stringify(processed);
   const plainText = processed.children.map(textContent).join(" ");
 
@@ -72,9 +72,11 @@ export async function renderDocx(bytes: Uint8Array): Promise<RenderedMarkdown> {
   const mammothModule = await import("mammoth");
   const mammoth = mammothModule.default ?? mammothModule;
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const bufferConstructor = (globalThis as typeof globalThis & {
-    Buffer?: { from: (value: ArrayBuffer) => unknown };
-  }).Buffer;
+  const bufferConstructor = (
+    globalThis as typeof globalThis & {
+      Buffer?: { from: (value: ArrayBuffer) => unknown };
+    }
+  ).Buffer;
   const input = bufferConstructor ? { buffer: bufferConstructor.from(arrayBuffer) } : { arrayBuffer };
   const result = await mammoth.convertToHtml(input as Parameters<typeof mammoth.convertToHtml>[0]);
 

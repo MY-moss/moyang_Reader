@@ -7,7 +7,10 @@ const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 
 function comparablePath(path: string): string {
-  return path.replace(/[\\/]+/g, "\\").replace(/\\$/, "").toLocaleLowerCase();
+  return path
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\$/, "")
+    .toLocaleLowerCase();
 }
 
 export function loadWorkspacePath(): string | null {
@@ -36,14 +39,15 @@ export function loadRecentWorkspaces(): RecentWorkspace[] {
 
     const seen = new Set<string>();
     return parsed
-      .filter((item): item is RecentWorkspace => (
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as RecentWorkspace).path === "string" &&
-        typeof (item as RecentWorkspace).name === "string" &&
-        (item as RecentWorkspace).path.trim().length > 0 &&
-        (item as RecentWorkspace).name.trim().length > 0
-      ))
+      .filter(
+        (item): item is RecentWorkspace =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as RecentWorkspace).path === "string" &&
+          typeof (item as RecentWorkspace).name === "string" &&
+          (item as RecentWorkspace).path.trim().length > 0 &&
+          (item as RecentWorkspace).name.trim().length > 0,
+      )
       .filter((workspace) => {
         const key = comparablePath(workspace.path);
         if (seen.has(key)) return false;
@@ -66,10 +70,10 @@ export function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {
 
 export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
   const key = comparablePath(workspace.path);
-  const next = [
-    workspace,
-    ...loadRecentWorkspaces().filter((item) => comparablePath(item.path) !== key),
-  ].slice(0, maxRecentWorkspaces);
+  const next = [workspace, ...loadRecentWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    maxRecentWorkspaces,
+  );
   saveRecentWorkspaces(next);
   return next;
 }
@@ -81,12 +85,13 @@ export function loadRecentFiles(): RecentFile[] {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((item): item is RecentFile => (
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as RecentFile).path === "string" &&
-        typeof (item as RecentFile).name === "string"
-      ))
+      .filter(
+        (item): item is RecentFile =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as RecentFile).path === "string" &&
+          typeof (item as RecentFile).name === "string",
+      )
       .slice(0, maxRecentFiles);
   } catch {
     return [];

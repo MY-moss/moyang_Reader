@@ -44,12 +44,15 @@ describe("reader storage", () => {
   });
 
   it("filters malformed and duplicate workspace records before saving", () => {
-    localStorage.setItem("moyang-reader-recent-workspaces", JSON.stringify([
-      { path: "C:/Notes", name: "Notes" },
-      { path: "c:\\notes", name: "Duplicate" },
-      { path: "", name: "Missing path" },
-      { path: "C:/Archive", name: 42 },
-    ]));
+    localStorage.setItem(
+      "moyang-reader-recent-workspaces",
+      JSON.stringify([
+        { path: "C:/Notes", name: "Notes" },
+        { path: "c:\\notes", name: "Duplicate" },
+        { path: "", name: "Missing path" },
+        { path: "C:/Archive", name: 42 },
+      ]),
+    );
 
     expect(loadRecentWorkspaces()).toEqual([{ path: "C:/Notes", name: "Notes" }]);
 

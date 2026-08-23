@@ -63,7 +63,7 @@ describe("document adapters", () => {
   it("sanitizes converted HTML before it reaches the reader", async () => {
     const result = await renderHtmlFragment("<h1>标题</h1><script>alert('x')</script><p>正文</p>");
 
-    expect(result.html).toContain("<h1 id=\"标题\">标题</h1>");
+    expect(result.html).toContain('<h1 id="标题">标题</h1>');
     expect(result.html).not.toContain("<script");
     expect(result.toc).toEqual([{ id: "标题", depth: 1, text: "标题" }]);
   });

@@ -1,11 +1,7 @@
 import type { WorkspaceIndexEntry } from "./types";
 
 function stripLinkFragment(value: string): string {
-  return value
-    .trim()
-    .split(/[?#]/, 1)[0]
-    .trim()
-    .replace(/^<|>$/g, "");
+  return value.trim().split(/[?#]/, 1)[0].trim().replace(/^<|>$/g, "");
 }
 
 function normalizeWorkspacePath(value: string): string {
@@ -22,8 +18,7 @@ function normalizeWorkspacePath(value: string): string {
 }
 
 function withoutMarkdownExtension(value: string): string {
-  return normalizeWorkspacePath(stripLinkFragment(value))
-    .replace(/\.(?:md|markdown|mdown|mkd)$/i, "");
+  return normalizeWorkspacePath(stripLinkFragment(value)).replace(/\.(?:md|markdown|mdown|mkd)$/i, "");
 }
 
 function entryKeys(entry: WorkspaceIndexEntry): string[] {
@@ -34,9 +29,7 @@ export function linkMatchesEntry(link: string, entry: WorkspaceIndexEntry): bool
   const target = withoutMarkdownExtension(link);
   if (!target) return false;
 
-  return entryKeys(entry).some((key) => (
-    key === target || key.endsWith(`/${target}`)
-  ));
+  return entryKeys(entry).some((key) => key === target || key.endsWith(`/${target}`));
 }
 
 function directoryOf(relativePath: string): string {
@@ -56,15 +49,15 @@ export function findLinkedEntry(
 
   if (current) {
     const relativeTarget = withoutMarkdownExtension(`${directoryOf(current.file.relativePath)}/${target}`);
-    const sameFolderMatch = entries.find((entry) => (
-      withoutMarkdownExtension(entry.file.relativePath) === relativeTarget
-    ));
+    const sameFolderMatch = entries.find(
+      (entry) => withoutMarkdownExtension(entry.file.relativePath) === relativeTarget,
+    );
     if (sameFolderMatch) return sameFolderMatch;
   }
 
-  const exactMatch = entries.find((entry) => (
-    withoutMarkdownExtension(entry.file.relativePath) === withoutMarkdownExtension(target)
-  ));
+  const exactMatch = entries.find(
+    (entry) => withoutMarkdownExtension(entry.file.relativePath) === withoutMarkdownExtension(target),
+  );
   if (exactMatch) return exactMatch;
 
   return entries.find((entry) => linkMatchesEntry(target, entry));
@@ -75,7 +68,7 @@ export function findIndexEntry(entries: WorkspaceIndexEntry[], path: string): Wo
 }
 
 export function findBacklinks(entries: WorkspaceIndexEntry[], current: WorkspaceIndexEntry): WorkspaceIndexEntry[] {
-  return entries.filter((entry) => (
-    entry.file.path !== current.file.path && entry.links.some((link) => linkMatchesEntry(link, current))
-  ));
+  return entries.filter(
+    (entry) => entry.file.path !== current.file.path && entry.links.some((link) => linkMatchesEntry(link, current)),
+  );
 }
