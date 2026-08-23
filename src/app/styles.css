@@ -75,12 +75,15 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .sidebar { overflow: auto; border-right: 1px solid var(--line); background: #f0ede6; padding: 26px 18px; }
 .workspace-panel { padding-bottom: 22px; border-bottom: 1px solid var(--line); }
 .workspace-heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+.workspace-actions { display: flex; align-items: center; gap: 8px; }
+.workspace-actions .quiet-button:disabled { cursor: not-allowed; opacity: 0.45; }
 .workspace-heading h2 { margin: 7px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 18px; font-weight: 500; }
 .quiet-button { border: 0; background: transparent; color: var(--accent-deep); padding: 2px 0; font-size: 11px; }
 .quiet-button:hover { text-decoration: underline; text-underline-offset: 3px; }
 .workspace-location { display: flex; align-items: center; gap: 7px; margin-top: 14px; overflow: hidden; color: var(--ink); font-size: 11px; }
 .workspace-location span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-location small { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+.workspace-export-note { margin-top: 9px; color: var(--accent-deep); font-size: 10px; line-height: 1.5; }
 .workspace-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .workspace-help { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .workspace-search { width: 100%; margin-top: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 9px; outline: none; font-size: 11px; }

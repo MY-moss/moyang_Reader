@@ -47,7 +47,7 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
-import { buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
+import { buildBatchHtmlExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
 import {
   loadRecentFiles,
   loadWorkspacePath,
@@ -170,6 +170,8 @@ export function App() {
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
+  const [workspaceExporting, setWorkspaceExporting] = useState(false);
+  const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
@@ -980,6 +982,60 @@ export function App() {
     ? workspaceResults.filter((result) => taggedFilePaths.has(result.file.path))
     : workspaceResults;
 
+  const handleExportWorkspace = useCallback(async () => {
+    if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+
+    const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
+    const savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, "html"), "html");
+    if (!savePath) return;
+
+    setWorkspaceExporting(true);
+    setWorkspaceExportNotice(null);
+    setError(null);
+
+    let exported = 0;
+    let skipped = 0;
+    try {
+      const documents = [];
+      for (const file of visibleWorkspaceFiles) {
+        try {
+          let rendered;
+          if (file.kind === "docx") {
+            rendered = await renderDocx(await readBinaryFile(file.path));
+          } else if (file.kind === "markdown" || file.kind === "text") {
+            rendered = await renderSource(file.path, await readTextFile(file.path));
+          } else {
+            skipped += 1;
+            continue;
+          }
+
+          const body = await inlineLocalImages(
+            rendered.html,
+            (source) => {
+              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+              return resolveRelativePath(file.path, safeDecode(target));
+            },
+            readBinaryFile,
+            imageMimeType,
+          );
+          documents.push({ title: file.relativePath, body });
+          exported += 1;
+        } catch {
+          skipped += 1;
+        }
+      }
+
+      if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
+      await writeTextFile(savePath, buildBatchHtmlExport(`${workspaceName} 阅读库`, documents));
+      setWorkspaceExportNotice(`已导出 ${exported} 篇文档${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "批量导出失败。");
+    } finally {
+      setWorkspaceExporting(false);
+    }
+  }, [visibleWorkspaceFiles, workspacePath]);
+
   return (
     <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
       <TopBar
@@ -1040,6 +1096,9 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
+            onExportWorkspace={() => void handleExportWorkspace()}
+            workspaceExporting={workspaceExporting}
+            workspaceExportNotice={workspaceExportNotice}
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}

@@ -65,6 +65,7 @@ export async function inlineLocalImages(
 
   return html.replace(/\bsrc="([^"]+)"/g, (match, source: string) => {
     const replacement = replacements.get(source);
+
     return replacement ? `src="${replacement}"` : match;
   });
 }
@@ -84,7 +85,11 @@ export function buildHtmlExport(title: string, body: string): string {
     "    h1 { margin: 0 0 30px; font-size: 42px; }\n" +
     "    h2 { margin: 50px 0 16px; font-size: 29px; }\n" +
     "    h3 { margin: 35px 0 12px; font-size: 23px; }\n" +
+    "    .batch-index { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; }\n" +
+    "    .batch-index strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
+    "    .batch-index ol { margin: 0; padding-left: 22px; }\n" +
     "    p, ul, ol, blockquote, pre, table { margin: 0 0 20px; }\n" +
+    "    .batch-document + .batch-document { break-before: page; }\n" +
     "    a { color: #28655f; }\n" +
     "    img { max-width: 100%; height: auto; }\n" +
     "    blockquote { border-left: 3px solid #9abdb4; padding-left: 16px; color: #6d716b; }\n" +
@@ -99,4 +104,23 @@ export function buildHtmlExport(title: string, body: string): string {
     "  <main class=\"reader-content\">" + normalizeExportLinks(body) + "</main>\n" +
     "</body>\n" +
     "</html>\n";
+}
+
+export type HtmlExportDocument = {
+  title: string;
+  body: string;
+};
+
+export function buildBatchHtmlExport(title: string, documents: HtmlExportDocument[]): string {
+  const index = documents.map((document, index) => (
+    `<li><a href="#moyang-document-${index}">${escapeHtml(document.title)}</a></li>`
+  )).join("");
+  const content = [
+    `<nav class="batch-index"><strong>文档目录</strong><ol>${index}</ol></nav>`,
+    ...documents.map((document, index) => (
+      `<section id="moyang-document-${index}" class="batch-document"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`
+    )),
+  ].join("\n");
+
+  return buildHtmlExport(title, content);
 }

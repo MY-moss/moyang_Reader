@@ -13,6 +13,9 @@ type WorkspacePanelProps = {
   tagOptions: string[];
   selectedTag: string | null;
   onChooseWorkspace: () => void;
+  onExportWorkspace: () => void;
+  workspaceExporting: boolean;
+  workspaceExportNotice: string | null;
   onOpenFile: (path: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
@@ -34,6 +37,9 @@ export function WorkspacePanel({
   tagOptions,
   selectedTag,
   onChooseWorkspace,
+  onExportWorkspace,
+  workspaceExporting,
+  workspaceExportNotice,
   onOpenFile,
   onSearchQueryChange,
   onTagChange,
@@ -45,9 +51,19 @@ export function WorkspacePanel({
           <div className="panel-kicker">WORKSPACE</div>
           <h2 id="workspace-title">阅读库</h2>
         </div>
-        <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
-          {workspacePath ? "更换文件夹" : "添加文件夹"}
-        </button>
+        <div className="workspace-actions">
+          <button
+            type="button"
+            className="quiet-button"
+            onClick={onExportWorkspace}
+            disabled={!workspacePath || workspaceExporting || !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))}
+          >
+            {workspaceExporting ? "导出中…" : "批量导出"}
+          </button>
+          <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
+            {workspacePath ? "更换文件夹" : "添加文件夹"}
+          </button>
+        </div>
       </div>
 
       {workspacePath ? (
@@ -59,6 +75,7 @@ export function WorkspacePanel({
       ) : (
         <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
       )}
+      {workspaceExportNotice && <div className="workspace-export-note" role="status">{workspaceExportNotice}</div>}
 
       {workspacePath && (
         <>

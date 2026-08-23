@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
+import { buildBatchHtmlExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
 
 describe("document export helpers", () => {
   it("keeps the directory while changing the export extension", () => {
@@ -31,5 +31,16 @@ describe("document export helpers", () => {
     expect(reads).toEqual(["C:\\Notes\\cover.png"]);
     expect(html).toContain('src="data:image/png;base64,AAEC"');
     expect(html).toContain('src="https://example.com/remote.png"');
+  });
+  it("builds a single HTML document with a linked table of contents", () => {
+    const html = buildBatchHtmlExport("阅读库", [
+      { title: "notes/第一篇.md", body: "<p>第一篇</p>" },
+      { title: "notes/第二篇.md", body: "<p>第二篇</p>" },
+    ]);
+
+    expect(html).toContain("文档目录");
+    expect(html).toContain('href="#moyang-document-0"');
+    expect(html).toContain('id="moyang-document-1"');
+    expect(html).toContain("第二篇");
   });
 });
