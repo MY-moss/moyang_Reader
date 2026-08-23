@@ -15,6 +15,7 @@ import {
   chooseDocumentPath,
   chooseSavePath,
   chooseWorkspacePath,
+  closeWindow,
   createMarkdownFile,
   fileExists,
   fileSize,
@@ -22,10 +23,12 @@ import {
   initialPaths,
   isTauriRuntime,
   listWorkspaceFiles,
+  openExternalUrl,
   readBinaryFile,
   readTextFile,
   searchWorkspace,
   subscribeToWorkspaceChanges,
+  subscribeToCloseRequest,
   subscribeToOpenPaths,
   writeBinaryFile,
   writeTextFile,
@@ -214,6 +217,43 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isTauriRuntime() || !documentStateRef.current?.modified) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    const handleCloseRequest = () => {
+      const current = documentStateRef.current;
+      if (current?.modified && !window.confirm("当前文档有未保存修改，确定退出 Moyang Reader 吗？")) return;
+      void closeWindow().catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+      });
+    };
+
+    void subscribeToCloseRequest(handleCloseRequest).then((dispose) => {
+      if (!active) {
+        dispose?.();
+        return;
+      }
+      unlisten = dispose;
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     workspacePathRef.current = workspacePath;
@@ -608,9 +648,19 @@ export function App() {
 
     void (async () => {
       const paths = await initialPaths();
-      if (active && paths[0]) await openPath(paths[0]);
+      for (const path of [...new Set(paths)]) {
+        if (!active) break;
+        await openPath(path);
+      }
       const dispose = await subscribeToOpenPaths((nextPaths) => {
-        if (nextPaths[0]) void openPath(nextPaths[0]);
+        if (documentStateRef.current?.modified
+          && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？")) return;
+        void (async () => {
+          for (const path of [...new Set(nextPaths)]) {
+            if (!active) break;
+            await openPath(path);
+          }
+        })();
       });
       if (active) unlisten = dispose;
       else dispose?.();
@@ -989,7 +1039,23 @@ export function App() {
       return;
     }
 
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) return;
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {
+      event.preventDefault();
+      const normalized = target.startsWith("//") ? `https:${target}` : target;
+      try {
+        const externalUrl = new URL(normalized, window.location.href);
+        if (!["http:", "https:", "mailto:", "tel:"].includes(externalUrl.protocol)) {
+          setError("已阻止不受支持的外部链接协议。");
+          return;
+        }
+        void openExternalUrl(externalUrl.toString()).catch((cause) => {
+          setError(cause instanceof Error ? cause.message : "无法打开外部链接。");
+        });
+      } catch {
+        setError("无法解析这个外部链接。");
+      }
+      return;
+    }
     if (!documentState || documentState.path.startsWith("browser://")) {
       event.preventDefault();
       setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");

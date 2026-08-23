@@ -7,7 +7,7 @@ use std::sync::{
 };
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 const MARKDOWN_EXTENSIONS: [&str; 4] = ["md", "markdown", "mdown", "mkd"];
@@ -266,6 +266,16 @@ fn register_selected_path(
         .to_string();
     access.register_path(&path)?;
     Ok(Some(path_string))
+}
+
+#[tauri::command]
+pub fn close_window(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "主窗口不可用。".to_string())?;
+    window
+        .destroy()
+        .map_err(|error| format!("关闭窗口失败：{error}"))
 }
 
 #[tauri::command]

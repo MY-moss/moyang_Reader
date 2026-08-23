@@ -6,6 +6,17 @@ export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 }
 
+export async function openExternalUrl(url: string): Promise<void> {
+  const normalized = url.startsWith("//") ? `${window.location.protocol}${url}` : url;
+  if (isTauriRuntime()) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(normalized);
+    return;
+  }
+
+  window.open(normalized, "_blank", "noopener,noreferrer");
+}
+
 export async function chooseDocumentPath(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invoke<string | null>("choose_document_path");
@@ -99,6 +110,16 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
 export async function initialPaths(): Promise<string[]> {
   if (!isTauriRuntime()) return [];
   return invoke<string[]>("initial_paths");
+}
+
+export async function closeWindow(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("close_window");
+}
+
+export async function subscribeToCloseRequest(onRequest: () => void): Promise<UnlistenFn | null> {
+  if (!isTauriRuntime()) return null;
+  return listen("close-requested", () => onRequest());
 }
 
 export async function subscribeToOpenPaths(
