@@ -73,7 +73,8 @@ npm run tauri -- build
 模拟正式更新构建时，使用 Tauri CLI 支持的环境变量，不要把私钥写进项目：
 
 ~~~powershell
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw "C:\Users\HUAWEI\.moyang-reader\moyang-reader.key"
+$privateKeyPath = Join-Path $env:USERPROFILE ".moyang-reader\moyang-reader.key"
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw $privateKeyPath
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 npm run tauri -- build --config src-tauri/tauri.release.conf.json
 ~~~
