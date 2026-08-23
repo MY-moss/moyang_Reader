@@ -9,8 +9,10 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 import { visit } from "unist-util-visit";
+import type { Root as HastRoot } from "hast";
 import type { PhrasingContent, Root } from "mdast";
-import type { RenderedMarkdown, TocItem } from "../app/types";
+import type { RenderedMarkdown } from "../app/types";
+import { collectToc, escapeHtml, readingStats, textContent } from "./text";
 
 const wikiPattern = /(!?)\[\[([^\]]+)\]\]/g;
 
@@ -72,80 +74,26 @@ function remarkWikiLinks() {
   };
 }
 
-function collectToc(tree: Root): TocItem[] {
-  const toc: TocItem[] = [];
-
-  visit(tree, "heading", (node) => {
-    const text = node.children
-      .map((child) => ("value" in child ? child.value : ""))
-      .join("")
-      .trim();
-
-    if (text) {
-      toc.push({
-        id: slugify(text),
-        depth: node.depth,
-        text,
-      });
-    }
-  });
-
-  return toc;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .replace(/[\s-]+/g, "-") || "section";
-}
-
-function readingStats(source: string): Pick<RenderedMarkdown, "wordCount" | "readingMinutes"> {
-  const wordCount = source.trim() ? Array.from(source.trim()).length : 0;
-  return {
-    wordCount,
-    readingMinutes: Math.max(1, Math.ceil(wordCount / 450)),
-  };
-}
-
 export async function renderMarkdown(source: string): Promise<RenderedMarkdown> {
-  const tree = unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkFrontmatter, ["yaml", "toml"])
-    .use(remarkMath)
-    .use(remarkWikiLinks)
-    .parse(source);
-
-  const toc = collectToc(tree);
-  const processed = await unified()
+  const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkFrontmatter, ["yaml", "toml"])
     .use(remarkMath)
     .use(remarkWikiLinks)
     .use(remarkRehype)
-    .use(rehypeSlug)
     .use(rehypeSanitize, sanitizeSchema)
+    .use(rehypeSlug)
     .use(rehypeKatex)
-    .use(rehypeStringify)
-    .process(source);
+    .use(rehypeStringify);
+  const tree = processor.parse(source);
+  const processed = await processor.run(tree) as HastRoot;
 
   return {
-    html: String(processed),
-    toc,
-    ...readingStats(source),
+    html: processor.stringify(processed),
+    toc: collectToc(processed),
+    ...readingStats(processed.children.map(textContent).join(" ")),
   };
-}
-
-function escapeHtml(source: string): string {
-  return source
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 export async function renderPlainText(source: string): Promise<RenderedMarkdown> {

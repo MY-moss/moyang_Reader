@@ -1,8 +1,14 @@
-import type { RecentFile } from "./types";
+import type { RecentFile, RecentWorkspace } from "./types";
 
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
+const recentWorkspacesKey = "moyang-reader-recent-workspaces";
 const maxRecentFiles = 12;
+const maxRecentWorkspaces = 8;
+
+function comparablePath(path: string): string {
+  return path.replace(/[\\/]+/g, "\\").replace(/\\$/, "").toLocaleLowerCase();
+}
 
 export function loadWorkspacePath(): string | null {
   try {
@@ -19,6 +25,53 @@ export function saveWorkspacePath(path: string | null): void {
   } catch {
     // Local storage may be unavailable in a restricted browser preview.
   }
+}
+
+export function loadRecentWorkspaces(): RecentWorkspace[] {
+  try {
+    const raw = localStorage.getItem(recentWorkspacesKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    return parsed
+      .filter((item): item is RecentWorkspace => (
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as RecentWorkspace).path === "string" &&
+        typeof (item as RecentWorkspace).name === "string" &&
+        (item as RecentWorkspace).path.trim().length > 0 &&
+        (item as RecentWorkspace).name.trim().length > 0
+      ))
+      .filter((workspace) => {
+        const key = comparablePath(workspace.path);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxRecentWorkspaces);
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {
+  try {
+    localStorage.setItem(recentWorkspacesKey, JSON.stringify(workspaces.slice(0, maxRecentWorkspaces)));
+  } catch {
+    // Recent workspaces remain available for the current session.
+  }
+}
+
+export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
+  const key = comparablePath(workspace.path);
+  const next = [
+    workspace,
+    ...loadRecentWorkspaces().filter((item) => comparablePath(item.path) !== key),
+  ].slice(0, maxRecentWorkspaces);
+  saveRecentWorkspaces(next);
+  return next;
 }
 
 export function loadRecentFiles(): RecentFile[] {

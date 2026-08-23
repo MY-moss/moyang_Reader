@@ -85,6 +85,11 @@ export async function fileExists(path: string): Promise<boolean> {
   return invoke<boolean>("path_exists", { path });
 }
 
+export async function fileSize(path: string): Promise<number> {
+  if (!isTauriRuntime()) return 0;
+  return invoke<number>("file_size", { path });
+}
+
 export async function readTextFile(path: string): Promise<string> {
   if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");
@@ -98,8 +103,8 @@ export async function readBinaryFile(path: string): Promise<Uint8Array> {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");
   }
 
-  const bytes = await invoke<number[]>("read_binary_file", { path });
-  return Uint8Array.from(bytes);
+  const { readFile } = await import("@tauri-apps/plugin-fs");
+  return readFile(path);
 }
 
 export async function writeTextFile(path: string, contents: string): Promise<void> {

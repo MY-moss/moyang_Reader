@@ -98,7 +98,8 @@ function WorkspaceFolder({
 
 export function WorkspaceTreeView({ files, activePath, onOpenFile }: WorkspaceTreeProps) {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
-  const tree = useMemo(() => buildWorkspaceTree(files.slice(0, 80)), [files]);
+  const [showAll, setShowAll] = useState(false);
+  const tree = useMemo(() => buildWorkspaceTree(showAll ? files : files.slice(0, 80)), [files, showAll]);
 
   const toggleFolder = (path: string) => {
     setCollapsedFolders((current) => {
@@ -125,6 +126,11 @@ export function WorkspaceTreeView({ files, activePath, onOpenFile }: WorkspaceTr
           onOpenFile={onOpenFile}
         />
       ))}
+      {files.length > 80 && (
+        <button type="button" className="quiet-button" onClick={() => setShowAll((current) => !current)}>
+          {showAll ? "收起列表" : `显示全部 ${files.length} 项`}
+        </button>
+      )}
     </>
   );
 }

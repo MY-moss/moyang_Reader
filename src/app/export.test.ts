@@ -34,6 +34,29 @@ describe("document export helpers", () => {
     expect(html).toContain('src="data:image/png;base64,AAEC"');
     expect(html).toContain('src="https://example.com/remote.png"');
   });
+
+  it("skips oversized local images before reading their bytes", async () => {
+    const reads: string[] = [];
+    const sizes: string[] = [];
+    const html = await inlineLocalImages(
+      '<img src="moyang-embed:large.png">',
+      () => "C:\\Notes\\large.png",
+      async (path) => {
+        reads.push(path);
+        return Uint8Array.from([0, 1, 2]);
+      },
+      () => "image/png",
+      async (path) => {
+        sizes.push(path);
+        return 12 * 1024 * 1024 + 1;
+      },
+    );
+
+    expect(sizes).toEqual(["C:\\Notes\\large.png"]);
+    expect(reads).toEqual([]);
+    expect(html).toContain('src="moyang-embed:large.png"');
+  });
+
   it("builds a single HTML document with a linked table of contents", () => {
     const html = buildBatchHtmlExport("阅读库", [
       { title: "notes/第一篇.md", body: "<p>第一篇</p>" },

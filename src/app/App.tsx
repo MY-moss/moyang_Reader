@@ -17,6 +17,7 @@ import {
   chooseWorkspacePath,
   createMarkdownFile,
   fileExists,
+  fileSize,
   indexWorkspace,
   initialPaths,
   isTauriRuntime,
@@ -43,6 +44,7 @@ import type {
   OpenDocument,
   ReaderMode,
   RecentFile,
+  RecentWorkspace,
   ThemeMode,
   WorkspaceFile,
   WorkspaceIndexEntry,
@@ -51,9 +53,12 @@ import type {
 import { buildBatchHtmlExport, buildDocxExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension, pathWithNameSuffix } from "./export";
 import {
   loadRecentFiles,
+  loadRecentWorkspaces,
   loadWorkspacePath,
   rememberRecentFile,
+  rememberRecentWorkspace,
   saveRecentFiles,
+  saveRecentWorkspaces,
   saveWorkspacePath,
 } from "./storage";
 import {
@@ -104,16 +109,8 @@ function resolveWikiPath(basePath: string, target: string): string | null {
   return /\.[A-Za-z0-9]+$/.test(resolved) ? resolved : `${resolved}.md`;
 }
 
-function headingIdFromAnchor(anchor: string): string {
-  return anchor
-    .toLocaleLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, "")
-    .replace(/[\s-]+/g, "-") || "section";
-}
-
 function scrollToHeading(anchor: string): void {
-  const id = headingIdFromAnchor(anchor);
+  const id = safeDecode(anchor);
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -163,6 +160,7 @@ type BrowserDocument = {
   kind: DocumentKind;
   source?: string;
   bytes?: Uint8Array;
+  previewUrl?: string;
 };
 
 export function App() {
@@ -180,6 +178,7 @@ export function App() {
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
+  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
@@ -210,6 +209,7 @@ export function App() {
   const workspaceLoadRequestRef = useRef(0);
   const workspaceReloadTimerRef = useRef<number | null>(null);
   const selfWrittenPathsRef = useRef(new Map<string, number>());
+  const sourceRenderRequestRef = useRef(0);
 
   useEffect(() => {
     documentStateRef.current = documentState;
@@ -221,6 +221,16 @@ export function App() {
 
   useEffect(() => () => {
     previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    browserDocumentsRef.current.clear();
+  }, []);
+
+  const releaseBrowserDocument = useCallback((path: string) => {
+    const cached = browserDocumentsRef.current.get(path);
+    if (cached?.previewUrl) {
+      URL.revokeObjectURL(cached.previewUrl);
+      previewUrlsRef.current.delete(cached.previewUrl);
+    }
+    browserDocumentsRef.current.delete(path);
   }, []);
 
   const closePendingUpdate = useCallback(async () => {
@@ -382,6 +392,10 @@ export function App() {
       }
       setWorkspaceRevision((current) => current + 1);
       saveWorkspacePath(root);
+      setRecentWorkspaces(rememberRecentWorkspace({
+        path: root,
+        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
+      }));
       if (!silent) setError(null);
       setWorkspaceLoading(false);
 
@@ -429,6 +443,7 @@ export function App() {
       const kind = documentKindFromPath(path);
       const rendered = await renderSource(path, source);
       if (path.startsWith("browser://")) {
+        releaseBrowserDocument(path);
         browserDocumentsRef.current.set(path, { kind, source });
       }
       setDocumentState({
@@ -453,7 +468,7 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [releaseBrowserDocument]);
 
   const openBinary = useCallback(async (path: string, bytes?: Uint8Array) => {
     const kind = documentKindFromPath(path);
@@ -486,7 +501,8 @@ export function App() {
       }
 
       if (path.startsWith("browser://")) {
-        browserDocumentsRef.current.set(path, { kind, bytes });
+        releaseBrowserDocument(path);
+        browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });
       }
 
       setDocumentState({
@@ -512,7 +528,7 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [releaseBrowserDocument]);
 
   const openPath = useCallback(async (path: string) => {
     try {
@@ -637,6 +653,29 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    void Promise.all(loadRecentWorkspaces().map(async (workspace) => ({
+      workspace,
+      exists: await fileExists(workspace.path),
+    })))
+      .then((entries) => {
+        if (!active) return;
+        const validWorkspaces = entries.filter((entry) => entry.exists).map((entry) => entry.workspace);
+        setRecentWorkspaces(validWorkspaces);
+        saveRecentWorkspaces(validWorkspaces);
+      })
+      .catch(() => {
+        // A failed existence check should not prevent the reader from opening.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
 
     let active = true;
@@ -746,12 +785,33 @@ export function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [openSelectedFile, saveDocument]);
 
-  const updateSource = useCallback(async (nextSource: string) => {
-    if (!documentState || !isEditableDocument(documentState.kind)) return;
+  useEffect(() => {
+    const path = documentState?.path;
+    const kind = documentState?.kind;
+    const requestId = ++sourceRenderRequestRef.current;
+    if (mode !== "source" || !path || !kind || !isEditableDocument(kind)) return;
+
+    const nextSource = sourceDraft;
+    const timer = window.setTimeout(() => {
+      void renderSource(path, nextSource).then((rendered) => {
+        if (requestId !== sourceRenderRequestRef.current) return;
+        setDocumentState((current) => current?.path === path ? { ...current, rendered } : current);
+      }).catch((cause) => {
+        if (requestId === sourceRenderRequestRef.current) {
+          setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+        }
+      });
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [documentState?.kind, documentState?.path, mode, sourceDraft]);
+
+  const updateSource = useCallback((nextSource: string) => {
+    const current = documentStateRef.current;
+    if (!current || !isEditableDocument(current.kind)) return;
     setSourceDraft(nextSource);
-    const rendered = await renderSource(documentState.path, nextSource);
-    setDocumentState((current) => current ? { ...current, rendered, modified: nextSource !== current.source } : current);
-  }, [documentState]);
+    setDocumentState((document) => document ? { ...document, modified: nextSource !== document.source } : document);
+  }, []);
 
   const handleExport = useCallback(() => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
@@ -797,6 +857,7 @@ export function App() {
         },
         readBinaryFile,
         imageMimeType,
+        fileSize,
       )
       : documentState.rendered.html;
     const contents = buildHtmlExport(documentState.name, body);
@@ -828,6 +889,7 @@ export function App() {
           },
           readBinaryFile,
           imageMimeType,
+          fileSize,
         )
         : documentState.rendered.html;
       const contents = await buildDocxExport(documentState.name, body);
@@ -875,6 +937,7 @@ export function App() {
     if (documentState?.path === path && documentState.modified && !window.confirm("当前文档有未保存修改，关闭后将丢失这些修改。继续吗？")) return;
 
     const nextTabs = openTabs.filter((tab) => tab.path !== path);
+    if (path.startsWith("browser://")) releaseBrowserDocument(path);
     setOpenTabs(nextTabs);
     if (documentState?.path !== path) return;
 
@@ -888,7 +951,7 @@ export function App() {
       setSearchQuery("");
       setError(null);
     }
-  }, [documentState, openPath, openTabs]);
+  }, [documentState, openPath, openTabs, releaseBrowserDocument]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1115,6 +1178,7 @@ export function App() {
             },
             readBinaryFile,
             imageMimeType,
+            fileSize,
           );
           documents.push({ title: file.relativePath, body });
           exported += 1;
@@ -1203,6 +1267,7 @@ export function App() {
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}
             recentFiles={recentFiles}
+            recentWorkspaces={recentWorkspaces}
             activePath={documentState?.path ?? null}
             searchQuery={workspaceQuery}
             searchResults={visibleWorkspaceResults}
@@ -1210,6 +1275,7 @@ export function App() {
             tagOptions={availableTags}
             selectedTag={selectedTag}
             onChooseWorkspace={() => void handleChooseWorkspace()}
+            onOpenWorkspace={(path) => void loadWorkspace(path)}
             onOpenFile={(path) => void handleSelectTab(path)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}

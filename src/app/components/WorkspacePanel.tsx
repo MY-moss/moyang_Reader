@@ -1,4 +1,4 @@
-import type { RecentFile, WorkspaceFile, WorkspaceSearchResult } from "../types";
+import type { RecentFile, RecentWorkspace, WorkspaceFile, WorkspaceSearchResult } from "../types";
 import { WorkspaceTreeView } from "./WorkspaceTree";
 
 type WorkspacePanelProps = {
@@ -6,6 +6,7 @@ type WorkspacePanelProps = {
   files: WorkspaceFile[];
   visibleFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
+  recentWorkspaces: RecentWorkspace[];
   activePath: string | null;
   searchQuery: string;
   searchResults: WorkspaceSearchResult[];
@@ -13,6 +14,7 @@ type WorkspacePanelProps = {
   tagOptions: string[];
   selectedTag: string | null;
   onChooseWorkspace: () => void;
+  onOpenWorkspace: (path: string) => void;
   onExportWorkspace: () => void;
   workspaceExporting: boolean;
   workspaceExportNotice: string | null;
@@ -31,6 +33,7 @@ export function WorkspacePanel({
   files,
   visibleFiles,
   recentFiles,
+  recentWorkspaces,
   activePath,
   searchQuery,
   searchResults,
@@ -38,6 +41,7 @@ export function WorkspacePanel({
   tagOptions,
   selectedTag,
   onChooseWorkspace,
+  onOpenWorkspace,
   onExportWorkspace,
   workspaceExporting,
   workspaceExportNotice,
@@ -129,12 +133,29 @@ export function WorkspacePanel({
             <div className="workspace-files" aria-label="工作区文件">
               <div className="workspace-subheading">文件</div>
               <WorkspaceTreeView files={visibleFiles} activePath={activePath} onOpenFile={onOpenFile} />
-              {visibleFiles.length > 80 && <p className="muted-copy">还有 {visibleFiles.length - 80} 项，可使用搜索定位。</p>}
             </div>
           )}
 
           {workspacePath && visibleFiles.length === 0 && (
             <p className="muted-copy">当前标签下没有文件。</p>
+          )}
+
+          {!workspacePath && recentWorkspaces.length > 0 && (
+            <div className="workspace-files recent-files" aria-label="最近阅读库">
+              <div className="workspace-subheading">最近阅读库</div>
+              {recentWorkspaces.map((workspace) => (
+                <button
+                  type="button"
+                  className="workspace-file"
+                  key={workspace.path}
+                  title={workspace.path}
+                  onClick={() => onOpenWorkspace(workspace.path)}
+                >
+                  <span>{workspace.name}</span>
+                  <small>{workspace.path}</small>
+                </button>
+              ))}
+            </div>
           )}
 
           {!workspacePath && recentFiles.length > 0 && (

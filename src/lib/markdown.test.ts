@@ -11,6 +11,15 @@ describe("renderMarkdown", () => {
     expect(result.toc).toEqual([{ id: "标题", depth: 1, text: "标题" }]);
   });
 
+  it("keeps TOC ids identical to rendered heading ids", async () => {
+    const result = await renderMarkdown("## API v2.0\n\n## Notes\n\n## Notes");
+    const document = new DOMParser().parseFromString(`<div>${result.html}</div>`, "text/html");
+    const headingIds = Array.from(document.querySelectorAll("h2"), (heading) => heading.id);
+
+    expect(result.toc.map((item) => item.id)).toEqual(headingIds);
+    expect(headingIds).toEqual(["api-v20", "notes", "notes-1"]);
+  });
+
   it("renders wiki links without executing arbitrary HTML", async () => {
     const result = await renderMarkdown("[[第二篇|下一篇]]\n\n<script>alert('x')</script>");
 

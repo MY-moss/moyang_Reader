@@ -9,6 +9,7 @@ const TEXT_EXTENSIONS: [&str; 3] = ["txt", "text", "log"];
 const DOCX_EXTENSIONS: [&str; 1] = ["docx"];
 const PDF_EXTENSIONS: [&str; 1] = ["pdf"];
 const IMAGE_EXTENSIONS: [&str; 7] = ["avif", "gif", "jpeg", "jpg", "png", "svg", "webp"];
+const MAX_READ_FILE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_SEARCH_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_INDEX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -39,6 +40,9 @@ pub struct WorkspaceIndexEntry {
 
 fn decode_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.starts_with(&[0xFF, 0xFE]) {
+        if (bytes.len() - 2) % 2 != 0 {
+            return Err("UTF-16 文件末尾存在不完整的字节，无法安全读取。".to_string());
+        }
         let values = bytes[2..]
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
@@ -47,6 +51,9 @@ fn decode_text(bytes: &[u8]) -> Result<String, String> {
     }
 
     if bytes.starts_with(&[0xFE, 0xFF]) {
+        if (bytes.len() - 2) % 2 != 0 {
+            return Err("UTF-16 文件末尾存在不完整的字节，无法安全读取。".to_string());
+        }
         let values = bytes[2..]
             .chunks_exact(2)
             .map(|pair| u16::from_be_bytes([pair[0], pair[1]]));
@@ -83,18 +90,24 @@ pub fn initial_paths() -> Vec<String> {
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
     let path = PathBuf::from(path);
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+    if metadata.len() > MAX_READ_FILE_BYTES {
+        return Err("文件过大，暂不支持直接打开超过 100 MB 的文本文件。".to_string());
+    }
     let bytes = fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))?;
     decode_text(&bytes)
 }
 
 #[tauri::command]
-pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
-    fs::read(PathBuf::from(path)).map_err(|error| format!("无法读取二进制文档：{error}"))
+pub fn path_exists(path: String) -> bool {
+    Path::new(&path).exists()
 }
 
 #[tauri::command]
-pub fn path_exists(path: String) -> bool {
-    Path::new(&path).is_file()
+pub fn file_size(path: String) -> Result<u64, String> {
+    fs::metadata(PathBuf::from(path))
+        .map(|metadata| metadata.len())
+        .map_err(|error| format!("无法读取文件信息：{error}"))
 }
 
 fn extension(path: &Path) -> Option<String> {
@@ -286,6 +299,30 @@ fn is_external_link(target: &str) -> bool {
         || target.starts_with("//")
 }
 
+fn markdown_link_end(source: &str, content_start: usize) -> Option<usize> {
+    let mut depth = 1;
+    let mut escaped = false;
+    for (offset, character) in source[content_start..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if character == '(' {
+            depth += 1;
+        } else if character == ')' {
+            depth -= 1;
+            if depth == 0 {
+                return Some(content_start + offset);
+            }
+        }
+    }
+    None
+}
+
 fn extract_markdown_links(source: &str) -> Vec<String> {
     let mut links = Vec::new();
     let mut cursor = 0;
@@ -300,10 +337,9 @@ fn extract_markdown_links(source: &str) -> Vec<String> {
             })
             .unwrap_or(false);
         let content_start = marker + 2;
-        let Some(end_offset) = source[content_start..].find(')') else {
+        let Some(end) = markdown_link_end(source, content_start) else {
             break;
         };
-        let end = content_start + end_offset;
         let mut target = source[content_start..end].trim();
         if let Some(stripped) = target.strip_prefix('<') {
             target = stripped.split('>').next().unwrap_or_default().trim();
@@ -379,8 +415,8 @@ fn extract_tags(source: &str) -> Vec<String> {
             }
         }
 
-        for token in trimmed.split_whitespace() {
-            if token.starts_with('#') {
+        if trimmed.starts_with('#') && !trimmed.starts_with("# ") && !trimmed.starts_with("#\t") {
+            for token in trimmed.split_whitespace() {
                 if let Some(tag) = clean_tag(token) {
                     push_unique(&mut tags, tag);
                 }
@@ -398,6 +434,44 @@ fn fallback_title(file: &WorkspaceFile) -> String {
         .unwrap_or_else(|| file.name.clone())
 }
 
+fn clean_title(value: &str) -> Option<String> {
+    let title = value
+        .trim()
+        .trim_end_matches('#')
+        .trim()
+        .trim_matches(|character| matches!(character, '"' | '\''))
+        .trim();
+    (!title.is_empty()).then(|| title.to_string())
+}
+
+fn atx_title(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let hash_count = trimmed
+        .chars()
+        .take_while(|character| *character == '#')
+        .count();
+    if !(1..=6).contains(&hash_count) {
+        return None;
+    }
+
+    let rest = trimmed.get(hash_count..)?;
+    if !rest
+        .as_bytes()
+        .first()
+        .is_some_and(|character| *character == b' ' || *character == b'\t')
+    {
+        return None;
+    }
+    clean_title(rest)
+}
+
+fn is_setext_underline(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.len() >= 3
+        && (trimmed.chars().all(|character| character == '=')
+            || trimmed.chars().all(|character| character == '-'))
+}
+
 fn display_path(path: &Path) -> String {
     let value = path.to_string_lossy();
     value
@@ -407,16 +481,36 @@ fn display_path(path: &Path) -> String {
 }
 
 fn extract_title(source: &str, file: &WorkspaceFile) -> String {
-    source
-        .lines()
-        .map(str::trim)
-        .find_map(|line| {
-            line.strip_prefix("# ")
-                .map(str::trim)
-                .filter(|title| !title.is_empty())
-        })
-        .map(str::to_string)
-        .unwrap_or_else(|| fallback_title(file))
+    let lines = source.lines().collect::<Vec<_>>();
+    if let Some(first) = lines.first().map(|line| line.trim()) {
+        if first == "---" || first == "+++" {
+            for line in lines.iter().skip(1) {
+                let trimmed = line.trim();
+                if trimmed == first {
+                    break;
+                }
+                if let Some(value) = trimmed.strip_prefix("title:").and_then(clean_title) {
+                    return value;
+                }
+            }
+        }
+    }
+
+    for (index, line) in lines.iter().enumerate() {
+        if let Some(title) = atx_title(line) {
+            return title;
+        }
+        if index + 1 < lines.len()
+            && !line.trim().is_empty()
+            && is_setext_underline(lines[index + 1])
+        {
+            if let Some(title) = clean_title(line) {
+                return title;
+            }
+        }
+    }
+
+    fallback_title(file)
 }
 
 fn markdown_extension(extension: Option<&str>) -> bool {
@@ -608,8 +702,10 @@ pub fn write_text_file(path: String, contents: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_markdown_file, index_workspace, is_supported_document_path, is_supported_text_path,
-        list_workspace_files, path_exists, search_workspace, should_skip_directory,
+        create_markdown_file, decode_text, extract_title, index_workspace,
+        is_supported_document_path, is_supported_text_path, list_workspace_files, path_exists,
+        read_text_file, search_workspace, should_skip_directory, WorkspaceFile,
+        MAX_READ_FILE_BYTES,
     };
     use std::fs;
     use std::path::Path;
@@ -625,6 +721,56 @@ mod tests {
         assert!(is_supported_document_path(Path::new("notes/Guide.PDF")));
         assert!(is_supported_document_path(Path::new("notes/Cover.PNG")));
         assert!(!is_supported_document_path(Path::new("notes/Guide.doc")));
+    }
+
+    #[test]
+    fn decodes_utf16_and_rejects_incomplete_trailing_bytes() {
+        assert_eq!(
+            decode_text(&[0xFF, 0xFE, b'A', 0]).expect("decode UTF-16LE"),
+            "A"
+        );
+        assert_eq!(
+            decode_text(&[0xFE, 0xFF, 0, b'A']).expect("decode UTF-16BE"),
+            "A"
+        );
+        assert!(decode_text(&[0xFF, 0xFE, b'A']).is_err());
+        assert_eq!(
+            decode_text("你好".as_bytes()).expect("decode UTF-8"),
+            "你好"
+        );
+    }
+
+    #[test]
+    fn extracts_titles_from_frontmatter_atx_and_setext_headings() {
+        let file = WorkspaceFile {
+            path: "C:/Notes/fallback.md".to_string(),
+            name: "fallback.md".to_string(),
+            relative_path: "fallback.md".to_string(),
+            size: 0,
+            kind: "markdown".to_string(),
+        };
+        assert_eq!(
+            extract_title("## Second-level title", &file),
+            "Second-level title"
+        );
+        assert_eq!(extract_title("Setext title\n===\n", &file), "Setext title");
+        assert_eq!(
+            extract_title("---\ntitle: \"Frontmatter title\"\n---\n# Heading", &file),
+            "Frontmatter title"
+        );
+        assert_eq!(extract_title("body only", &file), "fallback");
+    }
+
+    #[test]
+    fn rejects_text_files_over_the_read_limit() {
+        let path = std::env::temp_dir().join(format!("moyang-reader-large-{}", std::process::id()));
+        let file = fs::File::create(&path).expect("create sparse file");
+        file.set_len(MAX_READ_FILE_BYTES + 1)
+            .expect("grow sparse file");
+        let error =
+            read_text_file(path.to_string_lossy().into_owned()).expect_err("reject large file");
+        assert!(error.contains("100 MB"));
+        fs::remove_file(path).expect("remove sparse file");
     }
 
     #[test]
@@ -650,7 +796,7 @@ mod tests {
         fs::write(notes.join("Cover.png"), [6_u8, 7, 8]).expect("write image attachment");
         fs::write(
             notes.join("Linked.md"),
-            "# Linked note\n\ntags: [front]\n\n[[README]] #topic\n\n[Second](Second.MARKDOWN#Heading) ![cover](Cover.png) [web](https://example.com)",
+            "# Linked note\n\ntags: [front]\n\n#topic\n\n[[README]] #inline\n\n[Second](Second.MARKDOWN#Heading) [Guide](docs/Guide(2026).md) ![cover](Cover.png) [web](https://example.com)",
         )
         .expect("write linked document");
         fs::write(generated.join("ignored.md"), "needle").expect("write ignored document");
@@ -670,12 +816,17 @@ mod tests {
             .find(|entry| entry.file.name == "Linked.md")
             .expect("find linked document");
         assert_eq!(linked.title, "Linked note");
-        assert_eq!(linked.links, vec!["README", "Second.MARKDOWN#Heading"]);
+        assert_eq!(
+            linked.links,
+            vec!["README", "Second.MARKDOWN#Heading", "docs/Guide(2026).md"]
+        );
         assert!(linked.tags.iter().any(|tag| tag == "front"));
         assert!(linked.tags.iter().any(|tag| tag == "topic"));
+        assert!(!linked.tags.iter().any(|tag| tag == "inline"));
         assert!(path_exists(
             root.join("README.md").to_string_lossy().into_owned()
         ));
+        assert!(path_exists(root.to_string_lossy().into_owned()));
         assert!(!path_exists(
             root.join("missing.md").to_string_lossy().into_owned()
         ));

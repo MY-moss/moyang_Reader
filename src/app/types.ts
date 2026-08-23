@@ -29,6 +29,11 @@ export type RecentFile = {
   name: string;
 };
 
+export type RecentWorkspace = {
+  path: string;
+  name: string;
+};
+
 export type TocItem = {
   id: string;
   depth: number;

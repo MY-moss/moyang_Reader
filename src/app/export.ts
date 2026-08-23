@@ -1,4 +1,6 @@
 
+import { escapeHtml } from "../lib/text";
+
 export function fileNameWithExtension(name: string, extension: string): string {
   const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
   return baseName + "." + extension;
@@ -17,15 +19,6 @@ export function pathWithNameSuffix(path: string, suffix: string, extension: stri
   const name = separator >= 0 ? path.slice(separator + 1) : path;
   const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
   return directory + baseName + suffix + "." + extension;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 function normalizeExportLinks(html: string): string {
@@ -54,6 +47,7 @@ export async function inlineLocalImages(
   resolveLocalPath: (source: string) => string | null,
   readBinary: (path: string) => Promise<Uint8Array>,
   mimeTypeForPath: (path: string) => string,
+  getSize?: (path: string) => Promise<number>,
 ): Promise<string> {
   const sources = Array.from(html.matchAll(/\bsrc="([^"]+)"/g), (match) => match[1]);
   const replacements = new Map<string, string>();
@@ -63,6 +57,7 @@ export async function inlineLocalImages(
     if (!localPath) return;
 
     try {
+      if (getSize && await getSize(localPath) > MAX_INLINE_IMAGE_BYTES) return;
       const bytes = await readBinary(localPath);
       if (bytes.length > MAX_INLINE_IMAGE_BYTES) return;
       replacements.set(source, `data:${mimeTypeForPath(localPath)};base64,${bytesToBase64(bytes)}`);

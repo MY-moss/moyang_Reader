@@ -38,8 +38,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::initial_paths,
             commands::read_text_file,
-            commands::read_binary_file,
             commands::path_exists,
+            commands::file_size,
             commands::write_text_file,
             commands::create_markdown_file,
             commands::list_workspace_files,

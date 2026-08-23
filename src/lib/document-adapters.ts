@@ -3,9 +3,9 @@ import rehypeParse from "rehype-parse";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
-import { visit } from "unist-util-visit";
-import type { Root as HastRoot, RootContent } from "hast";
-import type { DocumentKind, RenderedMarkdown, TocItem } from "../app/types";
+import type { Root as HastRoot } from "hast";
+import type { DocumentKind, RenderedMarkdown } from "../app/types";
+import { collectToc, readingStats, textContent } from "./text";
 
 const docxSanitizeSchema = {
   ...defaultSchema,
@@ -44,33 +44,6 @@ export function imageMimeType(path: string): string {
 
 export function isEditableDocument(kind: DocumentKind): boolean {
   return kind === "markdown" || kind === "text";
-}
-
-function readingStats(text: string): Pick<RenderedMarkdown, "wordCount" | "readingMinutes"> {
-  const wordCount = text.trim() ? Array.from(text.trim()).length : 0;
-  return {
-    wordCount,
-    readingMinutes: wordCount ? Math.max(1, Math.ceil(wordCount / 450)) : 0,
-  };
-}
-
-function textContent(node: RootContent): string {
-  if (node.type === "text") return node.value;
-  if ("children" in node) return node.children.map(textContent).join("");
-  return "";
-}
-
-function collectToc(tree: HastRoot): TocItem[] {
-  const toc: TocItem[] = [];
-
-  visit(tree, "element", (node) => {
-    if (!/^h[1-4]$/.test(node.tagName)) return;
-    const text = node.children.map(textContent).join("").trim();
-    const id = typeof node.properties?.id === "string" ? node.properties.id : "section";
-    if (text) toc.push({ id, depth: Number(node.tagName.slice(1)), text });
-  });
-
-  return toc;
 }
 
 export async function renderHtmlFragment(source: string): Promise<RenderedMarkdown> {
