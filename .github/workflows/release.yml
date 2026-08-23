@@ -34,6 +34,8 @@ jobs:
         run: |
           npm test -- --run
           npm run build
+          npm run release:check
+          npm run test:release
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
           cargo test --manifest-path src-tauri/Cargo.toml
 

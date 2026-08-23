@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tauri": "tauri"
+    "test:release": "node --test scripts/release-check.test.mjs",
+    "tauri": "tauri",
+    "release:check": "node scripts/release-check.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

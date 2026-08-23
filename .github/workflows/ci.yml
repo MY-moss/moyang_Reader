@@ -32,6 +32,12 @@ jobs:
       - name: Frontend build
         run: npm run build
 
+      - name: Release metadata check
+        run: npm run release:check
+
+      - name: Release preflight tests
+        run: npm run test:release
+
       - name: Rust format
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
