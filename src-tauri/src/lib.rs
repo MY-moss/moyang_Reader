@@ -7,6 +7,7 @@ use tauri::{Emitter, Manager};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .manage(commands::AccessRegistry::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let paths = argv
                 .into_iter()
@@ -37,6 +38,7 @@ pub fn run() {
     builder
         .invoke_handler(tauri::generate_handler![
             commands::initial_paths,
+            commands::register_path,
             commands::read_text_file,
             commands::path_exists,
             commands::file_size,

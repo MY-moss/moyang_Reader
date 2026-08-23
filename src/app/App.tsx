@@ -24,6 +24,7 @@ import {
   listWorkspaceFiles,
   readBinaryFile,
   readTextFile,
+  registerPath,
   searchWorkspace,
   subscribeToWorkspaceChanges,
   subscribeToOpenPaths,
@@ -378,6 +379,7 @@ export function App() {
     setWorkspaceLoading(true);
     setWorkspaceIndexLoading(true);
     try {
+      await registerPath(root);
       const files = await listWorkspaceFiles(root);
       if (requestId !== workspaceLoadRequestRef.current) return;
 
@@ -543,6 +545,7 @@ export function App() {
         return;
       }
 
+      await registerPath(path);
       const kind = documentKindFromPath(path);
       if (kind === "docx" || kind === "pdf" || kind === "image") {
         await openBinary(path, kind === "docx" ? await readBinaryFile(path) : undefined);

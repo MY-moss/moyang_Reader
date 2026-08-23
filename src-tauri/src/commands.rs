@@ -1,8 +1,10 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::Serialize;
+use tauri::State;
 
 const MARKDOWN_EXTENSIONS: [&str; 4] = ["md", "markdown", "mdown", "mkd"];
 const TEXT_EXTENSIONS: [&str; 3] = ["txt", "text", "log"];
@@ -12,6 +14,77 @@ const IMAGE_EXTENSIONS: [&str; 7] = ["avif", "gif", "jpeg", "jpg", "png", "svg",
 const MAX_READ_FILE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_SEARCH_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_INDEX_FILE_BYTES: u64 = 4 * 1024 * 1024;
+
+#[derive(Default)]
+pub struct AccessRegistry {
+    entries: Mutex<Vec<PathBuf>>,
+}
+
+impl AccessRegistry {
+    fn register_path(&self, path: &Path) -> Result<(), String> {
+        let normalized = normalize_access_path(path)?;
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| "文件访问状态不可用。".to_string())?;
+
+        if entries
+            .iter()
+            .any(|entry| access_path_contains(entry, &normalized))
+        {
+            return Ok(());
+        }
+
+        entries.retain(|entry| !access_path_contains(&normalized, entry));
+        entries.push(normalized);
+        Ok(())
+    }
+
+    fn is_allowed(&self, path: &Path) -> bool {
+        let Ok(normalized) = normalize_access_path(path) else {
+            return false;
+        };
+        self.entries
+            .lock()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .any(|entry| access_path_contains(entry, &normalized))
+            })
+            .unwrap_or(false)
+    }
+}
+
+fn normalize_access_path(path: &Path) -> Result<PathBuf, String> {
+    if path.exists() {
+        return fs::canonicalize(path).map_err(|error| format!("无法确认文件路径：{error}"));
+    }
+
+    let parent = path
+        .parent()
+        .ok_or_else(|| "文件路径没有可确认的父目录。".to_string())?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| "文件名无法解析。".to_string())?;
+    Ok(fs::canonicalize(parent)
+        .map_err(|error| format!("无法确认文件父目录：{error}"))?
+        .join(file_name))
+}
+
+fn access_path_contains(root: &Path, candidate: &Path) -> bool {
+    let root = access_path_key(root);
+    let candidate = access_path_key(candidate);
+    candidate == root || candidate.starts_with(&(root.trim_end_matches('/').to_string() + "/"))
+}
+
+fn access_path_key(path: &Path) -> String {
+    let value = path.to_string_lossy().replace('\\', "/");
+    if cfg!(windows) {
+        value.to_ascii_lowercase()
+    } else {
+        value
+    }
+}
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -78,13 +151,22 @@ fn decode_text(bytes: &[u8]) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn initial_paths() -> Vec<String> {
-    std::env::args()
+pub fn initial_paths(access: State<'_, AccessRegistry>) -> Vec<String> {
+    let paths = std::env::args()
         .skip(1)
         .filter(|argument| {
             Path::new(argument).is_file() && is_supported_document_path(Path::new(argument))
         })
-        .collect()
+        .collect::<Vec<_>>();
+    for path in &paths {
+        let _ = access.register_path(Path::new(path));
+    }
+    paths
+}
+
+#[tauri::command]
+pub fn register_path(path: String, access: State<'_, AccessRegistry>) -> Result<(), String> {
+    access.register_path(Path::new(&path))
 }
 
 #[tauri::command]
@@ -664,8 +746,19 @@ pub fn index_workspace(root: String) -> Result<Vec<WorkspaceIndexEntry>, String>
 }
 
 #[tauri::command]
-pub fn write_text_file(path: String, contents: String) -> Result<(), String> {
+pub fn write_text_file(
+    path: String,
+    contents: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
     let path = PathBuf::from(path);
+    if !access.is_allowed(&path) {
+        return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
+    write_text_file_inner(path, contents)
+}
+
+fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "文件路径没有父目录。".to_string())?;
@@ -704,7 +797,7 @@ mod tests {
     use super::{
         create_markdown_file, decode_text, extract_title, index_workspace,
         is_supported_document_path, is_supported_text_path, list_workspace_files, path_exists,
-        read_text_file, search_workspace, should_skip_directory, WorkspaceFile,
+        read_text_file, search_workspace, should_skip_directory, AccessRegistry, WorkspaceFile,
         MAX_READ_FILE_BYTES,
     };
     use std::fs;
@@ -721,6 +814,28 @@ mod tests {
         assert!(is_supported_document_path(Path::new("notes/Guide.PDF")));
         assert!(is_supported_document_path(Path::new("notes/Cover.PNG")));
         assert!(!is_supported_document_path(Path::new("notes/Guide.doc")));
+    }
+
+    #[test]
+    fn access_registry_limits_writes_to_registered_paths() {
+        let root =
+            std::env::temp_dir().join(format!("moyang-reader-access-{}", std::process::id()));
+        let vault = root.join("vault");
+        let note = vault.join("note.md");
+        let outside = root.join("outside.md");
+        fs::create_dir_all(&vault).expect("create access test directory");
+        fs::write(&note, "note").expect("write access test note");
+
+        let access = AccessRegistry::default();
+        access
+            .register_path(&vault)
+            .expect("register selected directory");
+
+        assert!(access.is_allowed(&note));
+        assert!(access.is_allowed(&vault.join("new.md")));
+        assert!(!access.is_allowed(&outside));
+
+        fs::remove_dir_all(root).expect("remove access test directory");
     }
 
     #[test]

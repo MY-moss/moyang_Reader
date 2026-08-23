@@ -21,7 +21,9 @@ export async function chooseDocumentPath(): Promise<string | null> {
     ],
   });
 
-  return typeof selected === "string" ? selected : null;
+  if (typeof selected !== "string") return null;
+  await registerPath(selected);
+  return selected;
 }
 
 export async function chooseWorkspacePath(): Promise<string | null> {
@@ -29,7 +31,9 @@ export async function chooseWorkspacePath(): Promise<string | null> {
 
   const { open } = await import("@tauri-apps/plugin-dialog");
   const selected = await open({ directory: true, multiple: false });
-  return typeof selected === "string" ? selected : null;
+  if (typeof selected !== "string") return null;
+  await registerPath(selected);
+  return selected;
 }
 
 export async function chooseSavePath(defaultPath: string, format: "markdown" | "html" | "docx"): Promise<string | null> {
@@ -41,11 +45,13 @@ export async function chooseSavePath(defaultPath: string, format: "markdown" | "
     : format === "docx"
       ? { name: "Word 文档", extensions: ["docx"] }
       : { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] };
-  return save({
+  const selected = await save({
     title: format === "html" ? "导出 HTML" : format === "docx" ? "导出 Word" : "导出 Markdown",
     defaultPath,
     filters: [options],
   });
+  if (selected) await registerPath(selected);
+  return selected;
 }
 
 export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]> {
@@ -83,6 +89,11 @@ export async function subscribeToWorkspaceChanges(
 export async function fileExists(path: string): Promise<boolean> {
   if (!isTauriRuntime()) return false;
   return invoke<boolean>("path_exists", { path });
+}
+
+export async function registerPath(path: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("register_path", { path });
 }
 
 export async function fileSize(path: string): Promise<number> {
