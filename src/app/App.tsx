@@ -47,7 +47,7 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
-import { buildHtmlExport, fileNameWithExtension, pathWithExtension } from "./export";
+import { buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
 import {
   loadRecentFiles,
   loadWorkspacePath,
@@ -726,7 +726,19 @@ export function App() {
   const handleExportHtml = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
 
-    const contents = buildHtmlExport(documentState.name, documentState.rendered.html);
+    const body = isTauriRuntime()
+      ? await inlineLocalImages(
+        documentState.rendered.html,
+        (source) => {
+          const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+          if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+          return resolveRelativePath(documentState.path, safeDecode(target));
+        },
+        readBinaryFile,
+        imageMimeType,
+      )
+      : documentState.rendered.html;
+    const contents = buildHtmlExport(documentState.name, body);
     try {
       if (isTauriRuntime()) {
         const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");

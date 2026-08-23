@@ -30,6 +30,45 @@ function normalizeExportLinks(html: string): string {
     });
 }
 
+const MAX_INLINE_IMAGE_BYTES = 12 * 1024 * 1024;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+export async function inlineLocalImages(
+  html: string,
+  resolveLocalPath: (source: string) => string | null,
+  readBinary: (path: string) => Promise<Uint8Array>,
+  mimeTypeForPath: (path: string) => string,
+): Promise<string> {
+  const sources = Array.from(html.matchAll(/\bsrc="([^"]+)"/g), (match) => match[1]);
+  const replacements = new Map<string, string>();
+
+  await Promise.all(Array.from(new Set(sources)).map(async (source) => {
+    const localPath = resolveLocalPath(source);
+    if (!localPath) return;
+
+    try {
+      const bytes = await readBinary(localPath);
+      if (bytes.length > MAX_INLINE_IMAGE_BYTES) return;
+      replacements.set(source, `data:${mimeTypeForPath(localPath)};base64,${bytesToBase64(bytes)}`);
+    } catch {
+      // Keep an unreadable local image as a relative link so export still succeeds.
+    }
+  }));
+
+  return html.replace(/\bsrc="([^"]+)"/g, (match, source: string) => {
+    const replacement = replacements.get(source);
+    return replacement ? `src="${replacement}"` : match;
+  });
+}
+
 export function buildHtmlExport(title: string, body: string): string {
   return "<!doctype html>\n" +
     "<html lang=\"zh-CN\">\n" +

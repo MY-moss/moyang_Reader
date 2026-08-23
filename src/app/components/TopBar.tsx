@@ -122,7 +122,7 @@ export function TopBar({
                 <button type="button" onClick={onExportMarkdown}>导出 Markdown / 文本</button>
               )}
               {canExportHtml && (
-                <button type="button" onClick={onExportHtml}>导出 HTML</button>
+                <button type="button" onClick={onExportHtml}>导出 HTML（含图片）</button>
               )}
             </div>
           </details>
