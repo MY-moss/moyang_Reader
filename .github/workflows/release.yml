@@ -13,6 +13,8 @@ jobs:
   publish:
     name: Build and publish Windows update
     runs-on: windows-latest
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +35,11 @@ jobs:
         shell: pwsh
         run: |
           npm test -- --run
+          npm run test:coverage
           npm run build
+          npx playwright install chromium
+          npm run test:e2e
+          npm audit --audit-level=high
           npm run release:check
           npm run test:release
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

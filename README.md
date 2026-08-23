@@ -43,7 +43,9 @@ v0.5.1 关系与发布增强版，继续基于轻量本地阅读核心完善：
 ```powershell
 npm install
 npm run test
+npm run test:coverage
 npm run build
+npm run test:e2e
 npm run tauri dev
 ```
 
@@ -58,6 +60,8 @@ npm run tauri dev
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd` 文件关联。DOCX/PDF 当前支持在应用内选择、拖放和通过启动参数打开，但不会抢占 Word/PDF 的系统默认关联。
 
 更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。当前版本的 PDF 交付方式是系统打印对话框中的“保存为 PDF”；真正的 PDF 模板和批量 PDF 导出列入后续版本。
+
+贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 后续版本路线
 

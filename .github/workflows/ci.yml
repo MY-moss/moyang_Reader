@@ -10,6 +10,8 @@ jobs:
   quality:
     name: Quality checks
     runs-on: windows-latest
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,8 +31,20 @@ jobs:
       - name: Frontend tests
         run: npm test -- --run
 
+      - name: Frontend coverage gate
+        run: npm run test:coverage
+
       - name: Frontend build
         run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Browser smoke test
+        run: npm run test:e2e
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
 
       - name: Release metadata check
         run: npm run release:check

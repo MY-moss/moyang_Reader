@@ -1,6 +1,8 @@
 node_modules/
 .npm-cache/
 dist/
+coverage/
+test-results/
 .vite/
 src-tauri/target/
 src-tauri/gen/

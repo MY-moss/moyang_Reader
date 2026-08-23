@@ -4,7 +4,7 @@
 
 Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
 
-1. 发布者给 main 打一个 v0.5.0 形式的版本标签。
+1. 发布者给 main 打一个 vX.Y.Z 形式的版本标签，例如 v0.5.1。
 2. GitHub Actions 在 Windows runner 上运行测试、构建并生成 NSIS 安装包。
 3. 构建时使用 GitHub Secrets 中的私钥给更新包签名。
 4. tauri-action 将安装包、.sig 签名和 latest.json 上传到 Release。
@@ -21,13 +21,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 更新私钥不能提交到仓库，也不能写进 workflow 文件。
 
-本机当前生成的私钥文件位于：
-
-C:\Users\HUAWEI\.moyang-reader\moyang-reader.key
-
 在 GitHub 仓库的 Settings → Secrets and variables → Actions 添加：
 
-- TAURI_SIGNING_PRIVATE_KEY：粘贴上面私钥文件的完整内容。
+- TAURI_SIGNING_PRIVATE_KEY：粘贴本机安全保存的私钥文件完整内容。
 - TAURI_SIGNING_PRIVATE_KEY_PASSWORD：当前密钥未设置密码，暂时留空；正式公开发布前建议重新生成带密码的密钥并更新公钥。
 
 当前公钥已经写入 src-tauri/tauri.conf.json，公钥可以公开，私钥和密码绝不能公开。
@@ -39,9 +35,9 @@ C:\Users\HUAWEI\.moyang-reader\moyang-reader.key
 确认代码已经合并到 main 后：
 
 ~~~powershell
-git tag -a v0.5.0 -m "Release v0.5.0"
+git tag -a v0.5.1 -m "Release v0.5.1"
 git push origin main
-git push origin v0.5.0
+git push origin v0.5.1
 ~~~
 
 只推送版本标签会触发 Release workflow。建议先推送 main，确认 CI 通过，再推送标签。
