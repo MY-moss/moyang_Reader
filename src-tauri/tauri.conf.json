@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Moyang Reader",
+  "version": "0.4.0",
+  "identifier": "com.moyang.reader",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Moyang Reader",
+        "width": 1240,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http: https: data:; frame-src 'self' asset: http: https: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "name": "Markdown 文档",
+        "description": "使用 Moyang Reader 阅读 Markdown 文档",
+        "role": "Editor",
+        "mimeType": "text/markdown"
+      }
+    ]
+  }
+}

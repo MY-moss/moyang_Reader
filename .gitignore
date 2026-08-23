@@ -1,0 +1,9 @@
+node_modules/
+.npm-cache/
+dist/
+.vite/
+src-tauri/target/
+src-tauri/gen/
+*.tsbuildinfo
+.idea/
+.vscode/
