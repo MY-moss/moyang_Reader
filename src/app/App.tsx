@@ -64,6 +64,7 @@ import {
   renderSource,
 } from "../lib/document-adapters";
 import { findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
+import { isCurrentWorkspaceLoad, isSelfWrittenChangePending } from "./workspace-refresh";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -181,6 +182,7 @@ export function App() {
   const updateRef = useRef<Update | null>(null);
   const updateCheckInFlightRef = useRef(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
@@ -192,11 +194,18 @@ export function App() {
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const previewUrlsRef = useRef(new Set<string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
-  const selfWrittenPathsRef = useRef(new Set<string>());
+  const workspacePathRef = useRef<string | null>(workspacePath);
+  const workspaceLoadRequestRef = useRef(0);
+  const workspaceReloadTimerRef = useRef<number | null>(null);
+  const selfWrittenPathsRef = useRef(new Map<string, number>());
 
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    workspacePathRef.current = workspacePath;
+  }, [workspacePath]);
 
   useEffect(() => () => {
     previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -343,29 +352,55 @@ export function App() {
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
 
+    const requestId = ++workspaceLoadRequestRef.current;
     setWorkspaceLoading(true);
+    setWorkspaceIndexLoading(true);
     try {
-      const [files, index] = await Promise.all([
-        listWorkspaceFiles(root),
-        indexWorkspace(root).catch(() => []),
-      ]);
+      const files = await listWorkspaceFiles(root);
+      if (requestId !== workspaceLoadRequestRef.current) return;
+
+      const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
+      workspacePathRef.current = root;
       setWorkspacePath(root);
       setWorkspaceFiles(files);
-      setWorkspaceIndex(index);
+      if (switchedWorkspace) {
+        setWorkspaceIndex([]);
+        setWorkspaceResults([]);
+        setSelectedTag(null);
+      }
       setWorkspaceRevision((current) => current + 1);
       saveWorkspacePath(root);
       if (!silent) setError(null);
+      setWorkspaceLoading(false);
+
+      void indexWorkspace(root)
+        .then((index) => {
+          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current)) return;
+          setWorkspaceIndex(index);
+        })
+        .catch((cause) => {
+          if (requestId !== workspaceLoadRequestRef.current) return;
+          setWorkspaceIndex([]);
+          if (!silent) {
+            setError(cause instanceof Error ? cause.message : "工作区索引失败。");
+          }
+        })
+        .finally(() => {
+          if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
+        });
     } catch (cause) {
+      if (requestId !== workspaceLoadRequestRef.current) return;
+      setWorkspaceLoading(false);
+      setWorkspaceIndexLoading(false);
       if (silent) {
         setWorkspacePath(null);
+        workspacePathRef.current = null;
         setWorkspaceFiles([]);
         setWorkspaceIndex([]);
         saveWorkspacePath(null);
       } else {
         setError(cause instanceof Error ? cause.message : "工作区读取失败。");
       }
-    } finally {
-      setWorkspaceLoading(false);
     }
   }, []);
 
@@ -523,7 +558,7 @@ export function App() {
 
     try {
       if (isTauriRuntime()) {
-        selfWrittenPathsRef.current.add(comparablePath(documentState.path));
+        selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
         await writeTextFile(documentState.path, sourceDraft);
       } else {
         downloadText(documentState.name, sourceDraft);
@@ -531,7 +566,7 @@ export function App() {
 
       const rendered = await renderSource(documentState.path, sourceDraft);
       setDocumentState((current) => current ? { ...current, source: sourceDraft, rendered, modified: false } : current);
-      selfWrittenPathsRef.current.delete(comparablePath(documentState.path));
+      selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
     } catch (cause) {
       selfWrittenPathsRef.current.delete(comparablePath(documentState.path));
@@ -599,7 +634,14 @@ export function App() {
     void subscribeToWorkspaceChanges(workspacePath, (paths) => {
       if (!active) return;
 
-      void loadWorkspace(workspacePath, true);
+      if (workspaceReloadTimerRef.current !== null) {
+        window.clearTimeout(workspaceReloadTimerRef.current);
+      }
+      workspaceReloadTimerRef.current = window.setTimeout(() => {
+        workspaceReloadTimerRef.current = null;
+        void loadWorkspace(workspacePath, true);
+      }, 280);
+
       const current = documentStateRef.current;
       if (!current || current.path.startsWith("browser://")) return;
 
@@ -607,9 +649,10 @@ export function App() {
       if (!changedCurrentFile) return;
 
       const currentPath = comparablePath(current.path);
-      if (selfWrittenPathsRef.current.has(currentPath)) {
+      const writtenUntil = selfWrittenPathsRef.current.get(currentPath);
+      if (writtenUntil) {
+        if (isSelfWrittenChangePending(writtenUntil, Date.now())) return;
         selfWrittenPathsRef.current.delete(currentPath);
-        return;
       }
 
       if (current.modified) {
@@ -631,6 +674,10 @@ export function App() {
 
     return () => {
       active = false;
+      if (workspaceReloadTimerRef.current !== null) {
+        window.clearTimeout(workspaceReloadTimerRef.current);
+        workspaceReloadTimerRef.current = null;
+      }
       unwatch?.();
     };
   }, [loadWorkspace, openPath, workspacePath]);
@@ -1099,6 +1146,7 @@ export function App() {
             onExportWorkspace={() => void handleExportWorkspace()}
             workspaceExporting={workspaceExporting}
             workspaceExportNotice={workspaceExportNotice}
+            workspaceIndexLoading={workspaceIndexLoading}
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}

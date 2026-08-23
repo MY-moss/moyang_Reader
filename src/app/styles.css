@@ -104,6 +104,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .workspace-location span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-location small { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
 .workspace-export-note { margin-top: 9px; color: var(--accent-deep); font-size: 10px; line-height: 1.5; }
+.workspace-index-note { margin-top: 8px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .workspace-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .workspace-help { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .workspace-search { width: 100%; margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); padding: 9px 10px; outline: none; font-size: 11px; box-shadow: inset 0 1px 2px rgba(47, 49, 41, 0.03); }

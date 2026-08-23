@@ -16,6 +16,7 @@ type WorkspacePanelProps = {
   onExportWorkspace: () => void;
   workspaceExporting: boolean;
   workspaceExportNotice: string | null;
+  workspaceIndexLoading: boolean;
   onOpenFile: (path: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
@@ -40,6 +41,7 @@ export function WorkspacePanel({
   onExportWorkspace,
   workspaceExporting,
   workspaceExportNotice,
+  workspaceIndexLoading,
   onOpenFile,
   onSearchQueryChange,
   onTagChange,
@@ -76,6 +78,7 @@ export function WorkspacePanel({
         <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
       )}
       {workspaceExportNotice && <div className="workspace-export-note" role="status">{workspaceExportNotice}</div>}
+      {workspaceIndexLoading && <div className="workspace-index-note" role="status">目录已打开，正在整理链接与标签…</div>}
 
       {workspacePath && (
         <>
