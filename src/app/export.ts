@@ -11,6 +11,14 @@ export function pathWithExtension(path: string, extension: string): string {
   return directory + fileNameWithExtension(name, extension);
 }
 
+export function pathWithNameSuffix(path: string, suffix: string, extension: string): string {
+  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  const directory = separator >= 0 ? path.slice(0, separator + 1) : "";
+  const name = separator >= 0 ? path.slice(separator + 1) : path;
+  const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
+  return directory + baseName + suffix + "." + extension;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -123,4 +131,193 @@ export function buildBatchHtmlExport(title: string, documents: HtmlExportDocumen
   ].join("\n");
 
   return buildHtmlExport(title, content);
+}
+
+type DocxImage = {
+  bytes: Uint8Array;
+  contentType: string;
+  extension: string;
+  relationshipId: string;
+};
+
+type DocxRenderState = {
+  images: DocxImage[];
+  nextImageId: number;
+};
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function runXml(value: string, properties = ""): string {
+  if (!value) return "";
+  const content = value.split(/\r?\n/).map((line, index) => (
+    `${index > 0 ? "<w:br/>" : ""}<w:t xml:space="preserve">${escapeXml(line)}</w:t>`
+  )).join("");
+  return `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}${content}</w:r>`;
+}
+
+function imageExtension(contentType: string): string | null {
+  return {
+    "image/gif": "gif",
+    "image/jpeg": "jpeg",
+    "image/png": "png",
+  }[contentType] ?? null;
+}
+
+function imageXml(element: HTMLElement, state: DocxRenderState): string {
+  const source = element.getAttribute("src") ?? "";
+  const match = source.match(/^data:([^;,]+);base64,(.+)$/);
+  const extension = match ? imageExtension(match[1].toLowerCase()) : null;
+  if (!match || !extension) {
+    return runXml(`[图片${element.getAttribute("alt") ? `：${element.getAttribute("alt")}` : ""}]`);
+  }
+
+  try {
+    const binary = atob(match[2]);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const relationshipId = `rId${state.nextImageId}`;
+    state.nextImageId += 1;
+    state.images.push({
+      bytes,
+      contentType: match[1].toLowerCase(),
+      extension,
+      relationshipId,
+    });
+
+    const imageId = state.images.length;
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5486400" cy="3657600"/><wp:docPr id="${imageId}" name="图片 ${imageId}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${imageId}" name="图片 ${imageId}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="3657600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  } catch {
+    return runXml("[图片无法读取]");
+  }
+}
+
+function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = ""): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return runXml(node.nodeValue ?? "", inheritedProperties);
+  }
+  if (!(node instanceof HTMLElement)) return "";
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === "br") return "<w:r><w:br/></w:r>";
+  if (tag === "img") return imageXml(node, state);
+
+  let properties = inheritedProperties;
+  if (tag === "strong" || tag === "b") properties += "<w:b/>";
+  if (tag === "em" || tag === "i") properties += "<w:i/>";
+  if (tag === "u") properties += "<w:u w:val=\"single\"/>";
+  if (tag === "code" || tag === "kbd") properties += "<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\"/><w:shd w:fill=\"F0EEE9\"/>";
+  if (tag === "a") properties += "<w:color w:val=\"28655F\"/><w:u w:val=\"single\"/>";
+
+  return Array.from(node.childNodes).map((child) => inlineXml(child, state, properties)).join("");
+}
+
+function paragraphXml(content: string, style?: string, extraProperties = ""): string {
+  const properties = style || extraProperties
+    ? `<w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ""}${extraProperties}</w:pPr>`
+    : "";
+  return `<w:p>${properties}${content || "<w:r><w:t></w:t></w:r>"}</w:p>`;
+}
+
+function tableXml(table: HTMLElement, state: DocxRenderState): string {
+  const rows = Array.from(table.querySelectorAll("tr"));
+  const columnCount = Math.max(1, ...rows.map((row) => row.querySelectorAll(":scope > th, :scope > td").length));
+  const grid = Array.from({ length: columnCount }, () => "<w:gridCol w:w=\"2200\"/>").join("");
+  const body = rows.map((row) => {
+    const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td"));
+    return `<w:tr>${cells.map((cell) => {
+      const isHeader = cell.tagName.toLowerCase() === "th";
+      const content = Array.from(cell.childNodes).map((child) => inlineXml(child, state, isHeader ? "<w:b/>" : "")).join("");
+      return `<w:tc><w:tcPr><w:tcW w:w="2200" w:type="dxa"/></w:tcPr>${paragraphXml(content)}</w:tc>`;
+    }).join("")}</w:tr>`;
+  }).join("");
+
+  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="D9D5CC"/><w:left w:val="single" w:sz="4" w:color="D9D5CC"/><w:bottom w:val="single" w:sz="4" w:color="D9D5CC"/><w:right w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideH w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideV w:val="single" w:sz="4" w:color="D9D5CC"/></w:tblBorders></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${body}</w:tbl>`;
+}
+
+function blockXml(node: Node, state: DocxRenderState): string {
+  if (!(node instanceof HTMLElement)) {
+    return node.nodeType === Node.TEXT_NODE && node.textContent?.trim() ? paragraphXml(runXml(node.textContent)) : "";
+  }
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === "table") return tableXml(node, state);
+  if (tag === "ul" || tag === "ol") {
+    return Array.from(node.children).map((child) => blockXml(child, state)).join("");
+  }
+  if (tag === "li") {
+    const parentTag = node.parentElement?.tagName.toLowerCase();
+    const content = Array.from(node.childNodes)
+      .filter((child) => !(child instanceof HTMLElement && ["ul", "ol"].includes(child.tagName.toLowerCase())))
+      .map((child) => inlineXml(child, state))
+      .join("");
+    const nested = Array.from(node.children)
+      .filter((child) => ["ul", "ol"].includes(child.tagName.toLowerCase()))
+      .map((child) => blockXml(child, state))
+      .join("");
+    return paragraphXml(runXml(parentTag === "ol" ? "1. " : "• ") + content, "Normal") + nested;
+  }
+  if (/^h[1-4]$/.test(tag)) {
+    return paragraphXml(Array.from(node.childNodes).map((child) => inlineXml(child, state)).join(""), `Heading${tag.slice(1)}`);
+  }
+  if (tag === "pre") {
+    return paragraphXml(inlineXml(node, state, "<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\"/><w:sz w:val=\"20\"/>"), "CodeBlock");
+  }
+  if (tag === "blockquote") {
+    return paragraphXml(Array.from(node.childNodes).map((child) => inlineXml(child, state, "<w:i/>" )).join(""), "Quote");
+  }
+  if (tag === "hr") {
+    return paragraphXml("", "Normal", "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"8\" w:space=\"1\" w:color=\"D9D5CC\"/></w:pBdr>");
+  }
+  if (tag === "img") return paragraphXml(imageXml(node, state));
+
+  const blockChildren = Array.from(node.children).filter((child) => /^(p|div|section|article|h[1-4]|ul|ol|table|blockquote|pre|hr)$/i.test(child.tagName));
+  if (blockChildren.length > 0) return blockChildren.map((child) => blockXml(child, state)).join("");
+  return paragraphXml(Array.from(node.childNodes).map((child) => inlineXml(child, state)).join(""));
+}
+
+function docxStylesXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="等线"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="6D716B"/></w:rPr></w:style></w:styles>`;
+}
+
+function docxDocumentXml(title: string, body: string, state: DocxRenderState): string {
+  const parsed = new DOMParser().parseFromString(`<div>${body}</div>`, "text/html");
+  const root = parsed.body.firstElementChild;
+  const content = root ? Array.from(root.childNodes).map((node) => blockXml(node, state)).join("") : "";
+  const titleParagraph = paragraphXml(runXml(title), "Title");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}${content}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+}
+
+function docxContentTypesXml(images: DocxImage[]): string {
+  const imageTypes = Array.from(new Map(images.map((image) => [image.extension, image.contentType]))).map(([extension, contentType]) => `<Default Extension="${extension}" ContentType="${contentType}"/>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageTypes}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+}
+
+function docxRelationshipsXml(images: DocxImage[]): string {
+  const relationships = images.map((image, index) => `<Relationship Id="${image.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${index + 1}.${image.extension}"/>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`;
+}
+
+export async function buildDocxExport(title: string, body: string): Promise<Uint8Array> {
+  const { default: JSZip } = await import("jszip");
+  const state: DocxRenderState = { images: [], nextImageId: 1 };
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
+  zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`);
+  zip.file("word/document.xml", docxDocumentXml(title, body, state));
+  zip.file("word/styles.xml", docxStylesXml());
+  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
+  zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Moyang Reader</dc:creator></cp:coreProperties>`);
+  zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Moyang Reader</Application></Properties>`);
+
+  // The document XML is built before the content types and relationships are finalized.
+  zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
+  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
+  state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
+  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }

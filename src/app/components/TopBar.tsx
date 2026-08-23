@@ -18,8 +18,10 @@ type TopBarProps = {
   exportLabel?: string;
   canExportMarkdown: boolean;
   canExportHtml: boolean;
+  canExportDocx: boolean;
   onExportMarkdown: () => void;
   onExportHtml: () => void;
+  onExportDocx: () => void;
   updateStatus: UpdateStatus;
   updateVersion: string | null;
   onCheckUpdates: () => void;
@@ -48,8 +50,10 @@ export function TopBar({
   exportLabel = "打印 / PDF",
   canExportMarkdown,
   canExportHtml,
+  canExportDocx,
   onExportMarkdown,
   onExportHtml,
+  onExportDocx,
   updateStatus,
   updateVersion,
   onCheckUpdates,
@@ -114,7 +118,7 @@ export function TopBar({
         <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
           {exportLabel}
         </button>
-        {(canExportMarkdown || canExportHtml) && (
+        {(canExportMarkdown || canExportHtml || canExportDocx) && (
           <details className="export-menu">
             <summary className="toolbar-button" title="导出文件">导出</summary>
             <div className="export-menu-panel">
@@ -123,6 +127,9 @@ export function TopBar({
               )}
               {canExportHtml && (
                 <button type="button" onClick={onExportHtml}>导出 HTML（含图片）</button>
+              )}
+              {canExportDocx && (
+                <button type="button" onClick={onExportDocx}>导出 Word（DOCX）</button>
               )}
             </div>
           </details>

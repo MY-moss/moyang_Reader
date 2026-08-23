@@ -26,6 +26,7 @@ import {
   searchWorkspace,
   subscribeToWorkspaceChanges,
   subscribeToOpenPaths,
+  writeBinaryFile,
   writeTextFile,
 } from "./bridge";
 import type { Update } from "@tauri-apps/plugin-updater";
@@ -47,7 +48,7 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
-import { buildBatchHtmlExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension } from "./export";
+import { buildBatchHtmlExport, buildDocxExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension, pathWithNameSuffix } from "./export";
 import {
   loadRecentFiles,
   loadWorkspacePath,
@@ -139,6 +140,17 @@ function readSavedTheme(): ThemeMode {
 
 function downloadText(name: string, contents: string, mimeType = "text/markdown"): void {
   const blob = new Blob([contents], { type: mimeType + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadBytes(name: string, contents: Uint8Array, mimeType: string): void {
+  const buffer = contents.buffer.slice(contents.byteOffset, contents.byteOffset + contents.byteLength) as ArrayBuffer;
+  const blob = new Blob([buffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -802,6 +814,44 @@ export function App() {
     }
   }, [documentState]);
 
+  const handleExportDocx = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    try {
+      const body = isTauriRuntime()
+        ? await inlineLocalImages(
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+        )
+        : documentState.rendered.html;
+      const contents = await buildDocxExport(documentState.name, body);
+
+      if (isTauriRuntime()) {
+        const defaultPath = documentState.kind === "docx"
+          ? pathWithNameSuffix(documentState.path, " - 导出", "docx")
+          : pathWithExtension(documentState.path, "docx");
+        const path = await chooseSavePath(defaultPath, "docx");
+        if (!path) return;
+        await writeBinaryFile(path, contents);
+      } else {
+        downloadBytes(
+          fileNameWithExtension(documentState.name, "docx"),
+          contents,
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        );
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 Word 失败。");
+    }
+  }, [documentState]);
+
   const handleBrowserFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
     const path = `browser://${file.name}`;
@@ -1102,8 +1152,10 @@ export function App() {
         exportLabel={documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"}
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         onExportMarkdown={() => void handleExportMarkdown()}
         onExportHtml={() => void handleExportHtml()}
+        onExportDocx={() => void handleExportDocx()}
         onToggleSearch={() => setSearchOpen((current) => !current)}
         updateStatus={updateStatus}
         updateVersion={availableUpdate?.version ?? null}

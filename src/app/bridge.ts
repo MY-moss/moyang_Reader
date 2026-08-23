@@ -32,15 +32,17 @@ export async function chooseWorkspacePath(): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
-export async function chooseSavePath(defaultPath: string, format: "markdown" | "html"): Promise<string | null> {
+export async function chooseSavePath(defaultPath: string, format: "markdown" | "html" | "docx"): Promise<string | null> {
   if (!isTauriRuntime()) return null;
 
   const { save } = await import("@tauri-apps/plugin-dialog");
   const options = format === "html"
     ? { name: "HTML 网页", extensions: ["html", "htm"] }
-    : { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] };
+    : format === "docx"
+      ? { name: "Word 文档", extensions: ["docx"] }
+      : { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] };
   return save({
-    title: format === "html" ? "导出 HTML" : "导出 Markdown",
+    title: format === "html" ? "导出 HTML" : format === "docx" ? "导出 Word" : "导出 Markdown",
     defaultPath,
     filters: [options],
   });
@@ -106,6 +108,15 @@ export async function writeTextFile(path: string, contents: string): Promise<voi
   }
 
   await invoke("write_text_file", { path, contents });
+}
+
+export async function writeBinaryFile(path: string, contents: Uint8Array): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能写回本地文件。");
+  }
+
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  await writeFile(path, contents);
 }
 
 export async function initialPaths(): Promise<string[]> {
