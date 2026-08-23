@@ -1,10 +1,14 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Mutex,
+};
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::{DialogExt, FilePath};
 
 const MARKDOWN_EXTENSIONS: [&str; 4] = ["md", "markdown", "mdown", "mkd"];
 const TEXT_EXTENSIONS: [&str; 3] = ["txt", "text", "log"];
@@ -14,6 +18,7 @@ const IMAGE_EXTENSIONS: [&str; 7] = ["avif", "gif", "jpeg", "jpg", "png", "svg",
 const MAX_READ_FILE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_SEARCH_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_INDEX_FILE_BYTES: u64 = 4 * 1024 * 1024;
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Default)]
 pub struct AccessRegistry {
@@ -21,7 +26,7 @@ pub struct AccessRegistry {
 }
 
 impl AccessRegistry {
-    fn register_path(&self, path: &Path) -> Result<(), String> {
+    pub(crate) fn register_path(&self, path: &Path) -> Result<(), String> {
         let normalized = normalize_access_path(path)?;
         let mut entries = self
             .entries
@@ -40,7 +45,7 @@ impl AccessRegistry {
         Ok(())
     }
 
-    fn is_allowed(&self, path: &Path) -> bool {
+    pub(crate) fn is_allowed(&self, path: &Path) -> bool {
         let Ok(normalized) = normalize_access_path(path) else {
             return false;
         };
@@ -165,19 +170,126 @@ pub fn initial_paths(access: State<'_, AccessRegistry>) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn register_path(path: String, access: State<'_, AccessRegistry>) -> Result<(), String> {
-    access.register_path(Path::new(&path))
+pub async fn choose_document_path(
+    app: AppHandle,
+    access: State<'_, AccessRegistry>,
+) -> Result<Option<String>, String> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title("打开文档")
+            .add_filter(
+                "文档",
+                &[
+                    "md", "markdown", "mdown", "mkd", "txt", "text", "log", "docx", "pdf", "avif",
+                    "gif", "jpeg", "jpg", "png", "svg", "webp",
+                ],
+            )
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|error| format!("打开文件选择器失败：{error}"))?;
+    register_selected_path(access, selected)
+}
+
+#[tauri::command]
+pub async fn choose_workspace_path(
+    app: AppHandle,
+    access: State<'_, AccessRegistry>,
+) -> Result<Option<String>, String> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title("添加阅读库文件夹")
+            .blocking_pick_folder()
+    })
+    .await
+    .map_err(|error| format!("打开文件夹选择器失败：{error}"))?;
+    register_selected_path(access, selected)
+}
+
+#[tauri::command]
+pub async fn choose_save_path(
+    app: AppHandle,
+    default_path: String,
+    format: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Option<String>, String> {
+    let (title, filter_name, extensions): (&str, &str, &'static [&'static str]) =
+        match format.as_str() {
+            "html" => ("导出 HTML", "HTML 网页", &["html", "htm"]),
+            "docx" => ("导出 Word", "Word 文档", &["docx"]),
+            "markdown" => (
+                "导出 Markdown",
+                "Markdown / 文本",
+                &["md", "markdown", "txt"],
+            ),
+            _ => return Err("不支持的导出格式。".to_string()),
+        };
+
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        let default = PathBuf::from(default_path);
+        let mut dialog = app
+            .dialog()
+            .file()
+            .set_title(title)
+            .add_filter(filter_name, extensions);
+        if let Some(parent) = default
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            dialog = dialog.set_directory(parent);
+        }
+        if let Some(file_name) = default.file_name().and_then(|name| name.to_str()) {
+            dialog = dialog.set_file_name(file_name);
+        }
+        dialog.blocking_save_file()
+    })
+    .await
+    .map_err(|error| format!("打开保存位置选择器失败：{error}"))?;
+    register_selected_path(access, selected)
+}
+
+fn register_selected_path(
+    access: State<'_, AccessRegistry>,
+    selected: Option<FilePath>,
+) -> Result<Option<String>, String> {
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|_| "系统返回的选择路径不可访问。".to_string())?;
+    let path_string = path
+        .to_str()
+        .ok_or_else(|| "选择的路径包含无法处理的字符。".to_string())?
+        .to_string();
+    access.register_path(&path)?;
+    Ok(Some(path_string))
 }
 
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
-    let path = PathBuf::from(path);
+    read_text_file_inner(PathBuf::from(path))
+}
+
+fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
     let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
     if metadata.len() > MAX_READ_FILE_BYTES {
         return Err("文件过大，暂不支持直接打开超过 100 MB 的文本文件。".to_string());
     }
     let bytes = fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))?;
     decode_text(&bytes)
+}
+
+#[tauri::command]
+pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
+    let path = PathBuf::from(path);
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+    if metadata.len() > MAX_READ_FILE_BYTES {
+        return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
+    }
+    fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))
 }
 
 #[tauri::command]
@@ -292,17 +404,28 @@ fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
 
 #[tauri::command]
 pub fn list_workspace_files(root: String) -> Result<Vec<WorkspaceFile>, String> {
-    sorted_workspace_files(&PathBuf::from(root))
+    list_workspace_files_inner(PathBuf::from(root))
+}
+
+fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, String> {
+    sorted_workspace_files(&root)
 }
 
 #[tauri::command]
 pub fn search_workspace(root: String, query: String) -> Result<Vec<WorkspaceSearchResult>, String> {
+    search_workspace_inner(PathBuf::from(root), query)
+}
+
+fn search_workspace_inner(
+    root: PathBuf,
+    query: String,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
     let query = query.trim().to_lowercase();
     if query.is_empty() {
         return Ok(Vec::new());
     }
 
-    let files = sorted_workspace_files(&PathBuf::from(root))?;
+    let files = sorted_workspace_files(&root)?;
     let mut results = Vec::new();
 
     for file in files {
@@ -310,12 +433,14 @@ pub fn search_workspace(root: String, query: String) -> Result<Vec<WorkspaceSear
         let preview = if is_supported_text_path(Path::new(&file.path))
             && file.size <= MAX_SEARCH_FILE_BYTES
         {
-            read_text_file(file.path.clone()).ok().and_then(|source| {
-                source
-                    .lines()
-                    .find(|line| line.to_lowercase().contains(&query))
-                    .map(|line| line.trim().chars().take(180).collect::<String>())
-            })
+            read_text_file_inner(PathBuf::from(file.path.clone()))
+                .ok()
+                .and_then(|source| {
+                    source
+                        .lines()
+                        .find(|line| line.to_lowercase().contains(&query))
+                        .map(|line| line.trim().chars().take(180).collect::<String>())
+                })
         } else {
             None
         };
@@ -655,6 +780,18 @@ pub fn create_markdown_file(
     root: String,
     base_file: String,
     target: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    if !access.is_allowed(Path::new(&root)) {
+        return Err("拒绝在未通过用户文件夹选择的工作区中创建文档。请重新添加文件夹。".to_string());
+    }
+    create_markdown_file_inner(root, base_file, target)
+}
+
+fn create_markdown_file_inner(
+    root: String,
+    base_file: String,
+    target: String,
 ) -> Result<String, String> {
     let root = fs::canonicalize(PathBuf::from(root))
         .map_err(|error| format!("无法读取工作区目录：{error}"))?;
@@ -718,7 +855,11 @@ pub fn create_markdown_file(
 
 #[tauri::command]
 pub fn index_workspace(root: String) -> Result<Vec<WorkspaceIndexEntry>, String> {
-    let files = sorted_workspace_files(&PathBuf::from(root))?;
+    index_workspace_inner(PathBuf::from(root))
+}
+
+fn index_workspace_inner(root: PathBuf) -> Result<Vec<WorkspaceIndexEntry>, String> {
+    let files = sorted_workspace_files(&root)?;
     let mut entries = Vec::new();
 
     for file in files {
@@ -726,7 +867,7 @@ pub fn index_workspace(root: String) -> Result<Vec<WorkspaceIndexEntry>, String>
             continue;
         }
 
-        let source = match read_text_file(file.path.clone()) {
+        let source = match read_text_file_inner(PathBuf::from(file.path.clone())) {
             Ok(source) => source,
             Err(_) => continue,
         };
@@ -759,6 +900,27 @@ pub fn write_text_file(
 }
 
 fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> {
+    write_bytes_file_inner(path, contents.as_bytes(), true)
+}
+
+#[tauri::command]
+pub fn write_binary_file(
+    path: String,
+    contents: Vec<u8>,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    if !access.is_allowed(&path) {
+        return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
+    }
+    write_bytes_file_inner(path, &contents, false)
+}
+
+fn write_bytes_file_inner(
+    path: PathBuf,
+    contents: &[u8],
+    create_backup: bool,
+) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "文件路径没有父目录。".to_string())?;
@@ -767,41 +929,87 @@ fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> 
         .and_then(|name| name.to_str())
         .ok_or_else(|| "文件名无法解析。".to_string())?;
 
-    let backup = parent.join(format!(".{file_name}.moyang.bak"));
-    if path.is_file() {
-        fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
+    if create_backup {
+        let backup = parent.join(format!(".{file_name}.moyang.bak"));
+        if path.is_file() {
+            fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
+        }
     }
 
-    let temp = parent.join(format!(".{file_name}.moyang.tmp"));
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(&temp)
-        .map_err(|error| format!("创建临时文件失败：{error}"))?;
-    file.write_all(contents.as_bytes())
-        .map_err(|error| format!("写入临时文件失败：{error}"))?;
-    file.sync_all()
-        .map_err(|error| format!("刷新临时文件失败：{error}"))?;
-    drop(file);
+    let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let temp = parent.join(format!(
+        ".{file_name}.moyang.tmp-{}-{nonce}",
+        std::process::id()
+    ));
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temp)
+            .map_err(|error| format!("创建临时文件失败：{error}"))?;
+        file.write_all(contents)
+            .map_err(|error| format!("写入临时文件失败：{error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("刷新临时文件失败：{error}"))?;
+        drop(file);
 
-    if path.exists() {
-        fs::remove_file(&path).map_err(|error| format!("替换原文件失败：{error}"))?;
+        replace_file(&temp, &path).map_err(|error| format!("完成文件替换失败：{error}"))?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
     }
-    fs::rename(&temp, &path).map_err(|error| format!("完成文件替换失败：{error}"))?;
-    Ok(())
+    result
+}
+
+#[cfg(not(windows))]
+fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::rename(temp, destination)
+}
+
+#[cfg(windows)]
+fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
+
+    let temp = temp
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    let destination = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    let status = unsafe {
+        MoveFileExW(
+            temp.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if status == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        create_markdown_file, decode_text, extract_title, index_workspace,
-        is_supported_document_path, is_supported_text_path, list_workspace_files, path_exists,
-        read_text_file, search_workspace, should_skip_directory, AccessRegistry, WorkspaceFile,
-        MAX_READ_FILE_BYTES,
+        create_markdown_file_inner, decode_text, extract_title, index_workspace_inner,
+        is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
+        path_exists, read_text_file_inner, search_workspace_inner, should_skip_directory,
+        write_text_file_inner, AccessRegistry, WorkspaceFile, MAX_READ_FILE_BYTES,
+        TEMP_FILE_COUNTER,
     };
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn recognizes_supported_document_extensions_case_insensitively() {
@@ -836,6 +1044,30 @@ mod tests {
         assert!(!access.is_allowed(&outside));
 
         fs::remove_dir_all(root).expect("remove access test directory");
+    }
+
+    #[test]
+    fn replaces_existing_file_without_removing_the_original_first() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-atomic-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.load(Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create atomic test directory");
+        let path = root.join("note.md");
+        fs::write(&path, "old").expect("write original file");
+
+        write_text_file_inner(path.clone(), "new".to_string()).expect("replace file");
+
+        assert_eq!(
+            fs::read_to_string(&path).expect("read replaced file"),
+            "new"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join(".note.md.moyang.bak")).expect("read backup"),
+            "old"
+        );
+        fs::remove_dir_all(root).expect("remove atomic test directory");
     }
 
     #[test]
@@ -882,8 +1114,7 @@ mod tests {
         let file = fs::File::create(&path).expect("create sparse file");
         file.set_len(MAX_READ_FILE_BYTES + 1)
             .expect("grow sparse file");
-        let error =
-            read_text_file(path.to_string_lossy().into_owned()).expect_err("reject large file");
+        let error = read_text_file_inner(path.clone()).expect_err("reject large file");
         assert!(error.contains("100 MB"));
         fs::remove_file(path).expect("remove sparse file");
     }
@@ -917,7 +1148,8 @@ mod tests {
         fs::write(generated.join("ignored.md"), "needle").expect("write ignored document");
 
         let root_string = root.to_string_lossy().into_owned();
-        let files = list_workspace_files(root_string.clone()).expect("list workspace files");
+        let files = list_workspace_files_inner(PathBuf::from(root_string.clone()))
+            .expect("list workspace files");
         assert_eq!(files.len(), 7);
         assert!(files
             .iter()
@@ -925,7 +1157,8 @@ mod tests {
         assert!(files.iter().any(|file| file.kind == "docx"));
         assert!(files.iter().any(|file| file.kind == "pdf"));
         assert!(files.iter().any(|file| file.kind == "image"));
-        let index = index_workspace(root_string.clone()).expect("index workspace");
+        let index =
+            index_workspace_inner(PathBuf::from(root_string.clone())).expect("index workspace");
         let linked = index
             .iter()
             .find(|entry| entry.file.name == "Linked.md")
@@ -946,7 +1179,7 @@ mod tests {
             root.join("missing.md").to_string_lossy().into_owned()
         ));
 
-        let created = create_markdown_file(
+        let created = create_markdown_file_inner(
             root_string.clone(),
             notes.join("Linked.md").to_string_lossy().into_owned(),
             "Created Note#Section".to_string(),
@@ -960,21 +1193,21 @@ mod tests {
             fs::read_to_string(&created).expect("read created note"),
             "# Created Note\n\n"
         );
-        assert!(create_markdown_file(
+        assert!(create_markdown_file_inner(
             root_string.clone(),
             notes.join("Linked.md").to_string_lossy().into_owned(),
             "../outside".to_string(),
         )
         .is_err());
-        assert!(create_markdown_file(
+        assert!(create_markdown_file_inner(
             root_string.clone(),
             notes.join("Linked.md").to_string_lossy().into_owned(),
             "Created Note".to_string(),
         )
         .is_err());
 
-        let results =
-            search_workspace(root_string, "needle".to_string()).expect("search workspace");
+        let results = search_workspace_inner(PathBuf::from(root_string), "needle".to_string())
+            .expect("search workspace");
         assert_eq!(results.len(), 2);
         assert!(results
             .iter()

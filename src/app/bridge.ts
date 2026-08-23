@@ -8,50 +8,17 @@ export function isTauriRuntime(): boolean {
 
 export async function chooseDocumentPath(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
-
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selected = await open({
-    multiple: false,
-    directory: false,
-    filters: [
-      {
-        name: "文档",
-        extensions: ["md", "markdown", "mdown", "mkd", "txt", "text", "log", "docx", "pdf", "avif", "gif", "jpeg", "jpg", "png", "svg", "webp"],
-      },
-    ],
-  });
-
-  if (typeof selected !== "string") return null;
-  await registerPath(selected);
-  return selected;
+  return invoke<string | null>("choose_document_path");
 }
 
 export async function chooseWorkspacePath(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
-
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selected = await open({ directory: true, multiple: false });
-  if (typeof selected !== "string") return null;
-  await registerPath(selected);
-  return selected;
+  return invoke<string | null>("choose_workspace_path");
 }
 
 export async function chooseSavePath(defaultPath: string, format: "markdown" | "html" | "docx"): Promise<string | null> {
   if (!isTauriRuntime()) return null;
-
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const options = format === "html"
-    ? { name: "HTML 网页", extensions: ["html", "htm"] }
-    : format === "docx"
-      ? { name: "Word 文档", extensions: ["docx"] }
-      : { name: "Markdown / 文本", extensions: ["md", "markdown", "txt"] };
-  const selected = await save({
-    title: format === "html" ? "导出 HTML" : format === "docx" ? "导出 Word" : "导出 Markdown",
-    defaultPath,
-    filters: [options],
-  });
-  if (selected) await registerPath(selected);
-  return selected;
+  return invoke<string | null>("choose_save_path", { defaultPath, format });
 }
 
 export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]> {
@@ -91,11 +58,6 @@ export async function fileExists(path: string): Promise<boolean> {
   return invoke<boolean>("path_exists", { path });
 }
 
-export async function registerPath(path: string): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await invoke("register_path", { path });
-}
-
 export async function fileSize(path: string): Promise<number> {
   if (!isTauriRuntime()) return 0;
   return invoke<number>("file_size", { path });
@@ -114,8 +76,8 @@ export async function readBinaryFile(path: string): Promise<Uint8Array> {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");
   }
 
-  const { readFile } = await import("@tauri-apps/plugin-fs");
-  return readFile(path);
+  const bytes = await invoke<number[]>("read_binary_file", { path });
+  return Uint8Array.from(bytes);
 }
 
 export async function writeTextFile(path: string, contents: string): Promise<void> {
@@ -131,8 +93,7 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
     throw new Error("浏览器预览模式不能写回本地文件。");
   }
 
-  const { writeFile } = await import("@tauri-apps/plugin-fs");
-  await writeFile(path, contents);
+  await invoke("write_binary_file", { path, contents: Array.from(contents) });
 }
 
 export async function initialPaths(): Promise<string[]> {
