@@ -6,6 +6,7 @@ import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
 import { PrintPreview } from "./components/PrintPreview";
+import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
@@ -2924,7 +2925,7 @@ export function App() {
                       <div className="print-document-title">{documentState.name}</div>
                     </header>
                   )}
-                  <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+                  <ProgressiveReaderContent html={documentState.rendered.html} />
                 </article>
                 <ReadingRail
                   progress={readingProgress}

@@ -1857,6 +1857,13 @@ a:focus-visible {
   background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 18%, transparent));
   opacity: 0.72;
 }
+.progressive-reader-content {
+  display: block;
+}
+.progressive-reader-chunk {
+  content-visibility: auto;
+  contain-intrinsic-size: 960px;
+}
 .reading-width-narrow .reader-content {
   width: min(720px, calc(100% - 96px));
 }
@@ -2821,6 +2828,10 @@ a:focus-visible {
   .reader-content::before,
   .reader-meta {
     display: none;
+  }
+  .progressive-reader-chunk {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
   }
   .pdf-preview {
     width: auto;
