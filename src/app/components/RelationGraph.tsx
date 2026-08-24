@@ -98,7 +98,12 @@ export function RelationGraph({ current, entries, onClose, onOpenFile }: Relatio
           </button>
         </header>
         <div className="graph-stage">
-          <svg viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`} role="img" aria-label="当前文档及直接关联文档">
+          <svg
+            viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="当前文档及直接关联文档"
+          >
             <defs>
               <marker id="graph-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
                 <path d="M0,0 L7,3.5 L0,7 z" fill="var(--accent)" />
