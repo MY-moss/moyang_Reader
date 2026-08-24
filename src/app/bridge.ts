@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { WorkspaceFile, WorkspaceIndexEntry, WorkspaceSearchResult } from "./types";
+import type { WorkspaceFile, WorkspaceIndexEntry, WorkspaceRefreshResult, WorkspaceSearchResult } from "./types";
 
 export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
@@ -48,6 +48,11 @@ export async function searchWorkspace(root: string, query: string): Promise<Work
 export async function indexWorkspace(root: string): Promise<WorkspaceIndexEntry[]> {
   if (!isTauriRuntime()) return [];
   return invoke<WorkspaceIndexEntry[]>("index_workspace", { root });
+}
+
+export async function refreshWorkspace(root: string, paths: string[]): Promise<WorkspaceRefreshResult> {
+  if (!isTauriRuntime()) return { scopePaths: paths, files: [], index: [] };
+  return invoke<WorkspaceRefreshResult>("refresh_workspace", { root, paths });
 }
 
 export async function createMarkdownFile(root: string, baseFile: string, target: string): Promise<string> {

@@ -25,6 +25,7 @@ import {
   openExternalUrl,
   readBinaryFile,
   readTextFile,
+  refreshWorkspace,
   searchWorkspace,
   subscribeToWorkspaceChanges,
   subscribeToCloseRequest,
@@ -81,7 +82,12 @@ import {
   renderSource,
 } from "../lib/document-adapters";
 import { findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
-import { isCurrentWorkspaceLoad, isSelfWrittenChangePending } from "./workspace-refresh";
+import {
+  applyWorkspaceFileDelta,
+  applyWorkspaceIndexDelta,
+  isCurrentWorkspaceLoad,
+  isSelfWrittenChangePending,
+} from "./workspace-refresh";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -222,7 +228,9 @@ export function App() {
   const documentStateRef = useRef<OpenDocument | null>(null);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const workspaceLoadRequestRef = useRef(0);
+  const workspaceRefreshRequestRef = useRef(0);
   const workspaceReloadTimerRef = useRef<number | null>(null);
+  const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
 
@@ -444,10 +452,36 @@ export function App() {
     };
   }, [checkForUpdates, preferences.startupUpdateCheck]);
 
+  const refreshWorkspaceChanges = useCallback(async (root: string, paths: string[]) => {
+    if (!isTauriRuntime() || paths.length === 0) return;
+
+    const requestId = ++workspaceRefreshRequestRef.current;
+    setWorkspaceIndexLoading(true);
+    try {
+      const delta = await refreshWorkspace(root, paths);
+      if (
+        requestId !== workspaceRefreshRequestRef.current ||
+        comparablePath(workspacePathRef.current ?? "") !== comparablePath(root)
+      ) {
+        return;
+      }
+      setWorkspaceFiles((current) => applyWorkspaceFileDelta(current, delta));
+      setWorkspaceIndex((current) => applyWorkspaceIndexDelta(current, delta));
+      setWorkspaceRevision((current) => current + 1);
+    } catch {
+      if (requestId === workspaceRefreshRequestRef.current) {
+        setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
+      }
+    } finally {
+      if (requestId === workspaceRefreshRequestRef.current) setWorkspaceIndexLoading(false);
+    }
+  }, []);
+
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
 
     const requestId = ++workspaceLoadRequestRef.current;
+    workspaceRefreshRequestRef.current += 1;
     setWorkspaceLoading(true);
     setWorkspaceIndexLoading(true);
     try {
@@ -783,17 +817,21 @@ export function App() {
 
     let active = true;
     let unwatch: (() => void) | null = null;
+    const pendingWorkspacePaths = pendingWorkspacePathsRef.current;
     setWorkspaceWatchError(null);
 
     void subscribeToWorkspaceChanges(workspacePath, (paths) => {
       if (!active) return;
 
+      for (const path of paths) pendingWorkspacePaths.add(path);
       if (workspaceReloadTimerRef.current !== null) {
         window.clearTimeout(workspaceReloadTimerRef.current);
       }
       workspaceReloadTimerRef.current = window.setTimeout(() => {
         workspaceReloadTimerRef.current = null;
-        void loadWorkspace(workspacePath, true);
+        const changedPaths = [...pendingWorkspacePaths];
+        pendingWorkspacePaths.clear();
+        void refreshWorkspaceChanges(workspacePath, changedPaths);
       }, 280);
 
       const current = documentStateRef.current;
@@ -832,9 +870,10 @@ export function App() {
         window.clearTimeout(workspaceReloadTimerRef.current);
         workspaceReloadTimerRef.current = null;
       }
+      pendingWorkspacePaths.clear();
       unwatch?.();
     };
-  }, [loadWorkspace, openPath, workspacePath]);
+  }, [openPath, refreshWorkspaceChanges, workspacePath]);
 
   useEffect(() => {
     const query = workspaceQuery.trim();

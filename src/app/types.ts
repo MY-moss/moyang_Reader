@@ -24,6 +24,12 @@ export type WorkspaceIndexEntry = {
   tags: string[];
 };
 
+export type WorkspaceRefreshResult = {
+  scopePaths: string[];
+  files: WorkspaceFile[];
+  index: WorkspaceIndexEntry[];
+};
+
 export type RecentFile = {
   path: string;
   name: string;
