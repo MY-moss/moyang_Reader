@@ -2,7 +2,26 @@ mod commands;
 
 use std::path::Path;
 
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Manager, Url, WindowEvent};
+
+const DEV_SERVER_PORT: u16 = 1420;
+
+fn is_allowed_app_navigation(url: &Url) -> bool {
+    match url.scheme() {
+        // Tauri's production asset protocol is local to the application.
+        "asset" => true,
+        // macOS/Linux builds may use the legacy custom protocol origin.
+        "tauri" => url.host_str() == Some("localhost"),
+        // Windows production builds use https://tauri.localhost; development
+        // uses the Vite server configured in tauri.conf.json.
+        "http" | "https" => match url.host_str() {
+            Some("tauri.localhost") => url.port().is_none(),
+            Some("127.0.0.1") | Some("localhost") => url.port() == Some(DEV_SERVER_PORT),
+            _ => false,
+        },
+        _ => false,
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,7 +52,18 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init());
+        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri::plugin::Builder::<_, ()>::new("navigation-guard")
+                .on_navigation(|window, url| {
+                    let allowed = window.label() != "main" || is_allowed_app_navigation(url);
+                    if !allowed {
+                        eprintln!("blocked navigation in main window: {url}");
+                    }
+                    allowed
+                })
+                .build(),
+        );
 
     #[cfg(desktop)]
     let builder = builder
@@ -70,4 +100,45 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Moyang Reader");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_allowed_app_navigation;
+    use tauri::Url;
+
+    #[test]
+    fn allows_app_origins_and_dev_server() {
+        for raw in [
+            "asset://localhost/assets/index.js",
+            "tauri://localhost/index.html",
+            "https://tauri.localhost/",
+            "http://127.0.0.1:1420/",
+            "http://localhost:1420/settings",
+        ] {
+            let url = Url::parse(raw).expect("test URL should parse");
+            assert!(
+                is_allowed_app_navigation(&url),
+                "expected allowed URL: {raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn blocks_external_and_unsupported_navigation() {
+        for raw in [
+            "https://example.com/",
+            "http://127.0.0.1:3000/",
+            "file:///C:/secret.txt",
+            "mailto:someone@example.com",
+            "javascript:alert(1)",
+            "moyang-wiki:Next",
+        ] {
+            let url = Url::parse(raw).expect("test URL should parse");
+            assert!(
+                !is_allowed_app_navigation(&url),
+                "expected blocked URL: {raw}"
+            );
+        }
+    }
 }
