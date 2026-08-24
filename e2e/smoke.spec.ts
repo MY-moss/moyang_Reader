@@ -9,6 +9,28 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
 });
 
+test("opens the quick-open palette from the keyboard", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "quick-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Quick note\n\n快速打开测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
+
+  await page.keyboard.press("Control+P");
+  await expect(page.getByRole("dialog", { name: "快速打开" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "快速打开文档" })).toBeFocused();
+
+  await page.getByRole("searchbox", { name: "快速打开文档" }).fill("quick-note");
+  await expect(page.getByRole("option", { name: /quick-note\.md/ })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
+
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 
