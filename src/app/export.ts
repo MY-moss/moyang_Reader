@@ -743,7 +743,7 @@ function tableXml(table: HTMLElement, state: DocxRenderState): string {
   return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="D9D5CC"/><w:left w:val="single" w:sz="4" w:color="D9D5CC"/><w:bottom w:val="single" w:sz="4" w:color="D9D5CC"/><w:right w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideH w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideV w:val="single" w:sz="4" w:color="D9D5CC"/></w:tblBorders></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${body}</w:tbl>`;
 }
 
-function blockXml(node: Node, state: DocxRenderState): string {
+function blockXml(node: Node, state: DocxRenderState, listDepth = 0): string {
   if (!(node instanceof HTMLElement)) {
     return node.nodeType === Node.TEXT_NODE && node.textContent?.trim() ? paragraphXml(runXml(node.textContent)) : "";
   }
@@ -755,7 +755,7 @@ function blockXml(node: Node, state: DocxRenderState): string {
     return (
       pageBreakPrefix +
       Array.from(node.children)
-        .map((child) => blockXml(child, state))
+        .map((child) => blockXml(child, state, listDepth))
         .join("")
     );
   }
@@ -773,15 +773,16 @@ function blockXml(node: Node, state: DocxRenderState): string {
       .join("");
     const nested = Array.from(node.children)
       .filter((child) => ["ul", "ol"].includes(child.tagName.toLowerCase()))
-      .map((child) => blockXml(child, state))
+      .map((child) => blockXml(child, state, listDepth + 1))
       .join("");
+    const listIndent = listDepth > 0 ? `<w:ind w:left="${listDepth * 720}" w:hanging="360"/>` : "";
     return (
       pageBreakPrefix +
-      paragraphXml(runXml(parentTag === "ol" ? `${orderedIndex}. ` : "• ") + content, "Normal") +
+      paragraphXml(runXml(parentTag === "ol" ? `${orderedIndex}. ` : "• ") + content, "Normal", listIndent) +
       nested
     );
   }
-  if (/^h[1-4]$/.test(tag)) {
+  if (/^h[1-6]$/.test(tag)) {
     return (
       pageBreakPrefix +
       paragraphXml(
@@ -821,7 +822,7 @@ function blockXml(node: Node, state: DocxRenderState): string {
   if (tag === "img") return pageBreakPrefix + paragraphXml(imageXml(node, state));
 
   const blockChildren = Array.from(node.children).filter((child) =>
-    /^(p|div|section|article|h[1-4]|ul|ol|table|blockquote|pre|hr)$/i.test(child.tagName),
+    /^(p|div|section|article|h[1-6]|ul|ol|table|blockquote|pre|hr)$/i.test(child.tagName),
   );
   if (blockChildren.length > 0) return pageBreakPrefix + blockChildren.map((child) => blockXml(child, state)).join("");
   return (
@@ -835,7 +836,7 @@ function blockXml(node: Node, state: DocxRenderState): string {
 }
 
 function docxStylesXml(): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="等线"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="6D716B"/></w:rPr></w:style></w:styles>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="等线"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="6D716B"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading5"><w:name w:val="heading 5"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading6"><w:name w:val="heading 6"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
 }
 
 function docxHeaderXml(title: string): string {
