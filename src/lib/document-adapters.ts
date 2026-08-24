@@ -7,6 +7,7 @@ import type { Root as HastRoot } from "hast";
 import type { DocumentKind, RenderedMarkdown } from "../app/types";
 import { collectToc, readingStats, textContent } from "./text";
 import type { RenderOptions } from "./markdown";
+import { documentAdapterForKind, documentAdapterForPath, extensionFromPath } from "./adapters/registry";
 
 const docxSanitizeSchema = {
   ...defaultSchema,
@@ -36,10 +37,6 @@ const localHtmlProcessor = createHtmlProcessor({ allowRemoteResources: false });
 const remoteHtmlProcessor = createHtmlProcessor({ allowRemoteResources: true });
 const htmlStringifyProcessor = unified().use(rehypeStringify);
 
-function extensionOf(path: string): string {
-  return path.split(/[?#]/, 1)[0].split(/[\\/]/).pop()?.split(".").pop()?.toLowerCase() ?? "";
-}
-
 const imageMimeTypes: Record<string, string> = {
   avif: "image/avif",
   gif: "image/gif",
@@ -50,24 +47,16 @@ const imageMimeTypes: Record<string, string> = {
   webp: "image/webp",
 };
 
-const markdownExtensions = ["md", "markdown", "mdown", "mkd"];
-
 export function documentKindFromPath(path: string): DocumentKind | null {
-  const extension = extensionOf(path);
-  if (extension === "docx") return "docx";
-  if (extension === "pdf") return "pdf";
-  if (Object.hasOwn(imageMimeTypes, extension)) return "image";
-  if (["txt", "text", "log"].includes(extension)) return "text";
-  if (markdownExtensions.includes(extension)) return "markdown";
-  return null;
+  return documentAdapterForPath(path)?.kind ?? null;
 }
 
 export function imageMimeType(path: string): string {
-  return imageMimeTypes[extensionOf(path)] ?? "application/octet-stream";
+  return imageMimeTypes[extensionFromPath(path)] ?? "application/octet-stream";
 }
 
 export function isEditableDocument(kind: DocumentKind): boolean {
-  return kind === "markdown" || kind === "text";
+  return documentAdapterForKind(kind)?.capabilities.edit ?? false;
 }
 
 export async function renderHtmlFragment(source: string, options: RenderOptions = {}): Promise<RenderedMarkdown> {
