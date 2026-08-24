@@ -56,6 +56,17 @@ jobs:
           foreach ($assetName in ($assetNames | Where-Object { $_ -ne "latest.json" -and $_ -notlike "*.sig" })) {
             gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sig" --dir $assetDir
           }
+          $manifestPath = Join-Path $assetDir "latest.json"
+          $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+          $releaseAssets = (gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json).assets
+          foreach ($entry in $manifest.platforms.PSObject.Properties) {
+            $asset = $releaseAssets | Where-Object { $_.apiUrl -eq $entry.Value.url } | Select-Object -First 1
+            if ($null -eq $asset) {
+              throw "无法将更新清单映射到 Release 资产：$($entry.Name)"
+            }
+            $entry.Value.url = $asset.url
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath $manifestPath
           "ASSET_DIR=$assetDir" >> $env:GITHUB_ENV
 
       - name: Prepare mirror files
