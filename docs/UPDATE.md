@@ -24,7 +24,7 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 在 GitHub 仓库的 Settings → Secrets and variables → Actions 添加：
 
 - TAURI_SIGNING_PRIVATE_KEY：粘贴本机安全保存的私钥文件完整内容。
-- TAURI_SIGNING_PRIVATE_KEY_PASSWORD：当前密钥未设置密码，暂时留空；正式公开发布前建议重新生成带密码的密钥并更新公钥。
+- TAURI_SIGNING_PRIVATE_KEY_PASSWORD：填写生成签名密钥时设置的密码；不要把密码写进仓库、脚本或命令行参数。
 
 当前公钥已经写入 src-tauri/tauri.conf.json，公钥可以公开，私钥和密码绝不能公开。
 
@@ -73,9 +73,15 @@ npm run tauri -- build
 模拟正式更新构建时，使用 Tauri CLI 支持的环境变量，不要把私钥写进项目：
 
 ~~~powershell
-$privateKeyPath = Join-Path $env:USERPROFILE ".moyang-reader\moyang-reader.key"
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw $privateKeyPath
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+$privateKeyPath = Read-Host "请输入本机私钥文件路径"
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw -LiteralPath $privateKeyPath
+$securePassword = Read-Host "请输入签名私钥密码" -AsSecureString
+$passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+try {
+  $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+}
 npm run tauri -- build --config src-tauri/tauri.release.conf.json
 ~~~
 
