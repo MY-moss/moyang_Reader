@@ -8,6 +8,7 @@ use tauri::{Emitter, Manager, WindowEvent};
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(commands::AccessRegistry::default())
+        .manage(commands::WorkspaceWatcher::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let paths = argv
                 .into_iter()
@@ -32,7 +33,6 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init());
 
     #[cfg(desktop)]
@@ -59,6 +59,8 @@ pub fn run() {
             commands::read_binary_file,
             commands::path_exists,
             commands::file_size,
+            commands::watch_workspace,
+            commands::unwatch_workspace,
             commands::write_text_file,
             commands::write_binary_file,
             commands::create_markdown_file,

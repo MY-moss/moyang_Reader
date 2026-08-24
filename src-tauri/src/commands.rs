@@ -6,8 +6,9 @@ use std::sync::{
     Mutex,
 };
 
+use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 const MARKDOWN_EXTENSIONS: [&str; 4] = ["md", "markdown", "mdown", "mkd"];
@@ -24,12 +25,28 @@ static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub struct AccessRegistry {
     read_entries: Mutex<Vec<PathBuf>>,
     write_entries: Mutex<Vec<PathBuf>>,
+    workspace_entries: Mutex<Vec<PathBuf>>,
+}
+
+struct ActiveWorkspaceWatcher {
+    root_key: String,
+    _watcher: RecommendedWatcher,
+}
+
+#[derive(Default)]
+pub struct WorkspaceWatcher {
+    current: Mutex<Option<ActiveWorkspaceWatcher>>,
 }
 
 impl AccessRegistry {
     pub(crate) fn register_path(&self, path: &Path) -> Result<(), String> {
         self.register_read_path(path)?;
         self.register_write_path(path)
+    }
+
+    pub(crate) fn register_workspace_path(&self, path: &Path) -> Result<(), String> {
+        self.register_path(path)?;
+        register_access_entry(&self.workspace_entries, path)
     }
 
     pub(crate) fn register_document_path(&self, path: &Path) -> Result<(), String> {
@@ -56,6 +73,10 @@ impl AccessRegistry {
 
     pub(crate) fn is_write_allowed(&self, path: &Path) -> bool {
         is_access_allowed(&self.write_entries, path)
+    }
+
+    pub(crate) fn is_workspace_allowed(&self, path: &Path) -> bool {
+        is_access_allowed(&self.workspace_entries, path)
     }
 }
 
@@ -145,6 +166,13 @@ pub struct WorkspaceIndexEntry {
     pub title: String,
     pub links: Vec<String>,
     pub tags: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceChangeEvent {
+    pub root: String,
+    pub paths: Vec<String>,
 }
 
 fn decode_text(bytes: &[u8]) -> Result<String, String> {
@@ -248,7 +276,7 @@ pub async fn choose_document_path(
     })
     .await
     .map_err(|error| format!("打开文件选择器失败：{error}"))?;
-    register_selected_path(access, selected)
+    register_selected_path(access, selected, false)
 }
 
 #[tauri::command]
@@ -264,7 +292,7 @@ pub async fn choose_workspace_path(
     })
     .await
     .map_err(|error| format!("打开文件夹选择器失败：{error}"))?;
-    register_selected_path(access, selected)
+    register_selected_path(access, selected, true)
 }
 
 #[tauri::command]
@@ -306,12 +334,13 @@ pub async fn choose_save_path(
     })
     .await
     .map_err(|error| format!("打开保存位置选择器失败：{error}"))?;
-    register_selected_path(access, selected)
+    register_selected_path(access, selected, false)
 }
 
 fn register_selected_path(
     access: State<'_, AccessRegistry>,
     selected: Option<FilePath>,
+    workspace: bool,
 ) -> Result<Option<String>, String> {
     let Some(selected) = selected else {
         return Ok(None);
@@ -324,9 +353,16 @@ fn register_selected_path(
         .ok_or_else(|| "选择的路径包含无法处理的字符。".to_string())?
         .to_string();
     if path.is_file() {
+        if workspace {
+            return Err("工作区选择器必须返回文件夹。".to_string());
+        }
         access.register_document_path(&path)?;
     } else {
-        access.register_path(&path)?;
+        if workspace {
+            access.register_workspace_path(&path)?;
+        } else {
+            access.register_path(&path)?;
+        }
     }
     Ok(Some(path_string))
 }
@@ -393,6 +429,93 @@ pub fn file_size(path: String, access: State<'_, AccessRegistry>) -> Result<u64,
     fs::metadata(PathBuf::from(path))
         .map(|metadata| metadata.len())
         .map_err(|error| format!("无法读取文件信息：{error}"))
+}
+
+#[tauri::command]
+pub fn watch_workspace(
+    root: String,
+    access: State<'_, AccessRegistry>,
+    workspace_watcher: State<'_, WorkspaceWatcher>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let requested_root = PathBuf::from(&root);
+    if !access.is_workspace_allowed(&requested_root) {
+        return Err("拒绝监听未通过用户选择的工作区。请重新选择文件夹。".to_string());
+    }
+
+    let normalized_root = fs::canonicalize(&requested_root)
+        .map_err(|error| format!("无法确认工作区路径：{error}"))?;
+    if !normalized_root.is_dir() {
+        return Err("工作区路径不是文件夹。".to_string());
+    }
+
+    let event_root = root.clone();
+    let watcher = RecommendedWatcher::new(
+        move |result: notify::Result<notify::Event>| {
+            let Ok(event) = result else {
+                return;
+            };
+
+            let mut paths = event
+                .paths
+                .into_iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            paths.sort_unstable();
+            paths.dedup();
+            if paths.is_empty() {
+                return;
+            }
+
+            let _ = app.emit(
+                "workspace-changed",
+                WorkspaceChangeEvent {
+                    root: event_root.clone(),
+                    paths,
+                },
+            );
+        },
+        Config::default(),
+    )
+    .map_err(|error| format!("无法创建工作区监听：{error}"))?;
+
+    let mut watcher = watcher;
+    watcher
+        .watch(&normalized_root, RecursiveMode::Recursive)
+        .map_err(|error| format!("无法监听工作区：{error}"))?;
+
+    let mut current = workspace_watcher
+        .current
+        .lock()
+        .map_err(|_| "工作区监听状态不可用。".to_string())?;
+    let previous = current.replace(ActiveWorkspaceWatcher {
+        root_key: access_path_key(&requested_root),
+        _watcher: watcher,
+    });
+    drop(current);
+    drop(previous);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn unwatch_workspace(
+    root: String,
+    workspace_watcher: State<'_, WorkspaceWatcher>,
+) -> Result<(), String> {
+    let root_key = access_path_key(Path::new(&root));
+    let mut current = workspace_watcher
+        .current
+        .lock()
+        .map_err(|_| "工作区监听状态不可用。".to_string())?;
+
+    let should_unwatch = current
+        .as_ref()
+        .map(|active| active.root_key == root_key)
+        .unwrap_or(false);
+    if should_unwatch {
+        current.take();
+    }
+    Ok(())
 }
 
 fn extension(path: &Path) -> Option<String> {
@@ -1159,11 +1282,13 @@ mod tests {
         assert!(!access.is_write_allowed(&sibling));
         assert!(!access.is_read_allowed(&outside));
         assert!(!access.is_write_allowed(&outside));
+        assert!(!access.is_workspace_allowed(&vault));
 
         access
-            .register_path(&vault)
+            .register_workspace_path(&vault)
             .expect("register selected directory");
         assert!(access.is_write_allowed(&sibling));
+        assert!(access.is_workspace_allowed(&vault));
 
         fs::remove_dir_all(root).expect("remove access test directory");
     }
