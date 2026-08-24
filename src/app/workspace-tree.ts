@@ -31,6 +31,7 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
     folders: [],
     fileCount: 0,
   };
+  const foldersByPath = new Map<string, WorkspaceTreeFolder>([["", root]]);
 
   for (const file of files) {
     const parts = file.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
@@ -40,7 +41,8 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
 
     for (const part of parts) {
       const folderPath = current.path ? `${current.path}/${part}` : part;
-      let folder = current.folders.find((candidate) => candidate.name.toLocaleLowerCase() === part.toLocaleLowerCase());
+      const folderKey = folderPath.toLocaleLowerCase();
+      let folder = foldersByPath.get(folderKey);
       if (!folder) {
         folder = {
           name: part,
@@ -50,6 +52,7 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
           fileCount: 0,
         };
         current.folders.push(folder);
+        foldersByPath.set(folderKey, folder);
       }
       current = folder;
       current.fileCount += 1;
