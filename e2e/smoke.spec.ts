@@ -77,6 +77,30 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("keeps same-named browser documents in separate tabs", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "duplicate-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# First duplicate"),
+    },
+    {
+      name: "duplicate-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Second duplicate"),
+    },
+  ]);
+
+  const tabs = page.getByRole("tab", { name: "duplicate-note.md" });
+  await expect(tabs).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Second duplicate" })).toBeVisible();
+
+  await tabs.nth(0).click();
+  await expect(page.getByRole("heading", { name: "First duplicate" })).toBeVisible();
+});
+
 test("rejects unsupported browser files instead of rendering them as markdown", async ({ page }) => {
   await page.goto("/");
 

@@ -315,6 +315,7 @@ export function App() {
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
+  const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
   const workspacePathRef = useRef<string | null>(workspacePath);
@@ -1482,10 +1483,20 @@ export function App() {
     async (files: FileList | File[] | null | undefined) => {
       const selectedFiles = Array.from(files ?? []);
       if (selectedFiles.length === 0) return;
-      const supportedFiles = selectedFiles.filter((file) => documentKindFromPath(file.name));
-      const unsupportedNames = selectedFiles
-        .filter((file) => !documentKindFromPath(file.name))
-        .map((file) => file.name);
+      const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];
+      const unsupportedNames: string[] = [];
+      for (const file of selectedFiles) {
+        const kind = documentKindFromPath(file.name);
+        if (!kind) {
+          unsupportedNames.push(file.name);
+          continue;
+        }
+        supportedFiles.push({
+          file,
+          kind,
+          path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,
+        });
+      }
       const unsupportedNotice =
         unsupportedNames.length > 0
           ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
@@ -1494,15 +1505,12 @@ export function App() {
         if (unsupportedNotice) setError(unsupportedNotice);
         return;
       }
-      const nextPaths = supportedFiles.map((file) => `browser://${file.name}`);
+      const nextPaths = supportedFiles.map((entry) => entry.path);
       if (!confirmDocumentReplacement(nextPaths, "当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")) {
         return;
       }
 
-      for (const file of supportedFiles) {
-        const path = `browser://${file.name}`;
-        const kind = documentKindFromPath(file.name);
-        if (!kind) continue;
+      for (const { file, kind, path } of supportedFiles) {
         if (kind === "docx" || kind === "pdf" || kind === "image") {
           await openBinary(path, new Uint8Array(await file.arrayBuffer()));
         } else {
