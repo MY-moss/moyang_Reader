@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-v0.5.1 关系与发布增强版，继续基于轻量本地阅读核心完善：
+v0.5.2 阅读体验增强版，继续基于轻量本地阅读核心完善：
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
 - 双击传入文件路径、单实例接收后续打开请求
@@ -58,7 +58,7 @@ npm run tauri dev
 
 完整 NSIS 安装包也已生成：
 
-`src-tauri/target/release/bundle/nsis/Moyang Reader_0.5.1_x64-setup.exe`
+`src-tauri/target/release/bundle/nsis/Moyang Reader_0.5.2_x64-setup.exe`
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd` 文件关联。DOCX/PDF 当前支持在应用内选择、拖放和通过启动参数打开，但不会抢占 Word/PDF 的系统默认关联。
 
