@@ -25,6 +25,10 @@ type TopBarProps = {
   updateStatus: UpdateStatus;
   updateVersion: string | null;
   onCheckUpdates: () => void;
+  allowRemoteResources: boolean;
+  startupUpdateCheck: boolean;
+  onAllowRemoteResourcesChange: (allowed: boolean) => void;
+  onStartupUpdateCheckChange: (enabled: boolean) => void;
   onToggleSearch: () => void;
   onSearchQueryChange: (query: string) => void;
   onSearchPrevious: () => void;
@@ -57,6 +61,10 @@ export function TopBar({
   updateStatus,
   updateVersion,
   onCheckUpdates,
+  allowRemoteResources,
+  startupUpdateCheck,
+  onAllowRemoteResourcesChange,
+  onStartupUpdateCheckChange,
   onToggleSearch,
   onSearchQueryChange,
   onSearchPrevious,
@@ -112,6 +120,36 @@ export function TopBar({
         <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
           {themeLabel}
         </button>
+        <details className="settings-menu">
+          <summary className="toolbar-button" title="隐私与更新设置">
+            设置
+          </summary>
+          <div className="settings-menu-panel">
+            <div className="settings-menu-title">本地优先</div>
+            <label className="settings-option">
+              <input
+                type="checkbox"
+                checked={allowRemoteResources}
+                onChange={(event) => onAllowRemoteResourcesChange(event.target.checked)}
+              />
+              <span>
+                <strong>允许远程图片</strong>
+                <small>关闭时只显示本地附件，减少文档追踪请求。</small>
+              </span>
+            </label>
+            <label className="settings-option">
+              <input
+                type="checkbox"
+                checked={startupUpdateCheck}
+                onChange={(event) => onStartupUpdateCheckChange(event.target.checked)}
+              />
+              <span>
+                <strong>启动时检查更新</strong>
+                <small>关闭后仍可点击“更新”手动检查。</small>
+              </span>
+            </label>
+          </div>
+        </details>
         <button
           type="button"
           className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
