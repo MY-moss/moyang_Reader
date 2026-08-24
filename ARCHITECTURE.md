@@ -22,6 +22,7 @@ React UI
 
 Tauri/Rust
   ├─ commands.rs：路径、文本解码、目录扫描、索引和安全边界
+  ├─ lib.rs：应用生命周期、单实例处理、外部导航兜底
   └─ capabilities/：插件权限和文件监听权限
 ```
 
@@ -33,6 +34,7 @@ Tauri/Rust
 - 更新使用 GitHub Releases + Tauri 签名 updater：公钥随应用发布，私钥只放在本地安全存储和 GitHub Actions Secret 中。
 - HTML 是通用导出中间层：HTML 可打印为 PDF；DOCX 导出只处理安全 HTML 的常用块，不引入服务端转换依赖。
 - 远程资源策略由本地偏好控制：默认只允许 data 和工作区附件协议，开启远程图片后才允许 Markdown 中的 http/https 图片；更新检查同样默认手动，可选开启启动检查。
+- 外部链接采用双层防护：前端点击处理将允许的 `http(s)`、`mailto`、`tel` 链接交给系统打开，Rust/Tauri 的 `on_navigation` 钩子只放行应用来源、开发服务器和本地 asset 协议，阻止主窗口意外导航到外部网页。
 
 更详细的发布决策见 [`docs/UPDATE.md`](docs/UPDATE.md)；后续重大架构变化应新增 ADR，而不是覆盖历史说明。
 
