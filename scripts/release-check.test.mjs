@@ -69,6 +69,39 @@ test("rejects incomplete or unsafe updater metadata", () => {
   );
 });
 
+test("validates updater metadata for every declared platform", () => {
+  const errors = validateManifest(
+    {
+      version: "0.5.1",
+      platforms: {
+        "windows-x86_64": {
+          url: "https://github.com/example/windows.exe",
+          signature: "x".repeat(64),
+        },
+        "darwin-aarch64": {
+          url: "http://example.com/macos.tar.gz",
+          signature: "short",
+        },
+        "linux-x86_64": null,
+      },
+    },
+    "0.5.1",
+  );
+
+  assert.equal(
+    errors.some((error) => error.includes("darwin-aarch64.url") && error.includes("HTTPS")),
+    true,
+  );
+  assert.equal(
+    errors.some((error) => error.includes("darwin-aarch64.signature")),
+    true,
+  );
+  assert.equal(
+    errors.some((error) => error.includes("linux-x86_64") && error.includes("格式错误")),
+    true,
+  );
+});
+
 test("rejects private local paths and empty signing passwords in public docs", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-docs-"));
   fs.mkdirSync(path.join(root, "docs"));
