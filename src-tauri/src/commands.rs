@@ -22,42 +22,73 @@ static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Default)]
 pub struct AccessRegistry {
-    entries: Mutex<Vec<PathBuf>>,
+    read_entries: Mutex<Vec<PathBuf>>,
+    write_entries: Mutex<Vec<PathBuf>>,
 }
 
 impl AccessRegistry {
     pub(crate) fn register_path(&self, path: &Path) -> Result<(), String> {
-        let normalized = normalize_access_path(path)?;
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|_| "文件访问状态不可用。".to_string())?;
+        self.register_read_path(path)?;
+        self.register_write_path(path)
+    }
 
-        if entries
-            .iter()
-            .any(|entry| access_path_contains(entry, &normalized))
-        {
-            return Ok(());
+    pub(crate) fn register_document_path(&self, path: &Path) -> Result<(), String> {
+        self.register_path(path)?;
+        if path.is_file() {
+            if let Some(parent) = path.parent() {
+                self.register_read_path(parent)?;
+            }
         }
-
-        entries.retain(|entry| !access_path_contains(&normalized, entry));
-        entries.push(normalized);
         Ok(())
     }
 
-    pub(crate) fn is_allowed(&self, path: &Path) -> bool {
-        let Ok(normalized) = normalize_access_path(path) else {
-            return false;
-        };
-        self.entries
-            .lock()
-            .map(|entries| {
-                entries
-                    .iter()
-                    .any(|entry| access_path_contains(entry, &normalized))
-            })
-            .unwrap_or(false)
+    pub(crate) fn register_read_path(&self, path: &Path) -> Result<(), String> {
+        register_access_entry(&self.read_entries, path)
     }
+
+    pub(crate) fn register_write_path(&self, path: &Path) -> Result<(), String> {
+        register_access_entry(&self.write_entries, path)
+    }
+
+    pub(crate) fn is_read_allowed(&self, path: &Path) -> bool {
+        is_access_allowed(&self.read_entries, path)
+    }
+
+    pub(crate) fn is_write_allowed(&self, path: &Path) -> bool {
+        is_access_allowed(&self.write_entries, path)
+    }
+}
+
+fn register_access_entry(entries: &Mutex<Vec<PathBuf>>, path: &Path) -> Result<(), String> {
+    let normalized = normalize_access_path(path)?;
+    let mut entries = entries
+        .lock()
+        .map_err(|_| "文件访问状态不可用。".to_string())?;
+
+    if entries
+        .iter()
+        .any(|entry| access_path_contains(entry, &normalized))
+    {
+        return Ok(());
+    }
+
+    entries.retain(|entry| !access_path_contains(&normalized, entry));
+    entries.push(normalized);
+    Ok(())
+}
+
+fn is_access_allowed(entries: &Mutex<Vec<PathBuf>>, path: &Path) -> bool {
+    let Ok(normalized) = normalize_access_path(path) else {
+        return false;
+    };
+    entries
+        .lock()
+        .map(|entries| {
+            entries
+                .iter()
+                .any(|entry| access_path_contains(entry, &normalized))
+        })
+        .unwrap_or(false)
 }
 
 fn normalize_access_path(path: &Path) -> Result<PathBuf, String> {
@@ -192,7 +223,7 @@ pub fn initial_paths(access: State<'_, AccessRegistry>) -> Vec<String> {
         })
         .collect::<Vec<_>>();
     for path in &paths {
-        let _ = access.register_path(Path::new(path));
+        let _ = access.register_document_path(Path::new(path));
     }
     paths
 }
@@ -292,7 +323,11 @@ fn register_selected_path(
         .to_str()
         .ok_or_else(|| "选择的路径包含无法处理的字符。".to_string())?
         .to_string();
-    access.register_path(&path)?;
+    if path.is_file() {
+        access.register_document_path(&path)?;
+    } else {
+        access.register_path(&path)?;
+    }
     Ok(Some(path_string))
 }
 
@@ -307,7 +342,10 @@ pub fn close_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn read_text_file(path: String) -> Result<String, String> {
+pub fn read_text_file(path: String, access: State<'_, AccessRegistry>) -> Result<String, String> {
+    if !access.is_read_allowed(Path::new(&path)) {
+        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
     read_text_file_inner(PathBuf::from(path))
 }
 
@@ -321,8 +359,14 @@ fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
+pub fn read_binary_file(
+    path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<u8>, String> {
     let path = PathBuf::from(path);
+    if !access.is_read_allowed(&path) {
+        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
     let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
     if metadata.len() > MAX_READ_FILE_BYTES {
         return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
@@ -331,12 +375,19 @@ pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
-pub fn path_exists(path: String) -> bool {
-    Path::new(&path).exists()
+pub fn path_exists(path: String, access: State<'_, AccessRegistry>) -> bool {
+    access.is_read_allowed(Path::new(&path)) && path_exists_inner(Path::new(&path))
+}
+
+fn path_exists_inner(path: &Path) -> bool {
+    path.exists()
 }
 
 #[tauri::command]
-pub fn file_size(path: String) -> Result<u64, String> {
+pub fn file_size(path: String, access: State<'_, AccessRegistry>) -> Result<u64, String> {
+    if !access.is_read_allowed(Path::new(&path)) {
+        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
     fs::metadata(PathBuf::from(path))
         .map(|metadata| metadata.len())
         .map_err(|error| format!("无法读取文件信息：{error}"))
@@ -441,7 +492,13 @@ fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
 }
 
 #[tauri::command]
-pub fn list_workspace_files(root: String) -> Result<Vec<WorkspaceFile>, String> {
+pub fn list_workspace_files(
+    root: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<WorkspaceFile>, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+    }
     list_workspace_files_inner(PathBuf::from(root))
 }
 
@@ -450,7 +507,14 @@ fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, Strin
 }
 
 #[tauri::command]
-pub fn search_workspace(root: String, query: String) -> Result<Vec<WorkspaceSearchResult>, String> {
+pub fn search_workspace(
+    root: String,
+    query: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+    }
     search_workspace_inner(PathBuf::from(root), query)
 }
 
@@ -820,7 +884,7 @@ pub fn create_markdown_file(
     target: String,
     access: State<'_, AccessRegistry>,
 ) -> Result<String, String> {
-    if !access.is_allowed(Path::new(&root)) {
+    if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝在未通过用户文件夹选择的工作区中创建文档。请重新添加文件夹。".to_string());
     }
     create_markdown_file_inner(root, base_file, target)
@@ -892,7 +956,13 @@ fn create_markdown_file_inner(
 }
 
 #[tauri::command]
-pub fn index_workspace(root: String) -> Result<Vec<WorkspaceIndexEntry>, String> {
+pub fn index_workspace(
+    root: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<WorkspaceIndexEntry>, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+    }
     index_workspace_inner(PathBuf::from(root))
 }
 
@@ -931,7 +1001,7 @@ pub fn write_text_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !access.is_allowed(&path) {
+    if !access.is_write_allowed(&path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
     write_text_file_inner(path, contents)
@@ -948,7 +1018,7 @@ pub fn write_binary_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !access.is_allowed(&path) {
+    if !access.is_write_allowed(&path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
     }
     write_bytes_file_inner(path, &contents, false)
@@ -1041,7 +1111,7 @@ mod tests {
     use super::{
         create_markdown_file_inner, decode_text, extract_title, index_workspace_inner,
         is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
-        path_exists, read_text_file_inner, search_workspace_inner, should_skip_directory,
+        path_exists_inner, read_text_file_inner, search_workspace_inner, should_skip_directory,
         write_text_file_inner, AccessRegistry, WorkspaceFile, MAX_READ_FILE_BYTES,
         TEMP_FILE_COUNTER,
     };
@@ -1063,23 +1133,35 @@ mod tests {
     }
 
     #[test]
-    fn access_registry_limits_writes_to_registered_paths() {
+    fn access_registry_keeps_document_reads_wider_than_writes() {
         let root =
             std::env::temp_dir().join(format!("moyang-reader-access-{}", std::process::id()));
         let vault = root.join("vault");
         let note = vault.join("note.md");
+        let attachment = vault.join("image.png");
+        let sibling = vault.join("other.md");
         let outside = root.join("outside.md");
         fs::create_dir_all(&vault).expect("create access test directory");
         fs::write(&note, "note").expect("write access test note");
+        fs::write(&attachment, [0_u8, 1, 2]).expect("write access test attachment");
 
         let access = AccessRegistry::default();
         access
+            .register_document_path(&note)
+            .expect("register selected document");
+
+        assert!(access.is_read_allowed(&note));
+        assert!(access.is_read_allowed(&attachment));
+        assert!(access.is_read_allowed(&sibling));
+        assert!(access.is_write_allowed(&note));
+        assert!(!access.is_write_allowed(&sibling));
+        assert!(!access.is_read_allowed(&outside));
+        assert!(!access.is_write_allowed(&outside));
+
+        access
             .register_path(&vault)
             .expect("register selected directory");
-
-        assert!(access.is_allowed(&note));
-        assert!(access.is_allowed(&vault.join("new.md")));
-        assert!(!access.is_allowed(&outside));
+        assert!(access.is_write_allowed(&sibling));
 
         fs::remove_dir_all(root).expect("remove access test directory");
     }
@@ -1217,13 +1299,9 @@ mod tests {
         assert!(linked.tags.iter().any(|tag| tag == "front"));
         assert!(linked.tags.iter().any(|tag| tag == "topic"));
         assert!(!linked.tags.iter().any(|tag| tag == "inline"));
-        assert!(path_exists(
-            root.join("README.md").to_string_lossy().into_owned()
-        ));
-        assert!(path_exists(root.to_string_lossy().into_owned()));
-        assert!(!path_exists(
-            root.join("missing.md").to_string_lossy().into_owned()
-        ));
+        assert!(path_exists_inner(&root.join("README.md")));
+        assert!(path_exists_inner(&root));
+        assert!(!path_exists_inner(&root.join("missing.md")));
 
         let created = create_markdown_file_inner(
             root_string.clone(),
