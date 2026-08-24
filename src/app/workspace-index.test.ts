@@ -35,9 +35,7 @@ describe("workspace index", () => {
     const sameFolder = entry("notes/Target.md");
     const otherFolder = entry("archive/Target.md");
 
-    expect(findLinkedEntry([otherFolder, sameFolder], current, "Target#Section")?.file.path)
-      .toBe("notes/Target.md");
-    expect(findLinkedEntry([otherFolder, sameFolder], current, "archive/Target")?.file.path)
-      .toBe("archive/Target.md");
+    expect(findLinkedEntry([otherFolder, sameFolder], current, "Target#Section")?.file.path).toBe("notes/Target.md");
+    expect(findLinkedEntry([otherFolder, sameFolder], current, "archive/Target")?.file.path).toBe("archive/Target.md");
   });
 });

@@ -1,5 +1,8 @@
 function normalizeWorkspacePath(value: string | null): string {
-  return (value ?? "").replace(/[\\/]+/g, "\\").replace(/\\$/, "").toLocaleLowerCase();
+  return (value ?? "")
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\$/, "")
+    .toLocaleLowerCase();
 }
 
 export function isCurrentWorkspaceLoad(

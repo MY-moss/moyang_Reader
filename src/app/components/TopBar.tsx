@@ -66,19 +66,25 @@ export function TopBar({
 }: TopBarProps) {
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const updateLabel =
-    updateStatus === "checking" ? "检查中…" :
-      updateStatus === "downloading" ? "下载中…" :
-        updateStatus === "available" ? "有更新" :
-          updateStatus === "ready" ? "已更新" :
-            updateStatus === "up-to-date" ? "已是最新" : "更新";
-  const updateTitle = updateVersion
-    ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
-    : "检查应用更新";
+    updateStatus === "checking"
+      ? "检查中…"
+      : updateStatus === "downloading"
+        ? "下载中…"
+        : updateStatus === "available"
+          ? "有更新"
+          : updateStatus === "ready"
+            ? "已更新"
+            : updateStatus === "up-to-date"
+              ? "已是最新"
+              : "更新";
+  const updateTitle = updateVersion ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示" : "检查应用更新";
 
   return (
     <header className="topbar">
       <div className="brand-block">
-        <span className="brand-mark" aria-hidden="true">M</span>
+        <span className="brand-mark" aria-hidden="true">
+          M
+        </span>
         <div>
           <div className="brand-name">Moyang Reader</div>
           <div className="brand-subtitle">本地阅读器</div>
@@ -120,16 +126,24 @@ export function TopBar({
         </button>
         {(canExportMarkdown || canExportHtml || canExportDocx) && (
           <details className="export-menu">
-            <summary className="toolbar-button" title="导出文件">导出</summary>
+            <summary className="toolbar-button" title="导出文件">
+              导出
+            </summary>
             <div className="export-menu-panel">
               {canExportMarkdown && (
-                <button type="button" onClick={onExportMarkdown}>导出 Markdown / 文本</button>
+                <button type="button" onClick={onExportMarkdown}>
+                  导出 Markdown / 文本
+                </button>
               )}
               {canExportHtml && (
-                <button type="button" onClick={onExportHtml}>导出 HTML（含图片）</button>
+                <button type="button" onClick={onExportHtml}>
+                  导出 HTML（含图片）
+                </button>
               )}
               {canExportDocx && (
-                <button type="button" onClick={onExportDocx}>导出 Word（DOCX）</button>
+                <button type="button" onClick={onExportDocx}>
+                  导出 Word（DOCX）
+                </button>
               )}
             </div>
           </details>
@@ -147,15 +161,24 @@ export function TopBar({
             onChange={(event) => onSearchQueryChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") onCloseSearch();
-              if (event.key === "Enter") event.shiftKey ? onSearchPrevious() : onSearchNext();
+              if (event.key === "Enter") {
+                if (event.shiftKey) onSearchPrevious();
+                else onSearchNext();
+              }
             }}
           />
           <span className="find-count">
             {searchResultCount === 0 ? "无结果" : `${searchResultIndex + 1} / ${searchResultCount}`}
           </span>
-          <button type="button" className="find-button" onClick={onSearchPrevious} aria-label="上一个结果">↑</button>
-          <button type="button" className="find-button" onClick={onSearchNext} aria-label="下一个结果">↓</button>
-          <button type="button" className="find-button" onClick={onCloseSearch} aria-label="关闭搜索">×</button>
+          <button type="button" className="find-button" onClick={onSearchPrevious} aria-label="上一个结果">
+            ↑
+          </button>
+          <button type="button" className="find-button" onClick={onSearchNext} aria-label="下一个结果">
+            ↓
+          </button>
+          <button type="button" className="find-button" onClick={onCloseSearch} aria-label="关闭搜索">
+            ×
+          </button>
         </div>
       )}
     </header>

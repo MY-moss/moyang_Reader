@@ -118,41 +118,69 @@ pub struct WorkspaceIndexEntry {
 
 fn decode_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.starts_with(&[0xFF, 0xFE]) {
-        if (bytes.len() - 2) % 2 != 0 {
+        if !(bytes.len() - 2).is_multiple_of(2) {
             return Err("UTF-16 文件末尾存在不完整的字节，无法安全读取。".to_string());
         }
         let values = bytes[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
-        return String::from_utf16(values.collect::<Vec<_>>().as_slice())
-            .map_err(|error| format!("UTF-16 文件无法解析：{error}"));
+        let text = String::from_utf16(values.collect::<Vec<_>>().as_slice())
+            .map_err(|error| format!("UTF-16 文件无法解析：{error}"))?;
+        return reject_suspicious_binary_text(text);
     }
 
     if bytes.starts_with(&[0xFE, 0xFF]) {
-        if (bytes.len() - 2) % 2 != 0 {
+        if !(bytes.len() - 2).is_multiple_of(2) {
             return Err("UTF-16 文件末尾存在不完整的字节，无法安全读取。".to_string());
         }
         let values = bytes[2..]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u16::from_be_bytes([pair[0], pair[1]]));
-        return String::from_utf16(values.collect::<Vec<_>>().as_slice())
-            .map_err(|error| format!("UTF-16 文件无法解析：{error}"));
+        let text = String::from_utf16(values.collect::<Vec<_>>().as_slice())
+            .map_err(|error| format!("UTF-16 文件无法解析：{error}"))?;
+        return reject_suspicious_binary_text(text);
     }
 
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        return String::from_utf8(bytes[3..].to_vec())
-            .map_err(|error| format!("UTF-8 文件无法解析：{error}"));
+        let text = String::from_utf8(bytes[3..].to_vec())
+            .map_err(|error| format!("UTF-8 文件无法解析：{error}"))?;
+        return reject_suspicious_binary_text(text);
     }
 
     if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-        return Ok(text);
+        return reject_suspicious_binary_text(text);
     }
 
     let (decoded, _, had_errors) = encoding_rs::GB18030.decode(bytes);
     if had_errors {
         return Err("文件不是有效的 UTF-8、UTF-16 或 GB18030 文本。".to_string());
     }
-    Ok(decoded.into_owned())
+    reject_suspicious_binary_text(decoded.into_owned())
+}
+
+fn reject_suspicious_binary_text(text: String) -> Result<String, String> {
+    let character_count = text.chars().count();
+    let suspicious_count = text
+        .chars()
+        .filter(|character| {
+            *character == '\u{FFFD}'
+                || (character.is_control() && !matches!(*character, '\t' | '\n' | '\r'))
+        })
+        .count();
+    let has_nul = text.contains('\0');
+    if has_nul
+        || (suspicious_count >= 3
+            && suspicious_count.saturating_mul(100) >= character_count.max(1).saturating_mul(2))
+    {
+        return Err(
+            "文件内容疑似二进制或损坏文本，已拒绝按文本打开，以避免乱码覆盖原文件。".to_string(),
+        );
+    }
+    Ok(text)
 }
 
 #[tauri::command]
@@ -1095,6 +1123,14 @@ mod tests {
             decode_text("你好".as_bytes()).expect("decode UTF-8"),
             "你好"
         );
+        let (gb18030, _, had_errors) = encoding_rs::GB18030.encode("你好，世界");
+        assert!(!had_errors);
+        assert_eq!(
+            decode_text(gb18030.as_ref()).expect("decode GB18030"),
+            "你好，世界"
+        );
+        assert!(decode_text(&[0, 1, 2, 3]).is_err());
+        assert!(decode_text(&[0xFF, 0xD8, 0xFF, 0xE0, 0, 0x01]).is_err());
     }
 
     #[test]

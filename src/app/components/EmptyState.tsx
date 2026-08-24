@@ -11,9 +11,7 @@ export function EmptyState({ onOpen }: EmptyStateProps) {
       </div>
       <div className="empty-eyebrow">READ LOCAL · STAY PORTABLE</div>
       <h1 id="empty-title">把文档打开，专心阅读。</h1>
-      <p>
-        双击文档即可进入阅读模式。这里先保持安静，编辑、搜索和工作区能力会在需要时出现。
-      </p>
+      <p>双击文档即可进入阅读模式。这里先保持安静，编辑、搜索和工作区能力会在需要时出现。</p>
       <div className="empty-capabilities" aria-label="支持的文档类型">
         <span>MARKDOWN</span>
         <span>WORD</span>

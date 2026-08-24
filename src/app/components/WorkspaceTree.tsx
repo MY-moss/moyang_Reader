@@ -64,7 +64,9 @@ function WorkspaceFolder({
         aria-expanded={isOpen}
         onClick={() => onToggleFolder(folder.path)}
       >
-        <span className="workspace-folder-caret" aria-hidden="true">{isOpen ? "⌄" : "›"}</span>
+        <span className="workspace-folder-caret" aria-hidden="true">
+          {isOpen ? "⌄" : "›"}
+        </span>
         <span>{folder.name}</span>
         <small>{folder.fileCount}</small>
       </button>
