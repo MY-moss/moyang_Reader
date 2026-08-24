@@ -21,6 +21,9 @@ const IMAGE_EXTENSIONS: [&str; 7] = ["avif", "gif", "jpeg", "jpg", "png", "svg",
 const MAX_READ_FILE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_SEARCH_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_INDEX_FILE_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_SEARCH_CACHE_ENTRIES: usize = 256;
+const MAX_SEARCH_CACHE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Default)]
@@ -43,43 +46,171 @@ pub struct WorkspaceWatcher {
 #[derive(Default)]
 pub struct WorkspaceSearchCache {
     entries: Mutex<HashMap<String, CachedSearchText>>,
-    file_lists: Mutex<HashMap<String, Vec<WorkspaceFile>>>,
+    file_lists: Mutex<HashMap<String, CachedWorkspaceFileList>>,
+    access_counter: AtomicU64,
 }
 
 struct CachedSearchText {
     size: u64,
     modified: Option<SystemTime>,
     source: String,
+    memory_bytes: u64,
+    last_used: u64,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct CachedDirectoryStamp {
+    path: PathBuf,
+    modified: SystemTime,
+}
+
+struct CachedWorkspaceFileList {
+    files: Vec<WorkspaceFile>,
+    directories: Vec<CachedDirectoryStamp>,
+    last_used: u64,
+}
+
+fn collect_workspace_directory_stamps(
+    directory: &Path,
+    stamps: &mut Vec<CachedDirectoryStamp>,
+) -> Result<(), String> {
+    let modified = fs::metadata(directory)
+        .and_then(|metadata| metadata.modified())
+        .map_err(|error| format!("无法读取工作区目录时间：{error}"))?;
+    stamps.push(CachedDirectoryStamp {
+        path: directory.to_path_buf(),
+        modified,
+    });
+
+    for entry in fs::read_dir(directory).map_err(|error| format!("无法读取工作区目录：{error}"))?
+    {
+        let entry = entry.map_err(|error| format!("无法读取工作区条目：{error}"))?;
+        let path = entry.path();
+        if entry
+            .file_type()
+            .map_err(|error| format!("无法读取工作区条目类型：{error}"))?
+            .is_dir()
+            && !should_skip_directory(&path)
+        {
+            collect_workspace_directory_stamps(&path, stamps)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn workspace_directory_stamps(root: &Path) -> Result<Vec<CachedDirectoryStamp>, String> {
+    let mut stamps = Vec::new();
+    collect_workspace_directory_stamps(root, &mut stamps)?;
+    Ok(stamps)
+}
+
+fn prune_search_entries(entries: &mut HashMap<String, CachedSearchText>) {
+    while entries.len() > MAX_SEARCH_CACHE_ENTRIES
+        || entries
+            .values()
+            .map(|entry| entry.memory_bytes)
+            .sum::<u64>()
+            > MAX_SEARCH_CACHE_BYTES
+    {
+        let Some(oldest_key) = entries
+            .iter()
+            .min_by_key(|(_, entry)| entry.last_used)
+            .map(|(key, _)| key.clone())
+        else {
+            break;
+        };
+        entries.remove(&oldest_key);
+    }
+}
+
+fn prune_file_lists(file_lists: &mut HashMap<String, CachedWorkspaceFileList>) {
+    while file_lists.len() > MAX_FILE_LIST_CACHE_ENTRIES {
+        let Some(oldest_key) = file_lists
+            .iter()
+            .min_by_key(|(_, entry)| entry.last_used)
+            .map(|(key, _)| key.clone())
+        else {
+            break;
+        };
+        file_lists.remove(&oldest_key);
+    }
 }
 
 impl WorkspaceSearchCache {
+    fn next_access(&self) -> u64 {
+        self.access_counter.fetch_add(1, Ordering::Relaxed)
+    }
+
     fn list_files(&self, root: &Path) -> Result<Vec<WorkspaceFile>, String> {
         let key = access_path_key(root);
+        let access = self.next_access();
+        let current_directories = workspace_directory_stamps(root).ok();
         if let Ok(file_lists) = self.file_lists.lock() {
-            if let Some(files) = file_lists.get(&key) {
-                return Ok(files.clone());
+            if let Some(cached) = file_lists.get(&key) {
+                if current_directories
+                    .as_ref()
+                    .map(|directories| directories == &cached.directories)
+                    .unwrap_or(false)
+                {
+                    let files = cached.files.clone();
+                    drop(file_lists);
+                    if let Ok(mut file_lists) = self.file_lists.lock() {
+                        if let Some(cached) = file_lists.get_mut(&key) {
+                            cached.last_used = access;
+                        }
+                    }
+                    return Ok(files);
+                }
             }
         }
 
         let files = sorted_workspace_files(root)?;
-        if let Ok(mut file_lists) = self.file_lists.lock() {
-            file_lists.insert(key, files.clone());
+        if let Ok(directories) = workspace_directory_stamps(root) {
+            if let Ok(mut file_lists) = self.file_lists.lock() {
+                file_lists.insert(
+                    key,
+                    CachedWorkspaceFileList {
+                        files: files.clone(),
+                        directories,
+                        last_used: access,
+                    },
+                );
+                prune_file_lists(&mut file_lists);
+            }
         }
         Ok(files)
     }
 
     fn read_text(&self, file: &WorkspaceFile) -> Option<String> {
         let path = PathBuf::from(&file.path);
-        let metadata = fs::metadata(&path).ok()?;
         let key = access_path_key(&path);
+        let metadata = match fs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                if let Ok(mut entries) = self.entries.lock() {
+                    entries.remove(&key);
+                }
+                return None;
+            }
+        };
         let modified = metadata.modified().ok();
+        let access = self.next_access();
 
-        if let Ok(entries) = self.entries.lock() {
+        if let Ok(mut entries) = self.entries.lock() {
             if let Some(cached) = entries.get(&key) {
                 if cached.size == metadata.len() && cached.modified == modified {
-                    return Some(cached.source.clone());
+                    let source = cached.source.clone();
+                    drop(entries);
+                    if let Ok(mut entries) = self.entries.lock() {
+                        if let Some(cached) = entries.get_mut(&key) {
+                            cached.last_used = access;
+                        }
+                    }
+                    return Some(source);
                 }
             }
+            entries.remove(&key);
         }
 
         let source = read_text_file_inner(path).ok()?;
@@ -90,25 +221,27 @@ impl WorkspaceSearchCache {
                     size: metadata.len(),
                     modified,
                     source: source.clone(),
+                    memory_bytes: source.len() as u64,
+                    last_used: access,
                 },
             );
+            prune_search_entries(&mut entries);
         }
         Some(source)
     }
 
     fn invalidate_scopes(&self, scopes: &[String]) {
-        let Ok(mut entries) = self.entries.lock() else {
-            return;
-        };
-        entries.retain(|path, _| {
-            !scopes.iter().any(|scope| {
-                access_path_contains(Path::new(scope), Path::new(path))
-                    || access_path_contains(
-                        Path::new(&display_path(Path::new(scope))),
-                        Path::new(&display_path(Path::new(path))),
-                    )
-            })
-        });
+        if let Ok(mut entries) = self.entries.lock() {
+            entries.retain(|path, _| {
+                !scopes.iter().any(|scope| {
+                    access_path_contains(Path::new(scope), Path::new(path))
+                        || access_path_contains(
+                            Path::new(&display_path(Path::new(scope))),
+                            Path::new(&display_path(Path::new(path))),
+                        )
+                })
+            });
+        }
 
         if let Ok(mut file_lists) = self.file_lists.lock() {
             file_lists.retain(|root, _| {
@@ -1555,10 +1688,11 @@ mod tests {
         create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
         extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
         is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
-        path_exists_inner, read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
-        search_workspace_inner_with_cache, should_skip_directory, write_text_file_inner,
-        AccessRegistry, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
+        path_exists_inner, prune_search_entries, read_text_file_inner, refresh_workspace_inner,
+        search_workspace_inner, search_workspace_inner_with_cache, should_skip_directory,
+        write_text_file_inner, AccessRegistry, CachedSearchText, OpenPath, OpenPathKind,
+        WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1979,7 +2113,7 @@ mod tests {
                 .lock()
                 .expect("lock workspace file cache")
                 .get(&root_key)
-                .map(Vec::len),
+                .map(|entry| entry.files.len()),
             Some(1)
         );
 
@@ -2012,6 +2146,68 @@ mod tests {
         assert_eq!(added_result.len(), 1);
 
         fs::remove_dir_all(root).expect("remove search cache workspace");
+    }
+
+    #[test]
+    fn refreshes_file_list_cache_when_a_nested_directory_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-cache-watch-fallback-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create watch fallback workspace");
+        fs::write(root.join("initial.md"), "initial needle").expect("write initial note");
+
+        let cache = WorkspaceSearchCache::default();
+        let initial =
+            search_workspace_inner_with_cache(root.clone(), "initial".to_string(), &cache)
+                .expect("search initial note");
+        assert_eq!(initial.len(), 1);
+
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        let nested = root.join("nested");
+        fs::create_dir_all(&nested).expect("create nested directory");
+        fs::write(nested.join("added.md"), "added needle").expect("write added note");
+
+        let added = search_workspace_inner_with_cache(root.clone(), "added".to_string(), &cache)
+            .expect("search added note after directory change");
+        assert_eq!(added.len(), 1);
+        assert_eq!(added[0].file.relative_path, "nested/added.md");
+
+        fs::remove_dir_all(root).expect("remove watch fallback workspace");
+    }
+
+    #[test]
+    fn bounds_search_cache_entries_and_memory_with_lru_eviction() {
+        let cache = WorkspaceSearchCache::default();
+        let mut entries = cache.entries.lock().expect("lock search cache");
+        for index in 0..MAX_SEARCH_CACHE_ENTRIES {
+            entries.insert(
+                format!("note-{index}"),
+                CachedSearchText {
+                    size: 1,
+                    modified: None,
+                    source: "x".to_string(),
+                    memory_bytes: 1,
+                    last_used: index as u64,
+                },
+            );
+        }
+        entries.insert(
+            "large".to_string(),
+            CachedSearchText {
+                size: MAX_SEARCH_CACHE_BYTES,
+                modified: None,
+                source: "large".to_string(),
+                memory_bytes: MAX_SEARCH_CACHE_BYTES,
+                last_used: MAX_SEARCH_CACHE_ENTRIES as u64,
+            },
+        );
+
+        prune_search_entries(&mut entries);
+
+        assert_eq!(entries.len(), 1);
+        assert!(entries.contains_key("large"));
     }
 
     #[test]
