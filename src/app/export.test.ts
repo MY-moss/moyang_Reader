@@ -230,4 +230,24 @@ describe("document export helpers", () => {
     expect(documentXml).toContain('w:w="15840" w:h="12240" w:orient="landscape"');
     expect(documentXml).toContain('w:top="2160" w:right="2160" w:bottom="2160" w:left="2160"');
   });
+
+  it("adds reusable header, footer, and page-number fields to DOCX exports", async () => {
+    const bytes = await buildDocxExport("页眉页脚示例", "<p>正文</p>");
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const headerXml = await zip.file("word/header1.xml")?.async("string");
+    const footerXml = await zip.file("word/footer1.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+    const contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
+
+    expect(documentXml).toContain('w:headerReference w:type="default" r:id="rIdHeader"');
+    expect(documentXml).toContain('w:footerReference w:type="default" r:id="rIdFooter"');
+    expect(headerXml).toContain("页眉页脚示例");
+    expect(footerXml).toContain('w:fldSimple w:instr="PAGE"');
+    expect(footerXml).toContain('w:fldSimple w:instr="NUMPAGES"');
+    expect(relationshipsXml).toContain('Id="rIdHeader"');
+    expect(relationshipsXml).toContain('Id="rIdFooter"');
+    expect(contentTypesXml).toContain("/word/header1.xml");
+    expect(contentTypesXml).toContain("/word/footer1.xml");
+  });
 });
