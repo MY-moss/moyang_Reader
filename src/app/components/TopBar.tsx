@@ -12,6 +12,7 @@ type TopBarProps = {
   searchResultIndex: number;
   theme: ThemeMode;
   onOpen: () => void;
+  onQuickOpen: () => void;
   onToggleMode: () => void;
   onSave: () => void;
   onExport: () => void;
@@ -48,6 +49,7 @@ export function TopBar({
   searchResultIndex,
   theme,
   onOpen,
+  onQuickOpen,
   onToggleMode,
   onSave,
   onExport,
@@ -107,6 +109,9 @@ export function TopBar({
       <nav className="toolbar" aria-label="文档操作">
         <button type="button" className="toolbar-button" onClick={onOpen} title="打开文件 (Ctrl+O)">
           打开
+        </button>
+        <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
+          快速打开
         </button>
         <button type="button" className="toolbar-button" onClick={onToggleSearch} title="查找文档内容 (Ctrl+F)">
           搜索

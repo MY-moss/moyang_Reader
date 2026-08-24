@@ -4,6 +4,7 @@ import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
+import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
 import { Tabs } from "./components/Tabs";
@@ -82,6 +83,7 @@ import {
   renderSource,
 } from "../lib/document-adapters";
 import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
+import type { QuickOpenCandidate } from "./quick-open";
 import {
   applyWorkspaceFileDelta,
   applyWorkspaceIndexDelta,
@@ -220,6 +222,7 @@ export function App() {
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -921,6 +924,10 @@ export function App() {
         event.preventDefault();
         setSearchOpen(true);
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setQuickOpen(true);
+      }
     };
 
     window.addEventListener("keydown", handleShortcut);
@@ -1367,6 +1374,20 @@ export function App() {
   const visibleWorkspaceResults = selectedTag
     ? workspaceResults.filter((result) => taggedFilePaths.has(result.file.path))
     : workspaceResults;
+  const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
+    const items = new Map<string, QuickOpenCandidate>();
+    const add = (candidate: QuickOpenCandidate) => {
+      const key = comparablePath(candidate.path);
+      const existing = items.get(key);
+      items.set(key, existing ? { ...existing, isRecent: existing.isRecent || candidate.isRecent } : candidate);
+    };
+
+    workspaceFiles.forEach((file) => add(file));
+    openTabs.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));
+    recentFiles.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));
+
+    return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
+  }, [openTabs, recentFiles, workspaceFiles]);
 
   const handleExportWorkspace = useCallback(async () => {
     if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
@@ -1446,6 +1467,7 @@ export function App() {
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
         onOpen={() => void openSelectedFile()}
+        onQuickOpen={() => setQuickOpen(true)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
         onExport={handleExport}
@@ -1634,6 +1656,16 @@ export function App() {
           entries={workspaceIndex}
           onClose={() => setGraphOpen(false)}
           onOpenFile={(path) => void handleSelectTab(path)}
+        />
+      )}
+      {quickOpen && (
+        <QuickOpenPalette
+          items={quickOpenItems}
+          onClose={() => setQuickOpen(false)}
+          onOpenFile={(path) => {
+            setQuickOpen(false);
+            void handleSelectTab(path);
+          }}
         />
       )}
     </div>

@@ -328,6 +328,194 @@ a:focus-visible {
     border-color 150ms ease,
     background 150ms ease;
 }
+.quick-open-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 24px 24px;
+  background: rgba(31, 38, 35, 0.42);
+  backdrop-filter: blur(10px) saturate(0.86);
+  animation: quick-open-fade 160ms ease-out;
+}
+.quick-open-dialog {
+  width: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, var(--accent-soft));
+  box-shadow: 0 24px 72px rgba(28, 37, 33, 0.28);
+  animation: quick-open-rise 180ms ease-out;
+}
+.quick-open-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 11px;
+}
+.quick-open-kicker {
+  color: var(--accent-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+}
+.quick-open-header h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+}
+.quick-open-header kbd,
+.quick-open-input-wrap kbd {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 3px 6px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+.quick-open-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 75%, transparent);
+  color: var(--accent-deep);
+}
+.quick-open-input-wrap > span {
+  font-family: Georgia, serif;
+  font-size: 21px;
+  line-height: 1;
+}
+.quick-open-input-wrap input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+.quick-open-input-wrap input::placeholder {
+  color: var(--muted);
+}
+.quick-open-results {
+  max-height: min(54vh, 500px);
+  overflow: auto;
+  padding: 4px 9px 8px;
+}
+.quick-open-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  padding: 10px 11px;
+  text-align: left;
+  transition:
+    border-color 130ms ease,
+    background 130ms ease,
+    transform 130ms ease;
+}
+.quick-open-item:hover,
+.quick-open-item.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+}
+.quick-open-item.active {
+  transform: translateX(2px);
+}
+.quick-open-kind {
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--accent-deep);
+  padding: 3px 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.quick-open-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.quick-open-copy strong,
+.quick-open-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-open-copy strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+.quick-open-copy small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.quick-open-recent {
+  color: var(--accent-warm);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.quick-open-empty {
+  display: grid;
+  gap: 6px;
+  padding: 34px 20px 38px;
+  color: var(--muted);
+  text-align: center;
+}
+.quick-open-empty strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+}
+.quick-open-empty span {
+  font-size: 11px;
+}
+.quick-open-footer {
+  display: flex;
+  gap: 15px;
+  padding: 9px 20px 11px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+}
+@keyframes quick-open-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes quick-open-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 .tab-strip {
   display: flex;
   min-width: 0;
@@ -1751,6 +1939,13 @@ a:focus-visible {
   .findbar input {
     width: auto;
     flex: 1;
+  }
+  .quick-open-backdrop {
+    padding: 8vh 16px 16px;
+  }
+  .quick-open-footer {
+    gap: 10px;
+    padding-inline: 14px;
   }
   .reader-content {
     width: calc(100% - 48px);
