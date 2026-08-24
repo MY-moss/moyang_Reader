@@ -39,6 +39,7 @@ type WorkspacePanelProps = {
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
+  onClearFilters: () => void;
 };
 
 function pathName(path: string): string {
@@ -73,7 +74,11 @@ export function WorkspacePanel({
   onSearchQueryChange,
   onTagChange,
   onKindChange,
+  onClearFilters,
 }: WorkspacePanelProps) {
+  const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
+  const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
+
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
       <div className="workspace-heading">
@@ -162,6 +167,27 @@ export function WorkspacePanel({
 
       {workspacePath && (
         <>
+          <div className="workspace-filter-summary" role="status">
+            <span>
+              {searchQuery.trim()
+                ? searchLoading
+                  ? "正在整理搜索结果…"
+                  : `当前结果 ${openableFiles.length} 项`
+                : `显示 ${visibleFiles.length} / ${files.length} 项`}
+            </span>
+            {hasFilters && (
+              <>
+                <span className="workspace-filter-label">
+                  · {selectedKind !== "all" ? selectedKindLabel : ""}
+                  {selectedKind !== "all" && selectedTag ? " · " : ""}
+                  {selectedTag ? `#${selectedTag}` : ""}
+                </span>
+                <button type="button" className="workspace-clear-filter" onClick={onClearFilters}>
+                  清除筛选
+                </button>
+              </>
+            )}
+          </div>
           <input
             className="workspace-search"
             type="search"

@@ -235,6 +235,8 @@ a:focus-visible {
   display: grid;
   gap: 9px;
   min-width: 250px;
+  max-height: min(72vh, 560px);
+  overflow: auto;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -295,6 +297,11 @@ a:focus-visible {
   color: var(--ink);
   padding: 5px 7px;
   font-size: 11px;
+}
+.settings-note {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
@@ -746,6 +753,31 @@ a:focus-visible {
   color: var(--muted);
   font-size: 10px;
 }
+.workspace-filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.workspace-filter-label {
+  color: var(--accent-deep);
+}
+.workspace-clear-filter {
+  border: 0;
+  background: transparent;
+  color: var(--accent-deep);
+  padding: 0;
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.workspace-clear-filter:hover {
+  color: var(--accent-warm);
+}
 .workspace-export-note {
   margin-top: 9px;
   color: var(--accent-deep);
@@ -1166,9 +1198,13 @@ a:focus-visible {
 }
 
 .content-area {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   overflow: auto;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--canvas)) 0%, var(--surface) 180px);
+  background:
+    radial-gradient(circle at 82% -8%, color-mix(in srgb, var(--accent-soft) 58%, transparent), transparent 26rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--canvas)) 0%, var(--surface) 220px);
 }
 .focus-exit {
   display: none;
@@ -1354,15 +1390,56 @@ a:focus-visible {
   color: #8a7654;
 }
 .reader-content {
+  position: relative;
+  z-index: 0;
   width: min(900px, calc(100% - 96px));
-  margin: 0 auto;
-  padding: 78px 0 120px;
+  margin: 28px auto 48px;
+  padding: 50px 58px 110px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-strong) 84%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+.reader-content::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 58px;
+  right: 58px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 18%, transparent));
+  opacity: 0.72;
 }
 .reading-width-narrow .reader-content {
   width: min(720px, calc(100% - 96px));
 }
 .reading-width-wide .reader-content {
   width: min(1080px, calc(100% - 72px));
+}
+.reader-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 25px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.reader-meta-kicker {
+  color: var(--accent-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.reader-meta span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .reading-scale-small .markdown-body {
   font-size: 15px;
@@ -2062,7 +2139,7 @@ a:focus-visible {
   }
   .reader-content {
     width: calc(100% - 48px);
-    padding-top: 56px;
+    padding: 38px 30px 88px;
   }
   .external-change-notice {
     width: calc(100% - 48px);
@@ -2082,6 +2159,11 @@ a:focus-visible {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  .workspace-files,
+  .workspace-results {
+    max-height: none;
+    overflow: visible;
+  }
   .content-area {
     min-height: 58vh;
   }
@@ -2100,7 +2182,8 @@ a:focus-visible {
   }
   .reader-content {
     width: calc(100% - 32px);
-    padding: 44px 0 80px;
+    margin-top: 16px;
+    padding: 32px 18px 72px;
   }
   .reading-width-narrow .reader-content,
   .reading-width-wide .reader-content {
@@ -2111,6 +2194,15 @@ a:focus-visible {
   }
   .markdown-body h1 {
     font-size: 40px;
+  }
+  .reader-content::before {
+    left: 18px;
+    right: 18px;
+  }
+  .reader-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
   }
   .statusbar {
     gap: 8px;
@@ -2161,6 +2253,13 @@ a:focus-visible {
     width: auto;
     margin: 0;
     padding: 0;
+    border: 0;
+    background: white;
+    box-shadow: none;
+  }
+  .reader-content::before,
+  .reader-meta {
+    display: none;
   }
   .pdf-preview {
     width: auto;

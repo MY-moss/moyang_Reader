@@ -1,10 +1,13 @@
-import type { ReadingScale, ReadingWidth } from "./types";
+import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth } from "./types";
 
 export type ReaderPreferences = {
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
   readingScale: ReadingScale;
   readingWidth: ReadingWidth;
+  exportPaper: ExportPaper;
+  exportOrientation: ExportOrientation;
+  exportMargin: ExportMargin;
 };
 
 export const defaultReaderPreferences: ReaderPreferences = {
@@ -12,6 +15,9 @@ export const defaultReaderPreferences: ReaderPreferences = {
   startupUpdateCheck: false,
   readingScale: "medium",
   readingWidth: "standard",
+  exportPaper: "a4",
+  exportOrientation: "portrait",
+  exportMargin: "standard",
 };
 
 const readerPreferencesKey = "moyang-reader-preferences";
@@ -45,6 +51,18 @@ export function loadReaderPreferences(): ReaderPreferences {
         parsed.readingWidth === "narrow" || parsed.readingWidth === "wide" || parsed.readingWidth === "standard"
           ? parsed.readingWidth
           : defaultReaderPreferences.readingWidth,
+      exportPaper:
+        parsed.exportPaper === "letter" || parsed.exportPaper === "a4"
+          ? parsed.exportPaper
+          : defaultReaderPreferences.exportPaper,
+      exportOrientation:
+        parsed.exportOrientation === "landscape" || parsed.exportOrientation === "portrait"
+          ? parsed.exportOrientation
+          : defaultReaderPreferences.exportOrientation,
+      exportMargin:
+        parsed.exportMargin === "compact" || parsed.exportMargin === "wide" || parsed.exportMargin === "standard"
+          ? parsed.exportMargin
+          : defaultReaderPreferences.exportMargin,
     };
   } catch {
     return defaultReaderPreferences;

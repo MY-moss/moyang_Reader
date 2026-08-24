@@ -1,4 +1,4 @@
-import type { ReadingScale, ReadingWidth, ThemeMode } from "../types";
+import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth, ThemeMode } from "../types";
 import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
@@ -13,8 +13,14 @@ type TopBarProps = {
   theme: ThemeMode;
   readingScale: ReadingScale;
   readingWidth: ReadingWidth;
+  exportPaper: ExportPaper;
+  exportOrientation: ExportOrientation;
+  exportMargin: ExportMargin;
   onReadingScaleChange: (scale: ReadingScale) => void;
   onReadingWidthChange: (width: ReadingWidth) => void;
+  onExportPaperChange: (paper: ExportPaper) => void;
+  onExportOrientationChange: (orientation: ExportOrientation) => void;
+  onExportMarginChange: (margin: ExportMargin) => void;
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
@@ -60,8 +66,14 @@ export function TopBar({
   theme,
   readingScale,
   readingWidth,
+  exportPaper,
+  exportOrientation,
+  exportMargin,
   onReadingScaleChange,
   onReadingWidthChange,
+  onExportPaperChange,
+  onExportOrientationChange,
+  onExportMarginChange,
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
@@ -218,6 +230,42 @@ export function TopBar({
                 <option value="wide">宽</option>
               </select>
             </label>
+            <div className="settings-divider">导出排版</div>
+            <label className="settings-select-option">
+              <span>导出纸张</span>
+              <select
+                aria-label="导出纸张"
+                value={exportPaper}
+                onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
+              >
+                <option value="a4">A4</option>
+                <option value="letter">Letter</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>导出方向</span>
+              <select
+                aria-label="导出方向"
+                value={exportOrientation}
+                onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
+              >
+                <option value="portrait">纵向</option>
+                <option value="landscape">横向</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>导出页边距</span>
+              <select
+                aria-label="导出页边距"
+                value={exportMargin}
+                onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
+              >
+                <option value="compact">紧凑</option>
+                <option value="standard">标准</option>
+                <option value="wide">宽松</option>
+              </select>
+            </label>
+            <small className="settings-note">应用于打印 / PDF、HTML 和 Word 导出。</small>
           </div>
         </details>
         <button

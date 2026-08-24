@@ -1118,7 +1118,7 @@ export function App() {
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
       const anchor = document.createElement("a");
       anchor.href = documentState.previewUrl;
@@ -1127,8 +1127,34 @@ export function App() {
       anchor.click();
       return;
     }
-    window.print();
-  }, [documentState?.kind, documentState?.previewUrl]);
+    if (!documentState) return;
+
+    try {
+      const body = isTauriRuntime()
+        ? await inlineLocalImages(
+            documentState.rendered.html,
+            (source) => {
+              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+              return resolveRelativePath(documentState.path, safeDecode(target));
+            },
+            readBinaryFile,
+            imageMimeType,
+            fileSize,
+          )
+        : documentState.rendered.html;
+      await printHtmlDocument(
+        buildHtmlExport(documentState.name, body, {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        }),
+      );
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+    }
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleCopy = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -1178,7 +1204,11 @@ export function App() {
           fileSize,
         )
       : documentState.rendered.html;
-    const contents = buildHtmlExport(documentState.name, body);
+    const contents = buildHtmlExport(documentState.name, body, {
+      paper: preferences.exportPaper,
+      orientation: preferences.exportOrientation,
+      margin: preferences.exportMargin,
+    });
     try {
       if (isTauriRuntime()) {
         const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");
@@ -1191,7 +1221,7 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");
     }
-  }, [documentState]);
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleExportDocx = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -1210,7 +1240,11 @@ export function App() {
             fileSize,
           )
         : documentState.rendered.html;
-      const contents = await buildDocxExport(documentState.name, body);
+      const contents = await buildDocxExport(documentState.name, body, {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
 
       if (isTauriRuntime()) {
         const defaultPath =
@@ -1231,7 +1265,7 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 Word 失败。");
     }
-  }, [documentState]);
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleBrowserFiles = useCallback(
     async (files: FileList | File[] | null | undefined) => {
@@ -1660,14 +1694,19 @@ export function App() {
           );
         }
         const exportTitle = `${workspaceName} 阅读库`;
+        const exportOptions = {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        };
         if (format === "html") {
           if (!savePath) throw new Error("没有选择 HTML 保存位置。");
-          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents));
+          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents, exportOptions));
         } else if (format === "docx") {
           if (!savePath) throw new Error("没有选择 Word 保存位置。");
-          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents));
+          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents, exportOptions));
         } else {
-          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents));
+          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents, exportOptions));
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
         const failureSummary = summarizeExportFailures(skippedFiles);
@@ -1682,7 +1721,14 @@ export function App() {
         setWorkspaceExporting(false);
       }
     },
-    [preferences.allowRemoteResources, workspaceActionFiles, workspacePath],
+    [
+      preferences.allowRemoteResources,
+      preferences.exportMargin,
+      preferences.exportOrientation,
+      preferences.exportPaper,
+      workspaceActionFiles,
+      workspacePath,
+    ],
   );
 
   return (
@@ -1705,8 +1751,14 @@ export function App() {
         theme={theme}
         readingScale={preferences.readingScale}
         readingWidth={preferences.readingWidth}
+        exportPaper={preferences.exportPaper}
+        exportOrientation={preferences.exportOrientation}
+        exportMargin={preferences.exportMargin}
         onReadingScaleChange={(scale) => setReaderPreferences({ readingScale: scale })}
         onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
+        onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}
+        onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}
+        onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
@@ -1720,7 +1772,7 @@ export function App() {
         onSave={() => void saveDocument()}
         onCopy={() => void handleCopy()}
         copyFeedback={copyFeedback}
-        onExport={handleExport}
+        onExport={() => void handleExport()}
         exportLabel={
           documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
         }
@@ -1797,6 +1849,10 @@ export function App() {
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}
+            onClearFilters={() => {
+              setSelectedTag(null);
+              setSelectedFileKind("all");
+            }}
           />
           {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}
           {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}
@@ -1876,6 +1932,13 @@ export function App() {
             documentState.kind !== "image" &&
             mode === "rendered" && (
               <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                <div className="reader-meta" aria-label="文档信息">
+                  <span className="reader-meta-kicker">DOCUMENT</span>
+                  <span>
+                    {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")} 字
+                    · {documentState.rendered.readingMinutes} 分钟阅读
+                  </span>
+                </div>
                 {!startsWithHeading(documentState.rendered.html) && (
                   <header className="print-document-header" aria-hidden="true">
                     <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>

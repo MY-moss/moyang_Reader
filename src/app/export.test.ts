@@ -32,6 +32,18 @@ describe("document export helpers", () => {
     expect(html).toContain('src="cover.png"');
     expect(html).toContain('href="下一篇.md"');
     expect(html).toContain("<!doctype html>");
+    expect(html).toContain("@page { size: A4 portrait; margin: 22mm 18mm; }");
+    expect(html).toContain("MOYANG READER · EXPORT");
+  });
+
+  it("applies custom paper, orientation, and margin settings to HTML export", () => {
+    const html = buildHtmlExport("报告", "<p>正文</p>", {
+      paper: "letter",
+      orientation: "landscape",
+      margin: "compact",
+    });
+
+    expect(html).toContain("@page { size: Letter landscape; margin: 14mm 14mm; }");
   });
 
   it("converts rendered HTML into a compact plain-text fallback", () => {
@@ -192,5 +204,18 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("第一篇正文");
     expect(documentXml).toContain("第二篇正文");
     expect(documentXml).toContain("<w:pageBreakBefore/>");
+  });
+
+  it("applies custom page layout settings to DOCX export", async () => {
+    const bytes = await buildDocxExport("Letter", "<p>正文</p>", {
+      paper: "letter",
+      orientation: "landscape",
+      margin: "wide",
+    });
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+
+    expect(documentXml).toContain('w:w="15840" w:h="12240" w:orient="landscape"');
+    expect(documentXml).toContain('w:top="2160" w:right="2160" w:bottom="2160" w:left="2160"');
   });
 });

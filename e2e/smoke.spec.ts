@@ -103,11 +103,17 @@ test("persists reading layout preferences", async ({ page }) => {
   await page.locator("summary", { hasText: "设置" }).click();
   await page.getByLabel("正文字号").selectOption("large");
   await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.getByLabel("导出纸张").selectOption("letter");
+  await page.getByLabel("导出方向").selectOption("landscape");
+  await page.getByLabel("导出页边距").selectOption("compact");
   await page.reload();
   await page.locator("summary", { hasText: "设置" }).click();
 
   await expect(page.getByLabel("正文字号")).toHaveValue("large");
   await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
+  await expect(page.getByLabel("导出纸张")).toHaveValue("letter");
+  await expect(page.getByLabel("导出方向")).toHaveValue("landscape");
+  await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
