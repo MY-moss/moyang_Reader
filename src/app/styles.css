@@ -825,15 +825,18 @@ a:focus-visible {
   color: var(--accent-deep);
 }
 .workspace-location {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 7px;
   margin-top: 14px;
-  overflow: hidden;
+  overflow: visible;
   color: var(--ink);
   font-size: 11px;
 }
 .workspace-location span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -842,6 +845,88 @@ a:focus-visible {
   flex: 0 0 auto;
   color: var(--muted);
   font-size: 10px;
+}
+.workspace-switcher {
+  position: relative;
+  flex: 0 0 auto;
+}
+.workspace-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-deep);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 9px;
+  list-style: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.workspace-switcher-trigger::-webkit-details-marker {
+  display: none;
+}
+.workspace-switcher-trigger:hover,
+.workspace-switcher[open] .workspace-switcher-trigger {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: var(--accent-soft);
+}
+.workspace-switcher-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: min(260px, 62vw);
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ink) 16%, transparent);
+  padding: 6px;
+}
+.workspace-switcher-label {
+  padding: 4px 7px 5px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.workspace-switcher-menu button {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  padding: 7px;
+  text-align: left;
+  cursor: pointer;
+}
+.workspace-switcher-menu button:hover {
+  border-color: var(--line);
+  background: var(--accent-soft);
+}
+.workspace-switcher-menu button strong,
+.workspace-switcher-menu button span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-switcher-menu button strong {
+  font-size: 10px;
+  font-weight: 650;
+}
+.workspace-switcher-menu button span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
 }
 .workspace-filter-summary {
   display: flex;

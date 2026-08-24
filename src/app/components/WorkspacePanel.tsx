@@ -7,6 +7,7 @@ import type {
 } from "../types";
 import { WorkspaceTreeView } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
+import { filterSwitchableWorkspaces } from "../workspace-switcher";
 
 const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
   { value: "all", label: "全部类型" },
@@ -88,6 +89,7 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
+  const switchableWorkspaces = filterSwitchableWorkspaces(recentWorkspaces, workspacePath);
 
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -155,6 +157,31 @@ export function WorkspacePanel({
           <span className="workspace-dot" aria-hidden="true" />
           <span>{pathName(workspacePath)}</span>
           <small>{files.length} 项</small>
+          {switchableWorkspaces.length > 0 && (
+            <details className="workspace-switcher">
+              <summary className="workspace-switcher-trigger" aria-label="切换阅读库">
+                切换
+              </summary>
+              <div className="workspace-switcher-menu" role="menu">
+                <div className="workspace-switcher-label">最近阅读库</div>
+                {switchableWorkspaces.map((workspace) => (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    key={workspace.path}
+                    title={workspace.path}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onOpenWorkspace(workspace.path);
+                    }}
+                  >
+                    <strong>{workspace.name}</strong>
+                    <span>{workspace.path}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       ) : (
         <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
