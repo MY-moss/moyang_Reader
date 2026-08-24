@@ -2082,8 +2082,9 @@ export function App() {
         entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),
       }))
     : [];
-  const availableTags = Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) =>
-    a.localeCompare(b),
+  const availableTags = useMemo(
+    () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
+    [workspaceIndex],
   );
   const taggedFilePaths = useMemo(
     () =>
