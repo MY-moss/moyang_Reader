@@ -34,7 +34,7 @@ v0.5.1 关系与发布增强版，继续基于轻量本地阅读核心完善：
 - Windows Markdown 文件关联配置和应用图标
 - Markdown、纯文本和 DOCX 内容可另存为 HTML（桌面版会尝试内嵌本地图片）；也可按需导出真正的 DOCX Word 文档；Markdown/纯文本还能另存为源文件
 - 工作区可按当前筛选批量导出为带目录的单文件 HTML，支持 Markdown、纯文本和 DOCX
-- 启动后静默检查 GitHub Release，顶部按钮可手动检查，签名更新包安装后自动重启
+- 更新检查和远程图片访问均可在顶部“设置”中控制，默认只进行本地阅读；顶部按钮始终可以手动检查 GitHub Release，签名更新包安装后自动重启
 
 生产构建会把 Markdown、DOCX 适配器拆成按需加载的 chunk：空白启动页不需要加载完整文档解析器，打开对应类型时才加载。
 
@@ -60,6 +60,8 @@ npm run tauri dev
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd` 文件关联。DOCX/PDF 当前支持在应用内选择、拖放和通过启动参数打开，但不会抢占 Word/PDF 的系统默认关联。
 
 更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。当前版本的 PDF 交付方式是系统打印对话框中的“保存为 PDF”；真正的 PDF 模板和批量 PDF 导出列入后续版本。
+
+顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
 
 贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
 

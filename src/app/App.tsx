@@ -71,6 +71,7 @@ import {
   saveRecentWorkspaces,
   saveWorkspacePath,
 } from "./storage";
+import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import {
   documentKindFromPath,
   emptyRenderedDocument,
@@ -187,6 +188,7 @@ export function App() {
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
+  const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(loadWorkspacePath);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
@@ -223,6 +225,14 @@ export function App() {
   const workspaceReloadTimerRef = useRef<number | null>(null);
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
+
+  const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
+    setPreferences((current) => {
+      const next = { ...current, ...changes };
+      saveReaderPreferences(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     documentStateRef.current = documentState;
@@ -422,15 +432,17 @@ export function App() {
       })
       .catch(() => undefined);
 
-    const timer = window.setTimeout(() => {
-      if (active) void checkForUpdates(false);
-    }, 1_200);
+    const timer = preferences.startupUpdateCheck
+      ? window.setTimeout(() => {
+          if (active) void checkForUpdates(false);
+        }, 1_200)
+      : null;
 
     return () => {
       active = false;
-      window.clearTimeout(timer);
+      if (timer !== null) window.clearTimeout(timer);
     };
-  }, [checkForUpdates]);
+  }, [checkForUpdates, preferences.startupUpdateCheck]);
 
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
@@ -506,7 +518,9 @@ export function App() {
 
       try {
         const kind = documentKindFromPath(path);
-        const rendered = await renderSource(path, source);
+        const rendered = await renderSource(path, source, {
+          allowRemoteResources: preferences.allowRemoteResources,
+        });
         releaseDocumentResources(path);
         if (path.startsWith("browser://")) {
           browserDocumentsRef.current.set(path, { kind, source });
@@ -534,7 +548,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources],
+    [preferences.allowRemoteResources, releaseDocumentResources],
   );
 
   const openBinary = useCallback(
@@ -548,7 +562,10 @@ export function App() {
       setError(null);
 
       try {
-        const rendered = kind === "docx" ? await renderDocx(bytes) : emptyRenderedDocument();
+        const rendered =
+          kind === "docx"
+            ? await renderDocx(bytes, { allowRemoteResources: preferences.allowRemoteResources })
+            : emptyRenderedDocument();
         let previewUrl: string | undefined;
         if (kind === "pdf" || kind === "image") {
           const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -589,7 +606,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources],
+    [preferences.allowRemoteResources, releaseDocumentResources],
   );
 
   const openPath = useCallback(
@@ -660,7 +677,9 @@ export function App() {
         downloadText(documentState.name, sourceDraft);
       }
 
-      const rendered = await renderSource(documentState.path, sourceDraft);
+      const rendered = await renderSource(documentState.path, sourceDraft, {
+        allowRemoteResources: preferences.allowRemoteResources,
+      });
       setDocumentState((current) =>
         current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
       );
@@ -670,7 +689,7 @@ export function App() {
       selfWrittenPathsRef.current.delete(comparablePath(documentState.path));
       setError(cause instanceof Error ? cause.message : "保存失败。");
     }
-  }, [documentState, sourceDraft]);
+  }, [documentState, preferences.allowRemoteResources, sourceDraft]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -877,7 +896,9 @@ export function App() {
 
     const nextSource = sourceDraft;
     const timer = window.setTimeout(() => {
-      void renderSource(path, nextSource)
+      void renderSource(path, nextSource, {
+        allowRemoteResources: preferences.allowRemoteResources,
+      })
         .then((rendered) => {
           if (requestId !== sourceRenderRequestRef.current) return;
           setDocumentState((current) => (current?.path === path ? { ...current, rendered } : current));
@@ -890,7 +911,27 @@ export function App() {
     }, 180);
 
     return () => window.clearTimeout(timer);
-  }, [documentState?.kind, documentState?.path, mode, sourceDraft]);
+  }, [documentState?.kind, documentState?.path, mode, preferences.allowRemoteResources, sourceDraft]);
+
+  useEffect(() => {
+    const current = documentStateRef.current;
+    if (mode !== "rendered" || !current || !isEditableDocument(current.kind)) return;
+
+    const requestId = ++sourceRenderRequestRef.current;
+    const path = current.path;
+    void renderSource(path, current.source, {
+      allowRemoteResources: preferences.allowRemoteResources,
+    })
+      .then((rendered) => {
+        if (requestId !== sourceRenderRequestRef.current) return;
+        setDocumentState((latest) => (latest?.path === path ? { ...latest, rendered } : latest));
+      })
+      .catch((cause) => {
+        if (requestId === sourceRenderRequestRef.current) {
+          setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+        }
+      });
+  }, [mode, preferences.allowRemoteResources]);
 
   const updateSource = useCallback((nextSource: string) => {
     const current = documentStateRef.current;
@@ -1306,9 +1347,13 @@ export function App() {
         try {
           let rendered;
           if (file.kind === "docx") {
-            rendered = await renderDocx(await readBinaryFile(file.path));
+            rendered = await renderDocx(await readBinaryFile(file.path), {
+              allowRemoteResources: preferences.allowRemoteResources,
+            });
           } else if (file.kind === "markdown" || file.kind === "text") {
-            rendered = await renderSource(file.path, await readTextFile(file.path));
+            rendered = await renderSource(file.path, await readTextFile(file.path), {
+              allowRemoteResources: preferences.allowRemoteResources,
+            });
           } else {
             skipped += 1;
             continue;
@@ -1342,7 +1387,7 @@ export function App() {
     } finally {
       setWorkspaceExporting(false);
     }
-  }, [visibleWorkspaceFiles, workspacePath]);
+  }, [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath]);
 
   return (
     <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
@@ -1356,6 +1401,10 @@ export function App() {
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        allowRemoteResources={preferences.allowRemoteResources}
+        startupUpdateCheck={preferences.startupUpdateCheck}
+        onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
+        onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
         onOpen={() => void openSelectedFile()}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}

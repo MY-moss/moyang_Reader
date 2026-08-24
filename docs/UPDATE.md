@@ -8,7 +8,7 @@ Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
 2. GitHub Actions 在 Windows runner 上运行测试、构建并生成 NSIS 安装包。
 3. 构建时使用 GitHub Secrets 中的私钥给更新包签名。
 4. tauri-action 将安装包、.sig 签名和 latest.json 上传到 Release。
-5. 已安装的应用启动后会静默检查一次；用户也可以点击顶部的“更新”按钮。
+5. 用户开启启动更新检查时，已安装的应用会在启动后检查一次；用户也可以随时点击顶部的“更新”按钮。
 6. 发现新版本后，用户确认“下载并安装”，应用会校验签名、安装并自动重启。
 
 更新地址固定为：

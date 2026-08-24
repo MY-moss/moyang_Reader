@@ -6,6 +6,7 @@ import rehypeStringify from "rehype-stringify";
 import type { Root as HastRoot } from "hast";
 import type { DocumentKind, RenderedMarkdown } from "../app/types";
 import { collectToc, readingStats, textContent } from "./text";
+import type { RenderOptions } from "./markdown";
 
 const docxSanitizeSchema = {
   ...defaultSchema,
@@ -14,6 +15,18 @@ const docxSanitizeSchema = {
     src: [...(defaultSchema.protocols?.src ?? []), "data"],
   },
 };
+
+function schemaFor(options: RenderOptions) {
+  if (options.allowRemoteResources) return docxSanitizeSchema;
+
+  return {
+    ...docxSanitizeSchema,
+    protocols: {
+      ...docxSanitizeSchema.protocols,
+      src: ["data", "moyang-embed"],
+    },
+  };
+}
 
 function extensionOf(path: string): string {
   return path.split(/[?#]/, 1)[0].split(/[\\/]/).pop()?.split(".").pop()?.toLowerCase() ?? "";
@@ -46,10 +59,10 @@ export function isEditableDocument(kind: DocumentKind): boolean {
   return kind === "markdown" || kind === "text";
 }
 
-export async function renderHtmlFragment(source: string): Promise<RenderedMarkdown> {
+export async function renderHtmlFragment(source: string, options: RenderOptions = {}): Promise<RenderedMarkdown> {
   const processor = unified()
     .use(rehypeParse, { fragment: true })
-    .use(rehypeSanitize, docxSanitizeSchema)
+    .use(rehypeSanitize, schemaFor(options))
     .use(rehypeSlug);
   const tree = processor.parse(source);
   const processed = (await processor.run(tree)) as HastRoot;
@@ -63,12 +76,16 @@ export async function renderHtmlFragment(source: string): Promise<RenderedMarkdo
   };
 }
 
-export async function renderSource(path: string, source: string): Promise<RenderedMarkdown> {
+export async function renderSource(
+  path: string,
+  source: string,
+  options: RenderOptions = {},
+): Promise<RenderedMarkdown> {
   const { renderMarkdown, renderPlainText } = await import("./markdown");
-  return documentKindFromPath(path) === "text" ? renderPlainText(source) : renderMarkdown(source);
+  return documentKindFromPath(path) === "text" ? renderPlainText(source) : renderMarkdown(source, options);
 }
 
-export async function renderDocx(bytes: Uint8Array): Promise<RenderedMarkdown> {
+export async function renderDocx(bytes: Uint8Array, options: RenderOptions = {}): Promise<RenderedMarkdown> {
   const mammothModule = await import("mammoth");
   const mammoth = mammothModule.default ?? mammothModule;
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -84,7 +101,7 @@ export async function renderDocx(bytes: Uint8Array): Promise<RenderedMarkdown> {
     throw new Error("Word 文档没有可显示的正文内容。");
   }
 
-  return renderHtmlFragment(result.value);
+  return renderHtmlFragment(result.value, options);
 }
 
 export function emptyRenderedDocument(): RenderedMarkdown {

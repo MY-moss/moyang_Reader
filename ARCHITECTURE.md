@@ -17,7 +17,8 @@ React UI
   ├─ markdown.ts：Markdown/GFM/公式/Obsidian 链接渲染
   ├─ document-adapters.ts：DOCX/HTML 适配和统一统计、TOC
   ├─ workspace-index.ts：工作区索引、搜索和标签关系
-  └─ export.ts：HTML、DOCX 和打印导出
+  ├─ export.ts：HTML、DOCX 和打印导出
+  └─ preferences.ts：本地隐私与更新偏好
 
 Tauri/Rust
   ├─ commands.rs：路径、文本解码、目录扫描、索引和安全边界
@@ -31,6 +32,7 @@ Tauri/Rust
 - Markdown 目录从最终 HAST 渲染树提取：TOC 使用实际渲染后的 heading id，避免目录锚点与页面不一致。
 - 更新使用 GitHub Releases + Tauri 签名 updater：公钥随应用发布，私钥只放在本地安全存储和 GitHub Actions Secret 中。
 - HTML 是通用导出中间层：HTML 可打印为 PDF；DOCX 导出只处理安全 HTML 的常用块，不引入服务端转换依赖。
+- 远程资源策略由本地偏好控制：默认只允许 data 和工作区附件协议，开启远程图片后才允许 Markdown 中的 http/https 图片；更新检查同样默认手动，可选开启启动检查。
 
 更详细的发布决策见 [`docs/UPDATE.md`](docs/UPDATE.md)；后续重大架构变化应新增 ADR，而不是覆盖历史说明。
 

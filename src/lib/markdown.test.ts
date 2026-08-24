@@ -27,6 +27,16 @@ describe("renderMarkdown", () => {
     expect(result.html).not.toContain("<script");
   });
 
+  it("blocks remote images by default and allows them when explicitly enabled", async () => {
+    const source = "![tracking](https://example.com/pixel.png)\n\n![local](moyang-embed:cover.png)";
+    const localOnly = await renderMarkdown(source);
+    const remoteAllowed = await renderMarkdown(source, { allowRemoteResources: true });
+
+    expect(localOnly.html).not.toContain('src="https://example.com/pixel.png"');
+    expect(localOnly.html).toContain('src="moyang-embed:cover.png"');
+    expect(remoteAllowed.html).toContain('src="https://example.com/pixel.png"');
+  });
+
   it("supports math syntax", async () => {
     const result = await renderMarkdown("行内公式：$x^2$");
     expect(result.html).toContain("katex");

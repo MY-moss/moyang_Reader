@@ -213,6 +213,60 @@ a:focus-visible {
   background: var(--accent-soft);
   color: var(--accent-deep);
 }
+.settings-menu {
+  position: relative;
+}
+.settings-menu summary {
+  display: inline-block;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-menu summary::-webkit-details-marker {
+  display: none;
+}
+.settings-menu-panel {
+  position: absolute;
+  z-index: 7;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  gap: 9px;
+  min-width: 250px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-lifted);
+}
+.settings-menu-title {
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.settings-option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: start;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+}
+.settings-option input {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+.settings-option span {
+  display: grid;
+  gap: 3px;
+}
+.settings-option small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
   color: #a24f2e;
