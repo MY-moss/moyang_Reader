@@ -1249,7 +1249,7 @@ export function App() {
 
     const requestId = ++sourceRenderRequestRef.current;
     const path = current.path;
-    void renderSource(path, current.source, {
+    void renderSource(path, sourceDraft, {
       allowRemoteResources: preferences.allowRemoteResources,
     })
       .then((rendered) => {
@@ -1261,7 +1261,7 @@ export function App() {
           setError(cause instanceof Error ? cause.message : "文档渲染失败。");
         }
       });
-  }, [mode, preferences.allowRemoteResources]);
+  }, [mode, preferences.allowRemoteResources, sourceDraft]);
 
   const updateSource = useCallback((nextSource: string) => {
     const current = documentStateRef.current;

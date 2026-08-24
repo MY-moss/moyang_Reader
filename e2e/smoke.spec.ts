@@ -102,6 +102,23 @@ test("protects unsaved browser edits before opening another document", async ({ 
   await expect(editor).toHaveValue("# Unsaved note\n\n尚未保存");
 });
 
+test("shows the latest source draft after switching back to reading", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "draft-preview-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Original title\n\n原始内容"),
+  });
+  await page.getByRole("button", { name: "源文本" }).click();
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.fill("# Draft title\n\n最新草稿内容");
+  await page.getByRole("button", { name: "阅读" }).click();
+
+  await expect(page.getByRole("heading", { name: "Draft title" })).toBeVisible();
+  await expect(page.getByText("最新草稿内容")).toBeVisible();
+});
+
 test("enters and exits focus reading mode", async ({ page }) => {
   await page.goto("/");
 
