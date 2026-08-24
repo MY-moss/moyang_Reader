@@ -25,6 +25,22 @@ const sanitizeSchema = {
   },
 };
 
+export type RenderOptions = {
+  allowRemoteResources?: boolean;
+};
+
+function schemaFor(options: RenderOptions) {
+  if (options.allowRemoteResources) return sanitizeSchema;
+
+  return {
+    ...sanitizeSchema,
+    protocols: {
+      ...sanitizeSchema.protocols,
+      src: ["data", "moyang-embed"],
+    },
+  };
+}
+
 function remarkWikiLinks() {
   return (tree: Root) => {
     visit(tree, "text", (node, index, parent) => {
@@ -74,7 +90,7 @@ function remarkWikiLinks() {
   };
 }
 
-export async function renderMarkdown(source: string): Promise<RenderedMarkdown> {
+export async function renderMarkdown(source: string, options: RenderOptions = {}): Promise<RenderedMarkdown> {
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
@@ -82,7 +98,7 @@ export async function renderMarkdown(source: string): Promise<RenderedMarkdown> 
     .use(remarkMath)
     .use(remarkWikiLinks)
     .use(remarkRehype)
-    .use(rehypeSanitize, sanitizeSchema)
+    .use(rehypeSanitize, schemaFor(options))
     .use(rehypeSlug)
     .use(rehypeKatex)
     .use(rehypeStringify);

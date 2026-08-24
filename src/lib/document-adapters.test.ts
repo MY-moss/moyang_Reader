@@ -68,6 +68,16 @@ describe("document adapters", () => {
     expect(result.toc).toEqual([{ id: "标题", depth: 1, text: "标题" }]);
   });
 
+  it("applies the remote resource preference to HTML fragments", async () => {
+    const source = '<img src="https://example.com/pixel.png"><img src="data:image/png;base64,AA==">';
+    const localOnly = await renderHtmlFragment(source);
+    const remoteAllowed = await renderHtmlFragment(source, { allowRemoteResources: true });
+
+    expect(localOnly.html).not.toContain('src="https://example.com/pixel.png"');
+    expect(localOnly.html).toContain('src="data:image/png;base64,AA=="');
+    expect(remoteAllowed.html).toContain('src="https://example.com/pixel.png"');
+  });
+
   it("converts a minimal DOCX package into readable HTML", async () => {
     const result = await renderDocx(await createMinimalDocx());
 
