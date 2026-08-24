@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -23,6 +23,8 @@ const MAX_SEARCH_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_INDEX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_SEARCH_CACHE_ENTRIES: usize = 256;
 const MAX_SEARCH_CACHE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_SEARCH_INDEX_ROOTS: usize = 8;
+const MAX_SEARCH_INDEX_POSTINGS: usize = 500_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -47,6 +49,7 @@ pub struct WorkspaceWatcher {
 pub struct WorkspaceSearchCache {
     entries: Mutex<HashMap<String, CachedSearchText>>,
     file_lists: Mutex<HashMap<String, CachedWorkspaceFileList>>,
+    search_indexes: Mutex<HashMap<String, CachedSearchIndex>>,
     access_counter: AtomicU64,
 }
 
@@ -68,6 +71,21 @@ struct CachedWorkspaceFileList {
     files: Vec<WorkspaceFile>,
     directories: Vec<CachedDirectoryStamp>,
     last_used: u64,
+}
+
+#[derive(Default)]
+struct CachedSearchIndex {
+    files: HashMap<String, IndexedSearchFile>,
+    postings: HashMap<String, HashSet<String>>,
+    posting_count: usize,
+    last_used: u64,
+    disabled: bool,
+}
+
+struct IndexedSearchFile {
+    size: u64,
+    modified: Option<SystemTime>,
+    shingles: HashSet<String>,
 }
 
 fn collect_workspace_directory_stamps(
@@ -135,6 +153,72 @@ fn prune_file_lists(file_lists: &mut HashMap<String, CachedWorkspaceFileList>) {
         };
         file_lists.remove(&oldest_key);
     }
+}
+
+fn prune_search_indexes(search_indexes: &mut HashMap<String, CachedSearchIndex>) {
+    while search_indexes.len() > MAX_SEARCH_INDEX_ROOTS {
+        let Some(oldest_key) = search_indexes
+            .iter()
+            .min_by_key(|(_, entry)| entry.last_used)
+            .map(|(key, _)| key.clone())
+        else {
+            break;
+        };
+        search_indexes.remove(&oldest_key);
+    }
+}
+
+fn source_shingles(source: &str) -> HashSet<String> {
+    let chars: Vec<char> = source.to_lowercase().chars().collect();
+    chars
+        .windows(2)
+        .map(|pair| pair.iter().collect::<String>())
+        .collect()
+}
+
+fn remove_indexed_file(index: &mut CachedSearchIndex, path: &str) {
+    let Some(file) = index.files.remove(path) else {
+        return;
+    };
+
+    for shingle in file.shingles {
+        if let Some(paths) = index.postings.get_mut(&shingle) {
+            if paths.remove(path) {
+                index.posting_count = index.posting_count.saturating_sub(1);
+            }
+            if paths.is_empty() {
+                index.postings.remove(&shingle);
+            }
+        }
+    }
+}
+
+fn add_indexed_file(
+    index: &mut CachedSearchIndex,
+    path: String,
+    size: u64,
+    modified: Option<SystemTime>,
+    source: &str,
+) -> bool {
+    let shingles = source_shingles(source);
+    for shingle in &shingles {
+        let paths = index.postings.entry(shingle.clone()).or_default();
+        if paths.insert(path.clone()) {
+            index.posting_count += 1;
+            if index.posting_count > MAX_SEARCH_INDEX_POSTINGS {
+                return false;
+            }
+        }
+    }
+    index.files.insert(
+        path,
+        IndexedSearchFile {
+            size,
+            modified,
+            shingles,
+        },
+    );
+    true
 }
 
 impl WorkspaceSearchCache {
@@ -230,6 +314,98 @@ impl WorkspaceSearchCache {
         Some(source)
     }
 
+    fn refresh_search_index(&self, root: &Path, files: &[WorkspaceFile]) {
+        let key = access_path_key(root);
+        let access = self.next_access();
+        let mut index = if let Ok(mut indexes) = self.search_indexes.lock() {
+            indexes.remove(&key).unwrap_or_default()
+        } else {
+            return;
+        };
+
+        if !index.disabled {
+            let eligible_paths = files
+                .iter()
+                .filter(|file| {
+                    is_supported_text_path(Path::new(&file.path))
+                        && file.size <= MAX_SEARCH_FILE_BYTES
+                })
+                .map(|file| access_path_key(Path::new(&file.path)))
+                .collect::<HashSet<_>>();
+            let stale_paths = index
+                .files
+                .keys()
+                .filter(|path| !eligible_paths.contains(*path))
+                .cloned()
+                .collect::<Vec<_>>();
+            for path in stale_paths {
+                remove_indexed_file(&mut index, &path);
+            }
+
+            for file in files.iter().filter(|file| {
+                is_supported_text_path(Path::new(&file.path)) && file.size <= MAX_SEARCH_FILE_BYTES
+            }) {
+                let path = access_path_key(Path::new(&file.path));
+                let Ok(metadata) = fs::metadata(&file.path) else {
+                    remove_indexed_file(&mut index, &path);
+                    continue;
+                };
+                let modified = metadata.modified().ok();
+                if index
+                    .files
+                    .get(&path)
+                    .map(|cached| cached.size == metadata.len() && cached.modified == modified)
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+
+                remove_indexed_file(&mut index, &path);
+                if let Some(source) = self.read_text(file) {
+                    if !add_indexed_file(&mut index, path, metadata.len(), modified, &source) {
+                        index.disabled = true;
+                        index.files.clear();
+                        index.postings.clear();
+                        index.posting_count = 0;
+                        break;
+                    }
+                }
+            }
+        }
+
+        index.last_used = access;
+        if let Ok(mut indexes) = self.search_indexes.lock() {
+            indexes.insert(key, index);
+            prune_search_indexes(&mut indexes);
+        }
+    }
+
+    fn content_candidates(&self, root: &Path, query: &str) -> Option<HashSet<String>> {
+        if query.chars().count() < 2 {
+            return None;
+        }
+
+        let key = access_path_key(root);
+        let indexes = self.search_indexes.lock().ok()?;
+        let index = indexes.get(&key)?;
+        if index.disabled {
+            return None;
+        }
+
+        let shingles = source_shingles(query);
+        let mut candidates: Option<HashSet<String>> = None;
+        for shingle in shingles {
+            let Some(paths) = index.postings.get(&shingle) else {
+                return Some(HashSet::new());
+            };
+            candidates = Some(match candidates {
+                Some(current) => current.intersection(paths).cloned().collect(),
+                None => paths.clone(),
+            });
+        }
+        candidates
+    }
+
     fn invalidate_scopes(&self, scopes: &[String]) {
         if let Ok(mut entries) = self.entries.lock() {
             entries.retain(|path, _| {
@@ -245,6 +421,23 @@ impl WorkspaceSearchCache {
 
         if let Ok(mut file_lists) = self.file_lists.lock() {
             file_lists.retain(|root, _| {
+                !scopes.iter().any(|scope| {
+                    access_path_contains(Path::new(scope), Path::new(root))
+                        || access_path_contains(Path::new(root), Path::new(scope))
+                        || access_path_contains(
+                            Path::new(&display_path(Path::new(scope))),
+                            Path::new(&display_path(Path::new(root))),
+                        )
+                        || access_path_contains(
+                            Path::new(&display_path(Path::new(root))),
+                            Path::new(&display_path(Path::new(scope))),
+                        )
+                })
+            });
+        }
+
+        if let Ok(mut search_indexes) = self.search_indexes.lock() {
+            search_indexes.retain(|root, _| {
                 !scopes.iter().any(|scope| {
                     access_path_contains(Path::new(scope), Path::new(root))
                         || access_path_contains(Path::new(root), Path::new(scope))
@@ -997,12 +1190,19 @@ fn search_workspace_inner_with_cache(
     }
 
     let files = cache.list_files(&root)?;
+    cache.refresh_search_index(&root, &files);
+    let content_candidates = cache.content_candidates(&root, &query);
     let mut results = Vec::new();
 
     for file in files {
         let name_matches = file.name.to_lowercase().contains(&query);
+        let content_candidate = content_candidates
+            .as_ref()
+            .map(|paths| paths.contains(&access_path_key(Path::new(&file.path))))
+            .unwrap_or(true);
         let preview = if is_supported_text_path(Path::new(&file.path))
             && file.size <= MAX_SEARCH_FILE_BYTES
+            && content_candidate
         {
             cache.read_text(&file).and_then(|source| {
                 source
@@ -2201,6 +2401,68 @@ mod tests {
         assert_eq!(added_result.len(), 1);
 
         fs::remove_dir_all(root).expect("remove search cache workspace");
+    }
+
+    #[test]
+    fn uses_search_index_candidates_without_changing_substring_results() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-index-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create search index workspace");
+        fs::write(root.join("first.md"), "alpha Needle content").expect("write indexed match");
+        fs::write(root.join("second.md"), "unrelated content").expect("write indexed non-match");
+
+        let cache = WorkspaceSearchCache::default();
+        let indexed = search_workspace_inner_with_cache(root.clone(), "eedl".to_string(), &cache)
+            .expect("search indexed substring");
+        assert_eq!(indexed.len(), 1);
+        assert_eq!(indexed[0].file.name, "first.md");
+
+        let short_query = search_workspace_inner_with_cache(root.clone(), "a".to_string(), &cache)
+            .expect("search short query");
+        assert!(short_query
+            .iter()
+            .any(|result| result.file.name == "first.md"));
+
+        fs::remove_dir_all(root).expect("remove search index workspace");
+    }
+
+    #[test]
+    fn refreshes_search_index_when_file_metadata_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-index-refresh-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create search index refresh workspace");
+        let note = root.join("note.md");
+        fs::write(&note, "first needle").expect("write initial indexed note");
+
+        let cache = WorkspaceSearchCache::default();
+        assert_eq!(
+            search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
+                .expect("search initial index")
+                .len(),
+            1
+        );
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        fs::write(&note, "second needle").expect("write updated indexed note");
+
+        assert!(
+            search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
+                .expect("search removed indexed term")
+                .is_empty()
+        );
+        assert_eq!(
+            search_workspace_inner_with_cache(root.clone(), "second".to_string(), &cache)
+                .expect("search updated indexed term")
+                .len(),
+            1
+        );
+
+        fs::remove_dir_all(root).expect("remove search index refresh workspace");
     }
 
     #[test]
