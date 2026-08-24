@@ -114,7 +114,11 @@ import {
 } from "./workspace-refresh";
 import { createWorkspaceOpenPlan } from "./workspace-open";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
-import { shouldConfirmDocumentReplacement, shouldConfirmWorkspaceSwitch } from "./document-transition";
+import {
+  isSameDocumentPath,
+  shouldConfirmDocumentReplacement,
+  shouldConfirmWorkspaceSwitch,
+} from "./document-transition";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -920,13 +924,17 @@ export function App() {
         return;
       }
 
-      const documentPaths = paths.filter((entry) => entry.kind === "document").map((entry) => entry.path);
+      const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
+      const pathsToProcess = currentModifiedPath
+        ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(currentModifiedPath, entry.path))
+        : paths;
+      const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
       if (!confirmDocumentReplacement(documentPaths, "当前文档有未保存修改，打开新文档后将丢失这些修改。继续吗？")) {
         return;
       }
 
       const seen = new Set<string>();
-      for (const entry of paths) {
+      for (const entry of pathsToProcess) {
         const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -1855,9 +1863,17 @@ export function App() {
 
     const plan = createWorkspaceOpenPlan(workspaceActionFiles);
     if (plan.files.length === 0) return;
+    const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
+    const filesToOpen = currentModifiedPath
+      ? plan.files.filter((file) => !isSameDocumentPath(currentModifiedPath, file.path))
+      : plan.files;
+    if (filesToOpen.length === 0) {
+      setWorkspaceOpenNotice("当前文档有未保存修改，已保留，不重复打开。");
+      return;
+    }
     if (
       !confirmDocumentReplacement(
-        plan.files.map((file) => file.path),
+        filesToOpen.map((file) => file.path),
         "当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？",
       )
     ) {
@@ -1870,14 +1886,17 @@ export function App() {
 
     let opened = 0;
     try {
-      for (const file of plan.files) {
+      for (const file of filesToOpen) {
         if (await openPath(file.path)) opened += 1;
       }
 
-      const failed = plan.files.length - opened;
+      const failed = filesToOpen.length - opened;
       const details = [
         `已打开 ${opened} 个文档`,
         failed > 0 ? `失败 ${failed} 个` : "",
+        filesToOpen.length < plan.files.length
+          ? `已保留当前未保存文档 ${plan.files.length - filesToOpen.length} 个`
+          : "",
         plan.skippedCount > 0 ? `为保持轻量跳过 ${plan.skippedCount} 个` : "",
       ].filter(Boolean);
       setWorkspaceOpenNotice(`${details.join("，")}。`);

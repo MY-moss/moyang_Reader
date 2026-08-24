@@ -9,13 +9,17 @@ function comparablePath(path: string): string {
     .toLocaleLowerCase();
 }
 
+export function isSameDocumentPath(left: string, right: string): boolean {
+  return comparablePath(left) === comparablePath(right);
+}
+
 export function shouldConfirmDocumentReplacement(
   document: ActiveDocument | null,
   nextPaths: readonly string[],
 ): boolean {
   if (!document?.modified) return false;
   const currentPath = comparablePath(document.path);
-  return nextPaths.some((path) => comparablePath(path) !== currentPath);
+  return nextPaths.some((path) => !isSameDocumentPath(path, currentPath));
 }
 
 export function shouldConfirmWorkspaceSwitch(
