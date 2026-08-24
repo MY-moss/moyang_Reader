@@ -378,6 +378,21 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
+test("switches and remembers the core interface locale", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator("summary", { hasText: "设置" }).click();
+  await page.getByLabel("界面语言").selectOption("en-US");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("button", { name: "Folder", exact: true })).toBeVisible();
+  await expect(page.getByText("LOCAL FIRST")).toBeVisible();
+
+  await page.reload();
+  await page.locator("summary", { hasText: "Settings" }).click();
+  await expect(page.getByLabel("Interface language")).toHaveValue("en-US");
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 

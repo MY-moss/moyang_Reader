@@ -116,6 +116,7 @@ import {
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
+import { loadLocale, saveLocale, type Locale } from "./i18n";
 import {
   documentKindFromPath,
   emptyRenderedDocument,
@@ -374,6 +375,7 @@ export function App() {
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
+  const [locale, setLocale] = useState<Locale>(loadLocale);
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
@@ -486,6 +488,7 @@ export function App() {
       const serialized = serializePortableSettings(
         createPortableSettingsBundle({
           preferences,
+          locale,
           theme,
           workspacePath,
           lastDocumentPath: loadLastDocumentPath(),
@@ -506,7 +509,7 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "设置备份导出失败。");
     }
-  }, [mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
+  }, [locale, mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
 
   const importPortableSettings = useCallback(() => {
     const input = document.createElement("input");
@@ -527,6 +530,8 @@ export function App() {
           saveWorkspacePath(bundle.workspacePath);
           saveLastDocumentPath(bundle.lastDocumentPath);
           setPreferences(bundle.preferences);
+          setLocale(bundle.locale);
+          saveLocale(bundle.locale);
           setTheme(bundle.theme);
           setMountedWorkspaces([...bundle.mountedWorkspaces]);
           setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
@@ -2405,6 +2410,11 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.lang = locale === "en-US" ? "en" : "zh-CN";
+    saveLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
     if (!selectedTag || !workspacePath || workspaceIndex.some((entry) => entry.tags.includes(selectedTag))) return;
     setSelectedTag(null);
   }, [selectedTag, workspaceIndex, workspacePath]);
@@ -2881,6 +2891,7 @@ export function App() {
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        locale={locale}
         readingScale={preferences.readingScale}
         readingWidth={preferences.readingWidth}
         exportPaper={preferences.exportPaper}
@@ -2938,6 +2949,7 @@ export function App() {
           setSearchQuery("");
         }}
         onCycleTheme={cycleTheme}
+        onLocaleChange={setLocale}
       />
       <div className="navigation-strip">
         {settingsNotice && (

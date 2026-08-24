@@ -4,6 +4,7 @@ import { createPortableSettingsBundle, parsePortableSettings, serializePortableS
 
 const input = {
   preferences: { ...defaultReaderPreferences, readingScale: "large" as const },
+  locale: "en-US" as const,
   theme: "dark" as const,
   workspacePath: "C:/Notes",
   lastDocumentPath: "C:/Notes/today.md",
@@ -27,6 +28,7 @@ describe("portable settings", () => {
     const parsed = parsePortableSettings(serialized);
 
     expect(parsed.preferences.readingScale).toBe("large");
+    expect(parsed.locale).toBe("en-US");
     expect(parsed.theme).toBe("dark");
     expect(parsed.mountedWorkspaces).toEqual([{ path: "C:/Notes", name: "Notes" }]);
     expect(parsed.workspaceSessions[0]?.tabs).toEqual([{ path: "C:/Notes/today.md", name: "today.md" }]);

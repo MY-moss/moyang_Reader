@@ -1,6 +1,7 @@
 import type { RecentFile, RecentWorkspace, ThemeMode } from "./types";
 import type { WorkspaceSession } from "./storage";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
+import type { Locale } from "./i18n";
 
 const PORTABLE_SETTINGS_FORMAT = "moyang-reader-settings";
 const PORTABLE_SETTINGS_VERSION = 1;
@@ -9,6 +10,7 @@ const MAX_TABS = 16;
 
 export type PortableSettingsInput = {
   preferences: ReaderPreferences;
+  locale: Locale;
   theme: ThemeMode;
   workspacePath: string | null;
   lastDocumentPath: string | null;
@@ -142,6 +144,7 @@ export function createPortableSettingsBundle(input: PortableSettingsInput): Port
     version: PORTABLE_SETTINGS_VERSION,
     exportedAt: new Date().toISOString(),
     preferences: input.preferences,
+    locale: input.locale,
     theme: input.theme,
     workspacePath: input.workspacePath,
     lastDocumentPath: input.lastDocumentPath,
@@ -169,11 +172,13 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
 
   const theme =
     parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system" ? parsed.theme : "system";
+  const locale = parsed.locale === "en-US" || parsed.locale === "zh-CN" ? parsed.locale : "zh-CN";
   return {
     format: PORTABLE_SETTINGS_FORMAT,
     version: PORTABLE_SETTINGS_VERSION,
     exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(),
     preferences: parsePreferences(parsed.preferences),
+    locale,
     theme,
     workspacePath: optionalPath(parsed.workspacePath),
     lastDocumentPath: optionalPath(parsed.lastDocumentPath),
