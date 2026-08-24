@@ -77,6 +77,31 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("protects unsaved browser edits before opening another document", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "unsaved-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Unsaved note\n\n原始内容"),
+  });
+  await page.getByRole("button", { name: "源文本" }).click();
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.fill("# Unsaved note\n\n尚未保存");
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("未保存修改");
+    await dialog.dismiss();
+  });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "replacement-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Replacement note"),
+  });
+
+  await expect(editor).toHaveValue("# Unsaved note\n\n尚未保存");
+});
+
 test("enters and exits focus reading mode", async ({ page }) => {
   await page.goto("/");
 

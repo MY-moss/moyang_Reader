@@ -111,6 +111,7 @@ import {
 } from "./workspace-refresh";
 import { createWorkspaceOpenPlan } from "./workspace-open";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
+import { shouldConfirmDocumentReplacement, shouldConfirmWorkspaceSwitch } from "./document-transition";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -321,6 +322,21 @@ export function App() {
   const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
+
+  const confirmDocumentReplacement = useCallback((nextPaths: readonly string[], message: string) => {
+    if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;
+    return window.confirm(message);
+  }, []);
+
+  const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, message: string) => {
+    const currentDocument = documentStateRef.current;
+    if (
+      !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)
+    ) {
+      return true;
+    }
+    return window.confirm(message);
+  }, []);
 
   const updateReadingRail = useCallback(() => {
     const contentArea = contentAreaRef.current;
@@ -721,19 +737,24 @@ export function App() {
 
   const handleChooseWorkspace = useCallback(async () => {
     const selected = await chooseWorkspacePath();
-    if (selected) await loadWorkspace(selected);
-  }, [loadWorkspace]);
+    if (selected && confirmWorkspaceSwitch(selected, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")) {
+      await loadWorkspace(selected);
+    }
+  }, [confirmWorkspaceSwitch, loadWorkspace]);
 
   const handleOpenRecentWorkspace = useCallback(
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, true);
+        if (!confirmWorkspaceSwitch(authorizedPath, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")) {
+          return;
+        }
         await loadWorkspace(authorizedPath);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "最近阅读库无法打开，请重新选择文件夹。");
       }
     },
-    [loadWorkspace],
+    [confirmWorkspaceSwitch, loadWorkspace],
   );
 
   const openSource = useCallback(
@@ -871,6 +892,22 @@ export function App() {
 
   const handleOpenPaths = useCallback(
     async (paths: OpenPath[]) => {
+      const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);
+      const workspacePathToConfirm = workspacePaths.find((path) =>
+        shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
+      );
+      if (
+        workspacePathToConfirm &&
+        !confirmWorkspaceSwitch(workspacePathToConfirm, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")
+      ) {
+        return;
+      }
+
+      const documentPaths = paths.filter((entry) => entry.kind === "document").map((entry) => entry.path);
+      if (!confirmDocumentReplacement(documentPaths, "当前文档有未保存修改，打开新文档后将丢失这些修改。继续吗？")) {
+        return;
+      }
+
       const seen = new Set<string>();
       for (const entry of paths) {
         const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
@@ -891,7 +928,7 @@ export function App() {
         }
       }
     },
-    [loadWorkspace, openPath],
+    [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
   );
 
   const handleCreateNote = useCallback(
@@ -1007,11 +1044,7 @@ export function App() {
 
       if (active) await handleOpenPaths(paths);
       if (active) setTabSessionReady(true);
-      const dispose = await subscribeToOpenPaths((nextPaths) => {
-        if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
-          return;
-        void handleOpenPaths(nextPaths);
-      });
+      const dispose = await subscribeToOpenPaths((nextPaths) => void handleOpenPaths(nextPaths));
       if (active) unlisten = dispose;
       else dispose?.();
     })();
@@ -1029,7 +1062,6 @@ export function App() {
     let unlisten: (() => void) | null = null;
     void subscribeToFileDrop((paths) => {
       if (!active) return;
-      if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开拖入的路径吗？")) return;
       void resolveOpenPaths(paths)
         .then((entries) => {
           if (active) return handleOpenPaths(entries);
@@ -1442,10 +1474,8 @@ export function App() {
     async (files: FileList | File[] | null | undefined) => {
       const selectedFiles = Array.from(files ?? []);
       if (selectedFiles.length === 0) return;
-      if (
-        documentStateRef.current?.modified &&
-        !window.confirm("当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")
-      ) {
+      const nextPaths = selectedFiles.map((file) => `browser://${file.name}`);
+      if (!confirmDocumentReplacement(nextPaths, "当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")) {
         return;
       }
 
@@ -1459,13 +1489,13 @@ export function App() {
         }
       }
     },
-    [openBinary, openSource],
+    [confirmDocumentReplacement, openBinary, openSource],
   );
 
   const handleSelectTab = useCallback(
     async (path: string) => {
       if (path === documentState?.path) return;
-      if (documentState?.modified && !window.confirm("当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
+      if (!confirmDocumentReplacement([path], "当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
       try {
         const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
         await openPath(authorizedPath);
@@ -1473,7 +1503,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");
       }
     },
-    [documentState, openPath],
+    [confirmDocumentReplacement, documentState, openPath],
   );
 
   const handleCloseTab = useCallback(
@@ -1534,7 +1564,7 @@ export function App() {
           setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
           return;
         }
-        void openPath(path).then(() => {
+        void handleSelectTab(path).then(() => {
           if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
         });
         return;
@@ -1577,11 +1607,11 @@ export function App() {
         setError("无法解析这个本地文档链接。");
         return;
       }
-      void openPath(path).then(() => {
+      void handleSelectTab(path).then(() => {
         if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
       });
     },
-    [documentState, openPath, workspaceIndex],
+    [documentState, handleSelectTab, workspaceIndex],
   );
 
   useEffect(() => {
@@ -1774,8 +1804,10 @@ export function App() {
     const plan = createWorkspaceOpenPlan(workspaceActionFiles);
     if (plan.files.length === 0) return;
     if (
-      documentStateRef.current?.modified &&
-      !window.confirm("当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？")
+      !confirmDocumentReplacement(
+        plan.files.map((file) => file.path),
+        "当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？",
+      )
     ) {
       return;
     }
@@ -1801,7 +1833,7 @@ export function App() {
     } finally {
       setWorkspaceOpening(false);
     }
-  }, [openPath, workspaceActionFiles, workspacePath]);
+  }, [confirmDocumentReplacement, openPath, workspaceActionFiles, workspacePath]);
 
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
