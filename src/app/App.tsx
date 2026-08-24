@@ -8,6 +8,7 @@ import { PrintPreview } from "./components/PrintPreview";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
+import { ReadingRail } from "./components/ReadingRail";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -171,6 +172,22 @@ function safeDecode(value: string): string {
   }
 }
 
+function currentHeadingFromArticle(article: HTMLElement | null, contentArea: HTMLElement | null): string | null {
+  if (!article) return null;
+
+  const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));
+  if (headings.length === 0) return null;
+
+  const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;
+  let currentHeading: HTMLElement | undefined;
+  for (const heading of headings) {
+    if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;
+    else break;
+  }
+
+  return (currentHeading ?? headings[0]).textContent?.trim() || null;
+}
+
 function readSavedTheme(): ThemeMode {
   try {
     const saved = localStorage.getItem("moyang-reader-theme");
@@ -261,6 +278,8 @@ export function App() {
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [currentHeading, setCurrentHeading] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +295,20 @@ export function App() {
   const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
+
+  const updateReadingRail = useCallback(() => {
+    const contentArea = contentAreaRef.current;
+    const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+    const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;
+    setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));
+    setCurrentHeading(currentHeadingFromArticle(articleRef.current, contentArea));
+  }, []);
+
+  const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+    contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });
+  }, []);
 
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
     setPreferences((current) => {
@@ -329,6 +362,33 @@ export function App() {
       saveReadingPosition(path, contentArea.scrollTop);
     };
   }, [documentState?.path]);
+
+  useEffect(() => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    let frame: number | null = null;
+    const update = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        updateReadingRail();
+      });
+    };
+
+    contentArea.addEventListener("scroll", update, { passive: true });
+    updateReadingRail();
+    return () => {
+      contentArea.removeEventListener("scroll", update);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);
+
+  useEffect(() => {
+    if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
+    setReadingProgress(0);
+    setCurrentHeading(null);
+  }, [documentState, mode]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -2012,22 +2072,31 @@ export function App() {
             documentState.kind !== "pdf" &&
             documentState.kind !== "image" &&
             mode === "rendered" && (
-              <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
-                <div className="reader-meta" aria-label="文档信息">
-                  <span className="reader-meta-kicker">DOCUMENT</span>
-                  <span>
-                    {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")} 字
-                    · {documentState.rendered.readingMinutes} 分钟阅读
-                  </span>
-                </div>
-                {!startsWithHeading(documentState.rendered.html) && (
-                  <header className="print-document-header" aria-hidden="true">
-                    <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
-                    <div className="print-document-title">{documentState.name}</div>
-                  </header>
-                )}
-                <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
-              </article>
+              <div className="reader-stage">
+                <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                  <div className="reader-meta" aria-label="文档信息">
+                    <span className="reader-meta-kicker">DOCUMENT</span>
+                    <span>
+                      {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")}{" "}
+                      字 · {documentState.rendered.readingMinutes} 分钟阅读
+                    </span>
+                  </div>
+                  {!startsWithHeading(documentState.rendered.html) && (
+                    <header className="print-document-header" aria-hidden="true">
+                      <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
+                      <div className="print-document-title">{documentState.name}</div>
+                    </header>
+                  )}
+                  <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+                </article>
+                <ReadingRail
+                  progress={readingProgress}
+                  currentHeading={currentHeading}
+                  headingCount={documentState.rendered.toc.length}
+                  onScrollToTop={() => scrollToReaderEdge("top")}
+                  onScrollToBottom={() => scrollToReaderEdge("bottom")}
+                />
+              </div>
             )}
           {!loading && documentState && canEdit && mode === "source" && (
             <textarea
