@@ -15,7 +15,7 @@ type WorkspacePanelProps = {
   selectedTag: string | null;
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
-  onExportWorkspace: () => void;
+  onExportWorkspace: (format: "html" | "docx") => void;
   workspaceExporting: boolean;
   workspaceExportNotice: string | null;
   workspaceIndexLoading: boolean;
@@ -58,18 +58,33 @@ export function WorkspacePanel({
           <h2 id="workspace-title">阅读库</h2>
         </div>
         <div className="workspace-actions">
-          <button
-            type="button"
-            className="quiet-button"
-            onClick={onExportWorkspace}
-            disabled={
-              !workspacePath ||
-              workspaceExporting ||
-              !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
-            }
-          >
-            {workspaceExporting ? "导出中…" : "批量导出"}
-          </button>
+          <details className="export-menu workspace-export-menu">
+            <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
+            <div className="export-menu-panel">
+              <button
+                type="button"
+                disabled={
+                  !workspacePath ||
+                  workspaceExporting ||
+                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                }
+                onClick={() => onExportWorkspace("html")}
+              >
+                单文件 HTML
+              </button>
+              <button
+                type="button"
+                disabled={
+                  !workspacePath ||
+                  workspaceExporting ||
+                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                }
+                onClick={() => onExportWorkspace("docx")}
+              >
+                单文件 Word
+              </button>
+            </div>
+          </details>
           <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
             {workspacePath ? "更换文件夹" : "添加文件夹"}
           </button>

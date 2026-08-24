@@ -58,6 +58,7 @@ import type {
   WorkspaceSearchResult,
 } from "./types";
 import {
+  buildBatchDocxExport,
   buildBatchHtmlExport,
   buildDocxExport,
   buildHtmlExport,
@@ -1475,66 +1476,76 @@ export function App() {
     return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
   }, [openTabs, recentFiles, workspaceFiles]);
 
-  const handleExportWorkspace = useCallback(async () => {
-    if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+  const handleExportWorkspace = useCallback(
+    async (format: "html" | "docx") => {
+      if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
 
-    const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
-    const savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, "html"), "html");
-    if (!savePath) return;
+      const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
+      const savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+      if (!savePath) return;
 
-    setWorkspaceExporting(true);
-    setWorkspaceExportNotice(null);
-    setError(null);
+      setWorkspaceExporting(true);
+      setWorkspaceExportNotice(null);
+      setError(null);
 
-    let exported = 0;
-    let skipped = 0;
-    try {
-      const documents = [];
-      for (const file of visibleWorkspaceFiles) {
-        try {
-          let rendered;
-          if (file.kind === "docx") {
-            rendered = await renderDocx(await readBinaryFile(file.path), {
-              allowRemoteResources: preferences.allowRemoteResources,
-            });
-          } else if (file.kind === "markdown" || file.kind === "text") {
-            rendered = await renderSource(file.path, await readTextFile(file.path), {
-              allowRemoteResources: preferences.allowRemoteResources,
-            });
-          } else {
+      let exported = 0;
+      let skipped = 0;
+      try {
+        const documents = [];
+        for (const file of visibleWorkspaceFiles) {
+          try {
+            let rendered;
+            if (file.kind === "docx") {
+              rendered = await renderDocx(await readBinaryFile(file.path), {
+                allowRemoteResources: preferences.allowRemoteResources,
+              });
+            } else if (file.kind === "markdown" || file.kind === "text") {
+              rendered = await renderSource(file.path, await readTextFile(file.path), {
+                allowRemoteResources: preferences.allowRemoteResources,
+              });
+            } else {
+              skipped += 1;
+              continue;
+            }
+
+            const body = await inlineLocalImages(
+              rendered.html,
+              (source) => {
+                const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+                if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+                return resolveRelativePath(file.path, safeDecode(target));
+              },
+              readBinaryFile,
+              imageMimeType,
+              fileSize,
+            );
+            documents.push({ title: file.relativePath, body });
+            exported += 1;
+          } catch {
             skipped += 1;
-            continue;
           }
-
-          const body = await inlineLocalImages(
-            rendered.html,
-            (source) => {
-              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-              return resolveRelativePath(file.path, safeDecode(target));
-            },
-            readBinaryFile,
-            imageMimeType,
-            fileSize,
-          );
-          documents.push({ title: file.relativePath, body });
-          exported += 1;
-        } catch {
-          skipped += 1;
         }
-      }
 
-      if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
-      await writeTextFile(savePath, buildBatchHtmlExport(`${workspaceName} 阅读库`, documents));
-      setWorkspaceExportNotice(
-        `已导出 ${exported} 篇文档${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
-      );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "批量导出失败。");
-    } finally {
-      setWorkspaceExporting(false);
-    }
-  }, [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath]);
+        if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
+        const exportTitle = `${workspaceName} 阅读库`;
+        if (format === "html") {
+          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents));
+        } else {
+          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents));
+        }
+        setWorkspaceExportNotice(
+          `已导出 ${exported} 篇文档为 ${format === "html" ? "HTML" : "Word"}${
+            skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""
+          }。`,
+        );
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "批量导出失败。");
+      } finally {
+        setWorkspaceExporting(false);
+      }
+    },
+    [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath],
+  );
 
   return (
     <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
@@ -1606,7 +1617,7 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
-            onExportWorkspace={() => void handleExportWorkspace()}
+            onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
             workspaceExportNotice={workspaceExportNotice}
             workspaceIndexLoading={workspaceIndexLoading}

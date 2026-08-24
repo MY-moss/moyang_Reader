@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import {
   buildBatchHtmlExport,
+  buildBatchDocxExport,
   buildDocxExport,
   buildHtmlExport,
   fileNameWithExtension,
@@ -99,5 +100,20 @@ describe("document export helpers", () => {
     expect(documentXml).toContain('r:embed="rId1"');
     expect(relationshipsXml).toContain('Target="media/image1.png"');
     expect(zip.file("word/media/image1.png")).not.toBeNull();
+  });
+
+  it("builds a paginated DOCX package for a batch of documents", async () => {
+    const bytes = await buildBatchDocxExport("阅读库", [
+      { title: "第一篇.md", body: "<p>第一篇正文</p>" },
+      { title: "第二篇.md", body: "<p>第二篇正文</p>" },
+    ]);
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+
+    expect(documentXml).toContain("第一篇.md");
+    expect(documentXml).toContain("第二篇.md");
+    expect(documentXml).toContain("第一篇正文");
+    expect(documentXml).toContain("第二篇正文");
+    expect(documentXml).toContain("<w:pageBreakBefore/>");
   });
 });
