@@ -5,6 +5,7 @@ import {
   buildBatchDocxExport,
   buildDocxExport,
   buildHtmlExport,
+  calculateDocxImageExtent,
   copyRichText,
   formatExportCancellationNotice,
   htmlToPlainText,
@@ -13,8 +14,63 @@ import {
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
+  readImageDimensions,
   summarizeExportFailures,
 } from "./export";
+
+function pngBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, width);
+  new DataView(bytes.buffer).setUint32(20, height);
+  return bytes;
+}
+
+function jpegBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(21);
+  bytes.set([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08], 0);
+  const view = new DataView(bytes.buffer);
+  view.setUint16(7, height);
+  view.setUint16(9, width);
+  return bytes;
+}
+
+function gifBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(10);
+  bytes.set(new TextEncoder().encode("GIF89a"), 0);
+  new DataView(bytes.buffer).setUint16(6, width, true);
+  new DataView(bytes.buffer).setUint16(8, height, true);
+  return bytes;
+}
+
+function avifBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(20);
+  bytes.set(new TextEncoder().encode("ispe"), 4);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(12, width);
+  view.setUint32(16, height);
+  return bytes;
+}
+
+function webpVp8xBytes(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(30);
+  bytes.set(new TextEncoder().encode("RIFF"), 0);
+  bytes.set(new TextEncoder().encode("WEBP"), 8);
+  bytes.set(new TextEncoder().encode("VP8X"), 12);
+  bytes.set([10, 0, 0, 0], 16);
+  bytes[24] = (width - 1) & 0xff;
+  bytes[25] = ((width - 1) >> 8) & 0xff;
+  bytes[26] = (width - 1) >> 16;
+  bytes[27] = (height - 1) & 0xff;
+  bytes[28] = ((height - 1) >> 8) & 0xff;
+  bytes[29] = (height - 1) >> 16;
+  return bytes;
+}
+
+function dataUrl(contentType: string, bytes: Uint8Array): string {
+  return `data:${contentType};base64,${btoa(String.fromCharCode(...bytes))}`;
+}
 
 describe("document export helpers", () => {
   it("keeps the directory while changing the export extension", () => {
@@ -121,6 +177,21 @@ describe("document export helpers", () => {
     expect(html).toContain('src="moyang-embed:large.png"');
   });
 
+  it("reads common image dimensions and calculates an undistorted DOCX extent", () => {
+    expect(readImageDimensions(pngBytes(1600, 800), "image/png")).toEqual({ width: 1600, height: 800 });
+    expect(readImageDimensions(jpegBytes(600, 1200), "image/jpeg")).toEqual({ width: 600, height: 1200 });
+    expect(readImageDimensions(gifBytes(320, 240), "image/gif")).toEqual({ width: 320, height: 240 });
+    expect(readImageDimensions(webpVp8xBytes(1920, 1080), "image/webp")).toEqual({ width: 1920, height: 1080 });
+    expect(readImageDimensions(avifBytes(1024, 768), "image/avif")).toEqual({ width: 1024, height: 768 });
+    expect(readImageDimensions(new TextEncoder().encode('<svg viewBox="0 0 800 400"></svg>'), "image/svg+xml")).toEqual(
+      { width: 800, height: 400 },
+    );
+
+    expect(calculateDocxImageExtent({ width: 1600, height: 800 })).toEqual({ cx: 5486400, cy: 2743200 });
+    expect(calculateDocxImageExtent({ width: 600, height: 1200 })).toEqual({ cx: 1828800, cy: 3657600 });
+    expect(calculateDocxImageExtent(null)).toEqual({ cx: 5486400, cy: 3657600 });
+  });
+
   it("summarizes unique export failures without hiding the count", () => {
     expect(summarizeExportFailures([])).toBe("");
     expect(summarizeExportFailures(["a.md", "a.md", "b.docx"], 3)).toBe("a.md、b.docx");
@@ -206,6 +277,25 @@ describe("document export helpers", () => {
     expect(documentXml).toContain('r:embed="rId1"');
     expect(relationshipsXml).toContain('Target="media/image1.png"');
     expect(zip.file("word/media/image1.png")).not.toBeNull();
+  });
+
+  it("preserves image proportions and embeds SVG resources in DOCX", async () => {
+    const png = dataUrl("image/png", pngBytes(1600, 800));
+    const svg = dataUrl("image/svg+xml", new TextEncoder().encode('<svg width="400" height="200"></svg>'));
+    const bytes = await buildDocxExport(
+      "图片导出",
+      `<p><img src="${png}" alt="宽幅图"/></p><p><img src="${svg}"/></p>`,
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+    const contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
+
+    expect(documentXml).toContain('<wp:extent cx="5486400" cy="2743200"/>');
+    expect(documentXml).toContain('descr="宽幅图"');
+    expect(relationshipsXml).toContain('Target="media/image2.svg"');
+    expect(contentTypesXml).toContain('<Default Extension="svg" ContentType="image/svg+xml"/>');
+    expect(zip.file("word/media/image2.svg")).not.toBeNull();
   });
 
   it("builds a paginated DOCX package for a batch of documents", async () => {
