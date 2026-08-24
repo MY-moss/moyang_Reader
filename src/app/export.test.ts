@@ -6,6 +6,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportCancellationNotice,
   htmlToPlainText,
   fileNameWithExtension,
   inlineLocalImages,
@@ -124,6 +125,10 @@ describe("document export helpers", () => {
     expect(summarizeExportFailures([])).toBe("");
     expect(summarizeExportFailures(["a.md", "a.md", "b.docx"], 3)).toBe("a.md、b.docx");
     expect(summarizeExportFailures(["a.md", "b.docx", "c.txt", "d.pdf"], 3)).toBe("a.md、b.docx、c.txt 等 4 个");
+  });
+
+  it("explains that cancelling a batch export leaves no partial output", () => {
+    expect(formatExportCancellationNotice(4)).toBe("已取消批量导出，已整理 4 篇文档，未写入文件。");
   });
 
   it("builds a single HTML document with a linked table of contents", () => {

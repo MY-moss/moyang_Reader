@@ -37,6 +37,7 @@ type WorkspacePanelProps = {
   onOpenWorkspace: (path: string) => void;
   onOpenVisibleFiles: () => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
+  onCancelWorkspaceExport: () => void;
   workspaceExporting: boolean;
   workspaceExportProgress: { current: number; total: number; fileName: string } | null;
   workspaceExportFailures: WorkspaceExportFailure[];
@@ -74,6 +75,7 @@ export function WorkspacePanel({
   onOpenWorkspace,
   onOpenVisibleFiles,
   onExportWorkspace,
+  onCancelWorkspaceExport,
   workspaceExporting,
   workspaceExportProgress,
   workspaceExportFailures,
@@ -146,6 +148,11 @@ export function WorkspacePanel({
               </button>
             </div>
           </details>
+          {workspaceExporting && (
+            <button type="button" className="quiet-button workspace-export-cancel" onClick={onCancelWorkspaceExport}>
+              取消导出
+            </button>
+          )}
           <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
             {workspacePath ? "更换文件夹" : "添加文件夹"}
           </button>

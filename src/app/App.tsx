@@ -69,6 +69,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportCancellationNotice,
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
@@ -294,6 +295,7 @@ export function App() {
   const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
   const updateRef = useRef<Update | null>(null);
   const updateCheckInFlightRef = useRef(false);
+  const workspaceExportAbortRef = useRef<AbortController | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
@@ -1835,6 +1837,10 @@ export function App() {
     }
   }, [confirmDocumentReplacement, openPath, workspaceActionFiles, workspacePath]);
 
+  const handleCancelWorkspaceExport = useCallback(() => {
+    workspaceExportAbortRef.current?.abort();
+  }, []);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
@@ -1846,6 +1852,8 @@ export function App() {
           : await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
       if (format !== "pdf" && !savePath) return;
 
+      const controller = new AbortController();
+      workspaceExportAbortRef.current = controller;
       setWorkspaceExporting(true);
       setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
       setWorkspaceExportFailures([]);
@@ -1861,6 +1869,10 @@ export function App() {
       try {
         const documents = [];
         for (const [index, file] of workspaceActionFiles.entries()) {
+          if (controller.signal.aborted) {
+            setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+            return;
+          }
           setWorkspaceExportProgress({
             current: index + 1,
             total: workspaceActionFiles.length,
@@ -1897,6 +1909,11 @@ export function App() {
           } catch {
             recordSkippedFile(file.relativePath, "读取失败");
           }
+        }
+
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+          return;
         }
 
         if (documents.length === 0) {
@@ -1940,8 +1957,13 @@ export function App() {
           }${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
         );
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "批量导出失败。");
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+        } else {
+          setError(cause instanceof Error ? cause.message : "批量导出失败。");
+        }
       } finally {
+        if (workspaceExportAbortRef.current === controller) workspaceExportAbortRef.current = null;
         setWorkspaceExporting(false);
         setWorkspaceExportProgress(null);
       }
@@ -2053,6 +2075,7 @@ export function App() {
           <WorkspacePanel
             onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
+            onCancelWorkspaceExport={handleCancelWorkspaceExport}
             workspaceExporting={workspaceExporting}
             workspaceExportProgress={workspaceExportProgress}
             workspaceExportFailures={workspaceExportFailures}

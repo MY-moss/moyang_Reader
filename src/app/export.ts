@@ -128,6 +128,10 @@ export function summarizeExportFailures(paths: string[], maxItems = 3): string {
   return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
 }
 
+export function formatExportCancellationNotice(exported: number): string {
+  return `已取消批量导出，已整理 ${exported} 篇文档，未写入文件。`;
+}
+
 function exportMargin(options: ExportOptions): string {
   return options.margin === "compact" ? "14mm 14mm" : options.margin === "wide" ? "28mm 24mm" : "22mm 18mm";
 }
