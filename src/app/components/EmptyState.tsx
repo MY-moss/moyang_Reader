@@ -27,7 +27,7 @@ export function EmptyState({ onOpen, onChooseWorkspace }: EmptyStateProps) {
           添加整个文件夹
         </button>
       </div>
-      <p className="empty-hint">也可以把 Markdown、Word、PDF 或图片拖到窗口中</p>
+      <p className="empty-hint">桌面版还可以把文档或整个文件夹拖到窗口中</p>
     </section>
   );
 }

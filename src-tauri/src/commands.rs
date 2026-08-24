@@ -241,6 +241,20 @@ pub struct WorkspaceChangeEvent {
     pub paths: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OpenPathKind {
+    Document,
+    Workspace,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenPath {
+    pub path: String,
+    pub kind: OpenPathKind,
+}
+
 fn decode_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.starts_with(&[0xFF, 0xFE]) {
         if !(bytes.len() - 2).is_multiple_of(2) {
@@ -309,17 +323,53 @@ fn reject_suspicious_binary_text(text: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn initial_paths(access: State<'_, AccessRegistry>) -> Vec<String> {
-    let paths = std::env::args()
-        .skip(1)
-        .filter(|argument| {
-            Path::new(argument).is_file() && is_supported_document_path(Path::new(argument))
-        })
-        .collect::<Vec<_>>();
+pub fn initial_paths(access: State<'_, AccessRegistry>) -> Vec<OpenPath> {
+    let paths = collect_open_paths(std::env::args().skip(1));
     for path in &paths {
-        let _ = access.register_document_path(Path::new(path));
+        let _ = register_open_path(access.inner(), path);
     }
     paths
+}
+
+#[tauri::command]
+pub fn resolve_open_paths(paths: Vec<String>, access: State<'_, AccessRegistry>) -> Vec<OpenPath> {
+    let paths = collect_open_paths(paths);
+    for path in &paths {
+        let _ = register_open_path(access.inner(), path);
+    }
+    paths
+}
+
+pub(crate) fn collect_open_paths<I>(arguments: I) -> Vec<OpenPath>
+where
+    I: IntoIterator<Item = String>,
+{
+    arguments
+        .into_iter()
+        .filter_map(|argument| {
+            let path = Path::new(&argument);
+            if path.is_dir() {
+                return Some(OpenPath {
+                    path: argument,
+                    kind: OpenPathKind::Workspace,
+                });
+            }
+            if path.is_file() && is_supported_document_path(path) {
+                return Some(OpenPath {
+                    path: argument,
+                    kind: OpenPathKind::Document,
+                });
+            }
+            None
+        })
+        .collect()
+}
+
+pub(crate) fn register_open_path(access: &AccessRegistry, path: &OpenPath) -> Result<(), String> {
+    match path.kind {
+        OpenPathKind::Document => access.register_document_path(Path::new(&path.path)),
+        OpenPathKind::Workspace => access.register_workspace_path(Path::new(&path.path)),
+    }
 }
 
 #[tauri::command]
@@ -1414,13 +1464,14 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        access_path_key, authorize_stored_path_inner, clean_tag, create_markdown_file_inner,
-        decode_text, extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
-        index_workspace_inner, is_supported_document_path, is_supported_text_path,
-        list_workspace_files_inner, path_exists_inner, read_text_file_inner,
-        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
-        should_skip_directory, write_text_file_inner, AccessRegistry, WorkspaceFile,
-        WorkspaceSearchCache, MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
+        access_path_key, authorize_stored_path_inner, clean_tag, collect_open_paths,
+        create_markdown_file_inner, decode_text, extract_markdown_links, extract_tags,
+        extract_title, extract_wiki_links, index_workspace_inner, is_supported_document_path,
+        is_supported_text_path, list_workspace_files_inner, path_exists_inner,
+        read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
+        search_workspace_inner_with_cache, should_skip_directory, write_text_file_inner,
+        AccessRegistry, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
+        MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1437,6 +1488,54 @@ mod tests {
         assert!(is_supported_document_path(Path::new("notes/Guide.PDF")));
         assert!(is_supported_document_path(Path::new("notes/Cover.PNG")));
         assert!(!is_supported_document_path(Path::new("notes/Guide.doc")));
+    }
+
+    #[test]
+    fn collects_existing_workspaces_and_supported_documents() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-open-paths-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let workspace = root.join("vault");
+        let note = workspace.join("note.md");
+        let unsupported = workspace.join("note.doc");
+        fs::create_dir_all(&workspace).expect("create open paths workspace");
+        fs::write(&note, "note").expect("write open paths note");
+        fs::write(&unsupported, "unsupported").expect("write unsupported open path");
+
+        let paths = collect_open_paths(vec![
+            workspace.to_string_lossy().into_owned(),
+            note.to_string_lossy().into_owned(),
+            unsupported.to_string_lossy().into_owned(),
+            root.join("missing.md").to_string_lossy().into_owned(),
+        ]);
+
+        assert_eq!(paths.len(), 2);
+        assert!(paths
+            .iter()
+            .any(|path| path.path == workspace.to_string_lossy()
+                && path.kind == OpenPathKind::Workspace));
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.path == note.to_string_lossy()
+                    && path.kind == OpenPathKind::Document)
+        );
+
+        fs::remove_dir_all(root).expect("remove open paths workspace");
+    }
+
+    #[test]
+    fn serializes_open_path_kind_for_the_frontend_bridge() {
+        let paths = vec![OpenPath {
+            path: "C:\\Notes\\vault".to_string(),
+            kind: OpenPathKind::Workspace,
+        }];
+        let value = serde_json::to_value(paths).expect("serialize open paths");
+
+        assert_eq!(value[0]["path"], "C:\\Notes\\vault");
+        assert_eq!(value[0]["kind"], "workspace");
     }
 
     #[test]

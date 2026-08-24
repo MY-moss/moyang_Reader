@@ -27,7 +27,9 @@ import {
   readBinaryFile,
   readTextFile,
   refreshWorkspace,
+  resolveOpenPaths,
   searchWorkspace,
+  subscribeToFileDrop,
   subscribeToWorkspaceChanges,
   subscribeToCloseRequest,
   subscribeToOpenPaths,
@@ -45,6 +47,7 @@ import {
 } from "./updater";
 import type {
   DocumentKind,
+  OpenPath,
   OpenDocument,
   ReaderMode,
   RecentFile,
@@ -725,6 +728,31 @@ export function App() {
     [openBinary, openSource],
   );
 
+  const handleOpenPaths = useCallback(
+    async (paths: OpenPath[]) => {
+      const seen = new Set<string>();
+      for (const entry of paths) {
+        const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        try {
+          const authorizedPath = isTauriRuntime()
+            ? await authorizeStoredPath(entry.path, entry.kind === "workspace")
+            : entry.path;
+          if (entry.kind === "workspace") {
+            await loadWorkspace(authorizedPath);
+          } else {
+            await openPath(authorizedPath);
+          }
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");
+        }
+      }
+    },
+    [loadWorkspace, openPath],
+  );
+
   const handleCreateNote = useCallback(
     async (target: string) => {
       if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
@@ -785,8 +813,9 @@ export function App() {
     void (async () => {
       const paths = await initialPaths();
       if (isTauriRuntime()) {
+        const hasStartupWorkspace = paths.some((entry) => entry.kind === "workspace");
         const savedWorkspace = loadWorkspacePath();
-        if (savedWorkspace) {
+        if (savedWorkspace && !hasStartupWorkspace) {
           try {
             const authorizedWorkspace = await authorizeStoredPath(savedWorkspace, true);
             if (!active) return;
@@ -815,19 +844,11 @@ export function App() {
         }
       }
 
-      for (const path of [...new Set(paths)]) {
-        if (!active) break;
-        await openPath(path);
-      }
+      if (active) await handleOpenPaths(paths);
       const dispose = await subscribeToOpenPaths((nextPaths) => {
         if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
           return;
-        void (async () => {
-          for (const path of [...new Set(nextPaths)]) {
-            if (!active) break;
-            await openPath(path);
-          }
-        })();
+        void handleOpenPaths(nextPaths);
       });
       if (active) unlisten = dispose;
       else dispose?.();
@@ -837,7 +858,34 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [loadWorkspace, openPath]);
+  }, [handleOpenPaths, loadWorkspace, openPath]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    void subscribeToFileDrop((paths) => {
+      if (!active) return;
+      if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开拖入的路径吗？")) return;
+      void resolveOpenPaths(paths)
+        .then((entries) => {
+          if (active) return handleOpenPaths(entries);
+          return undefined;
+        })
+        .catch((cause) => {
+          if (active) setError(cause instanceof Error ? cause.message : "无法打开拖入的路径。");
+        });
+    }).then((dispose) => {
+      if (active) unlisten = dispose;
+      else dispose?.();
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleOpenPaths]);
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
