@@ -200,6 +200,7 @@ test("previews the print layout before exporting a document", async ({ page }) =
   await expect(previewFrame).toBeVisible();
   await expect(previewFrame).toHaveAttribute("srcdoc", /export-toc/);
   await expect(dialog.getByText("A4 · 纵向 · 标准页边距")).toBeVisible();
+  await expect(dialog.getByRole("status", { name: "打印分页估算" })).toHaveText(/预计 1 页/);
 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);

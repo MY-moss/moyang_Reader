@@ -636,6 +636,21 @@ a:focus-visible {
   color: var(--muted);
   font-size: 10px;
 }
+.print-preview-footer-meta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+}
+.print-preview-page-count {
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface));
+  color: var(--accent);
+  font-weight: 650;
+  white-space: nowrap;
+}
 .tab-strip {
   display: flex;
   min-width: 0;
@@ -2561,6 +2576,10 @@ a:focus-visible {
     flex-direction: column;
     gap: 4px;
     padding-inline: 14px;
+  }
+  .print-preview-footer-meta {
+    flex-wrap: wrap;
+    gap: 6px 10px;
   }
   .sidebar-restore {
     margin-left: 16px;
