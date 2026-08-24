@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth, ThemeMode } from "../types";
 import type { UpdateStatus } from "../updater";
 
@@ -35,6 +36,8 @@ type TopBarProps = {
   canCopy: boolean;
   onExport: () => void;
   exportLabel?: string;
+  canPreviewPrint: boolean;
+  onPreviewPrint: () => void;
   canExportMarkdown: boolean;
   canExportHtml: boolean;
   canExportDocx: boolean;
@@ -90,6 +93,8 @@ export function TopBar({
   canCopy,
   onExport,
   exportLabel = "打印 / PDF",
+  canPreviewPrint,
+  onPreviewPrint,
   canExportMarkdown,
   canExportHtml,
   canExportDocx,
@@ -110,6 +115,7 @@ export function TopBar({
   onCloseSearch,
   onCycleTheme,
 }: TopBarProps) {
+  const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const updateLabel =
     updateStatus === "checking"
@@ -294,11 +300,28 @@ export function TopBar({
           {exportLabel}
         </button>
         {(canExportMarkdown || canExportHtml || canExportDocx) && (
-          <details className="export-menu">
+          <details ref={exportMenuRef} className="export-menu">
             <summary className="toolbar-button" title="导出文件">
               导出
             </summary>
             <div className="export-menu-panel">
+              {canPreviewPrint && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const menu = exportMenuRef.current;
+                    if (menu) {
+                      menu.open = false;
+                      menu.removeAttribute("open");
+                    }
+                    onPreviewPrint();
+                  }}
+                >
+                  预览打印版式
+                </button>
+              )}
               {canExportMarkdown && (
                 <button type="button" onClick={onExportMarkdown}>
                   导出 Markdown / 文本

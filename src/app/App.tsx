@@ -4,6 +4,7 @@ import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
+import { PrintPreview } from "./components/PrintPreview";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
@@ -47,6 +48,9 @@ import {
 } from "./updater";
 import type {
   DocumentKind,
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
   OpenPath,
   OpenDocument,
   ReaderMode,
@@ -204,6 +208,14 @@ type BrowserDocument = {
   previewUrl?: string;
 };
 
+type PrintPreviewState = {
+  title: string;
+  html: string;
+  paper: ExportPaper;
+  orientation: ExportOrientation;
+  margin: ExportMargin;
+};
+
 export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -248,6 +260,7 @@ export function App() {
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1129,6 +1142,30 @@ export function App() {
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
 
+  const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
+
+    const body = isTauriRuntime()
+      ? await inlineLocalImages(
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        )
+      : documentState.rendered.html;
+
+    return buildHtmlExport(documentState.name, body, {
+      paper: preferences.exportPaper,
+      orientation: preferences.exportOrientation,
+      margin: preferences.exportMargin,
+    });
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+
   const handleExport = useCallback(async () => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
       const anchor = document.createElement("a");
@@ -1138,34 +1175,53 @@ export function App() {
       anchor.click();
       return;
     }
-    if (!documentState) return;
 
     try {
-      const body = isTauriRuntime()
-        ? await inlineLocalImages(
-            documentState.rendered.html,
-            (source) => {
-              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-              return resolveRelativePath(documentState.path, safeDecode(target));
-            },
-            readBinaryFile,
-            imageMimeType,
-            fileSize,
-          )
-        : documentState.rendered.html;
-      await printHtmlDocument(
-        buildHtmlExport(documentState.name, body, {
-          paper: preferences.exportPaper,
-          orientation: preferences.exportOrientation,
-          margin: preferences.exportMargin,
-        }),
-      );
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      await printHtmlDocument(html);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
     }
-  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+  }, [buildCurrentExportHtml, documentState]);
+
+  const handlePreviewPrint = useCallback(async () => {
+    if (!documentState) return;
+
+    try {
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      setPrintPreview({
+        title: documentState.name,
+        html,
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "生成打印版式预览失败。");
+    }
+  }, [
+    buildCurrentExportHtml,
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+  ]);
+
+  const handlePrintPreview = useCallback(async () => {
+    if (!printPreview) return;
+
+    try {
+      await printHtmlDocument(printPreview.html);
+      setPrintPreview(null);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+    }
+  }, [printPreview]);
 
   const handleCopy = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -1789,6 +1845,8 @@ export function App() {
         exportLabel={
           documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
         }
+        canPreviewPrint={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        onPreviewPrint={() => void handlePreviewPrint()}
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
@@ -2014,6 +2072,17 @@ export function App() {
           entries={workspaceIndex}
           onClose={() => setGraphOpen(false)}
           onOpenFile={(path) => void handleSelectTab(path)}
+        />
+      )}
+      {printPreview && (
+        <PrintPreview
+          title={printPreview.title}
+          html={printPreview.html}
+          paper={printPreview.paper}
+          orientation={printPreview.orientation}
+          margin={printPreview.margin}
+          onPrint={handlePrintPreview}
+          onClose={() => setPrintPreview(null)}
         />
       )}
       {quickOpen && (

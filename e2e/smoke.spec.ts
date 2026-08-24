@@ -120,6 +120,29 @@ test("collapses and restores the reading sidebar", async ({ page }) => {
   await expect(page.locator(".sidebar")).toBeVisible();
 });
 
+test("previews the print layout before exporting a document", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "print-preview-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Print preview\n\n打印版式预览测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Print preview" })).toBeVisible();
+
+  await page.getByText("导出", { exact: true }).click();
+  await page.getByRole("button", { name: "预览打印版式" }).click();
+  await expect(page.locator(".topbar .export-menu")).not.toHaveAttribute("open");
+
+  const dialog = page.getByRole("dialog", { name: "打印版式预览" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('iframe[title="print-preview-note.md 打印版式"]')).toBeVisible();
+  await expect(dialog.getByText("A4 · 纵向 · 标准页边距")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
 
