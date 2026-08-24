@@ -96,7 +96,8 @@ pub fn run() {
             commands::create_markdown_file,
             commands::list_workspace_files,
             commands::search_workspace,
-            commands::index_workspace
+            commands::index_workspace,
+            commands::refresh_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running Moyang Reader");
