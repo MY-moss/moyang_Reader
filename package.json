@@ -18,11 +18,14 @@
     "release:check": "node scripts/release-check.mjs"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/search": "^6.7.1",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
+    "codemirror": "^6.0.2",
     "jszip": "^3.10.1",
     "katex": "^0.16.11",
     "mammoth": "^1.8.0",
@@ -42,8 +45,8 @@
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
