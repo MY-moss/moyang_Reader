@@ -33,3 +33,20 @@ test("keeps remote images off until the local privacy setting is enabled", async
   await page.locator("summary", { hasText: "设置" }).click();
   await expect(page.getByRole("checkbox", { name: "允许远程图片" })).toBeChecked();
 });
+
+test("opens external links outside the reader window", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "external-link.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("[打开外部链接](https://example.com/reference)"),
+  });
+
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "打开外部链接" }).click();
+  const popup = await popupPromise;
+
+  await expect(popup).toHaveURL("https://example.com/reference");
+  await expect(page).toHaveTitle("Moyang Reader");
+});
