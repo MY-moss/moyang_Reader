@@ -89,6 +89,7 @@ export type DocxImageExtent = {
 
 const DEFAULT_DOCX_IMAGE_EXTENT: DocxImageExtent = { cx: 5486400, cy: 3657600 };
 const DOCX_MAX_IMAGE_EXTENT = DEFAULT_DOCX_IMAGE_EXTENT;
+export const BATCH_EXPORT_CHUNK_SIZE = 32;
 const DOCX_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/avif": "avif",
   "image/gif": "gif",
@@ -349,7 +350,11 @@ async function rasterizeDocxImage(source: string, image: DataImage): Promise<str
   }
 }
 
-async function normalizeDocxImageSources(html: string): Promise<string> {
+function throwIfExportAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new Error("EXPORT_CANCELLED");
+}
+
+async function normalizeDocxImageSources(html: string, signal?: AbortSignal): Promise<string> {
   const parsed = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const root = parsed.body.firstElementChild;
   if (!root) return html;
@@ -357,11 +362,13 @@ async function normalizeDocxImageSources(html: string): Promise<string> {
   const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
   await Promise.all(
     images.map(async (element) => {
+      throwIfExportAborted(signal);
       const source = element.getAttribute("src") ?? "";
       const image = parseDataImage(source);
       if (!image || !["image/avif", "image/webp"].includes(image.contentType)) return;
       const converted = await rasterizeDocxImage(source, image);
       if (converted) element.setAttribute("src", converted);
+      throwIfExportAborted(signal);
     }),
   );
 
@@ -410,7 +417,8 @@ export function summarizeExportFailures(paths: string[], maxItems = 3): string {
   return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
 }
 
-export function formatExportCancellationNotice(exported: number): string {
+export function formatExportCancellationNotice(exported: number, writtenVolumes = 0): string {
+  if (writtenVolumes > 0) return `已取消批量导出，已写入 ${writtenVolumes} 个文件，共整理 ${exported} 篇文档。`;
   return `已取消批量导出，已整理 ${exported} 篇文档，未写入文件。`;
 }
 
@@ -877,10 +885,12 @@ export async function buildDocxExport(
   title: string,
   body: string,
   options: ExportOptions = defaultExportOptions,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
   const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
-  const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(body));
+  const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(body), signal);
+  throwIfExportAborted(signal);
   const zip = new JSZip();
   zip.file(
     "_rels/.rels",
@@ -910,13 +920,15 @@ export async function buildBatchDocxExport(
   title: string,
   documents: HtmlExportDocument[],
   options: ExportOptions = defaultExportOptions,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> {
-  const content = documents
-    .map(
-      (document, index) =>
-        `<section data-page-break="${index > 0 ? "true" : "false"}"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`,
-    )
-    .join("");
+  const sections: string[] = [];
+  for (const [index, document] of documents.entries()) {
+    throwIfExportAborted(signal);
+    sections.push(
+      `<section data-page-break="${index > 0 ? "true" : "false"}"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`,
+    );
+  }
 
-  return buildDocxExport(title, content, options);
+  return buildDocxExport(title, sections.join(""), options, signal);
 }

@@ -65,6 +65,7 @@ import type {
 } from "./types";
 import { nextReaderModeAfterOpen } from "./reader-mode";
 import {
+  BATCH_EXPORT_CHUNK_SIZE,
   buildBatchDocxExport,
   buildBatchHtmlExport,
   buildDocxExport,
@@ -1910,16 +1911,54 @@ export function App() {
       setError(null);
 
       let exported = 0;
+      let writtenVolumes = 0;
       const skippedFiles: WorkspaceExportFailure[] = [];
       const recordSkippedFile = (fileName: string, reason: string) => {
         skippedFiles.push({ fileName, reason });
         setWorkspaceExportFailures([...skippedFiles]);
       };
       try {
-        const documents = [];
+        const exportTitle = `${workspaceName} 阅读库`;
+        const exportOptions = {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        };
+        const exportableFileCount = workspaceActionFiles.filter(
+          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
+        ).length;
+        const expectedVolumeCount =
+          format !== "pdf" ? Math.max(1, Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE)) : 1;
+        let documents: { title: string; body: string }[] = [];
+        const flushDocuments = async () => {
+          if (documents.length === 0) return;
+          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
+
+          const batch = documents;
+          documents = [];
+          const volumeNumber = writtenVolumes + 1;
+          const volumeTitle = expectedVolumeCount > 1 ? `${exportTitle} · 第 ${volumeNumber} 卷` : exportTitle;
+          if (format === "html") {
+            if (!savePath) throw new Error("没有选择 HTML 保存位置。");
+            const targetPath =
+              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "html") : savePath;
+            await writeTextFile(targetPath, buildBatchHtmlExport(volumeTitle, batch, exportOptions));
+          } else {
+            if (!savePath) throw new Error("没有选择 Word 保存位置。");
+            const targetPath =
+              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "docx") : savePath;
+            await writeBinaryFile(
+              targetPath,
+              await buildBatchDocxExport(volumeTitle, batch, exportOptions, controller.signal),
+            );
+          }
+          writtenVolumes = volumeNumber;
+          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
+        };
+
         for (const [index, file] of workspaceActionFiles.entries()) {
           if (controller.signal.aborted) {
-            setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+            setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
             return;
           }
           setWorkspaceExportProgress({
@@ -1955,17 +1994,18 @@ export function App() {
             );
             documents.push({ title: file.relativePath, body });
             exported += 1;
+            if (format !== "pdf" && documents.length >= BATCH_EXPORT_CHUNK_SIZE) await flushDocuments();
           } catch {
             recordSkippedFile(file.relativePath, "读取失败");
           }
         }
 
         if (controller.signal.aborted) {
-          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
           return;
         }
 
-        if (documents.length === 0) {
+        if (exported === 0) {
           const failureSummary = summarizeExportFailures(
             skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
           );
@@ -1975,19 +2015,7 @@ export function App() {
               : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",
           );
         }
-        const exportTitle = `${workspaceName} 阅读库`;
-        const exportOptions = {
-          paper: preferences.exportPaper,
-          orientation: preferences.exportOrientation,
-          margin: preferences.exportMargin,
-        };
-        if (format === "html") {
-          if (!savePath) throw new Error("没有选择 HTML 保存位置。");
-          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents, exportOptions));
-        } else if (format === "docx") {
-          if (!savePath) throw new Error("没有选择 Word 保存位置。");
-          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents, exportOptions));
-        } else {
+        if (format === "pdf") {
           setPrintPreview({
             title: `${exportTitle} · 批量打印`,
             html: buildBatchHtmlExport(exportTitle, documents, exportOptions),
@@ -1995,19 +2023,22 @@ export function App() {
             orientation: exportOptions.orientation,
             margin: exportOptions.margin,
           });
+        } else {
+          await flushDocuments();
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
         const failureSummary = summarizeExportFailures(
           skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
         );
+        const volumeNotice = writtenVolumes > 1 ? `，已分卷为 ${writtenVolumes} 个文件` : "";
         setWorkspaceExportNotice(
           `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
             format === "pdf" ? `${exported} 篇文档` : ""
-          }${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
+          }${volumeNotice}${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
         );
       } catch (cause) {
         if (controller.signal.aborted) {
-          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
         } else {
           setError(cause instanceof Error ? cause.message : "批量导出失败。");
         }
