@@ -34,6 +34,7 @@ function createHtmlProcessor(options: RenderOptions) {
 
 const localHtmlProcessor = createHtmlProcessor({ allowRemoteResources: false });
 const remoteHtmlProcessor = createHtmlProcessor({ allowRemoteResources: true });
+const htmlStringifyProcessor = unified().use(rehypeStringify);
 
 function extensionOf(path: string): string {
   return path.split(/[?#]/, 1)[0].split(/[\\/]/).pop()?.split(".").pop()?.toLowerCase() ?? "";
@@ -73,7 +74,7 @@ export async function renderHtmlFragment(source: string, options: RenderOptions 
   const processor = options.allowRemoteResources ? remoteHtmlProcessor : localHtmlProcessor;
   const tree = processor.parse(source);
   const processed = (await processor.run(tree)) as HastRoot;
-  const html = unified().use(rehypeStringify).stringify(processed);
+  const html = htmlStringifyProcessor.stringify(processed);
   const plainText = processed.children.map(textContent).join(" ");
 
   return {
@@ -116,3 +117,4 @@ export async function renderDocx(bytes: Uint8Array, options: RenderOptions = {})
 export function emptyRenderedDocument(): RenderedMarkdown {
   return { html: "", toc: [], wordCount: 0, readingMinutes: 0 };
 }
+
