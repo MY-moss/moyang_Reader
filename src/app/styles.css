@@ -875,6 +875,42 @@ a:focus-visible {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.workspace-export-progress {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent-soft) 54%, transparent);
+}
+.workspace-export-progress-label {
+  display: grid;
+  gap: 4px;
+  color: var(--accent-deep);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.workspace-export-progress-label strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-export-progress-track {
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+}
+.workspace-export-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+  transition: width 160ms ease-out;
+}
 .workspace-index-note {
   margin-top: 8px;
   color: var(--muted);

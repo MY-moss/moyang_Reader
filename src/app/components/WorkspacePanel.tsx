@@ -31,6 +31,7 @@ type WorkspacePanelProps = {
   onOpenVisibleFiles: () => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   workspaceExporting: boolean;
+  workspaceExportProgress: { current: number; total: number; fileName: string } | null;
   workspaceExportNotice: string | null;
   workspaceOpening: boolean;
   workspaceOpenNotice: string | null;
@@ -66,6 +67,7 @@ export function WorkspacePanel({
   onOpenVisibleFiles,
   onExportWorkspace,
   workspaceExporting,
+  workspaceExportProgress,
   workspaceExportNotice,
   workspaceOpening,
   workspaceOpenNotice,
@@ -152,6 +154,30 @@ export function WorkspacePanel({
       {workspaceExportNotice && (
         <div className="workspace-export-note" role="status">
           {workspaceExportNotice}
+        </div>
+      )}
+      {workspaceExportProgress && (
+        <div className="workspace-export-progress" role="status" aria-live="polite">
+          <div className="workspace-export-progress-label">
+            <span>
+              正在整理 {workspaceExportProgress.current} / {workspaceExportProgress.total}
+            </span>
+            <strong title={workspaceExportProgress.fileName}>{workspaceExportProgress.fileName}</strong>
+          </div>
+          <div
+            className="workspace-export-progress-track"
+            role="progressbar"
+            aria-label="批量导出进度"
+            aria-valuemin={0}
+            aria-valuemax={workspaceExportProgress.total}
+            aria-valuenow={workspaceExportProgress.current}
+          >
+            <span
+              style={{
+                width: `${Math.round((workspaceExportProgress.current / Math.max(1, workspaceExportProgress.total)) * 100)}%`,
+              }}
+            />
+          </div>
         </div>
       )}
       {workspaceOpenNotice && (

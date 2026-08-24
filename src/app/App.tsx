@@ -249,6 +249,12 @@ type PrintPreviewState = {
   margin: ExportMargin;
 };
 
+type WorkspaceExportProgress = {
+  current: number;
+  total: number;
+  fileName: string;
+};
+
 export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -272,6 +278,7 @@ export function App() {
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
+  const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [workspaceOpening, setWorkspaceOpening] = useState(false);
   const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
@@ -1801,6 +1808,7 @@ export function App() {
       if (format !== "pdf" && !savePath) return;
 
       setWorkspaceExporting(true);
+      setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
       setWorkspaceExportNotice(null);
       setError(null);
 
@@ -1808,7 +1816,12 @@ export function App() {
       const skippedFiles: string[] = [];
       try {
         const documents = [];
-        for (const file of workspaceActionFiles) {
+        for (const [index, file] of workspaceActionFiles.entries()) {
+          setWorkspaceExportProgress({
+            current: index + 1,
+            total: workspaceActionFiles.length,
+            fileName: file.relativePath,
+          });
           try {
             let rendered;
             if (file.kind === "docx") {
@@ -1876,6 +1889,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "批量导出失败。");
       } finally {
         setWorkspaceExporting(false);
+        setWorkspaceExportProgress(null);
       }
     },
     [
@@ -1986,6 +2000,7 @@ export function App() {
             onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
+            workspaceExportProgress={workspaceExportProgress}
             workspaceExportNotice={workspaceExportNotice}
             workspaceOpening={workspaceOpening}
             workspaceOpenNotice={workspaceOpenNotice}
