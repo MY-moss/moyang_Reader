@@ -6,14 +6,8 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "fs:default",
-    "fs:allow-watch",
     "opener:default",
     "process:default",
-    "updater:default",
-    {
-      "identifier": "fs:scope",
-      "allow": ["**"]
-    }
+    "updater:default"
   ]
 }

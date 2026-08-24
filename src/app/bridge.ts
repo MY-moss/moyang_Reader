@@ -63,8 +63,27 @@ export async function subscribeToWorkspaceChanges(
 ): Promise<(() => void) | null> {
   if (!isTauriRuntime()) return null;
 
-  const { watch } = await import("@tauri-apps/plugin-fs");
-  return watch(root, (event) => onPaths(event.paths), { recursive: true, delayMs: 300 });
+  let active = true;
+  const unlisten = await listen<{ root: string; paths: string[] }>("workspace-changed", (event) => {
+    if (event.payload.root === root) onPaths(event.payload.paths);
+  });
+
+  try {
+    if (!active) {
+      unlisten();
+      return null;
+    }
+    await invoke("watch_workspace", { root });
+  } catch (error) {
+    unlisten();
+    throw error;
+  }
+
+  return () => {
+    active = false;
+    unlisten();
+    void invoke("unwatch_workspace", { root }).catch(() => undefined);
+  };
 }
 
 export async function fileExists(path: string): Promise<boolean> {
