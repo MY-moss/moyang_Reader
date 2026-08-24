@@ -386,7 +386,8 @@ function imageXml(element: HTMLElement, state: DocxRenderState): string {
 }
 
 function isExternalDocxLink(value: string): boolean {
-  return /^(?:https?:\/\/|mailto:)/i.test(value);
+  if (/^(?:https?:\/\/|mailto:|tel:|file:)/i.test(value)) return true;
+  return Boolean(value && !value.startsWith("#") && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value));
 }
 
 function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = ""): string {
@@ -598,17 +599,16 @@ export async function buildDocxExport(
 ): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
   const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const normalizedBody = normalizeExportLinks(body);
   const zip = new JSZip();
-  zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
   zip.file(
     "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
   );
-  zip.file("word/document.xml", docxDocumentXml(title, body, state, options));
+  zip.file("word/document.xml", docxDocumentXml(title, normalizedBody, state, options));
   zip.file("word/styles.xml", docxStylesXml());
   zip.file("word/header1.xml", docxHeaderXml(title));
   zip.file("word/footer1.xml", docxFooterXml());
-  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   zip.file(
     "docProps/core.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Moyang Reader</dc:creator></cp:coreProperties>`,

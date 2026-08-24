@@ -245,16 +245,24 @@ describe("document export helpers", () => {
   it("preserves safe external hyperlinks in DOCX exports", async () => {
     const bytes = await buildDocxExport(
       "链接",
-      '<p><a href="https://example.com/?a=1&amp;b=2">官网</a> <a href="moyang-wiki:Note">内部笔记</a></p>',
+      '<p><a href="https://example.com/?a=1&amp;b=2">官网</a> <a href="mailto:hello@example.com">邮件</a> <a href="tel:+8613800138000">电话</a> <a href="guide/intro.md">相对文档</a> <a href="moyang-wiki:Note">内部笔记</a></p>',
     );
     const zip = await JSZip.loadAsync(bytes);
     const documentXml = await zip.file("word/document.xml")?.async("string");
     const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
 
     expect(documentXml).toContain('<w:hyperlink r:id="rIdLink1">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink2">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink3">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink4">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink5">');
     expect(relationshipsXml).toContain('Target="https://example.com/?a=1&amp;b=2"');
+    expect(relationshipsXml).toContain('Target="mailto:hello@example.com"');
+    expect(relationshipsXml).toContain('Target="tel:+8613800138000"');
+    expect(relationshipsXml).toContain('Target="guide/intro.md"');
+    expect(relationshipsXml).toContain('Target="Note.md"');
     expect(relationshipsXml).toContain('TargetMode="External"');
-    expect(relationshipsXml).not.toContain("moyang-wiki");
+    expect(relationshipsXml).not.toContain("moyang-wiki:");
   });
 
   it("applies custom page layout settings to DOCX export", async () => {
