@@ -52,6 +52,12 @@ import {
   relaunchApp,
   type UpdateStatus,
 } from "./updater";
+import {
+  clearUpdateRecovery,
+  formatUpdateRecoveryNotice,
+  loadUpdateRecovery,
+  saveUpdateRecovery,
+} from "./update-recovery";
 import type {
   DocumentKind,
   ExportMargin,
@@ -830,10 +836,18 @@ export function App() {
       }
     } catch (cause) {
       setUpdateStatus("error");
-      setUpdateError(describeUpdateError(cause));
+      const reason = describeUpdateError(cause);
+      const recovery = {
+        attemptedVersion: pending.version,
+        currentVersion,
+        failedAt: Date.now(),
+        reason,
+      };
+      saveUpdateRecovery(recovery);
+      setUpdateError(reason);
       setUpdateNoticeVisible(true);
     }
-  }, []);
+  }, [currentVersion]);
 
   const relaunchUpdatedApp = useCallback(async () => {
     try {
@@ -865,7 +879,17 @@ export function App() {
     let active = true;
     void getCurrentAppVersion()
       .then((version) => {
-        if (active && version) setCurrentVersion(version);
+        if (!active || !version) return;
+        setCurrentVersion(version);
+        const recovery = loadUpdateRecovery();
+        if (!recovery) return;
+        if (recovery.attemptedVersion.replace(/^v/i, "") === version.replace(/^v/i, "")) {
+          clearUpdateRecovery();
+          return;
+        }
+        setUpdateStatus("error");
+        setUpdateError(formatUpdateRecoveryNotice(recovery));
+        setUpdateNoticeVisible(true);
       })
       .catch(() => undefined);
 
