@@ -76,6 +76,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportFailureReport,
   formatExportCancellationNotice,
   fileNameWithExtension,
   inlineLocalImages,
@@ -2548,6 +2549,38 @@ export function App() {
     if (pdfBatchExportRef.current) finishPdfBatch(true);
   }, [finishPdfBatch]);
 
+  const copyWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持复制到剪贴板。");
+      await navigator.clipboard.writeText(formatExportFailureReport(workspaceExportFailures));
+      setWorkspaceExportNotice(`已复制 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制导出失败清单失败。");
+    }
+  }, [workspaceExportFailures]);
+
+  const saveWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    const report = formatExportFailureReport(workspaceExportFailures);
+    try {
+      if (isTauriRuntime()) {
+        const workspaceName = fileNameFromPath(workspacePath?.replace(/[\\/]+$/, "") ?? "") || "阅读库";
+        const defaultPath = pathWithExtension(`${workspacePath ?? ""}\\${workspaceName} - 导出失败清单.md`, "md");
+        const path = await chooseSavePath(defaultPath, "markdown");
+        if (!path) return;
+        await writeTextFile(path, report);
+      } else {
+        downloadText("moyang-reader-export-failures.md", report);
+      }
+      setWorkspaceExportNotice(`已保存 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "保存导出失败清单失败。");
+    }
+  }, [workspaceExportFailures, workspacePath]);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
@@ -2843,6 +2876,8 @@ export function App() {
             workspaceExporting={workspaceExporting}
             workspaceExportProgress={workspaceExportProgress}
             workspaceExportFailures={workspaceExportFailures}
+            onCopyExportFailures={() => void copyWorkspaceExportFailures()}
+            onSaveExportFailures={() => void saveWorkspaceExportFailures()}
             workspaceExportNotice={workspaceExportNotice}
             workspaceOpening={workspaceOpening}
             workspaceOpenNotice={workspaceOpenNotice}

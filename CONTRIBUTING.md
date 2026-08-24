@@ -26,6 +26,14 @@ npm run lint
 npm run format:check
 ```
 
+界面无障碍冒烟检查：
+
+```powershell
+npx playwright test e2e/a11y.spec.ts
+```
+
+检查应覆盖启动页、打开文档后的阅读界面、快速打开对话框和设置面板。新增按钮或对话框时，请补充可读的名称、键盘操作路径和对应的冒烟断言；视觉动画结束后再执行对比度检查，避免把过渡帧误判为最终状态。
+
 依赖审计需要 npm 官方 registry：
 
 ```powershell

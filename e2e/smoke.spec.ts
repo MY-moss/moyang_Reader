@@ -109,8 +109,8 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   ]);
 
   await expect(page.getByRole("heading", { name: "Second note" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "first-note.md" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "first-note.md", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
 });
 
 test("keeps same-named browser documents in separate tabs", async ({ page }) => {
@@ -129,7 +129,7 @@ test("keeps same-named browser documents in separate tabs", async ({ page }) => 
     },
   ]);
 
-  const tabs = page.getByRole("tab", { name: "duplicate-note.md" });
+  const tabs = page.getByRole("button", { name: "duplicate-note.md", exact: true });
   await expect(tabs).toHaveCount(2);
   await expect(page.getByRole("heading", { name: "Second duplicate" })).toBeVisible();
 

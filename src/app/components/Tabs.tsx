@@ -11,15 +11,14 @@ export function Tabs({ tabs, activePath, onSelect, onClose }: TabsProps) {
   if (tabs.length === 0) return null;
 
   return (
-    <div className="tab-strip" role="tablist" aria-label="已打开文档">
+    <div className="tab-strip" role="toolbar" aria-label="已打开文档">
       {tabs.map((tab) => {
         const active = tab.path === activePath;
         return (
           <div className={`tab-item ${active ? "active" : ""}`} key={tab.path}>
             <button
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               className="tab-label"
               title={tab.path}
               onClick={() => onSelect(tab.path)}
