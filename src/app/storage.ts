@@ -4,8 +4,10 @@ const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
 const recentWorkspacesKey = "moyang-reader-recent-workspaces";
 const lastDocumentKey = "moyang-reader-last-document";
+const readingPositionsKey = "moyang-reader-reading-positions";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
+const maxReadingPositions = 32;
 
 function comparablePath(path: string): string {
   return path
@@ -43,6 +45,61 @@ export function saveLastDocumentPath(path: string | null): void {
   try {
     if (path) localStorage.setItem(lastDocumentKey, path);
     else localStorage.removeItem(lastDocumentKey);
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+type StoredReadingPosition = {
+  path: string;
+  top: number;
+};
+
+function loadReadingPositions(): StoredReadingPosition[] {
+  try {
+    const raw = localStorage.getItem(readingPositionsKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    return parsed
+      .filter(
+        (item): item is StoredReadingPosition =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as StoredReadingPosition).path === "string" &&
+          typeof (item as StoredReadingPosition).top === "number" &&
+          Number.isFinite((item as StoredReadingPosition).top) &&
+          (item as StoredReadingPosition).top >= 0,
+      )
+      .filter((item) => {
+        const key = comparablePath(item.path);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxReadingPositions);
+  } catch {
+    return [];
+  }
+}
+
+export function loadReadingPosition(path: string): number {
+  const key = comparablePath(path);
+  return loadReadingPositions().find((item) => comparablePath(item.path) === key)?.top ?? 0;
+}
+
+export function saveReadingPosition(path: string, top: number): void {
+  const key = comparablePath(path);
+  if (!key || !Number.isFinite(top)) return;
+
+  try {
+    const next = [
+      { path, top: Math.max(0, Math.round(top)) },
+      ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key),
+    ].slice(0, maxReadingPositions);
+    localStorage.setItem(readingPositionsKey, JSON.stringify(next));
   } catch {
     // Local storage may be unavailable in a restricted browser preview.
   }
