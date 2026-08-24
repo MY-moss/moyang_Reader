@@ -25,6 +25,8 @@ type TopBarProps = {
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  draftCount: number;
+  onOpenRecovery: () => void;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   focusMode: boolean;
@@ -82,6 +84,8 @@ export function TopBar({
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  draftCount,
+  onOpenRecovery,
   sidebarCollapsed,
   onToggleSidebar,
   focusMode,
@@ -163,6 +167,16 @@ export function TopBar({
         <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
           快速打开
         </button>
+        {draftCount > 0 && (
+          <button
+            type="button"
+            className="toolbar-button recovery-button"
+            onClick={onOpenRecovery}
+            title="查看未保存草稿"
+          >
+            草稿 {draftCount}
+          </button>
+        )}
         <button
           type="button"
           className="toolbar-button sidebar-toggle"

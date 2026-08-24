@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { EmptyState } from "./components/EmptyState";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
+import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
@@ -138,7 +139,14 @@ import {
   insertTextAtSelection,
   MAX_CLIPBOARD_IMAGE_BYTES,
 } from "./clipboard-image";
-import { clearDraftSnapshot, findDraftSnapshot, saveDraftSnapshot, type DraftSnapshot } from "./draft-recovery";
+import {
+  clearAllDraftSnapshots,
+  clearDraftSnapshot,
+  findDraftSnapshot,
+  loadDraftSnapshots,
+  saveDraftSnapshot,
+  type DraftSnapshot,
+} from "./draft-recovery";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -392,6 +400,8 @@ export function App() {
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
+  const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
+  const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
@@ -1082,6 +1092,7 @@ export function App() {
         setSourceDraft(source);
         sourceDraftRef.current = source;
         setDraftRecovery(findDraftSnapshot(path, source));
+        setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -1145,6 +1156,7 @@ export function App() {
         setSourceDraft("");
         sourceDraftRef.current = "";
         setDraftRecovery(null);
+        setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -1326,6 +1338,7 @@ export function App() {
         current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
       );
       clearDraftSnapshot(documentState.path);
+      setDraftSnapshots(loadDraftSnapshots());
       setDraftRecovery(null);
       selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
@@ -1683,6 +1696,7 @@ export function App() {
         savedAt: Date.now(),
       });
       if (!stored) setError("草稿自动保存失败，仍保留在当前窗口中。");
+      else setDraftSnapshots(loadDraftSnapshots());
     }, 1_500);
     return () => window.clearTimeout(timer);
   }, [
@@ -1704,7 +1718,45 @@ export function App() {
   const discardDraft = useCallback(() => {
     if (draftRecovery) clearDraftSnapshot(draftRecovery.path);
     setDraftRecovery(null);
+    setDraftSnapshots(loadDraftSnapshots());
   }, [draftRecovery]);
+
+  const openDraftSnapshot = useCallback(
+    async (path: string) => {
+      try {
+        const authorizedPath = await authorizeStoredPath(path, false);
+        if (
+          !confirmDocumentReplacement(
+            [authorizedPath],
+            "当前文档有未保存修改，打开另一个草稿后将保留当前草稿。继续吗？",
+          )
+        ) {
+          return;
+        }
+        const opened = await openPath(authorizedPath);
+        if (opened) setDraftRecoveryOpen(false);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "草稿对应的文档无法打开，请确认文件仍然存在。");
+      }
+    },
+    [confirmDocumentReplacement, openPath],
+  );
+
+  const discardDraftByPath = useCallback(
+    (path: string) => {
+      clearDraftSnapshot(path);
+      setDraftSnapshots(loadDraftSnapshots());
+      if (isSameDocumentPath(draftRecovery?.path ?? "", path)) setDraftRecovery(null);
+    },
+    [draftRecovery?.path],
+  );
+
+  const clearAllDrafts = useCallback(() => {
+    if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
+    clearAllDraftSnapshots();
+    setDraftSnapshots([]);
+    setDraftRecovery(null);
+  }, [draftSnapshots.length]);
 
   const handleSourcePaste = useCallback(
     (context: SourceEditorPasteContext) => {
@@ -2723,6 +2775,8 @@ export function App() {
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        draftCount={draftSnapshots.length}
+        onOpenRecovery={() => setDraftRecoveryOpen(true)}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
@@ -2999,6 +3053,15 @@ export function App() {
             setQuickOpen(false);
             void handleSelectTab(path);
           }}
+        />
+      )}
+      {draftRecoveryOpen && draftSnapshots.length > 0 && (
+        <DraftRecoveryCenter
+          snapshots={draftSnapshots}
+          onOpen={(path) => void openDraftSnapshot(path)}
+          onDiscard={discardDraftByPath}
+          onClearAll={clearAllDrafts}
+          onClose={() => setDraftRecoveryOpen(false)}
         />
       )}
     </div>

@@ -179,6 +179,10 @@ a:focus-visible {
 .focus-button {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
 }
+.recovery-button {
+  border-color: color-mix(in srgb, var(--accent-warm) 58%, var(--line));
+  color: #9b532f;
+}
 .export-menu {
   position: relative;
 }
@@ -533,6 +537,75 @@ a:focus-visible {
   padding: 9px 20px 11px;
   border-top: 1px solid var(--line);
   color: var(--muted);
+  font-size: 10px;
+}
+.draft-recovery-backdrop {
+  z-index: 40;
+}
+.draft-recovery-dialog {
+  max-height: min(78vh, 680px);
+}
+.draft-recovery-list {
+  display: grid;
+  max-height: min(52vh, 430px);
+  overflow: auto;
+  padding: 0 14px 10px;
+}
+.draft-recovery-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+.draft-recovery-open {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 12px 6px;
+  text-align: left;
+}
+.draft-recovery-open:hover {
+  background: var(--accent-soft);
+}
+.draft-recovery-open strong,
+.draft-recovery-open span,
+.draft-recovery-open small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-recovery-open strong {
+  font-size: 12px;
+}
+.draft-recovery-open span,
+.draft-recovery-open small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.draft-recovery-open small {
+  color: var(--accent-warm);
+}
+.draft-recovery-discard {
+  align-self: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px;
+  font-size: 10px;
+}
+.draft-recovery-discard:hover {
+  color: var(--danger);
+}
+.draft-recovery-footer {
+  align-items: center;
+}
+.draft-recovery-footer .quiet-button {
+  flex: 0 0 auto;
+  padding: 5px 8px;
   font-size: 10px;
 }
 @keyframes quick-open-fade {
