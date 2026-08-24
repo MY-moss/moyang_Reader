@@ -1540,7 +1540,7 @@ pub fn write_text_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !access.is_write_allowed(&path) {
+    if !is_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
     write_text_file_inner(path, contents)
