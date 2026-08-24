@@ -952,6 +952,29 @@ a:focus-visible {
   color: var(--muted);
   font-size: 9px;
 }
+.workspace-switcher-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
+  min-width: 0;
+}
+.workspace-switcher-item > button:first-child {
+  width: auto;
+}
+.workspace-switcher-remove {
+  width: 26px !important;
+  min-height: 28px;
+  color: var(--muted) !important;
+  padding: 4px !important;
+  text-align: center !important;
+  font-size: 15px;
+  line-height: 1;
+}
+.workspace-switcher-remove:hover {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--line)) !important;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-strong)) !important;
+  color: var(--danger) !important;
+}
 .workspace-filter-summary {
   display: flex;
   align-items: center;

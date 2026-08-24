@@ -84,6 +84,7 @@ import {
 } from "./export";
 import {
   loadRecentFiles,
+  loadMountedWorkspaces,
   loadRecentWorkspaces,
   loadLastDocumentPath,
   loadOpenTabs,
@@ -91,11 +92,13 @@ import {
   loadSidebarCollapsed,
   loadWorkspacePath,
   rememberRecentFile,
+  rememberMountedWorkspace,
   rememberRecentWorkspace,
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
   saveSidebarCollapsed,
+  saveMountedWorkspaces,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -291,6 +294,32 @@ type PdfBatchExportState = {
   };
 };
 
+type CachedWorkspace = {
+  path: string;
+  name: string;
+  files: WorkspaceFile[];
+  index: WorkspaceIndexEntry[];
+  revision: number;
+};
+
+function updateCachedWorkspace(
+  cache: Map<string, CachedWorkspace>,
+  root: string,
+  changes: Partial<Omit<CachedWorkspace, "path">>,
+): void {
+  const key = comparablePath(root);
+  const current = cache.get(key);
+  if (!current) return;
+  cache.set(key, { ...current, ...changes });
+}
+
+function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: RecentWorkspace[]): void {
+  const mountedKeys = new Set(mounted.map((workspace) => comparablePath(workspace.path)));
+  for (const key of cache.keys()) {
+    if (!mountedKeys.has(key)) cache.delete(key);
+  }
+}
+
 export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -311,6 +340,7 @@ export function App() {
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
+  const [mountedWorkspaces, setMountedWorkspaces] = useState<RecentWorkspace[]>(loadMountedWorkspaces);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
@@ -357,6 +387,7 @@ export function App() {
   const sourceDraftRef = useRef(sourceDraft);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
+  const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
   const workspaceReloadTimerRef = useRef<number | null>(null);
@@ -725,9 +756,21 @@ export function App() {
       ) {
         return;
       }
-      setWorkspaceFiles((current) => applyWorkspaceFileDelta(current, delta));
-      setWorkspaceIndex((current) => applyWorkspaceIndexDelta(current, delta));
-      setWorkspaceRevision((current) => current + 1);
+      setWorkspaceFiles((current) => {
+        const next = applyWorkspaceFileDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
+        return next;
+      });
+      setWorkspaceIndex((current) => {
+        const next = applyWorkspaceIndexDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
+        return next;
+      });
+      setWorkspaceRevision((current) => {
+        const next = current + 1;
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
+        return next;
+      });
     } catch {
       if (requestId === workspaceRefreshRequestRef.current) {
         setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
@@ -745,10 +788,83 @@ export function App() {
     setWorkspaceLoading(true);
     setWorkspaceIndexLoading(true);
     try {
+      const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+      if (cached) {
+        const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(cached.path);
+        workspacePathRef.current = cached.path;
+        setWorkspacePath(cached.path);
+        setWorkspaceFiles(cached.files);
+        setWorkspaceIndex(cached.index);
+        setWorkspaceRevision(cached.revision);
+        if (switchedWorkspace) {
+          setWorkspaceResults([]);
+          setSelectedTag(null);
+          setSelectedFileKind("all");
+        }
+        saveWorkspacePath(cached.path);
+        setRecentWorkspaces(
+          rememberRecentWorkspace({
+            path: cached.path,
+            name: cached.name,
+          }),
+        );
+        const nextMountedWorkspaces = rememberMountedWorkspace({
+          path: cached.path,
+          name: cached.name,
+        });
+        pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
+        setMountedWorkspaces(nextMountedWorkspaces);
+        if (!silent) setError(null);
+        setWorkspaceLoading(false);
+
+        void (async () => {
+          try {
+            const files = await listWorkspaceFiles(cached.path);
+            if (
+              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
+            ) {
+              return;
+            }
+            setWorkspaceFiles(files);
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files });
+            setWorkspaceRevision((current) => {
+              const next = current + 1;
+              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
+              return next;
+            });
+            const index = await indexWorkspace(cached.path);
+            if (
+              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
+            ) {
+              return;
+            }
+            setWorkspaceIndex(index);
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index });
+          } catch (cause) {
+            if (requestId === workspaceLoadRequestRef.current && !silent) {
+              setError(cause instanceof Error ? cause.message : "工作区刷新失败。");
+            }
+          } finally {
+            if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
+          }
+        })();
+        return;
+      }
+
       const files = await listWorkspaceFiles(root);
       if (requestId !== workspaceLoadRequestRef.current) return;
 
       const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
+      const workspaceRecord = {
+        path: root,
+        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
+      };
+      mountedWorkspaceCacheRef.current.set(comparablePath(root), {
+        ...workspaceRecord,
+        files,
+        index: [],
+        revision: 0,
+      });
       workspacePathRef.current = root;
       setWorkspacePath(root);
       setWorkspaceFiles(files);
@@ -758,14 +874,16 @@ export function App() {
         setSelectedTag(null);
         setSelectedFileKind("all");
       }
-      setWorkspaceRevision((current) => current + 1);
+      setWorkspaceRevision((current) => {
+        const next = current + 1;
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
+        return next;
+      });
       saveWorkspacePath(root);
-      setRecentWorkspaces(
-        rememberRecentWorkspace({
-          path: root,
-          name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
-        }),
-      );
+      setRecentWorkspaces(rememberRecentWorkspace(workspaceRecord));
+      const nextMountedWorkspaces = rememberMountedWorkspace(workspaceRecord);
+      pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
+      setMountedWorkspaces(nextMountedWorkspaces);
       if (!silent) setError(null);
       setWorkspaceLoading(false);
 
@@ -774,6 +892,7 @@ export function App() {
           if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))
             return;
           setWorkspaceIndex(index);
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index });
         })
         .catch((cause) => {
           if (requestId !== workspaceLoadRequestRef.current) return;
@@ -795,6 +914,12 @@ export function App() {
         setWorkspaceFiles([]);
         setWorkspaceIndex([]);
         saveWorkspacePath(null);
+        mountedWorkspaceCacheRef.current.delete(comparablePath(root));
+        setMountedWorkspaces((current) => {
+          const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(root));
+          saveMountedWorkspaces(next);
+          return next;
+        });
       } else {
         setError(cause instanceof Error ? cause.message : "工作区读取失败。");
       }
@@ -822,6 +947,16 @@ export function App() {
     },
     [confirmWorkspaceSwitch, loadWorkspace],
   );
+
+  const handleRemoveMountedWorkspace = useCallback((path: string) => {
+    if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;
+    mountedWorkspaceCacheRef.current.delete(comparablePath(path));
+    setMountedWorkspaces((current) => {
+      const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));
+      saveMountedWorkspaces(next);
+      return next;
+    });
+  }, []);
 
   const openSource = useCallback(
     async (path: string, source: string, preserveMode = false): Promise<boolean> => {
@@ -1077,13 +1212,45 @@ export function App() {
       if (isTauriRuntime()) {
         const hasStartupWorkspace = paths.some((entry) => entry.kind === "workspace");
         const savedWorkspace = loadWorkspacePath();
-        if (savedWorkspace && !hasStartupWorkspace) {
-          try {
-            const authorizedWorkspace = await authorizeStoredPath(savedWorkspace, true);
-            if (!active) return;
-            await loadWorkspace(authorizedWorkspace, true);
-          } catch {
-            if (!active) return;
+        if (!hasStartupWorkspace) {
+          const candidates = [
+            ...(savedWorkspace
+              ? [
+                  {
+                    path: savedWorkspace,
+                    name: fileNameFromPath(savedWorkspace.replace(/[\\/]+$/, "")) || savedWorkspace,
+                  },
+                ]
+              : []),
+            ...loadMountedWorkspaces(),
+          ];
+          const authorizedMounts: RecentWorkspace[] = [];
+          const seen = new Set<string>();
+          for (const candidate of candidates) {
+            const candidateKey = comparablePath(candidate.path);
+            if (!candidateKey || seen.has(candidateKey)) continue;
+            seen.add(candidateKey);
+            try {
+              const authorizedWorkspace = await authorizeStoredPath(candidate.path, true);
+              if (!active) return;
+              authorizedMounts.push({
+                path: authorizedWorkspace,
+                name: fileNameFromPath(authorizedWorkspace.replace(/[\\/]+$/, "")) || candidate.name,
+              });
+            } catch {
+              // Stale mounted workspaces are discarded without blocking launch.
+            }
+          }
+          if (!active) return;
+          setMountedWorkspaces(authorizedMounts);
+          saveMountedWorkspaces(authorizedMounts);
+          const activeWorkspace =
+            authorizedMounts.find(
+              (workspace) => comparablePath(workspace.path) === comparablePath(savedWorkspace ?? ""),
+            ) ?? authorizedMounts[0];
+          if (activeWorkspace) {
+            await loadWorkspace(activeWorkspace.path, true);
+          } else if (candidates.length > 0) {
             saveWorkspacePath(null);
             workspacePathRef.current = null;
             setWorkspacePath(null);
@@ -2490,6 +2657,7 @@ export function App() {
             exportableFiles={workspaceActionFiles}
             recentFiles={recentFiles}
             recentWorkspaces={recentWorkspaces}
+            mountedWorkspaces={mountedWorkspaces}
             activePath={documentState?.path ?? null}
             searchQuery={workspaceQuery}
             searchResults={visibleWorkspaceResults}
@@ -2499,6 +2667,7 @@ export function App() {
             selectedKind={selectedFileKind}
             onChooseWorkspace={() => void handleChooseWorkspace()}
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
+            onRemoveWorkspace={handleRemoveMountedWorkspace}
             onOpenFile={(path) => void handleSelectTab(path)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}

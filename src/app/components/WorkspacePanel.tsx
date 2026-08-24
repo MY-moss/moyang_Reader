@@ -26,6 +26,7 @@ type WorkspacePanelProps = {
   exportableFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
   recentWorkspaces: RecentWorkspace[];
+  mountedWorkspaces: RecentWorkspace[];
   activePath: string | null;
   searchQuery: string;
   searchResults: WorkspaceSearchResult[];
@@ -35,6 +36,7 @@ type WorkspacePanelProps = {
   selectedKind: WorkspaceKindFilter;
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
+  onRemoveWorkspace: (path: string) => void;
   onOpenVisibleFiles: () => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   onCancelWorkspaceExport: () => void;
@@ -64,6 +66,7 @@ export function WorkspacePanel({
   exportableFiles,
   recentFiles,
   recentWorkspaces,
+  mountedWorkspaces,
   activePath,
   searchQuery,
   searchResults,
@@ -73,6 +76,7 @@ export function WorkspacePanel({
   selectedKind,
   onChooseWorkspace,
   onOpenWorkspace,
+  onRemoveWorkspace,
   onOpenVisibleFiles,
   onExportWorkspace,
   onCancelWorkspaceExport,
@@ -91,7 +95,7 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
-  const switchableWorkspaces = filterSwitchableWorkspaces(recentWorkspaces, workspacePath);
+  const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
 
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -170,21 +174,31 @@ export function WorkspacePanel({
                 切换
               </summary>
               <div className="workspace-switcher-menu" role="menu">
-                <div className="workspace-switcher-label">最近阅读库</div>
+                <div className="workspace-switcher-label">已挂载阅读库 · {mountedWorkspaces.length} / 5</div>
                 {switchableWorkspaces.map((workspace) => (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    key={workspace.path}
-                    title={workspace.path}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      onOpenWorkspace(workspace.path);
-                    }}
-                  >
-                    <strong>{workspace.name}</strong>
-                    <span>{workspace.path}</span>
-                  </button>
+                  <div className="workspace-switcher-item" role="none" key={workspace.path}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={workspace.path}
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        onOpenWorkspace(workspace.path);
+                      }}
+                    >
+                      <strong>{workspace.name}</strong>
+                      <span>{workspace.path}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="workspace-switcher-remove"
+                      title={`移除 ${workspace.name}`}
+                      aria-label={`从已挂载阅读库移除 ${workspace.name}`}
+                      onClick={() => onRemoveWorkspace(workspace.path)}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             </details>

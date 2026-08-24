@@ -1,18 +1,21 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   loadRecentFiles,
+  loadMountedWorkspaces,
   loadRecentWorkspaces,
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
   loadSidebarCollapsed,
   rememberRecentFile,
+  rememberMountedWorkspace,
   rememberRecentWorkspace,
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
   saveSidebarCollapsed,
   saveRecentFiles,
+  saveMountedWorkspaces,
   saveRecentWorkspaces,
 } from "./storage";
 
@@ -124,5 +127,28 @@ describe("reader storage", () => {
       { path: "C:/Archive", name: "Archive" },
     ]);
     expect(loadRecentWorkspaces()).toHaveLength(2);
+  });
+
+  it("persists at most five mounted workspaces and moves reopened workspaces to the front", () => {
+    for (let index = 0; index < 7; index += 1) {
+      rememberMountedWorkspace({ path: `C:/Mounted-${index}`, name: `Mounted ${index}` });
+    }
+
+    expect(loadMountedWorkspaces()).toHaveLength(5);
+    expect(loadMountedWorkspaces()[0].name).toBe("Mounted 6");
+
+    rememberMountedWorkspace({ path: "c:\\mounted-4", name: "Renamed mounted" });
+    expect(loadMountedWorkspaces()[0]).toEqual({ path: "c:\\mounted-4", name: "Renamed mounted" });
+    expect(loadMountedWorkspaces()).toHaveLength(5);
+
+    saveMountedWorkspaces([
+      { path: "C:/One", name: "One" },
+      { path: "c:\\one", name: "Duplicate" },
+      { path: "C:/Two", name: "Two" },
+    ]);
+    expect(loadMountedWorkspaces()).toEqual([
+      { path: "C:/One", name: "One" },
+      { path: "C:/Two", name: "Two" },
+    ]);
   });
 });
