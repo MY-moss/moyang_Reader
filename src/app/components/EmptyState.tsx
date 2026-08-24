@@ -1,8 +1,9 @@
 type EmptyStateProps = {
   onOpen: () => void;
+  onChooseWorkspace: () => void;
 };
 
-export function EmptyState({ onOpen }: EmptyStateProps) {
+export function EmptyState({ onOpen, onChooseWorkspace }: EmptyStateProps) {
   return (
     <section className="empty-state" aria-labelledby="empty-title">
       <div className="empty-mark" aria-hidden="true">
@@ -18,9 +19,14 @@ export function EmptyState({ onOpen }: EmptyStateProps) {
         <span>PDF</span>
         <span>IMAGE</span>
       </div>
-      <button type="button" className="empty-action" onClick={onOpen}>
-        打开文档
-      </button>
+      <div className="empty-actions">
+        <button type="button" className="empty-action" onClick={onOpen}>
+          打开文档
+        </button>
+        <button type="button" className="empty-action secondary" onClick={onChooseWorkspace}>
+          添加整个文件夹
+        </button>
+      </div>
       <p className="empty-hint">也可以把 Markdown、Word、PDF 或图片拖到窗口中</p>
     </section>
   );

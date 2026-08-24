@@ -6,7 +6,19 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page).toHaveTitle("Moyang Reader");
   await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "文件夹", exact: true })).toHaveAttribute(
+    "title",
+    /Ctrl\+Shift\+O/,
+  );
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
+});
+
+test("keeps the folder shortcut available from the landing page", async ({ page }) => {
+  await page.goto("/");
+
+  await page.keyboard.press("Control+Shift+O");
+  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
 });
 
 test("opens the quick-open palette from the keyboard", async ({ page }) => {
