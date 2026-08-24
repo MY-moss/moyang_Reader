@@ -21,7 +21,7 @@ pub fn run() {
             if !paths.is_empty() {
                 let access = app.state::<commands::AccessRegistry>();
                 for path in &paths {
-                    let _ = access.register_path(Path::new(path));
+                    let _ = access.register_document_path(Path::new(path));
                 }
                 let _ = app.emit("open-paths", paths);
             }
