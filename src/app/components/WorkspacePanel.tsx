@@ -5,6 +5,7 @@ type WorkspacePanelProps = {
   workspacePath: string | null;
   files: WorkspaceFile[];
   visibleFiles: WorkspaceFile[];
+  openableFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
   recentWorkspaces: RecentWorkspace[];
   activePath: string | null;
@@ -35,6 +36,7 @@ export function WorkspacePanel({
   workspacePath,
   files,
   visibleFiles,
+  openableFiles,
   recentFiles,
   recentWorkspaces,
   activePath,
@@ -67,11 +69,11 @@ export function WorkspacePanel({
           <button
             type="button"
             className="quiet-button"
-            disabled={!workspacePath || workspaceOpening || visibleFiles.length === 0}
+            disabled={!workspacePath || workspaceOpening || openableFiles.length === 0}
             onClick={onOpenVisibleFiles}
-            title="打开当前筛选的文档"
+            title={searchQuery.trim() ? "打开当前搜索结果" : "打开当前筛选的文档"}
           >
-            {workspaceOpening ? "打开中…" : "打开列表"}
+            {workspaceOpening ? "打开中…" : searchQuery.trim() ? "打开结果" : "打开列表"}
           </button>
           <details className="export-menu workspace-export-menu">
             <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>

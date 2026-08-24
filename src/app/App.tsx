@@ -1505,6 +1505,15 @@ export function App() {
   const visibleWorkspaceResults = selectedTag
     ? workspaceResults.filter((result) => taggedFilePaths.has(result.file.path))
     : workspaceResults;
+  const workspaceOpenFiles = useMemo(
+    () =>
+      workspaceQuery.trim()
+        ? workspaceQuery.trim().length >= 2
+          ? visibleWorkspaceResults.map((result) => result.file)
+          : []
+        : visibleWorkspaceFiles,
+    [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery],
+  );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
     const add = (candidate: QuickOpenCandidate) => {
@@ -1521,9 +1530,9 @@ export function App() {
   }, [openTabs, recentFiles, workspaceFiles]);
 
   const handleOpenWorkspaceFiles = useCallback(async () => {
-    if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+    if (!workspacePath || workspaceOpenFiles.length === 0 || !isTauriRuntime()) return;
 
-    const plan = createWorkspaceOpenPlan(visibleWorkspaceFiles);
+    const plan = createWorkspaceOpenPlan(workspaceOpenFiles);
     if (plan.files.length === 0) return;
     if (
       documentStateRef.current?.modified &&
@@ -1553,7 +1562,7 @@ export function App() {
     } finally {
       setWorkspaceOpening(false);
     }
-  }, [openPath, visibleWorkspaceFiles, workspacePath]);
+  }, [openPath, workspaceOpenFiles, workspacePath]);
 
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
@@ -1729,6 +1738,7 @@ export function App() {
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}
+            openableFiles={workspaceOpenFiles}
             recentFiles={recentFiles}
             recentWorkspaces={recentWorkspaces}
             activePath={documentState?.path ?? null}
