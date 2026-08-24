@@ -751,6 +751,7 @@ a:focus-visible {
   color: var(--accent-deep);
   font-size: 10px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .workspace-index-note {
   margin-top: 8px;

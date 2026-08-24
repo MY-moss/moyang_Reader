@@ -68,6 +68,7 @@ import {
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
+  summarizeExportFailures,
 } from "./export";
 import {
   loadRecentFiles,
@@ -1613,7 +1614,7 @@ export function App() {
       setError(null);
 
       let exported = 0;
-      let skipped = 0;
+      const skippedFiles: string[] = [];
       try {
         const documents = [];
         for (const file of workspaceActionFiles) {
@@ -1628,7 +1629,7 @@ export function App() {
                 allowRemoteResources: preferences.allowRemoteResources,
               });
             } else {
-              skipped += 1;
+              skippedFiles.push(`${file.relativePath}（类型不支持）`);
               continue;
             }
 
@@ -1646,11 +1647,18 @@ export function App() {
             documents.push({ title: file.relativePath, body });
             exported += 1;
           } catch {
-            skipped += 1;
+            skippedFiles.push(`${file.relativePath}（读取失败）`);
           }
         }
 
-        if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
+        if (documents.length === 0) {
+          const failureSummary = summarizeExportFailures(skippedFiles);
+          throw new Error(
+            failureSummary
+              ? `当前筛选中没有可导出的文档。跳过 ${skippedFiles.length} 个：${failureSummary}`
+              : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",
+          );
+        }
         const exportTitle = `${workspaceName} 阅读库`;
         if (format === "html") {
           if (!savePath) throw new Error("没有选择 HTML 保存位置。");
@@ -1662,10 +1670,11 @@ export function App() {
           await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents));
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
+        const failureSummary = summarizeExportFailures(skippedFiles);
         setWorkspaceExportNotice(
           `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
             format === "pdf" ? `${exported} 篇文档` : ""
-          }${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
+          }${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
         );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "批量导出失败。");

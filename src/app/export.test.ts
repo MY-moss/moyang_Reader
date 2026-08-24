@@ -12,6 +12,7 @@ import {
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
+  summarizeExportFailures,
 } from "./export";
 
 describe("document export helpers", () => {
@@ -93,6 +94,12 @@ describe("document export helpers", () => {
     expect(sizes).toEqual(["C:\\Notes\\large.png"]);
     expect(reads).toEqual([]);
     expect(html).toContain('src="moyang-embed:large.png"');
+  });
+
+  it("summarizes unique export failures without hiding the count", () => {
+    expect(summarizeExportFailures([])).toBe("");
+    expect(summarizeExportFailures(["a.md", "a.md", "b.docx"], 3)).toBe("a.md、b.docx");
+    expect(summarizeExportFailures(["a.md", "b.docx", "c.txt", "d.pdf"], 3)).toBe("a.md、b.docx、c.txt 等 4 个");
   });
 
   it("builds a single HTML document with a linked table of contents", () => {

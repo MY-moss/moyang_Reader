@@ -106,6 +106,15 @@ export async function inlineLocalImages(
   });
 }
 
+export function summarizeExportFailures(paths: string[], maxItems = 3): string {
+  const unique = Array.from(new Set(paths.map((path) => path.trim()).filter(Boolean)));
+  if (unique.length === 0) return "";
+
+  const limit = Number.isFinite(maxItems) ? Math.max(1, Math.floor(maxItems)) : 3;
+  const preview = unique.slice(0, limit).join("、");
+  return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
+}
+
 export function buildHtmlExport(title: string, body: string): string {
   return (
     "<!doctype html>\n" +
