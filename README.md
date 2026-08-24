@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-v0.5.3 文件夹入口增强版，继续基于轻量本地阅读核心完善：
+v0.5.3 本地候选版（文件夹入口增强），继续基于轻量本地阅读核心完善：
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
 - 双击传入文件路径、单实例接收后续打开请求
@@ -32,6 +32,7 @@ v0.5.3 文件夹入口增强版，继续基于轻量本地阅读核心完善：
 - 快速打开面板：Ctrl+P 按文件名或路径即时筛选工作区、最近文件和已打开标签
 - 系统/浅色/深色主题切换，并记住选择
 - 浏览器开发模式支持文件选择和拖放；桌面版还支持把多个文档或整个文件夹拖入窗口
+- 安装包会注册 Markdown、文本、Word、PDF 和常见图片文件关联，安装后可直接双击交给 Moyang Reader 打开；开发模式不会修改系统文件关联
 - UTF-8、UTF-8 BOM、UTF-16、GB18030 文本读取
 - 写回前创建隐藏备份和临时文件
 - 打印样式，可通过系统打印对话框保存为 PDF
@@ -57,11 +58,11 @@ npm run tauri dev
 
 `src-tauri/target/release/moyang-reader.exe`
 
-完整 NSIS 安装包也已生成：
+稳定批次生成的 NSIS 安装包预期路径：
 
-`src-tauri/target/release/bundle/nsis/Moyang Reader_0.5.2_x64-setup.exe`
+`src-tauri/target/release/bundle/nsis/Moyang Reader_0.5.3_x64-setup.exe`
 
-运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd` 文件关联。DOCX/PDF 当前支持在应用内选择、拖放和通过启动参数打开，但不会抢占 Word/PDF 的系统默认关联。
+运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
 
 更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。当前版本的 PDF 交付方式是系统打印对话框中的“保存为 PDF”；真正的 PDF 模板和批量 PDF 导出列入后续版本。
 

@@ -47,6 +47,34 @@
         "description": "使用 Moyang Reader 阅读 Markdown 文档",
         "role": "Editor",
         "mimeType": "text/markdown"
+      },
+      {
+        "ext": ["txt", "text", "log"],
+        "name": "文本文件",
+        "description": "使用 Moyang Reader 阅读文本文件",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": ["docx"],
+        "name": "Word 文档",
+        "description": "使用 Moyang Reader 阅读 Word 文档",
+        "role": "Viewer",
+        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      },
+      {
+        "ext": ["pdf"],
+        "name": "PDF 文档",
+        "description": "使用 Moyang Reader 打开 PDF 文档",
+        "role": "Viewer",
+        "mimeType": "application/pdf"
+      },
+      {
+        "ext": ["avif", "gif", "jpeg", "jpg", "png", "svg", "webp"],
+        "name": "图片文件",
+        "description": "使用 Moyang Reader 预览图片",
+        "role": "Viewer",
+        "mimeType": "image/*"
       }
     ]
   }
