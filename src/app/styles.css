@@ -1277,6 +1277,13 @@ a:focus-visible {
   background: rgba(255, 255, 255, 0.65);
   color: var(--accent-deep);
 }
+.outline-list a.active {
+  border-radius: 3px;
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--accent-deep);
+  font-weight: 600;
+}
 .muted-copy,
 .sidebar-note p {
   color: var(--muted);

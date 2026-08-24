@@ -172,20 +172,36 @@ function safeDecode(value: string): string {
   }
 }
 
-function currentHeadingFromArticle(article: HTMLElement | null, contentArea: HTMLElement | null): string | null {
+type CurrentHeading = {
+  id: string;
+  text: string;
+};
+
+function currentHeadingFromArticle(
+  article: HTMLElement | null,
+  contentArea: HTMLElement | null,
+): CurrentHeading | null {
   if (!article) return null;
 
   const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));
   if (headings.length === 0) return null;
 
-  const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;
+  const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+  const isAtBottom = Boolean(contentArea && contentArea.scrollTop >= maxScrollTop - 2);
   let currentHeading: HTMLElement | undefined;
-  for (const heading of headings) {
-    if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;
-    else break;
+  if (isAtBottom) {
+    currentHeading = headings[headings.length - 1];
+  } else {
+    const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;
+      else break;
+    }
   }
 
-  return (currentHeading ?? headings[0]).textContent?.trim() || null;
+  const heading = currentHeading ?? headings[0];
+  const text = heading.textContent?.trim() ?? "";
+  return text ? { id: heading.id, text } : null;
 }
 
 function readSavedTheme(): ThemeMode {
@@ -280,6 +296,7 @@ export function App() {
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
+  const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -301,7 +318,9 @@ export function App() {
     const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
     const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;
     setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));
-    setCurrentHeading(currentHeadingFromArticle(articleRef.current, contentArea));
+    const heading = currentHeadingFromArticle(articleRef.current, contentArea);
+    setCurrentHeading((current) => (current === (heading?.text ?? null) ? current : (heading?.text ?? null)));
+    setCurrentHeadingId((current) => (current === (heading?.id || null) ? current : heading?.id || null));
   }, []);
 
   const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
@@ -388,6 +407,7 @@ export function App() {
     if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
     setReadingProgress(0);
     setCurrentHeading(null);
+    setCurrentHeadingId(null);
   }, [documentState, mode]);
 
   useEffect(() => {
@@ -2005,7 +2025,7 @@ export function App() {
                   </div>
                 </div>
               </div>
-              <Outline items={documentState.rendered.toc} />
+              <Outline items={documentState.rendered.toc} activeId={currentHeadingId} />
               <RelatedPanel
                 entry={currentIndexEntry}
                 backlinks={backlinks}

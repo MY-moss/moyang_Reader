@@ -123,7 +123,10 @@ test("collapses and restores the reading sidebar", async ({ page }) => {
 test("shows a reading rail with progress and edge navigation", async ({ page }) => {
   await page.goto("/");
 
-  const sections = Array.from({ length: 36 }, (_, index) => `## Section ${index + 1}\n\n这一段用于验证阅读进度和当前章节提示。\n\n`);
+  const sections = Array.from(
+    { length: 36 },
+    (_, index) => `## Section ${index + 1}\n\n这一段用于验证阅读进度和当前章节提示。\n\n`,
+  );
   await page.locator('input[type="file"]').setInputFiles({
     name: "reading-rail-note.md",
     mimeType: "text/markdown",
@@ -135,16 +138,21 @@ test("shows a reading rail with progress and edge navigation", async ({ page }) 
   const progress = rail.getByRole("progressbar", { name: "文档阅读进度" });
   await expect(progress).toHaveAttribute("aria-valuenow", "0");
   await expect(rail.getByText("Reading rail")).toBeVisible();
+  await expect(page.locator(".outline-list a.active")).toHaveText("Reading rail");
 
   await page.locator(".content-area").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event("scroll"));
   });
   await expect(progress).toHaveAttribute("aria-valuenow", "100");
+  await expect(page.locator(".outline-list a.active")).toHaveText("Section 36");
 
   await rail.getByRole("button", { name: "顶部" }).click();
   await expect.poll(() => page.locator(".content-area").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(progress).toHaveAttribute("aria-valuenow", "0");
+
+  await page.getByRole("link", { name: "Section 10" }).click();
+  await expect(page.locator(".outline-list a.active")).toHaveText("Section 10");
 });
 
 test("previews the print layout before exporting a document", async ({ page }) => {
