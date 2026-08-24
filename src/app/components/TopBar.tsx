@@ -53,6 +53,8 @@ type TopBarProps = {
   startupUpdateCheck: boolean;
   onAllowRemoteResourcesChange: (allowed: boolean) => void;
   onStartupUpdateCheckChange: (enabled: boolean) => void;
+  onExportSettings: () => void;
+  onImportSettings: () => void;
   onToggleSearch: () => void;
   onSearchQueryChange: (query: string) => void;
   onSearchPrevious: () => void;
@@ -112,6 +114,8 @@ export function TopBar({
   startupUpdateCheck,
   onAllowRemoteResourcesChange,
   onStartupUpdateCheckChange,
+  onExportSettings,
+  onImportSettings,
   onToggleSearch,
   onSearchQueryChange,
   onSearchPrevious,
@@ -299,6 +303,16 @@ export function TopBar({
               </select>
             </label>
             <small className="settings-note">应用于打印 / PDF、HTML 和 Word 导出。</small>
+            <div className="settings-divider">迁移与备份</div>
+            <div className="settings-actions">
+              <button type="button" className="quiet-button" onClick={onExportSettings}>
+                导出设置
+              </button>
+              <button type="button" className="quiet-button" onClick={onImportSettings}>
+                导入设置
+              </button>
+            </div>
+            <small className="settings-note">只备份偏好、阅读库路径和标签页，不包含文档正文或私钥。</small>
           </div>
         </details>
         <button

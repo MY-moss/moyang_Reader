@@ -971,6 +971,7 @@ pub async fn choose_save_path(
         match format.as_str() {
             "html" => ("导出 HTML", "HTML 网页", &["html", "htm"]),
             "docx" => ("导出 Word", "Word 文档", &["docx"]),
+            "json" => ("导出设置备份", "Moyang Reader 设置", &["json"]),
             "markdown" => (
                 "导出 Markdown",
                 "Markdown / 文本",

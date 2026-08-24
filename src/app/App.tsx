@@ -104,10 +104,12 @@ import {
   saveSidebarCollapsed,
   saveMountedWorkspaces,
   saveWorkspaceSession,
+  saveWorkspaceSessions,
   forgetWorkspaceSession,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
+import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import {
   documentKindFromPath,
   emptyRenderedDocument,
@@ -384,6 +386,7 @@ export function App() {
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [workspaceOpening, setWorkspaceOpening] = useState(false);
   const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -472,6 +475,63 @@ export function App() {
     });
   }, []);
 
+  const exportPortableSettings = useCallback(async () => {
+    try {
+      const serialized = serializePortableSettings(
+        createPortableSettingsBundle({
+          preferences,
+          theme,
+          workspacePath,
+          lastDocumentPath: loadLastDocumentPath(),
+          mountedWorkspaces,
+          workspaceSessions: loadWorkspaceSessions(),
+          openTabs,
+        }),
+      );
+      if (isTauriRuntime()) {
+        const targetPath = await chooseSavePath("Moyang Reader - settings.json", "json");
+        if (!targetPath) return;
+        await writeTextFile(targetPath, serialized);
+        setSettingsNotice(`设置备份已保存：${fileNameFromPath(targetPath)}`);
+      } else {
+        downloadText("Moyang Reader - settings.json", serialized, "application/json");
+        setSettingsNotice("设置备份已下载，不包含文档正文或私钥。");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "设置备份导出失败。");
+    }
+  }, [mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
+
+  const importPortableSettings = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      void file
+        .text()
+        .then((serialized) => {
+          const bundle = parsePortableSettings(serialized);
+          saveReaderPreferences(bundle.preferences);
+          saveWorkspaceSessions([...bundle.workspaceSessions]);
+          saveOpenTabs([...bundle.openTabs]);
+          saveMountedWorkspaces([...bundle.mountedWorkspaces]);
+          saveWorkspacePath(bundle.workspacePath);
+          saveLastDocumentPath(bundle.lastDocumentPath);
+          setPreferences(bundle.preferences);
+          setTheme(bundle.theme);
+          setMountedWorkspaces([...bundle.mountedWorkspaces]);
+          setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
+        })
+        .catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : "设置备份导入失败。");
+        });
+    };
+    input.click();
+  }, []);
+
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
@@ -483,6 +543,12 @@ export function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    if (!settingsNotice) return;
+    const timer = window.setTimeout(() => setSettingsNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [settingsNotice]);
 
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
@@ -2805,6 +2871,8 @@ export function App() {
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
+        onExportSettings={() => void exportPortableSettings()}
+        onImportSettings={importPortableSettings}
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
@@ -2848,6 +2916,11 @@ export function App() {
         onCycleTheme={cycleTheme}
       />
       <div className="navigation-strip">
+        {settingsNotice && (
+          <div className="settings-notice" role="status">
+            {settingsNotice}
+          </div>
+        )}
         {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (
           <UpdateNotice
             status={updateStatus}

@@ -308,6 +308,22 @@ a:focus-visible {
   font-size: 10px;
   line-height: 1.45;
 }
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-actions .quiet-button {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+.settings-notice {
+  padding: 7px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--accent-soft) 64%, var(--surface));
+  color: var(--accent-deep);
+  font-size: 11px;
+}
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
   color: #a24f2e;

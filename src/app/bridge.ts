@@ -41,7 +41,7 @@ export async function authorizeStoredPath(path: string, workspace: boolean): Pro
 
 export async function chooseSavePath(
   defaultPath: string,
-  format: "markdown" | "html" | "docx",
+  format: "markdown" | "html" | "docx" | "json",
 ): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invoke<string | null>("choose_save_path", { defaultPath, format });
