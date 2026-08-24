@@ -1234,11 +1234,11 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_markdown_file_inner, decode_text, extract_title, index_workspace_inner,
-        is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
-        path_exists_inner, read_text_file_inner, search_workspace_inner, should_skip_directory,
-        write_text_file_inner, AccessRegistry, WorkspaceFile, MAX_READ_FILE_BYTES,
-        TEMP_FILE_COUNTER,
+        clean_tag, create_markdown_file_inner, decode_text, extract_markdown_links, extract_tags,
+        extract_title, extract_wiki_links, index_workspace_inner, is_supported_document_path,
+        is_supported_text_path, list_workspace_files_inner, path_exists_inner,
+        read_text_file_inner, search_workspace_inner, should_skip_directory, write_text_file_inner,
+        AccessRegistry, WorkspaceFile, MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1332,6 +1332,10 @@ mod tests {
             decode_text("你好".as_bytes()).expect("decode UTF-8"),
             "你好"
         );
+        assert_eq!(
+            decode_text(&[0xEF, 0xBB, 0xBF, b'B']).expect("decode UTF-8 BOM"),
+            "B"
+        );
         let (gb18030, _, had_errors) = encoding_rs::GB18030.encode("你好，世界");
         assert!(!had_errors);
         assert_eq!(
@@ -1340,6 +1344,47 @@ mod tests {
         );
         assert!(decode_text(&[0, 1, 2, 3]).is_err());
         assert!(decode_text(&[0xFF, 0xD8, 0xFF, 0xE0, 0, 0x01]).is_err());
+    }
+
+    #[test]
+    fn extracts_wiki_links_without_embeds_or_aliases() {
+        assert_eq!(
+            extract_wiki_links("[[Target|别名]] ![[Cover.png]] [[target]] [[Second#Section]]"),
+            vec!["Target", "Second#Section"]
+        );
+    }
+
+    #[test]
+    fn extracts_nested_markdown_links_and_skips_external_or_image_links() {
+        assert_eq!(
+            extract_markdown_links(
+                "[Second](Second.MARKDOWN#Heading) [Guide](docs/Guide(2026).md) [Space](<folder/with space.md>) [web](https://example.com) ![cover](Cover.png)"
+            ),
+            vec![
+                "Second.MARKDOWN#Heading",
+                "docs/Guide(2026).md",
+                "folder/with space.md"
+            ]
+        );
+    }
+
+    #[test]
+    fn extracts_tags_from_frontmatter_style_lines_and_headings() {
+        assert_eq!(
+            extract_tags(
+                "tags: [front, nested/path]\n\n#topic #second\n\n[[README]] #inline\n\n```md\n#inside-code\n```"
+            ),
+            vec!["front", "nested/path", "topic", "second"]
+        );
+    }
+
+    #[test]
+    fn cleans_valid_tags_and_rejects_invalid_values() {
+        assert_eq!(clean_tag(" #topic, "), Some("topic".to_string()));
+        assert_eq!(clean_tag("#nested/path"), Some("nested/path".to_string()));
+        assert_eq!(clean_tag("#not.valid"), None);
+        assert_eq!(clean_tag("#bad#"), None);
+        assert_eq!(clean_tag(""), None);
     }
 
     #[test]
