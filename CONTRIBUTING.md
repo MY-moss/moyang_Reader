@@ -33,6 +33,17 @@ $env:NPM_CONFIG_REGISTRY = "https://registry.npmjs.org"
 npm audit --audit-level=high
 ```
 
+Rust 依赖审计在 CI 中由 RustSec `audit-check` 门禁执行；本地可先安装 `cargo-audit`，再在 `src-tauri` 目录运行：
+
+```powershell
+cargo install cargo-audit --locked
+Push-Location src-tauri
+cargo audit
+Pop-Location
+```
+
+首次运行需要从 RustSec Advisory Database 下载公告库。
+
 ## 提交前检查
 
 - 开始新任务前先查看 [Issues](https://github.com/MY-moss/moyang_Reader/issues)，避免重复修复。

@@ -24,6 +24,7 @@
 - 更新文档移除本机私钥路径、用户名和无密码状态，并在发布检查中阻止这类内容重新进入公开文档。
 - 发布工作流的手动触发改为强制输入版本，并校验它与项目三处版本号一致，避免误生成分支名 Release。
 - 建立 ESLint/Prettier/Rust clippy 门禁和 Rust 构建缓存，并完成现有前端源码的格式化基线。
+- CI 和 Release 增加 RustSec cargo-audit 依赖漏洞门禁，并保留 Dependabot 的 npm、Cargo 和 GitHub Actions 更新配置。
 
 ### Changed
 
