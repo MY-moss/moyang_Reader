@@ -15,9 +15,12 @@ type WorkspacePanelProps = {
   selectedTag: string | null;
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
+  onOpenVisibleFiles: () => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   workspaceExporting: boolean;
   workspaceExportNotice: string | null;
+  workspaceOpening: boolean;
+  workspaceOpenNotice: string | null;
   workspaceIndexLoading: boolean;
   onOpenFile: (path: string) => void;
   onSearchQueryChange: (query: string) => void;
@@ -42,9 +45,12 @@ export function WorkspacePanel({
   selectedTag,
   onChooseWorkspace,
   onOpenWorkspace,
+  onOpenVisibleFiles,
   onExportWorkspace,
   workspaceExporting,
   workspaceExportNotice,
+  workspaceOpening,
+  workspaceOpenNotice,
   workspaceIndexLoading,
   onOpenFile,
   onSearchQueryChange,
@@ -58,6 +64,15 @@ export function WorkspacePanel({
           <h2 id="workspace-title">阅读库</h2>
         </div>
         <div className="workspace-actions">
+          <button
+            type="button"
+            className="quiet-button"
+            disabled={!workspacePath || workspaceOpening || visibleFiles.length === 0}
+            onClick={onOpenVisibleFiles}
+            title="打开当前筛选的文档"
+          >
+            {workspaceOpening ? "打开中…" : "打开列表"}
+          </button>
           <details className="export-menu workspace-export-menu">
             <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
             <div className="export-menu-panel">
@@ -114,6 +129,11 @@ export function WorkspacePanel({
       {workspaceExportNotice && (
         <div className="workspace-export-note" role="status">
           {workspaceExportNotice}
+        </div>
+      )}
+      {workspaceOpenNotice && (
+        <div className="workspace-export-note" role="status">
+          {workspaceOpenNotice}
         </div>
       )}
       {workspaceIndexLoading && (

@@ -98,6 +98,7 @@ import {
   isCurrentWorkspaceLoad,
   isSelfWrittenChangePending,
 } from "./workspace-refresh";
+import { createWorkspaceOpenPlan } from "./workspace-open";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -220,6 +221,8 @@ export function App() {
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
+  const [workspaceOpening, setWorkspaceOpening] = useState(false);
+  const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -609,7 +612,7 @@ export function App() {
   );
 
   const openSource = useCallback(
-    async (path: string, source: string) => {
+    async (path: string, source: string): Promise<boolean> => {
       setLoading(true);
       setError(null);
 
@@ -640,8 +643,10 @@ export function App() {
           saveLastDocumentPath(path);
         }
         setMode("rendered");
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -650,7 +655,7 @@ export function App() {
   );
 
   const openBinary = useCallback(
-    async (path: string, bytes: Uint8Array) => {
+    async (path: string, bytes: Uint8Array): Promise<boolean> => {
       const kind = documentKindFromPath(path);
       if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
         throw new Error("当前文件不是可预览的文档。");
@@ -699,8 +704,10 @@ export function App() {
           saveLastDocumentPath(path);
         }
         setMode("rendered");
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档预览失败。");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -709,29 +716,29 @@ export function App() {
   );
 
   const openPath = useCallback(
-    async (path: string) => {
+    async (path: string): Promise<boolean> => {
       try {
         if (path.startsWith("browser://")) {
           const cached = browserDocumentsRef.current.get(path);
           if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
           if (cached.bytes) {
-            await openBinary(path, cached.bytes);
+            return await openBinary(path, cached.bytes);
           } else if (cached.source !== undefined) {
-            await openSource(path, cached.source);
+            return await openSource(path, cached.source);
           }
-          return;
+          return false;
         }
 
         const kind = documentKindFromPath(path);
         if (kind === "docx" || kind === "pdf" || kind === "image") {
-          await openBinary(path, await readBinaryFile(path));
-          return;
+          return await openBinary(path, await readBinaryFile(path));
         }
 
         const source = await readTextFile(path);
-        await openSource(path, source);
+        return await openSource(path, source);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文件打开失败。");
+        return false;
       }
     },
     [openBinary, openSource],
@@ -1513,6 +1520,41 @@ export function App() {
     return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
   }, [openTabs, recentFiles, workspaceFiles]);
 
+  const handleOpenWorkspaceFiles = useCallback(async () => {
+    if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+
+    const plan = createWorkspaceOpenPlan(visibleWorkspaceFiles);
+    if (plan.files.length === 0) return;
+    if (
+      documentStateRef.current?.modified &&
+      !window.confirm("当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？")
+    ) {
+      return;
+    }
+
+    setWorkspaceOpening(true);
+    setWorkspaceOpenNotice(null);
+    setError(null);
+
+    let opened = 0;
+    try {
+      for (const file of plan.files) {
+        if (await openPath(file.path)) opened += 1;
+      }
+
+      const failed = plan.files.length - opened;
+      const details = [
+        `已打开 ${opened} 个文档`,
+        failed > 0 ? `失败 ${failed} 个` : "",
+        plan.skippedCount > 0 ? `为保持轻量跳过 ${plan.skippedCount} 个` : "",
+      ].filter(Boolean);
+      setWorkspaceOpenNotice(`${details.join("，")}。`);
+      if (failed > 0) setError(`有 ${failed} 个文档无法打开，请查看当前文件是否仍然存在。`);
+    } finally {
+      setWorkspaceOpening(false);
+    }
+  }, [openPath, visibleWorkspaceFiles, workspacePath]);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
@@ -1677,9 +1719,12 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
+            onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
             workspaceExportNotice={workspaceExportNotice}
+            workspaceOpening={workspaceOpening}
+            workspaceOpenNotice={workspaceOpenNotice}
             workspaceIndexLoading={workspaceIndexLoading}
             workspacePath={workspacePath}
             files={workspaceFiles}
