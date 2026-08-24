@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -5,6 +6,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
+use std::time::SystemTime;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
@@ -36,6 +38,62 @@ struct ActiveWorkspaceWatcher {
 #[derive(Default)]
 pub struct WorkspaceWatcher {
     current: Mutex<Option<ActiveWorkspaceWatcher>>,
+}
+
+#[derive(Default)]
+pub struct WorkspaceSearchCache {
+    entries: Mutex<HashMap<String, CachedSearchText>>,
+}
+
+struct CachedSearchText {
+    size: u64,
+    modified: Option<SystemTime>,
+    source: String,
+}
+
+impl WorkspaceSearchCache {
+    fn read_text(&self, file: &WorkspaceFile) -> Option<String> {
+        let path = PathBuf::from(&file.path);
+        let metadata = fs::metadata(&path).ok()?;
+        let key = access_path_key(&path);
+        let modified = metadata.modified().ok();
+
+        if let Ok(entries) = self.entries.lock() {
+            if let Some(cached) = entries.get(&key) {
+                if cached.size == metadata.len() && cached.modified == modified {
+                    return Some(cached.source.clone());
+                }
+            }
+        }
+
+        let source = read_text_file_inner(path).ok()?;
+        if let Ok(mut entries) = self.entries.lock() {
+            entries.insert(
+                key,
+                CachedSearchText {
+                    size: metadata.len(),
+                    modified,
+                    source: source.clone(),
+                },
+            );
+        }
+        Some(source)
+    }
+
+    fn invalidate_scopes(&self, scopes: &[String]) {
+        let Ok(mut entries) = self.entries.lock() else {
+            return;
+        };
+        entries.retain(|path, _| {
+            !scopes.iter().any(|scope| {
+                access_path_contains(Path::new(scope), Path::new(path))
+                    || access_path_contains(
+                        Path::new(&display_path(Path::new(scope))),
+                        Path::new(&display_path(Path::new(path))),
+                    )
+            })
+        });
+    }
 }
 
 impl AccessRegistry {
@@ -644,16 +702,27 @@ pub fn search_workspace(
     root: String,
     query: String,
     access: State<'_, AccessRegistry>,
+    cache: State<'_, WorkspaceSearchCache>,
 ) -> Result<Vec<WorkspaceSearchResult>, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
-    search_workspace_inner(PathBuf::from(root), query)
+    search_workspace_inner_with_cache(PathBuf::from(root), query, &cache)
 }
 
+#[cfg(test)]
 fn search_workspace_inner(
     root: PathBuf,
     query: String,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
+    let cache = WorkspaceSearchCache::default();
+    search_workspace_inner_with_cache(root, query, &cache)
+}
+
+fn search_workspace_inner_with_cache(
+    root: PathBuf,
+    query: String,
+    cache: &WorkspaceSearchCache,
 ) -> Result<Vec<WorkspaceSearchResult>, String> {
     let query = query.trim().to_lowercase();
     if query.is_empty() {
@@ -668,14 +737,12 @@ fn search_workspace_inner(
         let preview = if is_supported_text_path(Path::new(&file.path))
             && file.size <= MAX_SEARCH_FILE_BYTES
         {
-            read_text_file_inner(PathBuf::from(file.path.clone()))
-                .ok()
-                .and_then(|source| {
-                    source
-                        .lines()
-                        .find(|line| line.to_lowercase().contains(&query))
-                        .map(|line| line.trim().chars().take(180).collect::<String>())
-                })
+            cache.read_text(&file).and_then(|source| {
+                source
+                    .lines()
+                    .find(|line| line.to_lowercase().contains(&query))
+                    .map(|line| line.trim().chars().take(180).collect::<String>())
+            })
         } else {
             None
         };
@@ -1104,11 +1171,14 @@ pub fn refresh_workspace(
     root: String,
     paths: Vec<String>,
     access: State<'_, AccessRegistry>,
+    cache: State<'_, WorkspaceSearchCache>,
 ) -> Result<WorkspaceRefreshResult, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加工作区。".to_string());
     }
-    refresh_workspace_inner(PathBuf::from(root), paths)
+    let result = refresh_workspace_inner(PathBuf::from(root), paths)?;
+    cache.invalidate_scopes(&result.scope_paths);
+    Ok(result)
 }
 
 fn index_entry_for_file(file: WorkspaceFile) -> Option<WorkspaceIndexEntry> {
@@ -1309,12 +1379,13 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        clean_tag, create_markdown_file_inner, decode_text, extract_markdown_links, extract_tags,
-        extract_title, extract_wiki_links, index_workspace_inner, is_supported_document_path,
-        is_supported_text_path, list_workspace_files_inner, path_exists_inner,
-        read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
+        access_path_key, clean_tag, create_markdown_file_inner, decode_text,
+        extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
+        index_workspace_inner, is_supported_document_path, is_supported_text_path,
+        list_workspace_files_inner, path_exists_inner, read_text_file_inner,
+        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
         should_skip_directory, write_text_file_inner, AccessRegistry, WorkspaceFile,
-        MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1601,6 +1672,52 @@ mod tests {
         assert!(results.iter().any(|result| result.file.name == "plain.txt"));
 
         fs::remove_dir_all(root).expect("remove test workspace");
+    }
+
+    #[test]
+    fn reuses_search_text_cache_and_invalidates_changed_scopes() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-cache-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create search cache workspace");
+        let note = root.join("note.txt");
+        fs::write(&note, "first needle").expect("write search cache note");
+
+        let cache = WorkspaceSearchCache::default();
+        let first = search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
+            .expect("search first query");
+        assert_eq!(first.len(), 1);
+        let cache_key = access_path_key(&note);
+        assert_eq!(
+            cache
+                .entries
+                .lock()
+                .expect("lock search cache")
+                .get(&cache_key)
+                .map(|entry| entry.source.as_str()),
+            Some("first needle")
+        );
+
+        let cached_query =
+            search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+                .expect("search cached query");
+        assert_eq!(cached_query.len(), 1);
+
+        cache.invalidate_scopes(&[root.to_string_lossy().into_owned()]);
+        assert!(cache
+            .entries
+            .lock()
+            .expect("lock invalidated search cache")
+            .is_empty());
+
+        fs::write(&note, "second needle").expect("update search cache note");
+        let updated = search_workspace_inner_with_cache(root.clone(), "second".to_string(), &cache)
+            .expect("search updated query");
+        assert_eq!(updated.len(), 1);
+
+        fs::remove_dir_all(root).expect("remove search cache workspace");
     }
 
     #[test]
