@@ -1,0 +1,140 @@
+import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+
+type SourceEditorProps = {
+  value: string;
+  ariaLabel: string;
+  onChange: (value: string) => void;
+  onPaste?: (context: SourceEditorPasteContext) => boolean;
+};
+
+type EditorViewInstance = import("@codemirror/view").EditorView;
+
+export type SourceEditorPasteContext = {
+  clipboardData: DataTransfer;
+  selectionStart: number;
+  selectionEnd: number;
+  value: string;
+  preventDefault: () => void;
+};
+
+export function SourceEditor({ value, ariaLabel, onChange, onPaste }: SourceEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorViewInstance | null>(null);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  const onPasteRef = useRef(onPaste);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    valueRef.current = value;
+    const view = viewRef.current;
+    if (!view || view.state.doc.toString() === value) return;
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: value },
+    });
+  }, [value]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onPasteRef.current = onPaste;
+  }, [onPaste]);
+
+  useEffect(() => {
+    const parent = containerRef.current;
+    if (!parent) return;
+
+    setLoadFailed(false);
+    setReady(false);
+    let disposed = false;
+    let createdView: EditorViewInstance | null = null;
+
+    void Promise.all([
+      import("codemirror"),
+      import("@codemirror/state"),
+      import("@codemirror/view"),
+      import("@codemirror/lang-markdown"),
+      import("@codemirror/search"),
+    ])
+      .then(([codemirror, state, view, markdownLanguage, search]) => {
+        if (disposed) return;
+
+        createdView = new view.EditorView({
+          state: state.EditorState.create({
+            doc: valueRef.current,
+            extensions: [
+              codemirror.basicSetup,
+              markdownLanguage.markdown(),
+              view.keymap.of(search.searchKeymap),
+              view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
+              view.EditorView.domEventHandlers({
+                paste: (event, editorView) => {
+                  const handler = onPasteRef.current;
+                  if (!handler || !event.clipboardData) return false;
+
+                  const selection = editorView.state.selection.main;
+                  return handler({
+                    clipboardData: event.clipboardData,
+                    selectionStart: selection.from,
+                    selectionEnd: selection.to,
+                    value: editorView.state.doc.toString(),
+                    preventDefault: () => event.preventDefault(),
+                  });
+                },
+              }),
+              view.EditorView.updateListener.of((update) => {
+                if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+              }),
+            ],
+          }),
+          parent,
+        });
+        viewRef.current = createdView;
+        setReady(true);
+      })
+      .catch(() => {
+        if (!disposed) setLoadFailed(true);
+      });
+
+    return () => {
+      disposed = true;
+      createdView?.destroy();
+      viewRef.current = null;
+    };
+  }, [ariaLabel]);
+
+  if (loadFailed) {
+    return (
+      <textarea
+        className="source-editor"
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
+          const handler = onPasteRef.current;
+          if (!handler) return;
+
+          const handled = handler({
+            clipboardData: event.clipboardData,
+            selectionStart: event.currentTarget.selectionStart,
+            selectionEnd: event.currentTarget.selectionEnd,
+            value: event.currentTarget.value,
+            preventDefault: () => event.preventDefault(),
+          });
+          if (handled) event.preventDefault();
+        }}
+        spellCheck={false}
+      />
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready}>
+      {!ready && <span className="source-editor-loading">正在加载编辑器…</span>}
+    </div>
+  );
+}
