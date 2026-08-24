@@ -3,6 +3,7 @@ import {
   loadRecentFiles,
   loadMountedWorkspaces,
   loadRecentWorkspaces,
+  loadWorkspaceSessions,
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
@@ -17,6 +18,9 @@ import {
   saveRecentFiles,
   saveMountedWorkspaces,
   saveRecentWorkspaces,
+  saveWorkspaceSession,
+  saveWorkspaceSessions,
+  forgetWorkspaceSession,
 } from "./storage";
 
 afterEach(() => localStorage.clear());
@@ -150,5 +154,43 @@ describe("reader storage", () => {
       { path: "C:/One", name: "One" },
       { path: "C:/Two", name: "Two" },
     ]);
+  });
+
+  it("persists bounded per-workspace tabs and rejects paths outside the workspace", () => {
+    saveWorkspaceSessions([
+      {
+        path: "C:/Notes",
+        tabs: [
+          { path: "C:/Notes/today.md", name: "today.md" },
+          { path: "C:/Other/outside.md", name: "outside.md" },
+          { path: "browser://temporary.md", name: "temporary.md" },
+        ],
+        activeDocumentPath: "C:/Other/outside.md",
+      },
+      {
+        path: "c:\\notes",
+        tabs: [{ path: "c:\\notes\\duplicate.md", name: "duplicate.md" }],
+        activeDocumentPath: "c:\\notes\\duplicate.md",
+      },
+    ]);
+
+    expect(loadWorkspaceSessions()).toEqual([
+      {
+        path: "C:/Notes",
+        tabs: [{ path: "C:/Notes/today.md", name: "today.md" }],
+        activeDocumentPath: null,
+      },
+    ]);
+
+    saveWorkspaceSession({
+      path: "C:/Archive",
+      tabs: [{ path: "C:/Archive/index.md", name: "index.md" }],
+      activeDocumentPath: "C:/Archive/index.md",
+    });
+    expect(loadWorkspaceSessions()[0].path).toBe("C:/Archive");
+
+    forgetWorkspaceSession("c:\\archive");
+    expect(loadWorkspaceSessions()).toHaveLength(1);
+    expect(loadWorkspaceSessions()[0].path).toBe("C:/Notes");
   });
 });
