@@ -300,6 +300,9 @@ type CachedWorkspace = {
   files: WorkspaceFile[];
   index: WorkspaceIndexEntry[];
   revision: number;
+  selectedTag: string | null;
+  selectedFileKind: WorkspaceKindFilter;
+  searchQuery: string;
 };
 
 function updateCachedWorkspace(
@@ -578,6 +581,15 @@ export function App() {
     workspacePathRef.current = workspacePath;
   }, [workspacePath]);
 
+  useEffect(() => {
+    if (!workspacePath) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      selectedTag,
+      selectedFileKind,
+      searchQuery: workspaceQuery,
+    });
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
+
   useEffect(
     () => () => {
       previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -796,11 +808,10 @@ export function App() {
         setWorkspaceFiles(cached.files);
         setWorkspaceIndex(cached.index);
         setWorkspaceRevision(cached.revision);
-        if (switchedWorkspace) {
-          setWorkspaceResults([]);
-          setSelectedTag(null);
-          setSelectedFileKind("all");
-        }
+        setWorkspaceQuery(cached.searchQuery);
+        setSelectedTag(cached.selectedTag);
+        setSelectedFileKind(cached.selectedFileKind);
+        if (switchedWorkspace) setWorkspaceResults([]);
         saveWorkspacePath(cached.path);
         setRecentWorkspaces(
           rememberRecentWorkspace({
@@ -864,6 +875,9 @@ export function App() {
         files,
         index: [],
         revision: 0,
+        selectedTag: null,
+        selectedFileKind: "all",
+        searchQuery: "",
       });
       workspacePathRef.current = root;
       setWorkspacePath(root);
@@ -871,6 +885,7 @@ export function App() {
       if (switchedWorkspace) {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
+        setWorkspaceQuery("");
         setSelectedTag(null);
         setSelectedFileKind("all");
       }
@@ -2861,3 +2876,4 @@ export function App() {
     </div>
   );
 }
+
