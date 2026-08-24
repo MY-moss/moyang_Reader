@@ -84,6 +84,7 @@ pub fn run() {
             commands::initial_paths,
             commands::choose_document_path,
             commands::choose_workspace_path,
+            commands::authorize_stored_path,
             commands::choose_save_path,
             commands::close_window,
             commands::read_text_file,

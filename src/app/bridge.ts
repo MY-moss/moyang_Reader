@@ -27,6 +27,12 @@ export async function chooseWorkspacePath(): Promise<string | null> {
   return invoke<string | null>("choose_workspace_path");
 }
 
+/** Re-authorize a path the user previously opened from the local recent list. */
+export async function authorizeStoredPath(path: string, workspace: boolean): Promise<string> {
+  if (!isTauriRuntime()) return path;
+  return invoke<string>("authorize_stored_path", { path, workspace });
+}
+
 export async function chooseSavePath(
   defaultPath: string,
   format: "markdown" | "html" | "docx",

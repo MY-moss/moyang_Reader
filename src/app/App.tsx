@@ -15,9 +15,9 @@ import {
   chooseDocumentPath,
   chooseSavePath,
   chooseWorkspacePath,
+  authorizeStoredPath,
   closeWindow,
   createMarkdownFile,
-  fileExists,
   fileSize,
   indexWorkspace,
   initialPaths,
@@ -66,11 +66,11 @@ import {
 import {
   loadRecentFiles,
   loadRecentWorkspaces,
+  loadLastDocumentPath,
   loadWorkspacePath,
   rememberRecentFile,
   rememberRecentWorkspace,
-  saveRecentFiles,
-  saveRecentWorkspaces,
+  saveLastDocumentPath,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -197,7 +197,7 @@ export function App() {
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
-  const [workspacePath, setWorkspacePath] = useState<string | null>(loadWorkspacePath);
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
@@ -548,6 +548,18 @@ export function App() {
     if (selected) await loadWorkspace(selected);
   }, [loadWorkspace]);
 
+  const handleOpenRecentWorkspace = useCallback(
+    async (path: string) => {
+      try {
+        const authorizedPath = await authorizeStoredPath(path, true);
+        await loadWorkspace(authorizedPath);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "最近阅读库无法打开，请重新选择文件夹。");
+      }
+    },
+    [loadWorkspace],
+  );
+
   const openSource = useCallback(
     async (path: string, source: string) => {
       setLoading(true);
@@ -577,6 +589,7 @@ export function App() {
         );
         if (!path.startsWith("browser://")) {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+          saveLastDocumentPath(path);
         }
         setMode("rendered");
       } catch (cause) {
@@ -635,6 +648,7 @@ export function App() {
         );
         if (!path.startsWith("browser://")) {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+          saveLastDocumentPath(path);
         }
         setMode("rendered");
       } catch (cause) {
@@ -734,6 +748,37 @@ export function App() {
 
     void (async () => {
       const paths = await initialPaths();
+      if (isTauriRuntime()) {
+        const savedWorkspace = loadWorkspacePath();
+        if (savedWorkspace) {
+          try {
+            const authorizedWorkspace = await authorizeStoredPath(savedWorkspace, true);
+            if (!active) return;
+            await loadWorkspace(authorizedWorkspace, true);
+          } catch {
+            if (!active) return;
+            saveWorkspacePath(null);
+            workspacePathRef.current = null;
+            setWorkspacePath(null);
+            setWorkspaceFiles([]);
+            setWorkspaceIndex([]);
+          }
+        }
+
+        if (paths.length === 0) {
+          const lastDocument = loadLastDocumentPath();
+          if (lastDocument) {
+            try {
+              const authorizedDocument = await authorizeStoredPath(lastDocument, false);
+              if (!active) return;
+              await openPath(authorizedDocument);
+            } catch {
+              if (active) saveLastDocumentPath(null);
+            }
+          }
+        }
+      }
+
       for (const path of [...new Set(paths)]) {
         if (!active) break;
         await openPath(path);
@@ -756,64 +801,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [openPath]);
-
-  useEffect(() => {
-    const savedWorkspace = loadWorkspacePath();
-    if (savedWorkspace && isTauriRuntime()) {
-      void loadWorkspace(savedWorkspace, true);
-    }
-  }, [loadWorkspace]);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    let active = true;
-    void Promise.all(
-      loadRecentFiles().map(async (file) => ({
-        file,
-        exists: await fileExists(file.path),
-      })),
-    )
-      .then((entries) => {
-        if (!active) return;
-        const validFiles = entries.filter((entry) => entry.exists).map((entry) => entry.file);
-        setRecentFiles(validFiles);
-        saveRecentFiles(validFiles);
-      })
-      .catch(() => {
-        // A failed existence check should not prevent the reader from opening.
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    let active = true;
-    void Promise.all(
-      loadRecentWorkspaces().map(async (workspace) => ({
-        workspace,
-        exists: await fileExists(workspace.path),
-      })),
-    )
-      .then((entries) => {
-        if (!active) return;
-        const validWorkspaces = entries.filter((entry) => entry.exists).map((entry) => entry.workspace);
-        setRecentWorkspaces(validWorkspaces);
-        saveRecentWorkspaces(validWorkspaces);
-      })
-      .catch(() => {
-        // A failed existence check should not prevent the reader from opening.
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [loadWorkspace, openPath]);
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
@@ -1110,7 +1098,12 @@ export function App() {
     async (path: string) => {
       if (path === documentState?.path) return;
       if (documentState?.modified && !window.confirm("当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
-      await openPath(path);
+      try {
+        const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
+        await openPath(authorizedPath);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");
+      }
     },
     [documentState, openPath],
   );
@@ -1140,6 +1133,7 @@ export function App() {
         setMode("rendered");
         setSearchQuery("");
         setError(null);
+        saveLastDocumentPath(null);
       }
     },
     [documentState, openPath, openTabs, releaseDocumentResources],
@@ -1540,7 +1534,7 @@ export function App() {
             tagOptions={availableTags}
             selectedTag={selectedTag}
             onChooseWorkspace={() => void handleChooseWorkspace()}
-            onOpenWorkspace={(path) => void loadWorkspace(path)}
+            onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onOpenFile={(path) => void handleSelectTab(path)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}

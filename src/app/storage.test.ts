@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   loadRecentFiles,
   loadRecentWorkspaces,
+  loadLastDocumentPath,
   rememberRecentFile,
   rememberRecentWorkspace,
+  saveLastDocumentPath,
   saveRecentFiles,
   saveRecentWorkspaces,
 } from "./storage";
@@ -28,6 +30,16 @@ describe("reader storage", () => {
     saveRecentFiles([{ path: "C:/Notes/keep.md", name: "keep.md" }]);
 
     expect(loadRecentFiles()).toEqual([{ path: "C:/Notes/keep.md", name: "keep.md" }]);
+  });
+
+  it("persists and clears the last document path", () => {
+    expect(loadLastDocumentPath()).toBeNull();
+
+    saveLastDocumentPath("C:/Notes/last.md");
+    expect(loadLastDocumentPath()).toBe("C:/Notes/last.md");
+
+    saveLastDocumentPath(null);
+    expect(loadLastDocumentPath()).toBeNull();
   });
 
   it("deduplicates recent workspaces case-insensitively and keeps the newest eight", () => {
