@@ -5,6 +5,7 @@ import {
   buildBatchDocxExport,
   buildDocxExport,
   buildHtmlExport,
+  BATCH_EXPORT_CHUNK_SIZE,
   calculateDocxImageExtent,
   copyRichText,
   formatExportCancellationNotice,
@@ -200,6 +201,8 @@ describe("document export helpers", () => {
 
   it("explains that cancelling a batch export leaves no partial output", () => {
     expect(formatExportCancellationNotice(4)).toBe("已取消批量导出，已整理 4 篇文档，未写入文件。");
+    expect(formatExportCancellationNotice(40, 1)).toBe("已取消批量导出，已写入 1 个文件，共整理 40 篇文档。");
+    expect(BATCH_EXPORT_CHUNK_SIZE).toBe(32);
   });
 
   it("builds a single HTML document with a linked table of contents", () => {
