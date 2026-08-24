@@ -28,6 +28,13 @@ function schemaFor(options: RenderOptions) {
   };
 }
 
+function createHtmlProcessor(options: RenderOptions) {
+  return unified().use(rehypeParse, { fragment: true }).use(rehypeSanitize, schemaFor(options)).use(rehypeSlug);
+}
+
+const localHtmlProcessor = createHtmlProcessor({ allowRemoteResources: false });
+const remoteHtmlProcessor = createHtmlProcessor({ allowRemoteResources: true });
+
 function extensionOf(path: string): string {
   return path.split(/[?#]/, 1)[0].split(/[\\/]/).pop()?.split(".").pop()?.toLowerCase() ?? "";
 }
@@ -63,10 +70,7 @@ export function isEditableDocument(kind: DocumentKind): boolean {
 }
 
 export async function renderHtmlFragment(source: string, options: RenderOptions = {}): Promise<RenderedMarkdown> {
-  const processor = unified()
-    .use(rehypeParse, { fragment: true })
-    .use(rehypeSanitize, schemaFor(options))
-    .use(rehypeSlug);
+  const processor = options.allowRemoteResources ? remoteHtmlProcessor : localHtmlProcessor;
   const tree = processor.parse(source);
   const processed = (await processor.run(tree)) as HastRoot;
   const html = unified().use(rehypeStringify).stringify(processed);

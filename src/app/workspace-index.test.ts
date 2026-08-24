@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createBacklinkIndex, findBacklinks, findLinkedEntry, linkMatchesEntry } from "./workspace-index";
+import {
+  createBacklinkIndex,
+  createLinkIndex,
+  findBacklinks,
+  findLinkedEntry,
+  linkMatchesEntry,
+} from "./workspace-index";
 import type { WorkspaceIndexEntry } from "./types";
 
 function entry(path: string, links: string[] = []): WorkspaceIndexEntry {
@@ -48,5 +54,15 @@ describe("workspace index", () => {
 
     expect(findLinkedEntry([otherFolder, sameFolder], current, "Target#Section")?.file.path).toBe("notes/Target.md");
     expect(findLinkedEntry([otherFolder, sameFolder], current, "archive/Target")?.file.path).toBe("archive/Target.md");
+  });
+
+  it("resolves links through a reusable exact and suffix index", () => {
+    const current = entry("notes/Current.md");
+    const target = entry("archive/deep/Target.md");
+    const entries = [current, target];
+    const index = createLinkIndex(entries);
+
+    expect(findLinkedEntry(entries, current, "deep/Target", index)?.file.path).toBe(target.file.path);
+    expect(findLinkedEntry(entries, current, "Target", index)?.file.path).toBe(target.file.path);
   });
 });

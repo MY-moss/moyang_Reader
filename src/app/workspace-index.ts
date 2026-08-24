@@ -27,6 +27,11 @@ function entryKeys(entry: WorkspaceIndexEntry): string[] {
 
 export type WorkspaceBacklinkIndex = ReadonlyMap<string, ReadonlySet<string>>;
 
+export type WorkspaceLinkIndex = Readonly<{
+  exact: ReadonlyMap<string, readonly WorkspaceIndexEntry[]>;
+  suffix: ReadonlyMap<string, readonly WorkspaceIndexEntry[]>;
+}>;
+
 /** Build a reusable link-target index for the current workspace snapshot. */
 export function createBacklinkIndex(entries: WorkspaceIndexEntry[]): WorkspaceBacklinkIndex {
   const index = new Map<string, Set<string>>();
@@ -43,6 +48,32 @@ export function createBacklinkIndex(entries: WorkspaceIndexEntry[]): WorkspaceBa
   }
 
   return index;
+}
+
+function addLinkCandidate(index: Map<string, WorkspaceIndexEntry[]>, key: string, entry: WorkspaceIndexEntry): void {
+  if (!key) return;
+  const candidates = index.get(key) ?? [];
+  candidates.push(entry);
+  index.set(key, candidates);
+}
+
+/** Build reusable exact and suffix maps for wiki-link resolution. */
+export function createLinkIndex(entries: WorkspaceIndexEntry[]): WorkspaceLinkIndex {
+  const exact = new Map<string, WorkspaceIndexEntry[]>();
+  const suffix = new Map<string, WorkspaceIndexEntry[]>();
+
+  for (const entry of entries) {
+    const relativeKey = withoutMarkdownExtension(entry.file.relativePath);
+    if (!relativeKey) continue;
+
+    addLinkCandidate(exact, relativeKey, entry);
+    const parts = relativeKey.split("/");
+    for (let start = 0; start < parts.length; start += 1) {
+      addLinkCandidate(suffix, parts.slice(start).join("/"), entry);
+    }
+  }
+
+  return { exact, suffix };
 }
 
 export function linkMatchesEntry(link: string, entry: WorkspaceIndexEntry): boolean {
@@ -63,24 +94,22 @@ export function findLinkedEntry(
   entries: WorkspaceIndexEntry[],
   current: WorkspaceIndexEntry | undefined,
   link: string,
+  linkIndex: WorkspaceLinkIndex = createLinkIndex(entries),
 ): WorkspaceIndexEntry | undefined {
   const target = stripLinkFragment(link);
   if (!target) return undefined;
 
   if (current) {
     const relativeTarget = withoutMarkdownExtension(`${directoryOf(current.file.relativePath)}/${target}`);
-    const sameFolderMatch = entries.find(
-      (entry) => withoutMarkdownExtension(entry.file.relativePath) === relativeTarget,
-    );
+    const sameFolderMatch = linkIndex.exact.get(relativeTarget)?.[0];
     if (sameFolderMatch) return sameFolderMatch;
   }
 
-  const exactMatch = entries.find(
-    (entry) => withoutMarkdownExtension(entry.file.relativePath) === withoutMarkdownExtension(target),
-  );
+  const targetKey = withoutMarkdownExtension(target);
+  const exactMatch = linkIndex.exact.get(targetKey)?.[0];
   if (exactMatch) return exactMatch;
 
-  return entries.find((entry) => linkMatchesEntry(target, entry));
+  return linkIndex.suffix.get(targetKey)?.[0];
 }
 
 export function findIndexEntry(entries: WorkspaceIndexEntry[], path: string): WorkspaceIndexEntry | undefined {

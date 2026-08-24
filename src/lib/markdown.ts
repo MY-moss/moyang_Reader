@@ -41,6 +41,23 @@ function schemaFor(options: RenderOptions) {
   };
 }
 
+function createMarkdownProcessor(options: RenderOptions) {
+  return unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkFrontmatter, ["yaml", "toml"])
+    .use(remarkMath)
+    .use(remarkWikiLinks)
+    .use(remarkRehype)
+    .use(rehypeSanitize, schemaFor(options))
+    .use(rehypeSlug)
+    .use(rehypeKatex)
+    .use(rehypeStringify);
+}
+
+const localMarkdownProcessor = createMarkdownProcessor({ allowRemoteResources: false });
+const remoteMarkdownProcessor = createMarkdownProcessor({ allowRemoteResources: true });
+
 function remarkWikiLinks() {
   return (tree: Root) => {
     visit(tree, "text", (node, index, parent) => {
@@ -91,17 +108,7 @@ function remarkWikiLinks() {
 }
 
 export async function renderMarkdown(source: string, options: RenderOptions = {}): Promise<RenderedMarkdown> {
-  const processor = unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkFrontmatter, ["yaml", "toml"])
-    .use(remarkMath)
-    .use(remarkWikiLinks)
-    .use(remarkRehype)
-    .use(rehypeSanitize, schemaFor(options))
-    .use(rehypeSlug)
-    .use(rehypeKatex)
-    .use(rehypeStringify);
+  const processor = options.allowRemoteResources ? remoteMarkdownProcessor : localMarkdownProcessor;
   const tree = processor.parse(source);
   const processed = (await processor.run(tree)) as HastRoot;
 
