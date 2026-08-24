@@ -49,12 +49,11 @@ jobs:
           $assetDir = Join-Path $env:RUNNER_TEMP "moyang-reader-release-assets"
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
           gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern "latest.json" --dir $assetDir
-          $manifest = Get-Content -Raw -LiteralPath (Join-Path $assetDir "latest.json") | ConvertFrom-Json
-          $assetNames = foreach ($entry in $manifest.platforms.PSObject.Properties) {
-            $uri = [Uri]$entry.Value.url
-            [IO.Path]::GetFileName($uri.AbsolutePath)
+          $assetNames = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取 Release 资产列表。"
           }
-          foreach ($assetName in ($assetNames | Sort-Object -Unique)) {
+          foreach ($assetName in ($assetNames | Where-Object { $_ -ne "latest.json" -and $_ -notlike "*.sig" })) {
             gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sig" --dir $assetDir
           }
           "ASSET_DIR=$assetDir" >> $env:GITHUB_ENV
