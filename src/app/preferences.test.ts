@@ -17,6 +17,8 @@ describe("reader preferences", () => {
     const preferences: ReaderPreferences = {
       allowRemoteResources: true,
       startupUpdateCheck: true,
+      readingScale: "large",
+      readingWidth: "wide",
     };
 
     saveReaderPreferences(preferences);
@@ -30,6 +32,8 @@ describe("reader preferences", () => {
     expect(loadReaderPreferences()).toEqual({
       allowRemoteResources: true,
       startupUpdateCheck: false,
+      readingScale: "medium",
+      readingWidth: "standard",
     });
   });
 });

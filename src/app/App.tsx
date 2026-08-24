@@ -1594,7 +1594,9 @@ export function App() {
 
   return (
     <div
-      className={`app-shell${focusMode ? " focus-mode" : ""}`}
+      className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
+        focusMode ? " focus-mode" : ""
+      }`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -1608,6 +1610,10 @@ export function App() {
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        readingScale={preferences.readingScale}
+        readingWidth={preferences.readingWidth}
+        onReadingScaleChange={(scale) => setReaderPreferences({ readingScale: scale })}
+        onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}

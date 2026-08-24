@@ -97,6 +97,19 @@ test("enters and exits focus reading mode", async ({ page }) => {
   await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
 });
 
+test("persists reading layout preferences", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator("summary", { hasText: "设置" }).click();
+  await page.getByLabel("正文字号").selectOption("large");
+  await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.reload();
+  await page.locator("summary", { hasText: "设置" }).click();
+
+  await expect(page.getByLabel("正文字号")).toHaveValue("large");
+  await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 

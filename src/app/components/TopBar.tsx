@@ -1,4 +1,4 @@
-import type { ThemeMode } from "../types";
+import type { ReadingScale, ReadingWidth, ThemeMode } from "../types";
 import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
@@ -11,6 +11,10 @@ type TopBarProps = {
   searchResultCount: number;
   searchResultIndex: number;
   theme: ThemeMode;
+  readingScale: ReadingScale;
+  readingWidth: ReadingWidth;
+  onReadingScaleChange: (scale: ReadingScale) => void;
+  onReadingWidthChange: (width: ReadingWidth) => void;
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
@@ -54,6 +58,10 @@ export function TopBar({
   searchResultCount,
   searchResultIndex,
   theme,
+  readingScale,
+  readingWidth,
+  onReadingScaleChange,
+  onReadingWidthChange,
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
@@ -184,6 +192,31 @@ export function TopBar({
                 <strong>启动时检查更新</strong>
                 <small>关闭后仍可点击“更新”手动检查。</small>
               </span>
+            </label>
+            <div className="settings-divider">阅读排版</div>
+            <label className="settings-select-option">
+              <span>正文字号</span>
+              <select
+                aria-label="正文字号"
+                value={readingScale}
+                onChange={(event) => onReadingScaleChange(event.target.value as ReadingScale)}
+              >
+                <option value="small">紧凑</option>
+                <option value="medium">标准</option>
+                <option value="large">舒适</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>正文宽度</span>
+              <select
+                aria-label="正文宽度"
+                value={readingWidth}
+                onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+              >
+                <option value="narrow">窄</option>
+                <option value="standard">标准</option>
+                <option value="wide">宽</option>
+              </select>
             </label>
           </div>
         </details>

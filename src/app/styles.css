@@ -270,6 +270,32 @@ a:focus-visible {
   font-size: 10px;
   line-height: 1.45;
 }
+.settings-divider {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.settings-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 11px;
+}
+.settings-select-option select {
+  min-width: 92px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 5px 7px;
+  font-size: 11px;
+}
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
   color: #a24f2e;
@@ -1327,6 +1353,18 @@ a:focus-visible {
   margin: 0 auto;
   padding: 78px 0 120px;
 }
+.reading-width-narrow .reader-content {
+  width: min(720px, calc(100% - 96px));
+}
+.reading-width-wide .reader-content {
+  width: min(1080px, calc(100% - 72px));
+}
+.reading-scale-small .markdown-body {
+  font-size: 15px;
+}
+.reading-scale-large .markdown-body {
+  font-size: 19px;
+}
 .print-document-header {
   display: none;
 }
@@ -2058,6 +2096,10 @@ a:focus-visible {
   .reader-content {
     width: calc(100% - 32px);
     padding: 44px 0 80px;
+  }
+  .reading-width-narrow .reader-content,
+  .reading-width-wide .reader-content {
+    width: calc(100% - 32px);
   }
   .markdown-body {
     font-size: 16px;
