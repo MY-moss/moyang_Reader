@@ -71,8 +71,6 @@ npm run tauri dev
 
 顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
 
-顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
-
 贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 后续版本路线
