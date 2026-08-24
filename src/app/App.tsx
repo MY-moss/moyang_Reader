@@ -1186,15 +1186,25 @@ export function App() {
     }
   }, [documentState]);
 
-  const handleBrowserFile = useCallback(
-    async (file: File | undefined) => {
-      if (!file) return;
-      const path = `browser://${file.name}`;
-      const kind = documentKindFromPath(file.name);
-      if (kind === "docx" || kind === "pdf" || kind === "image") {
-        await openBinary(path, new Uint8Array(await file.arrayBuffer()));
-      } else {
-        await openSource(path, await file.text());
+  const handleBrowserFiles = useCallback(
+    async (files: FileList | File[] | null | undefined) => {
+      const selectedFiles = Array.from(files ?? []);
+      if (selectedFiles.length === 0) return;
+      if (
+        documentStateRef.current?.modified &&
+        !window.confirm("当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")
+      ) {
+        return;
+      }
+
+      for (const file of selectedFiles) {
+        const path = `browser://${file.name}`;
+        const kind = documentKindFromPath(file.name);
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          await openBinary(path, new Uint8Array(await file.arrayBuffer()));
+        } else {
+          await openSource(path, await file.text());
+        }
       }
     },
     [openBinary, openSource],
@@ -1248,9 +1258,9 @@ export function App() {
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      void handleBrowserFile(event.dataTransfer.files[0]);
+      void handleBrowserFiles(event.dataTransfer.files);
     },
-    [handleBrowserFile],
+    [handleBrowserFiles],
   );
 
   const handleReaderClick = useCallback(
@@ -1769,9 +1779,13 @@ export function App() {
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.docx,.pdf,.avif,.gif,.jpeg,.jpg,.png,.svg,.webp,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,image/*"
         hidden
-        onChange={(event) => void handleBrowserFile(event.target.files?.[0])}
+        onChange={(event) => {
+          void handleBrowserFiles(event.target.files);
+          event.currentTarget.value = "";
+        }}
       />
       {graphOpen && (
         <RelationGraph

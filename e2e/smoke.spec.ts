@@ -56,6 +56,27 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 });
 
+test("opens multiple browser-selected documents as tabs", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "first-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# First note"),
+    },
+    {
+      name: "second-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Second note"),
+    },
+  ]);
+
+  await expect(page.getByRole("heading", { name: "Second note" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "first-note.md" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 
