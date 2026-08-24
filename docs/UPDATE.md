@@ -2,7 +2,7 @@
 
 ## 更新链路
 
-Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
+Moyang Reader 使用 Tauri 官方 updater 插件、Cloudflare Pages 镜像和 GitHub Releases：
 
 1. 发布者给 main 打一个 vX.Y.Z 形式的版本标签，例如 v0.5.3。
 2. GitHub Actions 在 Windows runner 上运行测试、构建并生成 NSIS 安装包。
@@ -11,7 +11,9 @@ Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
 5. 用户开启启动更新检查时，已安装的应用会在启动后检查一次；用户也可以随时点击顶部的“更新”按钮。
 6. 发现新版本后，用户确认“下载并安装”，应用会校验签名、安装并自动重启。
 
-更新地址固定为：
+更新器会先访问 Cloudflare Pages 镜像，失败时再回退到 GitHub Release：
+
+https://moyang-reader-mirror.pages.dev/latest.json
 
 https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
@@ -34,17 +36,32 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 当前公钥已经写入 src-tauri/tauri.conf.json，公钥可以公开，私钥和密码绝不能公开。
 
+## Cloudflare Pages 镜像
+
+当前镜像项目为 `moyang-reader-mirror`，生产地址为：
+
+https://moyang-reader-mirror.pages.dev
+
+发布 Release 后，`.github/workflows/mirror-release.yml` 会从公开 Release 下载 `latest.json`、NSIS 安装包和 `.sig` 文件，重写 manifest 中的安装包 URL，再部署到 Pages。该流程不读取签名私钥。
+
+要启用自动同步，需要在 GitHub 仓库的 Actions Secrets 中配置：
+
+- `CLOUDFLARE_API_TOKEN`：仅授予 Pages 项目部署权限的 API Token。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
+
+这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。若镜像部署失败，GitHub Release 仍然保留，客户端也会继续使用第二个 GitHub 更新端点。
+
 如果私钥丢失，旧版本将无法验证后续更新。若密钥已经泄露，应立即停止发布，生成新密钥，并在还没有公开用户之前更新配置；一旦已有用户安装旧公钥版本，换钥匙需要专门的密钥轮换机制，不能直接覆盖。
 
 ## 发布新版本
 
 确认代码已经合并到 main 后：
 
-~~~powershell
+```powershell
 git tag -a v0.5.3 -m "Release v0.5.3"
 git push origin main
 git push origin v0.5.3
-~~~
+```
 
 只推送版本标签会触发 Release workflow。建议先推送 main，确认 CI 通过，再推送标签。
 
@@ -72,13 +89,13 @@ git push origin v0.5.3
 
 普通本地构建不需要私钥：
 
-~~~powershell
+```powershell
 npm run tauri -- build
-~~~
+```
 
 模拟正式更新构建时，使用 Tauri CLI 支持的环境变量，不要把私钥写进项目：
 
-~~~powershell
+```powershell
 $privateKeyPath = Read-Host "请输入本机私钥文件路径"
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw -LiteralPath $privateKeyPath
 $securePassword = Read-Host "请输入签名私钥密码" -AsSecureString
@@ -89,6 +106,6 @@ try {
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
 }
 npm run tauri -- build --config src-tauri/tauri.release.conf.json
-~~~
+```
 
 签名更新产物位于 src-tauri/target/release/bundle/ 下。key、pem 和 sig 文件已经加入 .gitignore，但仍应在提交前检查 staged diff。
