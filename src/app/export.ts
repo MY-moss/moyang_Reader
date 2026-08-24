@@ -318,9 +318,16 @@ type DocxImage = {
   relationshipId: string;
 };
 
+type DocxLink = {
+  relationshipId: string;
+  target: string;
+};
+
 type DocxRenderState = {
   images: DocxImage[];
   nextImageId: number;
+  links: DocxLink[];
+  nextLinkId: number;
 };
 
 function escapeXml(value: string): string {
@@ -378,6 +385,10 @@ function imageXml(element: HTMLElement, state: DocxRenderState): string {
   }
 }
 
+function isExternalDocxLink(value: string): boolean {
+  return /^(?:https?:\/\/|mailto:)/i.test(value);
+}
+
 function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = ""): string {
   if (node.nodeType === Node.TEXT_NODE) {
     return runXml(node.nodeValue ?? "", inheritedProperties);
@@ -395,6 +406,19 @@ function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = "")
   if (tag === "code" || tag === "kbd")
     properties += '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F0EEE9"/>';
   if (tag === "a") properties += '<w:color w:val="28655F"/><w:u w:val="single"/>';
+
+  if (tag === "a") {
+    const content = Array.from(node.childNodes)
+      .map((child) => inlineXml(child, state, properties))
+      .join("");
+    const target = node.getAttribute("href") ?? "";
+    if (!isExternalDocxLink(target)) return content;
+
+    const relationshipId = `rIdLink${state.nextLinkId}`;
+    state.nextLinkId += 1;
+    state.links.push({ relationshipId, target });
+    return `<w:hyperlink r:id="${relationshipId}">${content}</w:hyperlink>`;
+  }
 
   return Array.from(node.childNodes)
     .map((child) => inlineXml(child, state, properties))
@@ -551,13 +575,17 @@ function docxContentTypesXml(images: DocxImage[]): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageTypes}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
 }
 
-function docxRelationshipsXml(images: DocxImage[]): string {
+function docxRelationshipsXml(images: DocxImage[], links: DocxLink[]): string {
   const relationships = [
     '<Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>',
     '<Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>',
     ...images.map(
       (image, index) =>
         `<Relationship Id="${image.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${index + 1}.${image.extension}"/>`,
+    ),
+    ...links.map(
+      (link) =>
+        `<Relationship Id="${link.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escapeXml(link.target)}" TargetMode="External"/>`,
     ),
   ].join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`;
@@ -569,7 +597,7 @@ export async function buildDocxExport(
   options: ExportOptions = defaultExportOptions,
 ): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
-  const state: DocxRenderState = { images: [], nextImageId: 1 };
+  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
   const zip = new JSZip();
   zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
   zip.file(
@@ -580,7 +608,7 @@ export async function buildDocxExport(
   zip.file("word/styles.xml", docxStylesXml());
   zip.file("word/header1.xml", docxHeaderXml(title));
   zip.file("word/footer1.xml", docxFooterXml());
-  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
+  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   zip.file(
     "docProps/core.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Moyang Reader</dc:creator></cp:coreProperties>`,
@@ -592,7 +620,7 @@ export async function buildDocxExport(
 
   // The document XML is built before the content types and relationships are finalized.
   zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
-  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
+  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }

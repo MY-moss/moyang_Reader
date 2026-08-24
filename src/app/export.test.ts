@@ -242,6 +242,21 @@ describe("document export helpers", () => {
     expect(textRuns).toContain("2. 第二项");
   });
 
+  it("preserves safe external hyperlinks in DOCX exports", async () => {
+    const bytes = await buildDocxExport(
+      "链接",
+      '<p><a href="https://example.com/?a=1&amp;b=2">官网</a> <a href="moyang-wiki:Note">内部笔记</a></p>',
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink1">');
+    expect(relationshipsXml).toContain('Target="https://example.com/?a=1&amp;b=2"');
+    expect(relationshipsXml).toContain('TargetMode="External"');
+    expect(relationshipsXml).not.toContain("moyang-wiki");
+  });
+
   it("applies custom page layout settings to DOCX export", async () => {
     const bytes = await buildDocxExport("Letter", "<p>正文</p>", {
       paper: "letter",
