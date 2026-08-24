@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type MouseEvent,
+} from "react";
 import { EmptyState } from "./components/EmptyState";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
@@ -20,6 +29,7 @@ import {
   authorizeStoredPath,
   closeWindow,
   createMarkdownFile,
+  fileExists,
   fileSize,
   indexWorkspace,
   initialPaths,
@@ -119,6 +129,15 @@ import {
   shouldConfirmDocumentReplacement,
   shouldConfirmWorkspaceSwitch,
 } from "./document-transition";
+import {
+  clipboardAssetFileName,
+  clipboardAssetPath,
+  clipboardAssetReference,
+  clipboardImageToPng,
+  findClipboardImage,
+  insertTextAtSelection,
+  MAX_CLIPBOARD_IMAGE_BYTES,
+} from "./clipboard-image";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -1293,6 +1312,69 @@ export function App() {
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
 
+  const handleSourcePaste = useCallback(
+    async (event: ClipboardEvent<HTMLTextAreaElement>) => {
+      const image = findClipboardImage(event.clipboardData);
+      if (!image) return;
+
+      event.preventDefault();
+      const current = documentStateRef.current;
+      if (!isTauriRuntime()) {
+        setError("浏览器预览模式不能保存剪贴板图片，请使用桌面版 Moyang Reader。");
+        return;
+      }
+      if (!current || current.kind !== "markdown") {
+        setError("剪贴板图片只能粘贴到 Markdown 源码文档中。");
+        return;
+      }
+      if (!workspacePathRef.current || current.path.startsWith("browser://")) {
+        setError("请先添加文档所在的文件夹，再粘贴剪贴板图片。");
+        return;
+      }
+      if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {
+        setError("剪贴板图片不能超过 10 MB。");
+        return;
+      }
+
+      const editor = event.currentTarget;
+      const initialStart = editor.selectionStart;
+      const initialEnd = editor.selectionEnd;
+      const path = current.path;
+
+      try {
+        const bytes = await clipboardImageToPng(image);
+        if (bytes.byteLength > MAX_CLIPBOARD_IMAGE_BYTES) {
+          throw new Error("转换后的剪贴板图片不能超过 10 MB。");
+        }
+        if (documentStateRef.current?.path !== path) {
+          throw new Error("文档已切换，未插入剪贴板图片。");
+        }
+
+        const baseName = clipboardAssetFileName(bytes);
+        let assetName = baseName;
+        let assetPath = clipboardAssetPath(path, assetName);
+        for (let suffix = 2; suffix <= 100 && (await fileExists(assetPath)); suffix += 1) {
+          assetName = baseName.replace(/\.png$/i, `-${suffix}.png`);
+          assetPath = clipboardAssetPath(path, assetName);
+        }
+        if (await fileExists(assetPath)) throw new Error("无法为剪贴板图片生成不重复的文件名。");
+
+        await writeBinaryFile(assetPath, bytes);
+        if (documentStateRef.current?.path !== path) {
+          throw new Error("文档已切换，图片已保存但未插入引用。");
+        }
+
+        const start = document.activeElement === editor ? editor.selectionStart : initialStart;
+        const end = document.activeElement === editor ? editor.selectionEnd : initialEnd;
+        updateSource(insertTextAtSelection(editor.value, start, end, clipboardAssetReference(assetName)));
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法保存剪贴板图片。");
+      }
+    },
+    [updateSource],
+  );
+
   const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
 
@@ -2326,6 +2408,7 @@ export function App() {
               aria-label={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
               value={sourceDraft}
               onChange={(event) => void updateSource(event.target.value)}
+              onPaste={(event) => void handleSourcePaste(event)}
               spellCheck={false}
             />
           )}
