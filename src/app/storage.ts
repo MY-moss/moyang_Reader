@@ -6,10 +6,27 @@ const recentWorkspacesKey = "moyang-reader-recent-workspaces";
 const lastDocumentKey = "moyang-reader-last-document";
 const openTabsKey = "moyang-reader-open-tabs";
 const readingPositionsKey = "moyang-reader-reading-positions";
+const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 const maxOpenTabs = 16;
 const maxReadingPositions = 32;
+
+export function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(sidebarCollapsedKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(sidebarCollapsedKey, String(collapsed));
+  } catch {
+    // The layout preference remains available for the current session.
+  }
+}
 
 function comparablePath(path: string): string {
   return path

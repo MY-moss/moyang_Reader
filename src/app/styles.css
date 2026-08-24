@@ -680,6 +680,12 @@ a:focus-visible {
   display: grid;
   grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr);
 }
+.sidebar-collapsed .workspace-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sidebar-collapsed .sidebar {
+  display: none;
+}
 .sidebar {
   overflow: auto;
   border-right: 1px solid var(--line);
@@ -1205,6 +1211,32 @@ a:focus-visible {
   background:
     radial-gradient(circle at 82% -8%, color-mix(in srgb, var(--accent-soft) 58%, transparent), transparent 26rem),
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--canvas)) 0%, var(--surface) 220px);
+}
+.sidebar-restore {
+  position: sticky;
+  z-index: 7;
+  top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin: 14px 0 -44px 24px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+  color: var(--accent-deep);
+  padding: 7px 11px;
+  box-shadow: var(--shadow-soft);
+  font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+.sidebar-restore span {
+  color: var(--muted);
+  font-size: 9px;
+}
+.sidebar-restore:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 .focus-exit {
   display: none;
@@ -2137,9 +2169,16 @@ a:focus-visible {
     gap: 10px;
     padding-inline: 14px;
   }
+  .sidebar-restore {
+    margin-left: 16px;
+  }
   .reader-content {
     width: calc(100% - 48px);
     padding: 38px 30px 88px;
+  }
+  .sidebar-restore {
+    top: 10px;
+    margin: 10px 0 -42px 12px;
   }
   .external-change-notice {
     width: calc(100% - 48px);

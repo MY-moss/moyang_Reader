@@ -76,12 +76,14 @@ import {
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
+  loadSidebarCollapsed,
   loadWorkspacePath,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
+  saveSidebarCollapsed,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -214,6 +216,7 @@ export function App() {
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
   const [focusMode, setFocusMode] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -276,6 +279,10 @@ export function App() {
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
   }, [openTabs, tabSessionReady]);
+
+  useEffect(() => {
+    saveSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1052,6 +1059,10 @@ export function App() {
         event.preventDefault();
         setQuickOpen(true);
       }
+      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setSidebarCollapsed((current) => !current);
+      }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
         setFocusMode(false);
@@ -1735,7 +1746,7 @@ export function App() {
     <div
       className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
-      }`}
+      }${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -1766,6 +1777,8 @@ export function App() {
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
@@ -1896,6 +1909,16 @@ export function App() {
         </aside>
 
         <main ref={contentAreaRef} className="content-area" aria-live="polite">
+          {sidebarCollapsed && !focusMode && (
+            <button
+              type="button"
+              className="sidebar-restore"
+              onClick={() => setSidebarCollapsed(false)}
+              title="显示侧栏 (Ctrl+Shift+B)"
+            >
+              显示侧栏 <span>Ctrl+Shift+B</span>
+            </button>
+          )}
           {focusMode && (
             <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
               退出专注 <span>Esc</span>

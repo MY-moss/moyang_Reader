@@ -97,6 +97,29 @@ test("enters and exits focus reading mode", async ({ page }) => {
   await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
 });
 
+test("collapses and restores the reading sidebar", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "sidebar-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Sidebar note\n\n侧栏切换测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Sidebar note" })).toBeVisible();
+
+  const toggle = page.locator(".sidebar-toggle");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator(".sidebar-restore")).toBeVisible();
+
+  await page.keyboard.press("Control+Shift+B");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".app-shell")).not.toHaveClass(/sidebar-collapsed/);
+  await expect(page.locator(".sidebar")).toBeVisible();
+});
+
 test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
 

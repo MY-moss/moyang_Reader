@@ -24,6 +24,8 @@ type TopBarProps = {
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   focusMode: boolean;
   onToggleFocusMode: () => void;
   onToggleMode: () => void;
@@ -77,6 +79,8 @@ export function TopBar({
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  sidebarCollapsed,
+  onToggleSidebar,
   focusMode,
   onToggleFocusMode,
   onToggleMode,
@@ -152,6 +156,15 @@ export function TopBar({
         </button>
         <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
           快速打开
+        </button>
+        <button
+          type="button"
+          className="toolbar-button sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-pressed={sidebarCollapsed}
+          title={sidebarCollapsed ? "显示侧栏 (Ctrl+Shift+B)" : "隐藏侧栏 (Ctrl+Shift+B)"}
+        >
+          {sidebarCollapsed ? "显示侧栏" : "侧栏"}
         </button>
         <button
           type="button"

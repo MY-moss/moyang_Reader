@@ -5,11 +5,13 @@ import {
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
+  loadSidebarCollapsed,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
+  saveSidebarCollapsed,
   saveRecentFiles,
   saveRecentWorkspaces,
 } from "./storage";
@@ -44,6 +46,16 @@ describe("reader storage", () => {
 
     saveLastDocumentPath(null);
     expect(loadLastDocumentPath()).toBeNull();
+  });
+
+  it("persists the sidebar collapsed state", () => {
+    expect(loadSidebarCollapsed()).toBe(false);
+
+    saveSidebarCollapsed(true);
+    expect(loadSidebarCollapsed()).toBe(true);
+
+    saveSidebarCollapsed(false);
+    expect(loadSidebarCollapsed()).toBe(false);
   });
 
   it("persists bounded native tabs and drops temporary browser documents", () => {
