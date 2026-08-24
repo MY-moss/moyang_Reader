@@ -914,6 +914,10 @@ export function App() {
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") {
         event.preventDefault();
+        if (event.shiftKey) {
+          void handleChooseWorkspace();
+          return;
+        }
         void openSelectedFile();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -932,7 +936,7 @@ export function App() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [openSelectedFile, saveDocument]);
+  }, [handleChooseWorkspace, openSelectedFile, saveDocument]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1467,6 +1471,7 @@ export function App() {
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
         onOpen={() => void openSelectedFile()}
+        onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
@@ -1598,7 +1603,9 @@ export function App() {
               {error}
             </div>
           )}
-          {!loading && !documentState && <EmptyState onOpen={() => void openSelectedFile()} />}
+          {!loading && !documentState && (
+            <EmptyState onOpen={() => void openSelectedFile()} onChooseWorkspace={() => void handleChooseWorkspace()} />
+          )}
           {!loading && documentState && documentState.kind === "pdf" && mode === "rendered" && (
             <PdfPreview name={documentState.name} src={documentState.previewUrl} />
           )}

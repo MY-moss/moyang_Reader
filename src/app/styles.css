@@ -1642,6 +1642,22 @@ a:focus-visible {
     transform 150ms ease,
     box-shadow 150ms ease;
 }
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+.empty-actions .empty-action {
+  margin-top: 0;
+}
+.empty-action.secondary {
+  border-color: var(--line-strong);
+  background: var(--surface-strong);
+  color: var(--ink);
+  box-shadow: none;
+}
 .empty-hint {
   margin-top: 18px;
   font-family: var(--font-ui) !important;
