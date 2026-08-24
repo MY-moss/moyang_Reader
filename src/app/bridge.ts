@@ -143,7 +143,9 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
     throw new Error("浏览器预览模式不能写回本地文件。");
   }
 
-  await invoke("write_binary_file", { path, contents: Array.from(contents) });
+  await invoke("write_binary_file_raw", contents, {
+    headers: { path: encodeURIComponent(path) },
+  });
 }
 
 export async function initialPaths(): Promise<OpenPath[]> {

@@ -87,6 +87,7 @@ pub fn run() {
             commands::unwatch_workspace,
             commands::write_text_file,
             commands::write_binary_file,
+            commands::write_binary_file_raw,
             commands::create_markdown_file,
             commands::list_workspace_files,
             commands::search_workspace,
