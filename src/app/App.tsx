@@ -285,6 +285,20 @@ type WorkspaceExportProgress = {
   fileName: string;
 };
 
+type PdfBatchExportState = {
+  files: WorkspaceFile[];
+  nextIndex: number;
+  volumeNumber: number;
+  exported: number;
+  skippedFiles: WorkspaceExportFailure[];
+  title: string;
+  options: {
+    paper: ExportPaper;
+    orientation: ExportOrientation;
+    margin: ExportMargin;
+  };
+};
+
 export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -324,6 +338,7 @@ export function App() {
   const updateRef = useRef<Update | null>(null);
   const updateCheckInFlightRef = useRef(false);
   const workspaceExportAbortRef = useRef<AbortController | null>(null);
+  const pdfBatchExportRef = useRef<PdfBatchExportState | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
@@ -1518,17 +1533,115 @@ export function App() {
     preferences.exportPaper,
   ]);
 
+  const finishPdfBatch = useCallback((cancelled: boolean) => {
+    const batch = pdfBatchExportRef.current;
+    if (!batch) return;
+
+    const failureSummary = summarizeExportFailures(
+      batch.skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+    );
+    const suffix = failureSummary ? `，跳过 ${batch.skippedFiles.length} 个：${failureSummary}` : "";
+    setWorkspaceExportNotice(
+      cancelled
+        ? `已取消批量打印，已整理 ${batch.exported} 篇文档${suffix}。`
+        : `已完成批量打印，共 ${batch.exported} 篇文档${suffix}。`,
+    );
+    pdfBatchExportRef.current = null;
+    workspaceExportAbortRef.current = null;
+    setWorkspaceExporting(false);
+    setWorkspaceExportProgress(null);
+    setPrintPreview(null);
+  }, []);
+
+  const prepareNextPdfBatch = useCallback(async () => {
+    const batch = pdfBatchExportRef.current;
+    const controller = workspaceExportAbortRef.current;
+    if (!batch || !controller) return;
+
+    const documents: Array<{ title: string; body: string }> = [];
+    while (batch.nextIndex < batch.files.length && documents.length < BATCH_EXPORT_CHUNK_SIZE) {
+      if (controller.signal.aborted) {
+        finishPdfBatch(true);
+        return;
+      }
+
+      const file = batch.files[batch.nextIndex];
+      batch.nextIndex += 1;
+      setWorkspaceExportProgress({ current: batch.nextIndex, total: batch.files.length, fileName: file.relativePath });
+      try {
+        const rendered =
+          file.kind === "docx"
+            ? await renderDocx(await readBinaryFile(file.path), {
+                allowRemoteResources: preferencesRef.current.allowRemoteResources,
+              })
+            : await renderSource(file.path, await readTextFile(file.path), {
+                allowRemoteResources: preferencesRef.current.allowRemoteResources,
+              });
+        const body = await inlineLocalImages(
+          rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(file.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        );
+        documents.push({ title: file.relativePath, body });
+        batch.exported += 1;
+      } catch {
+        batch.skippedFiles.push({ fileName: file.relativePath, reason: "读取失败" });
+        setWorkspaceExportFailures([...batch.skippedFiles]);
+      }
+    }
+
+    if (controller.signal.aborted) {
+      finishPdfBatch(true);
+      return;
+    }
+    if (documents.length === 0) {
+      finishPdfBatch(false);
+      if (batch.exported === 0) setError("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");
+      return;
+    }
+
+    batch.volumeNumber += 1;
+    setPrintPreview({
+      title: `${batch.title} · 第 ${batch.volumeNumber} 卷`,
+      html: buildBatchHtmlExport(`${batch.title} · 第 ${batch.volumeNumber} 卷`, documents, batch.options),
+      paper: batch.options.paper,
+      orientation: batch.options.orientation,
+      margin: batch.options.margin,
+    });
+    setWorkspaceExportNotice(`第 ${batch.volumeNumber} 卷已准备，打印后自动继续。`);
+    setWorkspaceExporting(false);
+    setWorkspaceExportProgress(null);
+  }, [finishPdfBatch]);
+
   const handlePrintPreview = useCallback(async () => {
     if (!printPreview) return;
 
     try {
       await printHtmlDocument(printPreview.html);
-      setPrintPreview(null);
+      const batch = pdfBatchExportRef.current;
+      if (batch && batch.nextIndex < batch.files.length) {
+        await prepareNextPdfBatch();
+      } else if (batch) {
+        finishPdfBatch(false);
+      } else {
+        setPrintPreview(null);
+      }
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
     }
-  }, [printPreview]);
+  }, [finishPdfBatch, prepareNextPdfBatch, printPreview]);
+
+  const handleClosePrintPreview = useCallback(() => {
+    if (pdfBatchExportRef.current) finishPdfBatch(true);
+    else setPrintPreview(null);
+  }, [finishPdfBatch]);
 
   const handleCopy = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -2059,7 +2172,8 @@ export function App() {
 
   const handleCancelWorkspaceExport = useCallback(() => {
     workspaceExportAbortRef.current?.abort();
-  }, []);
+    if (pdfBatchExportRef.current) finishPdfBatch(true);
+  }, [finishPdfBatch]);
 
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
@@ -2080,6 +2194,40 @@ export function App() {
       setWorkspaceExportNotice(null);
       setError(null);
 
+      if (format === "pdf") {
+        const files = workspaceActionFiles.filter(
+          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
+        );
+        if (files.length === 0) {
+          workspaceExportAbortRef.current = null;
+          setWorkspaceExporting(false);
+          setWorkspaceExportProgress(null);
+          setWorkspaceExportNotice("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");
+          return;
+        }
+
+        pdfBatchExportRef.current = {
+          files,
+          nextIndex: 0,
+          volumeNumber: 0,
+          exported: 0,
+          skippedFiles: [],
+          title: `${workspaceName} 阅读库`,
+          options: {
+            paper: preferences.exportPaper,
+            orientation: preferences.exportOrientation,
+            margin: preferences.exportMargin,
+          },
+        };
+        try {
+          await prepareNextPdfBatch();
+        } catch (cause) {
+          finishPdfBatch(true);
+          setError(cause instanceof Error ? cause.message : "批量打印准备失败。");
+        }
+        return;
+      }
+
       let exported = 0;
       let writtenVolumes = 0;
       const skippedFiles: WorkspaceExportFailure[] = [];
@@ -2097,8 +2245,7 @@ export function App() {
         const exportableFileCount = workspaceActionFiles.filter(
           (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
         ).length;
-        const expectedVolumeCount =
-          format !== "pdf" ? Math.max(1, Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE)) : 1;
+        const expectedVolumeCount = Math.max(1, Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE));
         let documents: { title: string; body: string }[] = [];
         const flushDocuments = async () => {
           if (documents.length === 0) return;
@@ -2164,7 +2311,7 @@ export function App() {
             );
             documents.push({ title: file.relativePath, body });
             exported += 1;
-            if (format !== "pdf" && documents.length >= BATCH_EXPORT_CHUNK_SIZE) await flushDocuments();
+            if (documents.length >= BATCH_EXPORT_CHUNK_SIZE) await flushDocuments();
           } catch {
             recordSkippedFile(file.relativePath, "读取失败");
           }
@@ -2185,26 +2332,16 @@ export function App() {
               : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",
           );
         }
-        if (format === "pdf") {
-          setPrintPreview({
-            title: `${exportTitle} · 批量打印`,
-            html: buildBatchHtmlExport(exportTitle, documents, exportOptions),
-            paper: exportOptions.paper,
-            orientation: exportOptions.orientation,
-            margin: exportOptions.margin,
-          });
-        } else {
-          await flushDocuments();
-        }
-        const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
+        await flushDocuments();
+        const formatLabel = format === "html" ? "HTML" : "Word";
         const failureSummary = summarizeExportFailures(
           skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
         );
         const volumeNotice = writtenVolumes > 1 ? `，已分卷为 ${writtenVolumes} 个文件` : "";
         setWorkspaceExportNotice(
-          `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
-            format === "pdf" ? `${exported} 篇文档` : ""
-          }${volumeNotice}${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
+          `已导出 ${exported} 篇文档为 ${formatLabel}${volumeNotice}${
+            failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""
+          }。`,
         );
       } catch (cause) {
         if (controller.signal.aborted) {
@@ -2223,6 +2360,8 @@ export function App() {
       preferences.exportMargin,
       preferences.exportOrientation,
       preferences.exportPaper,
+      finishPdfBatch,
+      prepareNextPdfBatch,
       workspaceActionFiles,
       workspacePath,
     ],
@@ -2528,7 +2667,7 @@ export function App() {
           orientation={printPreview.orientation}
           margin={printPreview.margin}
           onPrint={handlePrintPreview}
-          onClose={() => setPrintPreview(null)}
+          onClose={handleClosePrintPreview}
         />
       )}
       {quickOpen && (
