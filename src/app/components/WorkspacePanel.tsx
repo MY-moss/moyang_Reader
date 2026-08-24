@@ -1,4 +1,10 @@
-import type { RecentFile, RecentWorkspace, WorkspaceFile, WorkspaceSearchResult } from "../types";
+import type {
+  RecentFile,
+  RecentWorkspace,
+  WorkspaceExportFailure,
+  WorkspaceFile,
+  WorkspaceSearchResult,
+} from "../types";
 import { WorkspaceTreeView } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 
@@ -32,6 +38,7 @@ type WorkspacePanelProps = {
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   workspaceExporting: boolean;
   workspaceExportProgress: { current: number; total: number; fileName: string } | null;
+  workspaceExportFailures: WorkspaceExportFailure[];
   workspaceExportNotice: string | null;
   workspaceOpening: boolean;
   workspaceOpenNotice: string | null;
@@ -68,6 +75,7 @@ export function WorkspacePanel({
   onExportWorkspace,
   workspaceExporting,
   workspaceExportProgress,
+  workspaceExportFailures,
   workspaceExportNotice,
   workspaceOpening,
   workspaceOpenNotice,
@@ -179,6 +187,19 @@ export function WorkspacePanel({
             />
           </div>
         </div>
+      )}
+      {workspaceExportFailures.length > 0 && (
+        <details className="workspace-export-failures">
+          <summary>查看 {workspaceExportFailures.length} 个未导出文件</summary>
+          <ul>
+            {workspaceExportFailures.map((failure) => (
+              <li key={`${failure.fileName}-${failure.reason}`}>
+                <strong title={failure.fileName}>{failure.fileName}</strong>
+                <span>{failure.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {workspaceOpenNotice && (
         <div className="workspace-export-note" role="status">

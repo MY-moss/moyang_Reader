@@ -32,6 +32,11 @@ export type WorkspaceSearchResult = {
   preview: string;
 };
 
+export type WorkspaceExportFailure = {
+  fileName: string;
+  reason: string;
+};
+
 export type WorkspaceIndexEntry = {
   file: WorkspaceFile;
   title: string;

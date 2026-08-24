@@ -911,6 +911,47 @@ a:focus-visible {
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
   transition: width 160ms ease-out;
 }
+.workspace-export-failures {
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-warm) 26%, var(--line));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent-warm) 7%, transparent);
+  color: var(--muted);
+  font-size: 10px;
+}
+.workspace-export-failures summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  color: var(--accent-warm);
+  font-weight: 700;
+  list-style-position: inside;
+}
+.workspace-export-failures ul {
+  display: grid;
+  gap: 6px;
+  max-height: 168px;
+  margin: 0;
+  padding: 0 10px 10px 27px;
+  overflow: auto;
+}
+.workspace-export-failures li {
+  padding-left: 2px;
+  line-height: 1.45;
+}
+.workspace-export-failures li strong,
+.workspace-export-failures li span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-export-failures li strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.workspace-export-failures li span {
+  color: var(--accent-warm);
+}
 .workspace-index-note {
   margin-top: 8px;
   color: var(--muted);

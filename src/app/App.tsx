@@ -58,6 +58,7 @@ import type {
   RecentFile,
   RecentWorkspace,
   ThemeMode,
+  WorkspaceExportFailure,
   WorkspaceFile,
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
@@ -279,6 +280,7 @@ export function App() {
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
   const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
+  const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [workspaceOpening, setWorkspaceOpening] = useState(false);
   const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
@@ -355,6 +357,11 @@ export function App() {
   useEffect(() => {
     saveSidebarCollapsed(sidebarCollapsed);
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    setWorkspaceExportFailures([]);
+    setWorkspaceExportNotice(null);
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1809,11 +1816,16 @@ export function App() {
 
       setWorkspaceExporting(true);
       setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
+      setWorkspaceExportFailures([]);
       setWorkspaceExportNotice(null);
       setError(null);
 
       let exported = 0;
-      const skippedFiles: string[] = [];
+      const skippedFiles: WorkspaceExportFailure[] = [];
+      const recordSkippedFile = (fileName: string, reason: string) => {
+        skippedFiles.push({ fileName, reason });
+        setWorkspaceExportFailures([...skippedFiles]);
+      };
       try {
         const documents = [];
         for (const [index, file] of workspaceActionFiles.entries()) {
@@ -1833,7 +1845,7 @@ export function App() {
                 allowRemoteResources: preferences.allowRemoteResources,
               });
             } else {
-              skippedFiles.push(`${file.relativePath}（类型不支持）`);
+              recordSkippedFile(file.relativePath, "类型不支持");
               continue;
             }
 
@@ -1851,12 +1863,14 @@ export function App() {
             documents.push({ title: file.relativePath, body });
             exported += 1;
           } catch {
-            skippedFiles.push(`${file.relativePath}（读取失败）`);
+            recordSkippedFile(file.relativePath, "读取失败");
           }
         }
 
         if (documents.length === 0) {
-          const failureSummary = summarizeExportFailures(skippedFiles);
+          const failureSummary = summarizeExportFailures(
+            skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+          );
           throw new Error(
             failureSummary
               ? `当前筛选中没有可导出的文档。跳过 ${skippedFiles.length} 个：${failureSummary}`
@@ -1879,7 +1893,9 @@ export function App() {
           await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents, exportOptions));
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
-        const failureSummary = summarizeExportFailures(skippedFiles);
+        const failureSummary = summarizeExportFailures(
+          skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+        );
         setWorkspaceExportNotice(
           `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
             format === "pdf" ? `${exported} 篇文档` : ""
@@ -2001,6 +2017,7 @@ export function App() {
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
             workspaceExportProgress={workspaceExportProgress}
+            workspaceExportFailures={workspaceExportFailures}
             workspaceExportNotice={workspaceExportNotice}
             workspaceOpening={workspaceOpening}
             workspaceOpenNotice={workspaceOpenNotice}
