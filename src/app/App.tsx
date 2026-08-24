@@ -86,6 +86,7 @@ import {
   loadRecentFiles,
   loadMountedWorkspaces,
   loadRecentWorkspaces,
+  loadWorkspaceSessions,
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
@@ -99,6 +100,8 @@ import {
   saveReadingPosition,
   saveSidebarCollapsed,
   saveMountedWorkspaces,
+  saveWorkspaceSession,
+  forgetWorkspaceSession,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -324,6 +327,16 @@ function updateCachedWorkspace(
   cache.set(key, { ...current, ...changes });
 }
 
+function persistCachedWorkspaceSession(cache: Map<string, CachedWorkspace>, root: string): void {
+  const cached = cache.get(comparablePath(root));
+  if (!cached) return;
+  saveWorkspaceSession({
+    path: cached.path,
+    tabs: cached.tabs,
+    activeDocumentPath: cached.activeDocumentPath,
+  });
+}
+
 function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: RecentWorkspace[]): void {
   const mountedKeys = new Set(mounted.map((workspace) => comparablePath(workspace.path)));
   for (const key of cache.keys()) {
@@ -399,6 +412,7 @@ export function App() {
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const openTabsRef = useRef<RecentFile[]>(openTabs);
+  const workspaceRestorePendingRef = useRef(false);
   const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
@@ -619,6 +633,11 @@ export function App() {
     });
   }, [documentState?.path, workspacePath]);
 
+  useEffect(() => {
+    if (!workspacePath) return;
+    persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
+  }, [documentState?.path, openTabs, workspacePath]);
+
   useEffect(
     () => () => {
       previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -825,8 +844,14 @@ export function App() {
     if (!isTauriRuntime()) return;
 
     const previousWorkspacePath = workspacePathRef.current;
+    const storedSession = loadWorkspaceSessions().find(
+      (session) => comparablePath(session.path) === comparablePath(root),
+    );
     const switchedWorkspace =
       comparablePath(previousWorkspacePath ?? "") !== comparablePath(root) && Boolean(previousWorkspacePath);
+    if (switchedWorkspace || (storedSession && !previousWorkspacePath)) {
+      workspaceRestorePendingRef.current = true;
+    }
     if (switchedWorkspace && previousWorkspacePath) {
       const currentDocument = documentStateRef.current;
       updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {
@@ -838,6 +863,7 @@ export function App() {
             ? currentDocument.path
             : null,
       });
+      persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, previousWorkspacePath);
     }
 
     const requestId = ++workspaceLoadRequestRef.current;
@@ -926,19 +952,19 @@ export function App() {
         selectedTag: null,
         selectedFileKind: "all",
         searchQuery: "",
-        tabs: [],
-        activeDocumentPath: null,
+        tabs: storedSession?.tabs ?? [],
+        activeDocumentPath: storedSession?.activeDocumentPath ?? null,
       });
       workspacePathRef.current = root;
       setWorkspacePath(root);
       setWorkspaceFiles(files);
-      if (switchedWorkspace) {
+      if (switchedWorkspace || !previousWorkspacePath) {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
         setWorkspaceQuery("");
         setSelectedTag(null);
         setSelectedFileKind("all");
-        setOpenTabs([]);
+        setOpenTabs(storedSession?.tabs ?? []);
       }
       setWorkspaceRevision((current) => {
         const next = current + 1;
@@ -981,6 +1007,7 @@ export function App() {
         setWorkspaceIndex([]);
         saveWorkspacePath(null);
         mountedWorkspaceCacheRef.current.delete(comparablePath(root));
+        forgetWorkspaceSession(root);
         setMountedWorkspaces((current) => {
           const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(root));
           saveMountedWorkspaces(next);
@@ -1017,6 +1044,7 @@ export function App() {
   const handleRemoveMountedWorkspace = useCallback((path: string) => {
     if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;
     mountedWorkspaceCacheRef.current.delete(comparablePath(path));
+    forgetWorkspaceSession(path);
     setMountedWorkspaces((current) => {
       const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));
       saveMountedWorkspaces(next);
@@ -1169,6 +1197,8 @@ export function App() {
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
+    if (!workspaceRestorePendingRef.current) return;
+    workspaceRestorePendingRef.current = false;
 
     const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));
     const targetPath = cached?.activeDocumentPath ?? null;
@@ -1194,6 +1224,7 @@ export function App() {
     void openPath(targetPath).then((opened) => {
       if (active && !opened) {
         updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+        persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
       }
     });
     return () => {
@@ -1360,8 +1391,14 @@ export function App() {
         }
 
         if (paths.length === 0) {
+          const activeWorkspacePath = loadWorkspacePath();
+          const workspaceSession = activeWorkspacePath
+            ? loadWorkspaceSessions().find(
+                (session) => comparablePath(session.path) === comparablePath(activeWorkspacePath),
+              )
+            : undefined;
           const restoredTabs: RecentFile[] = [];
-          for (const tab of loadOpenTabs()) {
+          for (const tab of workspaceSession?.tabs ?? loadOpenTabs()) {
             try {
               const authorizedDocument = await authorizeStoredPath(tab.path, false);
               if (!active) return;
@@ -1373,19 +1410,21 @@ export function App() {
           if (!active) return;
           setOpenTabs(restoredTabs);
 
-          const lastDocument = loadLastDocumentPath();
-          const activeTab =
-            restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??
-            restoredTabs[restoredTabs.length - 1];
-          if (activeTab) {
-            await openPath(activeTab.path);
-          } else if (lastDocument) {
-            try {
-              const authorizedDocument = await authorizeStoredPath(lastDocument, false);
-              if (!active) return;
-              await openPath(authorizedDocument);
-            } catch {
-              if (active) saveLastDocumentPath(null);
+          if (!workspaceSession) {
+            const lastDocument = loadLastDocumentPath();
+            const activeTab =
+              restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??
+              restoredTabs[restoredTabs.length - 1];
+            if (activeTab) {
+              await openPath(activeTab.path);
+            } else if (lastDocument) {
+              try {
+                const authorizedDocument = await authorizeStoredPath(lastDocument, false);
+                if (!active) return;
+                await openPath(authorizedDocument);
+              } catch {
+                if (active) saveLastDocumentPath(null);
+              }
             }
           }
         }

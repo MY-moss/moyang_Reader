@@ -4,6 +4,7 @@ const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
 const recentWorkspacesKey = "moyang-reader-recent-workspaces";
 const mountedWorkspacesKey = "moyang-reader-mounted-workspaces";
+const workspaceSessionsKey = "moyang-reader-workspace-sessions";
 const lastDocumentKey = "moyang-reader-last-document";
 const openTabsKey = "moyang-reader-open-tabs";
 const readingPositionsKey = "moyang-reader-reading-positions";
@@ -13,6 +14,12 @@ const maxRecentWorkspaces = 8;
 const maxMountedWorkspaces = 5;
 const maxOpenTabs = 16;
 const maxReadingPositions = 32;
+
+export type WorkspaceSession = {
+  path: string;
+  tabs: RecentFile[];
+  activeDocumentPath: string | null;
+};
 
 export function loadSidebarCollapsed(): boolean {
   try {
@@ -71,35 +78,106 @@ export function saveLastDocumentPath(path: string | null): void {
   }
 }
 
+function parseOpenTabs(parsed: unknown): RecentFile[] {
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  return parsed
+    .filter(
+      (item): item is RecentFile =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as RecentFile).path === "string" &&
+        typeof (item as RecentFile).name === "string" &&
+        (item as RecentFile).path.trim().length > 0 &&
+        (item as RecentFile).name.trim().length > 0,
+    )
+    .filter((item) => !item.path.startsWith("browser://"))
+    .filter((item) => {
+      const key = comparablePath(item.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, maxOpenTabs);
+}
+
 export function loadOpenTabs(): RecentFile[] {
   try {
     const raw = localStorage.getItem(openTabsKey);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    const seen = new Set<string>();
-    return parsed
-      .filter(
-        (item): item is RecentFile =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof (item as RecentFile).path === "string" &&
-          typeof (item as RecentFile).name === "string" &&
-          (item as RecentFile).path.trim().length > 0 &&
-          (item as RecentFile).name.trim().length > 0,
-      )
-      .filter((item) => !item.path.startsWith("browser://"))
-      .filter((item) => {
-        const key = comparablePath(item.path);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, maxOpenTabs);
+    return parseOpenTabs(JSON.parse(raw) as unknown);
   } catch {
     return [];
   }
+}
+
+function workspacePathContains(root: string, candidate: string): boolean {
+  const normalizedRoot = comparablePath(root);
+  const normalizedCandidate = comparablePath(candidate);
+  return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}\\`);
+}
+
+function parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  return parsed
+    .filter(
+      (item): item is { path: string; tabs?: unknown; activeDocumentPath?: unknown } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { path?: unknown }).path === "string" &&
+        (item as { path: string }).path.trim().length > 0,
+    )
+    .map((item) => {
+      const tabs = parseOpenTabs(item.tabs).filter((tab) => workspacePathContains(item.path, tab.path));
+      const activeDocumentPath =
+        typeof item.activeDocumentPath === "string" && workspacePathContains(item.path, item.activeDocumentPath)
+          ? item.activeDocumentPath
+          : null;
+      return { path: item.path, tabs, activeDocumentPath };
+    })
+    .filter((session) => {
+      const key = comparablePath(session.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, maxMountedWorkspaces);
+}
+
+export function loadWorkspaceSessions(): WorkspaceSession[] {
+  try {
+    return parseWorkspaceSessions(localStorage.getItem(workspaceSessionsKey));
+  } catch {
+    return [];
+  }
+}
+
+export function saveWorkspaceSessions(sessions: WorkspaceSession[]): void {
+  try {
+    const normalized = parseWorkspaceSessions(JSON.stringify(sessions));
+    localStorage.setItem(workspaceSessionsKey, JSON.stringify(normalized));
+  } catch {
+    // Workspace session restoration is best-effort when local storage is unavailable.
+  }
+}
+
+export function saveWorkspaceSession(session: WorkspaceSession): void {
+  const key = comparablePath(session.path);
+  const next = [session, ...loadWorkspaceSessions().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    maxMountedWorkspaces,
+  );
+  saveWorkspaceSessions(next);
+}
+
+export function forgetWorkspaceSession(path: string): void {
+  const key = comparablePath(path);
+  saveWorkspaceSessions(loadWorkspaceSessions().filter((session) => comparablePath(session.path) !== key));
 }
 
 export function saveOpenTabs(tabs: RecentFile[]): void {
