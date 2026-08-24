@@ -4,7 +4,7 @@
 
 Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
 
-1. 发布者给 main 打一个 vX.Y.Z 形式的版本标签，例如 v0.5.2。
+1. 发布者给 main 打一个 vX.Y.Z 形式的版本标签，例如 v0.5.3。
 2. GitHub Actions 在 Windows runner 上运行测试、构建并生成 NSIS 安装包。
 3. 构建时使用 GitHub Secrets 中的私钥给更新包签名。
 4. tauri-action 将安装包、.sig 签名和 latest.json 上传到 Release。
@@ -16,6 +16,12 @@ Moyang Reader 使用 Tauri 官方 updater 插件和 GitHub Releases：
 https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
+
+## 开发期与稳定批次
+
+功能快速迭代阶段只在本地开发、测试和提交，不为每个小改动推送 main、创建 Tag 或生成 Release。可以在同一个本地候选版本上连续累积多个功能，版本号和更新说明在准备稳定批次时统一整理。
+
+准备发布时再集中完成一次完整门禁：复查 Issues、运行前端/Rust 测试、构建安装包、检查更新清单和在线 Release，然后一次性同步 main、推送版本标签并验证旧版本在线更新。只有稳定批次才会进入公开更新通道。
 
 ## 首次配置 GitHub Secrets
 
@@ -35,9 +41,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 确认代码已经合并到 main 后：
 
 ~~~powershell
-git tag -a v0.5.2 -m "Release v0.5.2"
+git tag -a v0.5.3 -m "Release v0.5.3"
 git push origin main
-git push origin v0.5.2
+git push origin v0.5.3
 ~~~
 
 只推送版本标签会触发 Release workflow。建议先推送 main，确认 CI 通过，再推送标签。
@@ -58,7 +64,7 @@ git push origin v0.5.2
 如果发布出现问题，推荐：
 
 1. 立即停止继续发布。
-2. 修复问题并发布更高的 patch 版本，例如 v0.5.3。
+2. 修复问题并发布更高的 patch 版本，例如 v0.5.4。
 3. 在 GitHub Release 中标记问题版本，并在 Release notes 说明推荐升级到的版本。
 4. 如果需要手动兜底，保留旧版安装包和 GitHub Release，不要删除 latest.json。
 

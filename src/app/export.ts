@@ -30,6 +30,38 @@ function normalizeExportLinks(html: string): string {
     });
 }
 
+export function htmlToPlainText(html: string): string {
+  const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  return (parsed.body.textContent ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export async function copyRichText(html: string): Promise<void> {
+  const normalizedHtml = normalizeExportLinks(html);
+  const plainText = htmlToPlainText(normalizedHtml);
+
+  if (!navigator.clipboard) throw new Error("当前环境不支持复制到剪贴板。");
+
+  if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function") {
+    const clipboardItem = new ClipboardItem({
+      "text/html": new Blob([normalizedHtml], { type: "text/html" }),
+      "text/plain": new Blob([plainText], { type: "text/plain" }),
+    });
+    await navigator.clipboard.write([clipboardItem]);
+    return;
+  }
+
+  if (typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(plainText);
+    return;
+  }
+
+  throw new Error("当前环境不支持复制到剪贴板。");
+}
+
 const MAX_INLINE_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -134,6 +166,67 @@ export function buildBatchHtmlExport(title: string, documents: HtmlExportDocumen
   ].join("\n");
 
   return buildHtmlExport(title, content);
+}
+
+export function printHtmlDocument(html: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.title = "Moyang Reader 打印预览";
+    Object.assign(frame.style, {
+      position: "fixed",
+      right: "0",
+      bottom: "0",
+      width: "1px",
+      height: "1px",
+      border: "0",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    document.body.appendChild(frame);
+
+    let triggered = false;
+    let cleanupTimer: number | null = null;
+    const cleanup = () => {
+      if (cleanupTimer !== null) window.clearTimeout(cleanupTimer);
+      frame.remove();
+    };
+    const fail = (cause: unknown) => {
+      cleanup();
+      reject(cause instanceof Error ? cause : new Error("无法打开打印预览。"));
+    };
+    const triggerPrint = () => {
+      if (triggered) return;
+      triggered = true;
+
+      const printWindow = frame.contentWindow;
+      if (!printWindow) {
+        fail(new Error("无法创建打印预览窗口。"));
+        return;
+      }
+
+      printWindow.addEventListener("afterprint", cleanup, { once: true });
+      try {
+        printWindow.focus();
+        printWindow.print();
+        cleanupTimer = window.setTimeout(cleanup, 60_000);
+        resolve();
+      } catch (cause) {
+        fail(cause);
+      }
+    };
+
+    frame.onload = () => window.setTimeout(triggerPrint, 0);
+    const frameDocument = frame.contentDocument;
+    if (!frameDocument) {
+      fail(new Error("无法创建打印预览文档。"));
+      return;
+    }
+    frameDocument.open();
+    frameDocument.write(html);
+    frameDocument.close();
+    window.setTimeout(triggerPrint, 120);
+  });
 }
 
 type DocxImage = {
@@ -260,11 +353,15 @@ function blockXml(node: Node, state: DocxRenderState): string {
   }
 
   const tag = node.tagName.toLowerCase();
-  if (tag === "table") return tableXml(node, state);
+  const pageBreakPrefix = node.dataset.pageBreak === "true" ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
+  if (tag === "table") return pageBreakPrefix + tableXml(node, state);
   if (tag === "ul" || tag === "ol") {
-    return Array.from(node.children)
-      .map((child) => blockXml(child, state))
-      .join("");
+    return (
+      pageBreakPrefix +
+      Array.from(node.children)
+        .map((child) => blockXml(child, state))
+        .join("")
+    );
   }
   if (tag === "li") {
     const parentTag = node.parentElement?.tagName.toLowerCase();
@@ -276,47 +373,58 @@ function blockXml(node: Node, state: DocxRenderState): string {
       .filter((child) => ["ul", "ol"].includes(child.tagName.toLowerCase()))
       .map((child) => blockXml(child, state))
       .join("");
-    return paragraphXml(runXml(parentTag === "ol" ? "1. " : "• ") + content, "Normal") + nested;
+    return pageBreakPrefix + paragraphXml(runXml(parentTag === "ol" ? "1. " : "• ") + content, "Normal") + nested;
   }
   if (/^h[1-4]$/.test(tag)) {
-    return paragraphXml(
-      Array.from(node.childNodes)
-        .map((child) => inlineXml(child, state))
-        .join(""),
-      `Heading${tag.slice(1)}`,
+    return (
+      pageBreakPrefix +
+      paragraphXml(
+        Array.from(node.childNodes)
+          .map((child) => inlineXml(child, state))
+          .join(""),
+        `Heading${tag.slice(1)}`,
+      )
     );
   }
   if (tag === "pre") {
-    return paragraphXml(
-      inlineXml(node, state, '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/>'),
-      "CodeBlock",
+    return (
+      pageBreakPrefix +
+      paragraphXml(
+        inlineXml(node, state, '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/>'),
+        "CodeBlock",
+      )
     );
   }
   if (tag === "blockquote") {
-    return paragraphXml(
-      Array.from(node.childNodes)
-        .map((child) => inlineXml(child, state, "<w:i/>"))
-        .join(""),
-      "Quote",
+    return (
+      pageBreakPrefix +
+      paragraphXml(
+        Array.from(node.childNodes)
+          .map((child) => inlineXml(child, state, "<w:i/>"))
+          .join(""),
+        "Quote",
+      )
     );
   }
   if (tag === "hr") {
-    return paragraphXml(
-      "",
-      "Normal",
-      '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="D9D5CC"/></w:pBdr>',
+    return (
+      pageBreakPrefix +
+      paragraphXml("", "Normal", '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="D9D5CC"/></w:pBdr>')
     );
   }
-  if (tag === "img") return paragraphXml(imageXml(node, state));
+  if (tag === "img") return pageBreakPrefix + paragraphXml(imageXml(node, state));
 
   const blockChildren = Array.from(node.children).filter((child) =>
     /^(p|div|section|article|h[1-4]|ul|ol|table|blockquote|pre|hr)$/i.test(child.tagName),
   );
-  if (blockChildren.length > 0) return blockChildren.map((child) => blockXml(child, state)).join("");
-  return paragraphXml(
-    Array.from(node.childNodes)
-      .map((child) => inlineXml(child, state))
-      .join(""),
+  if (blockChildren.length > 0) return pageBreakPrefix + blockChildren.map((child) => blockXml(child, state)).join("");
+  return (
+    pageBreakPrefix +
+    paragraphXml(
+      Array.from(node.childNodes)
+        .map((child) => inlineXml(child, state))
+        .join(""),
+    )
   );
 }
 
@@ -379,4 +487,15 @@ export async function buildDocxExport(title: string, body: string): Promise<Uint
   zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
   state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+
+export async function buildBatchDocxExport(title: string, documents: HtmlExportDocument[]): Promise<Uint8Array> {
+  const content = documents
+    .map(
+      (document, index) =>
+        `<section data-page-break="${index > 0 ? "true" : "false"}"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`,
+    )
+    .join("");
+
+  return buildDocxExport(title, content);
 }

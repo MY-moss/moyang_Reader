@@ -56,6 +56,60 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 });
 
+test("opens multiple browser-selected documents as tabs", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "first-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# First note"),
+    },
+    {
+      name: "second-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Second note"),
+    },
+  ]);
+
+  await expect(page.getByRole("heading", { name: "Second note" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "first-note.md" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
+});
+
+test("enters and exits focus reading mode", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "focus-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Focus note\n\n专注阅读测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Focus note" })).toBeVisible();
+
+  await page.getByRole("button", { name: "专注", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+  await expect(page.getByRole("button", { name: /退出专注/ })).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeHidden();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".app-shell")).not.toHaveClass(/focus-mode/);
+  await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
+});
+
+test("persists reading layout preferences", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator("summary", { hasText: "设置" }).click();
+  await page.getByLabel("正文字号").selectOption("large");
+  await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.reload();
+  await page.locator("summary", { hasText: "设置" }).click();
+
+  await expect(page.getByLabel("正文字号")).toHaveValue("large");
+  await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 

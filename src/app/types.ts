@@ -4,6 +4,15 @@ export type DocumentKind = "markdown" | "text" | "docx" | "pdf" | "image";
 
 export type ThemeMode = "system" | "light" | "dark";
 
+export type ReadingScale = "small" | "medium" | "large";
+
+export type ReadingWidth = "narrow" | "standard" | "wide";
+
+export type OpenPath = {
+  path: string;
+  kind: "document" | "workspace";
+};
+
 export type WorkspaceFile = {
   path: string;
   name: string;

@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { WorkspaceFile, WorkspaceIndexEntry, WorkspaceRefreshResult, WorkspaceSearchResult } from "./types";
+import type {
+  OpenPath,
+  WorkspaceFile,
+  WorkspaceIndexEntry,
+  WorkspaceRefreshResult,
+  WorkspaceSearchResult,
+} from "./types";
 
 export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
@@ -17,9 +23,9 @@ export async function openExternalUrl(url: string): Promise<void> {
   window.open(normalized, "_blank", "noopener,noreferrer");
 }
 
-export async function chooseDocumentPath(): Promise<string | null> {
-  if (!isTauriRuntime()) return null;
-  return invoke<string | null>("choose_document_path");
+export async function chooseDocumentPaths(): Promise<string[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<string[]>("choose_document_paths");
 }
 
 export async function chooseWorkspacePath(): Promise<string | null> {
@@ -140,9 +146,14 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
   await invoke("write_binary_file", { path, contents: Array.from(contents) });
 }
 
-export async function initialPaths(): Promise<string[]> {
+export async function initialPaths(): Promise<OpenPath[]> {
   if (!isTauriRuntime()) return [];
-  return invoke<string[]>("initial_paths");
+  return invoke<OpenPath[]>("initial_paths");
+}
+
+export async function resolveOpenPaths(paths: string[]): Promise<OpenPath[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<OpenPath[]>("resolve_open_paths", { paths });
 }
 
 export async function closeWindow(): Promise<void> {
@@ -155,7 +166,16 @@ export async function subscribeToCloseRequest(onRequest: () => void): Promise<Un
   return listen("close-requested", () => onRequest());
 }
 
-export async function subscribeToOpenPaths(onPaths: (paths: string[]) => void): Promise<UnlistenFn | null> {
+export async function subscribeToOpenPaths(onPaths: (paths: OpenPath[]) => void): Promise<UnlistenFn | null> {
   if (!isTauriRuntime()) return null;
-  return listen<string[]>("open-paths", (event) => onPaths(event.payload));
+  return listen<OpenPath[]>("open-paths", (event) => onPaths(event.payload));
+}
+
+export async function subscribeToFileDrop(onPaths: (paths: string[]) => void): Promise<UnlistenFn | null> {
+  if (!isTauriRuntime()) return null;
+
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  return getCurrentWebview().onDragDropEvent((event) => {
+    if (event.payload.type === "drop") onPaths(event.payload.paths);
+  });
 }

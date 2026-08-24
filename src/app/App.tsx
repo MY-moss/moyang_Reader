@@ -12,7 +12,7 @@ import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { UpdateNotice } from "./components/UpdateNotice";
 import {
-  chooseDocumentPath,
+  chooseDocumentPaths,
   chooseSavePath,
   chooseWorkspacePath,
   authorizeStoredPath,
@@ -27,7 +27,9 @@ import {
   readBinaryFile,
   readTextFile,
   refreshWorkspace,
+  resolveOpenPaths,
   searchWorkspace,
+  subscribeToFileDrop,
   subscribeToWorkspaceChanges,
   subscribeToCloseRequest,
   subscribeToOpenPaths,
@@ -45,6 +47,7 @@ import {
 } from "./updater";
 import type {
   DocumentKind,
+  OpenPath,
   OpenDocument,
   ReaderMode,
   RecentFile,
@@ -55,13 +58,16 @@ import type {
   WorkspaceSearchResult,
 } from "./types";
 import {
+  buildBatchDocxExport,
   buildBatchHtmlExport,
   buildDocxExport,
   buildHtmlExport,
+  copyRichText,
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
   pathWithNameSuffix,
+  printHtmlDocument,
 } from "./export";
 import {
   loadRecentFiles,
@@ -99,6 +105,10 @@ function fileNameFromPath(path: string): string {
 
 function fileTypeLabel(kind: DocumentKind): string {
   return kind === "markdown" ? "MD" : kind === "image" ? "IMG" : kind.toUpperCase();
+}
+
+function startsWithHeading(html: string): boolean {
+  return /^\s*<h1(?:\s[^>]*)?>/i.test(html);
 }
 
 function comparablePath(path: string): string {
@@ -198,6 +208,7 @@ export function App() {
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
+  const [focusMode, setFocusMode] = useState(false);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -209,6 +220,7 @@ export function App() {
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
@@ -725,6 +737,31 @@ export function App() {
     [openBinary, openSource],
   );
 
+  const handleOpenPaths = useCallback(
+    async (paths: OpenPath[]) => {
+      const seen = new Set<string>();
+      for (const entry of paths) {
+        const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        try {
+          const authorizedPath = isTauriRuntime()
+            ? await authorizeStoredPath(entry.path, entry.kind === "workspace")
+            : entry.path;
+          if (entry.kind === "workspace") {
+            await loadWorkspace(authorizedPath);
+          } else {
+            await openPath(authorizedPath);
+          }
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");
+        }
+      }
+    },
+    [loadWorkspace, openPath],
+  );
+
   const handleCreateNote = useCallback(
     async (target: string) => {
       if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
@@ -745,13 +782,15 @@ export function App() {
   );
 
   const openSelectedFile = useCallback(async () => {
-    const nativePath = await chooseDocumentPath();
-    if (nativePath) {
-      await openPath(nativePath);
+    const nativePaths = await chooseDocumentPaths();
+    if (isTauriRuntime()) {
+      if (nativePaths.length > 0) {
+        await handleOpenPaths(nativePaths.map((path) => ({ path, kind: "document" as const })));
+      }
       return;
     }
     inputRef.current?.click();
-  }, [openPath]);
+  }, [handleOpenPaths]);
 
   const saveDocument = useCallback(async () => {
     if (!documentState || !documentState.modified || !isEditableDocument(documentState.kind)) return;
@@ -785,8 +824,9 @@ export function App() {
     void (async () => {
       const paths = await initialPaths();
       if (isTauriRuntime()) {
+        const hasStartupWorkspace = paths.some((entry) => entry.kind === "workspace");
         const savedWorkspace = loadWorkspacePath();
-        if (savedWorkspace) {
+        if (savedWorkspace && !hasStartupWorkspace) {
           try {
             const authorizedWorkspace = await authorizeStoredPath(savedWorkspace, true);
             if (!active) return;
@@ -815,19 +855,11 @@ export function App() {
         }
       }
 
-      for (const path of [...new Set(paths)]) {
-        if (!active) break;
-        await openPath(path);
-      }
+      if (active) await handleOpenPaths(paths);
       const dispose = await subscribeToOpenPaths((nextPaths) => {
         if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
           return;
-        void (async () => {
-          for (const path of [...new Set(nextPaths)]) {
-            if (!active) break;
-            await openPath(path);
-          }
-        })();
+        void handleOpenPaths(nextPaths);
       });
       if (active) unlisten = dispose;
       else dispose?.();
@@ -837,7 +869,34 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [loadWorkspace, openPath]);
+  }, [handleOpenPaths, loadWorkspace, openPath]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    void subscribeToFileDrop((paths) => {
+      if (!active) return;
+      if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开拖入的路径吗？")) return;
+      void resolveOpenPaths(paths)
+        .then((entries) => {
+          if (active) return handleOpenPaths(entries);
+          return undefined;
+        })
+        .catch((cause) => {
+          if (active) setError(cause instanceof Error ? cause.message : "无法打开拖入的路径。");
+        });
+    }).then((dispose) => {
+      if (active) unlisten = dispose;
+      else dispose?.();
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleOpenPaths]);
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
@@ -956,11 +1015,19 @@ export function App() {
         event.preventDefault();
         setQuickOpen(true);
       }
+      if (event.key === "Escape" && focusMode) {
+        event.preventDefault();
+        setFocusMode(false);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === "Enter" && documentStateRef.current) {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+      }
     };
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [handleChooseWorkspace, openSelectedFile, saveDocument]);
+  }, [focusMode, handleChooseWorkspace, openSelectedFile, saveDocument]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1025,6 +1092,19 @@ export function App() {
     }
     window.print();
   }, [documentState?.kind, documentState?.previewUrl]);
+
+  const handleCopy = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    try {
+      await copyRichText(documentState.rendered.html);
+      setCopyFeedback(true);
+      window.setTimeout(() => setCopyFeedback(false), 1_600);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制文档失败。");
+    }
+  }, [documentState]);
 
   const handleExportMarkdown = useCallback(async () => {
     if (!documentState || !isEditableDocument(documentState.kind)) return;
@@ -1116,15 +1196,25 @@ export function App() {
     }
   }, [documentState]);
 
-  const handleBrowserFile = useCallback(
-    async (file: File | undefined) => {
-      if (!file) return;
-      const path = `browser://${file.name}`;
-      const kind = documentKindFromPath(file.name);
-      if (kind === "docx" || kind === "pdf" || kind === "image") {
-        await openBinary(path, new Uint8Array(await file.arrayBuffer()));
-      } else {
-        await openSource(path, await file.text());
+  const handleBrowserFiles = useCallback(
+    async (files: FileList | File[] | null | undefined) => {
+      const selectedFiles = Array.from(files ?? []);
+      if (selectedFiles.length === 0) return;
+      if (
+        documentStateRef.current?.modified &&
+        !window.confirm("当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")
+      ) {
+        return;
+      }
+
+      for (const file of selectedFiles) {
+        const path = `browser://${file.name}`;
+        const kind = documentKindFromPath(file.name);
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          await openBinary(path, new Uint8Array(await file.arrayBuffer()));
+        } else {
+          await openSource(path, await file.text());
+        }
       }
     },
     [openBinary, openSource],
@@ -1178,9 +1268,9 @@ export function App() {
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      void handleBrowserFile(event.dataTransfer.files[0]);
+      void handleBrowserFiles(event.dataTransfer.files);
     },
-    [handleBrowserFile],
+    [handleBrowserFiles],
   );
 
   const handleReaderClick = useCallback(
@@ -1423,69 +1513,93 @@ export function App() {
     return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
   }, [openTabs, recentFiles, workspaceFiles]);
 
-  const handleExportWorkspace = useCallback(async () => {
-    if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+  const handleExportWorkspace = useCallback(
+    async (format: "html" | "docx" | "pdf") => {
+      if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
 
-    const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
-    const savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, "html"), "html");
-    if (!savePath) return;
+      const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
+      const savePath =
+        format === "pdf"
+          ? null
+          : await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+      if (format !== "pdf" && !savePath) return;
 
-    setWorkspaceExporting(true);
-    setWorkspaceExportNotice(null);
-    setError(null);
+      setWorkspaceExporting(true);
+      setWorkspaceExportNotice(null);
+      setError(null);
 
-    let exported = 0;
-    let skipped = 0;
-    try {
-      const documents = [];
-      for (const file of visibleWorkspaceFiles) {
-        try {
-          let rendered;
-          if (file.kind === "docx") {
-            rendered = await renderDocx(await readBinaryFile(file.path), {
-              allowRemoteResources: preferences.allowRemoteResources,
-            });
-          } else if (file.kind === "markdown" || file.kind === "text") {
-            rendered = await renderSource(file.path, await readTextFile(file.path), {
-              allowRemoteResources: preferences.allowRemoteResources,
-            });
-          } else {
+      let exported = 0;
+      let skipped = 0;
+      try {
+        const documents = [];
+        for (const file of visibleWorkspaceFiles) {
+          try {
+            let rendered;
+            if (file.kind === "docx") {
+              rendered = await renderDocx(await readBinaryFile(file.path), {
+                allowRemoteResources: preferences.allowRemoteResources,
+              });
+            } else if (file.kind === "markdown" || file.kind === "text") {
+              rendered = await renderSource(file.path, await readTextFile(file.path), {
+                allowRemoteResources: preferences.allowRemoteResources,
+              });
+            } else {
+              skipped += 1;
+              continue;
+            }
+
+            const body = await inlineLocalImages(
+              rendered.html,
+              (source) => {
+                const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+                if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+                return resolveRelativePath(file.path, safeDecode(target));
+              },
+              readBinaryFile,
+              imageMimeType,
+              fileSize,
+            );
+            documents.push({ title: file.relativePath, body });
+            exported += 1;
+          } catch {
             skipped += 1;
-            continue;
           }
-
-          const body = await inlineLocalImages(
-            rendered.html,
-            (source) => {
-              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-              return resolveRelativePath(file.path, safeDecode(target));
-            },
-            readBinaryFile,
-            imageMimeType,
-            fileSize,
-          );
-          documents.push({ title: file.relativePath, body });
-          exported += 1;
-        } catch {
-          skipped += 1;
         }
-      }
 
-      if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
-      await writeTextFile(savePath, buildBatchHtmlExport(`${workspaceName} 阅读库`, documents));
-      setWorkspaceExportNotice(
-        `已导出 ${exported} 篇文档${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
-      );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "批量导出失败。");
-    } finally {
-      setWorkspaceExporting(false);
-    }
-  }, [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath]);
+        if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
+        const exportTitle = `${workspaceName} 阅读库`;
+        if (format === "html") {
+          if (!savePath) throw new Error("没有选择 HTML 保存位置。");
+          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents));
+        } else if (format === "docx") {
+          if (!savePath) throw new Error("没有选择 Word 保存位置。");
+          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents));
+        } else {
+          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents));
+        }
+        const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
+        setWorkspaceExportNotice(
+          `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
+            format === "pdf" ? `${exported} 篇文档` : ""
+          }${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
+        );
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "批量导出失败。");
+      } finally {
+        setWorkspaceExporting(false);
+      }
+    },
+    [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath],
+  );
 
   return (
-    <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
+    <div
+      className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
+        focusMode ? " focus-mode" : ""
+      }`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
       <TopBar
         fileName={documentState?.name ?? null}
         mode={mode}
@@ -1496,6 +1610,10 @@ export function App() {
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        readingScale={preferences.readingScale}
+        readingWidth={preferences.readingWidth}
+        onReadingScaleChange={(scale) => setReaderPreferences({ readingScale: scale })}
+        onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
@@ -1503,8 +1621,12 @@ export function App() {
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
+        onCopy={() => void handleCopy()}
+        copyFeedback={copyFeedback}
         onExport={handleExport}
         exportLabel={
           documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
@@ -1512,6 +1634,7 @@ export function App() {
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        canCopy={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         onExportMarkdown={() => void handleExportMarkdown()}
         onExportHtml={() => void handleExportHtml()}
         onExportDocx={() => void handleExportDocx()}
@@ -1554,7 +1677,7 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
-            onExportWorkspace={() => void handleExportWorkspace()}
+            onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
             workspaceExportNotice={workspaceExportNotice}
             workspaceIndexLoading={workspaceIndexLoading}
@@ -1617,6 +1740,11 @@ export function App() {
         </aside>
 
         <main ref={contentAreaRef} className="content-area" aria-live="polite">
+          {focusMode && (
+            <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
+              退出专注 <span>Esc</span>
+            </button>
+          )}
           {loading && <div className="loading-state">正在打开文档…</div>}
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
@@ -1647,12 +1775,15 @@ export function App() {
             documentState.kind !== "pdf" &&
             documentState.kind !== "image" &&
             mode === "rendered" && (
-              <article
-                ref={articleRef}
-                className="reader-content markdown-body"
-                onClick={handleReaderClick}
-                dangerouslySetInnerHTML={{ __html: documentState.rendered.html }}
-              />
+              <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                {!startsWithHeading(documentState.rendered.html) && (
+                  <header className="print-document-header" aria-hidden="true">
+                    <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
+                    <div className="print-document-title">{documentState.name}</div>
+                  </header>
+                )}
+                <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+              </article>
             )}
           {!loading && documentState && canEdit && mode === "source" && (
             <textarea
@@ -1683,9 +1814,13 @@ export function App() {
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.docx,.pdf,.avif,.gif,.jpeg,.jpg,.png,.svg,.webp,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,image/*"
         hidden
-        onChange={(event) => void handleBrowserFile(event.target.files?.[0])}
+        onChange={(event) => {
+          void handleBrowserFiles(event.target.files);
+          event.currentTarget.value = "";
+        }}
       />
       {graphOpen && (
         <RelationGraph

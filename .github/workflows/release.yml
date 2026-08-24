@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "要发布的版本，必须与 package.json/Cargo.toml 一致，例如 0.5.2"
+        description: "要发布的版本，必须与 package.json/Cargo.toml 一致，例如 0.5.3"
         required: true
         type: string
 

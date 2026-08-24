@@ -1,11 +1,17 @@
+import type { ReadingScale, ReadingWidth } from "./types";
+
 export type ReaderPreferences = {
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
+  readingScale: ReadingScale;
+  readingWidth: ReadingWidth;
 };
 
 export const defaultReaderPreferences: ReaderPreferences = {
   allowRemoteResources: false,
   startupUpdateCheck: false,
+  readingScale: "medium",
+  readingWidth: "standard",
 };
 
 const readerPreferencesKey = "moyang-reader-preferences";
@@ -31,6 +37,14 @@ export function loadReaderPreferences(): ReaderPreferences {
         typeof parsed.startupUpdateCheck === "boolean"
           ? parsed.startupUpdateCheck
           : defaultReaderPreferences.startupUpdateCheck,
+      readingScale:
+        parsed.readingScale === "small" || parsed.readingScale === "large" || parsed.readingScale === "medium"
+          ? parsed.readingScale
+          : defaultReaderPreferences.readingScale,
+      readingWidth:
+        parsed.readingWidth === "narrow" || parsed.readingWidth === "wide" || parsed.readingWidth === "standard"
+          ? parsed.readingWidth
+          : defaultReaderPreferences.readingWidth,
     };
   } catch {
     return defaultReaderPreferences;

@@ -1,7 +1,5 @@
 mod commands;
 
-use std::path::Path;
-
 use tauri::{Emitter, Manager, Url, WindowEvent};
 
 const DEV_SERVER_PORT: u16 = 1420;
@@ -30,19 +28,12 @@ pub fn run() {
         .manage(commands::WorkspaceWatcher::default())
         .manage(commands::WorkspaceSearchCache::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            let paths = argv
-                .into_iter()
-                .skip(1)
-                .filter(|argument| {
-                    Path::new(argument).is_file()
-                        && commands::is_supported_document_path(Path::new(argument))
-                })
-                .collect::<Vec<_>>();
+            let paths = commands::collect_open_paths(argv.into_iter().skip(1));
 
             if !paths.is_empty() {
                 let access = app.state::<commands::AccessRegistry>();
                 for path in &paths {
-                    let _ = access.register_document_path(Path::new(path));
+                    let _ = commands::register_open_path(access.inner(), path);
                 }
                 let _ = app.emit("open-paths", paths);
             }
@@ -82,7 +73,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::initial_paths,
-            commands::choose_document_path,
+            commands::resolve_open_paths,
+            commands::choose_document_paths,
             commands::choose_workspace_path,
             commands::authorize_stored_path,
             commands::choose_save_path,

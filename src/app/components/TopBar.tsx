@@ -1,4 +1,4 @@
-import type { ThemeMode } from "../types";
+import type { ReadingScale, ReadingWidth, ThemeMode } from "../types";
 import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
@@ -11,11 +11,20 @@ type TopBarProps = {
   searchResultCount: number;
   searchResultIndex: number;
   theme: ThemeMode;
+  readingScale: ReadingScale;
+  readingWidth: ReadingWidth;
+  onReadingScaleChange: (scale: ReadingScale) => void;
+  onReadingWidthChange: (width: ReadingWidth) => void;
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  focusMode: boolean;
+  onToggleFocusMode: () => void;
   onToggleMode: () => void;
   onSave: () => void;
+  onCopy: () => void;
+  copyFeedback: boolean;
+  canCopy: boolean;
   onExport: () => void;
   exportLabel?: string;
   canExportMarkdown: boolean;
@@ -49,11 +58,20 @@ export function TopBar({
   searchResultCount,
   searchResultIndex,
   theme,
+  readingScale,
+  readingWidth,
+  onReadingScaleChange,
+  onReadingWidthChange,
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  focusMode,
+  onToggleFocusMode,
   onToggleMode,
   onSave,
+  onCopy,
+  copyFeedback,
+  canCopy,
   onExport,
   exportLabel = "打印 / PDF",
   canExportMarkdown,
@@ -123,6 +141,15 @@ export function TopBar({
         <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
           快速打开
         </button>
+        <button
+          type="button"
+          className="toolbar-button focus-button"
+          onClick={onToggleFocusMode}
+          disabled={!fileName}
+          title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
+        >
+          {focusMode ? "退出专注" : "专注"}
+        </button>
         <button type="button" className="toolbar-button" onClick={onToggleSearch} title="查找文档内容 (Ctrl+F)">
           搜索
         </button>
@@ -131,6 +158,9 @@ export function TopBar({
         </button>
         <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
           保存
+        </button>
+        <button type="button" className="toolbar-button" onClick={onCopy} disabled={!canCopy} title="复制当前文档内容">
+          {copyFeedback ? "已复制" : "复制"}
         </button>
         <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
           {themeLabel}
@@ -162,6 +192,31 @@ export function TopBar({
                 <strong>启动时检查更新</strong>
                 <small>关闭后仍可点击“更新”手动检查。</small>
               </span>
+            </label>
+            <div className="settings-divider">阅读排版</div>
+            <label className="settings-select-option">
+              <span>正文字号</span>
+              <select
+                aria-label="正文字号"
+                value={readingScale}
+                onChange={(event) => onReadingScaleChange(event.target.value as ReadingScale)}
+              >
+                <option value="small">紧凑</option>
+                <option value="medium">标准</option>
+                <option value="large">舒适</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>正文宽度</span>
+              <select
+                aria-label="正文宽度"
+                value={readingWidth}
+                onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+              >
+                <option value="narrow">窄</option>
+                <option value="standard">标准</option>
+                <option value="wide">宽</option>
+              </select>
             </label>
           </div>
         </details>
