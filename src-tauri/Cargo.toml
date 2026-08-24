@@ -21,6 +21,7 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 encoding_rs = "0.8"
 notify = { version = "8", features = ["serde", "serialization-compat-6"] }
+percent-encoding = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

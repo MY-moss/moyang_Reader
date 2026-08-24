@@ -1428,6 +1428,38 @@ pub fn write_binary_file(
     write_bytes_file_inner(path, &contents, false)
 }
 
+fn decode_ipc_path(encoded_path: &str) -> Result<PathBuf, String> {
+    percent_encoding::percent_decode_str(encoded_path)
+        .decode_utf8()
+        .map(|path| PathBuf::from(path.into_owned()))
+        .map_err(|_| "IPC 文件路径不是有效的 UTF-8。".to_string())
+}
+
+#[tauri::command]
+pub fn write_binary_file_raw(
+    request: tauri::ipc::Request<'_>,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let encoded_path = request
+        .headers()
+        .get("path")
+        .ok_or_else(|| "IPC 写入缺少文件路径。".to_string())?;
+    let path = decode_ipc_path(
+        encoded_path
+            .to_str()
+            .map_err(|_| "IPC 文件路径不是有效的请求头。".to_string())?,
+    )?;
+    if !access.is_write_allowed(&path) {
+        return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
+    }
+
+    let contents = match request.body() {
+        tauri::ipc::InvokeBody::Raw(contents) => contents,
+        _ => return Err("IPC 二进制写入需要原始字节请求体。".to_string()),
+    };
+    write_bytes_file_inner(path, contents, false)
+}
+
 fn write_bytes_file_inner(
     path: PathBuf,
     contents: &[u8],
@@ -1518,10 +1550,10 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 mod tests {
     use super::{
         access_path_key, authorize_stored_path_inner, clean_tag, collect_open_paths,
-        create_markdown_file_inner, decode_text, extract_markdown_links, extract_tags,
-        extract_title, extract_wiki_links, index_workspace_inner, is_supported_document_path,
-        is_supported_text_path, list_workspace_files_inner, path_exists_inner,
-        read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
+        create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
+        extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
+        is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
+        path_exists_inner, read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
         search_workspace_inner_with_cache, should_skip_directory, write_text_file_inner,
         AccessRegistry, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
         MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
@@ -1684,6 +1716,15 @@ mod tests {
         );
         assert!(!root.join(".note.md.moyang.bak").exists());
         fs::remove_dir_all(root).expect("remove atomic test directory");
+    }
+
+    #[test]
+    fn decodes_unicode_paths_for_raw_binary_ipc() {
+        assert_eq!(
+            decode_ipc_path("C%3A%5CNotes%5C%E4%BD%A0%E5%A5%BD.docx").expect("decode encoded path"),
+            PathBuf::from("C:\\Notes\\你好.docx")
+        );
+        assert!(decode_ipc_path("%FF").is_err());
     }
 
     #[test]
