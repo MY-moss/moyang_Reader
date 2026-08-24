@@ -28,6 +28,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .manage(commands::AccessRegistry::default())
         .manage(commands::WorkspaceWatcher::default())
+        .manage(commands::WorkspaceSearchCache::default())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let paths = argv
                 .into_iter()
