@@ -73,11 +73,13 @@ import {
   loadRecentFiles,
   loadRecentWorkspaces,
   loadLastDocumentPath,
+  loadOpenTabs,
   loadReadingPosition,
   loadWorkspacePath,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
+  saveOpenTabs,
   saveReadingPosition,
   saveWorkspacePath,
 } from "./storage";
@@ -241,6 +243,7 @@ export function App() {
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
+  const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -266,6 +269,10 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    if (tabSessionReady) saveOpenTabs(openTabs);
+  }, [openTabs, tabSessionReady]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -849,8 +856,26 @@ export function App() {
         }
 
         if (paths.length === 0) {
+          const restoredTabs: RecentFile[] = [];
+          for (const tab of loadOpenTabs()) {
+            try {
+              const authorizedDocument = await authorizeStoredPath(tab.path, false);
+              if (!active) return;
+              restoredTabs.push({ path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });
+            } catch {
+              // Stale tabs are discarded without blocking the next launch.
+            }
+          }
+          if (!active) return;
+          setOpenTabs(restoredTabs);
+
           const lastDocument = loadLastDocumentPath();
-          if (lastDocument) {
+          const activeTab =
+            restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??
+            restoredTabs[restoredTabs.length - 1];
+          if (activeTab) {
+            await openPath(activeTab.path);
+          } else if (lastDocument) {
             try {
               const authorizedDocument = await authorizeStoredPath(lastDocument, false);
               if (!active) return;
@@ -863,6 +888,7 @@ export function App() {
       }
 
       if (active) await handleOpenPaths(paths);
+      if (active) setTabSessionReady(true);
       const dispose = await subscribeToOpenPaths((nextPaths) => {
         if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
           return;
