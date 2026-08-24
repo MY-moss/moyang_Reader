@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { EmptyState } from "./components/EmptyState";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
@@ -217,7 +216,7 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
-  const previewUrlsRef = useRef(new Set<string>());
+  const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const workspaceLoadRequestRef = useRef(0);
@@ -273,16 +272,18 @@ export function App() {
   useEffect(
     () => () => {
       previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.clear();
       browserDocumentsRef.current.clear();
     },
     [],
   );
 
-  const releaseBrowserDocument = useCallback((path: string) => {
+  const releaseDocumentResources = useCallback((path: string) => {
     const cached = browserDocumentsRef.current.get(path);
-    if (cached?.previewUrl) {
-      URL.revokeObjectURL(cached.previewUrl);
-      previewUrlsRef.current.delete(cached.previewUrl);
+    const previewUrl = previewUrlsRef.current.get(path) ?? cached?.previewUrl;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrlsRef.current.delete(path);
     }
     browserDocumentsRef.current.delete(path);
   }, []);
@@ -506,8 +507,8 @@ export function App() {
       try {
         const kind = documentKindFromPath(path);
         const rendered = await renderSource(path, source);
+        releaseDocumentResources(path);
         if (path.startsWith("browser://")) {
-          releaseBrowserDocument(path);
           browserDocumentsRef.current.set(path, { kind, source });
         }
         setDocumentState({
@@ -533,44 +534,34 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseBrowserDocument],
+    [releaseDocumentResources],
   );
 
   const openBinary = useCallback(
-    async (path: string, bytes?: Uint8Array) => {
+    async (path: string, bytes: Uint8Array) => {
       const kind = documentKindFromPath(path);
       if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
         throw new Error("当前文件不是可预览的文档。");
-      }
-      if (kind === "docx" && !bytes) {
-        throw new Error("Word 文档内容读取失败。");
-      }
-      if ((kind === "pdf" || kind === "image") && path.startsWith("browser://") && !bytes) {
-        throw new Error("浏览器预览文件已失效，请重新选择。");
       }
 
       setLoading(true);
       setError(null);
 
       try {
-        const rendered = kind === "docx" ? await renderDocx(bytes as Uint8Array) : emptyRenderedDocument();
+        const rendered = kind === "docx" ? await renderDocx(bytes) : emptyRenderedDocument();
         let previewUrl: string | undefined;
         if (kind === "pdf" || kind === "image") {
-          const pdfBytes = bytes
-            ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
-            : null;
-          previewUrl = path.startsWith("browser://")
-            ? URL.createObjectURL(
-                new Blob([pdfBytes as ArrayBuffer], {
-                  type: kind === "pdf" ? "application/pdf" : imageMimeType(path),
-                }),
-              )
-            : convertFileSrc(path, "asset");
-          if (path.startsWith("browser://")) previewUrlsRef.current.add(previewUrl);
+          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          previewUrl = URL.createObjectURL(
+            new Blob([binary], {
+              type: kind === "pdf" ? "application/pdf" : imageMimeType(path),
+            }),
+          );
         }
 
+        releaseDocumentResources(path);
+        if (previewUrl) previewUrlsRef.current.set(path, previewUrl);
         if (path.startsWith("browser://")) {
-          releaseBrowserDocument(path);
           browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });
         }
 
@@ -598,7 +589,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseBrowserDocument],
+    [releaseDocumentResources],
   );
 
   const openPath = useCallback(
@@ -617,7 +608,7 @@ export function App() {
 
         const kind = documentKindFromPath(path);
         if (kind === "docx" || kind === "pdf" || kind === "image") {
-          await openBinary(path, kind === "docx" ? await readBinaryFile(path) : undefined);
+          await openBinary(path, await readBinaryFile(path));
           return;
         }
 
@@ -1045,7 +1036,7 @@ export function App() {
         return;
 
       const nextTabs = openTabs.filter((tab) => tab.path !== path);
-      if (path.startsWith("browser://")) releaseBrowserDocument(path);
+      releaseDocumentResources(path);
       setOpenTabs(nextTabs);
       if (documentState?.path !== path) return;
 
@@ -1060,7 +1051,7 @@ export function App() {
         setError(null);
       }
     },
-    [documentState, openPath, openTabs, releaseBrowserDocument],
+    [documentState, openPath, openTabs, releaseDocumentResources],
   );
 
   const handleDrop = useCallback(
@@ -1229,6 +1220,7 @@ export function App() {
     if (!root || mode !== "rendered" || !currentPath || !isTauriRuntime()) return;
 
     let active = true;
+    const objectUrls = new Set<string>();
     void (async () => {
       const images = Array.from(root.querySelectorAll<HTMLImageElement>("img[src]"));
       for (const image of images) {
@@ -1236,12 +1228,28 @@ export function App() {
         const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
         if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue;
         const localPath = resolveRelativePath(currentPath, safeDecode(target));
-        if (active && localPath) image.src = convertFileSrc(localPath, "asset");
+        if (!localPath) continue;
+
+        try {
+          const bytes = await readBinaryFile(localPath);
+          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          const objectUrl = URL.createObjectURL(new Blob([binary], { type: imageMimeType(localPath) }));
+          if (!active) {
+            URL.revokeObjectURL(objectUrl);
+            continue;
+          }
+          objectUrls.add(objectUrl);
+          image.src = objectUrl;
+        } catch {
+          // Keep the original source when a relative attachment is unavailable or unauthorized.
+        }
       }
     })();
 
     return () => {
       active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
     };
   }, [documentState?.path, documentState?.rendered.html, mode]);
 

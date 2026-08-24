@@ -90,8 +90,8 @@ export async function readBinaryFile(path: string): Promise<Uint8Array> {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");
   }
 
-  const bytes = await invoke<number[]>("read_binary_file", { path });
-  return Uint8Array.from(bytes);
+  const bytes = await invoke<ArrayBuffer | number[]>("read_binary_file", { path });
+  return bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : Uint8Array.from(bytes);
 }
 
 export async function writeTextFile(path: string, contents: string): Promise<void> {
