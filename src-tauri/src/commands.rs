@@ -43,6 +43,7 @@ pub struct WorkspaceWatcher {
 #[derive(Default)]
 pub struct WorkspaceSearchCache {
     entries: Mutex<HashMap<String, CachedSearchText>>,
+    file_lists: Mutex<HashMap<String, Vec<WorkspaceFile>>>,
 }
 
 struct CachedSearchText {
@@ -52,6 +53,21 @@ struct CachedSearchText {
 }
 
 impl WorkspaceSearchCache {
+    fn list_files(&self, root: &Path) -> Result<Vec<WorkspaceFile>, String> {
+        let key = access_path_key(root);
+        if let Ok(file_lists) = self.file_lists.lock() {
+            if let Some(files) = file_lists.get(&key) {
+                return Ok(files.clone());
+            }
+        }
+
+        let files = sorted_workspace_files(root)?;
+        if let Ok(mut file_lists) = self.file_lists.lock() {
+            file_lists.insert(key, files.clone());
+        }
+        Ok(files)
+    }
+
     fn read_text(&self, file: &WorkspaceFile) -> Option<String> {
         let path = PathBuf::from(&file.path);
         let metadata = fs::metadata(&path).ok()?;
@@ -93,6 +109,23 @@ impl WorkspaceSearchCache {
                     )
             })
         });
+
+        if let Ok(mut file_lists) = self.file_lists.lock() {
+            file_lists.retain(|root, _| {
+                !scopes.iter().any(|scope| {
+                    access_path_contains(Path::new(scope), Path::new(root))
+                        || access_path_contains(Path::new(root), Path::new(scope))
+                        || access_path_contains(
+                            Path::new(&display_path(Path::new(scope))),
+                            Path::new(&display_path(Path::new(root))),
+                        )
+                        || access_path_contains(
+                            Path::new(&display_path(Path::new(root))),
+                            Path::new(&display_path(Path::new(scope))),
+                        )
+                })
+            });
+        }
     }
 }
 
@@ -830,7 +863,7 @@ fn search_workspace_inner_with_cache(
         return Ok(Vec::new());
     }
 
-    let files = sorted_workspace_files(&root)?;
+    let files = cache.list_files(&root)?;
     let mut results = Vec::new();
 
     for file in files {
@@ -1888,23 +1921,44 @@ mod tests {
                 .map(|entry| entry.source.as_str()),
             Some("first needle")
         );
+        let root_key = access_path_key(&root);
+        assert_eq!(
+            cache
+                .file_lists
+                .lock()
+                .expect("lock workspace file cache")
+                .get(&root_key)
+                .map(Vec::len),
+            Some(1)
+        );
 
         let cached_query =
             search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
                 .expect("search cached query");
         assert_eq!(cached_query.len(), 1);
 
+        let added = root.join("added.md");
+        fs::write(&added, "added needle").expect("add search cache note");
         cache.invalidate_scopes(&[root.to_string_lossy().into_owned()]);
         assert!(cache
             .entries
             .lock()
             .expect("lock invalidated search cache")
             .is_empty());
+        assert!(cache
+            .file_lists
+            .lock()
+            .expect("lock invalidated workspace file cache")
+            .is_empty());
 
         fs::write(&note, "second needle").expect("update search cache note");
         let updated = search_workspace_inner_with_cache(root.clone(), "second".to_string(), &cache)
             .expect("search updated query");
         assert_eq!(updated.len(), 1);
+        let added_result =
+            search_workspace_inner_with_cache(root.clone(), "added".to_string(), &cache)
+                .expect("search newly added note");
+        assert_eq!(added_result.len(), 1);
 
         fs::remove_dir_all(root).expect("remove search cache workspace");
     }
