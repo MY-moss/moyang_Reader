@@ -25,6 +25,26 @@ function entryKeys(entry: WorkspaceIndexEntry): string[] {
   return [entry.file.relativePath, entry.file.name].map(withoutMarkdownExtension);
 }
 
+export type WorkspaceBacklinkIndex = ReadonlyMap<string, ReadonlySet<string>>;
+
+/** Build a reusable link-target index for the current workspace snapshot. */
+export function createBacklinkIndex(entries: WorkspaceIndexEntry[]): WorkspaceBacklinkIndex {
+  const index = new Map<string, Set<string>>();
+
+  for (const entry of entries) {
+    for (const link of entry.links) {
+      const target = withoutMarkdownExtension(link);
+      if (!target) continue;
+
+      const sources = index.get(target) ?? new Set<string>();
+      sources.add(entry.file.path);
+      index.set(target, sources);
+    }
+  }
+
+  return index;
+}
+
 export function linkMatchesEntry(link: string, entry: WorkspaceIndexEntry): boolean {
   const target = withoutMarkdownExtension(link);
   if (!target) return false;
@@ -67,8 +87,20 @@ export function findIndexEntry(entries: WorkspaceIndexEntry[], path: string): Wo
   return entries.find((entry) => entry.file.path === path);
 }
 
-export function findBacklinks(entries: WorkspaceIndexEntry[], current: WorkspaceIndexEntry): WorkspaceIndexEntry[] {
-  return entries.filter(
-    (entry) => entry.file.path !== current.file.path && entry.links.some((link) => linkMatchesEntry(link, current)),
-  );
+export function findBacklinks(
+  entries: WorkspaceIndexEntry[],
+  current: WorkspaceIndexEntry,
+  index: WorkspaceBacklinkIndex = createBacklinkIndex(entries),
+): WorkspaceIndexEntry[] {
+  const sourcePaths = new Set<string>();
+
+  for (const key of entryKeys(current)) {
+    const parts = key.split("/");
+    for (let start = 0; start < parts.length; start += 1) {
+      const sources = index.get(parts.slice(start).join("/"));
+      sources?.forEach((path) => sourcePaths.add(path));
+    }
+  }
+
+  return entries.filter((entry) => entry.file.path !== current.file.path && sourcePaths.has(entry.file.path));
 }
