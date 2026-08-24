@@ -1343,6 +1343,20 @@ mod tests {
     }
 
     #[test]
+    fn rejects_binary_bytes_from_a_markdown_named_file() {
+        let path = std::env::temp_dir().join(format!(
+            "moyang-reader-binary-md-{}-{}.md",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::write(&path, [0_u8, 1, 2, 3]).expect("write binary markdown fixture");
+
+        let error = read_text_file_inner(path.clone()).expect_err("reject binary markdown fixture");
+        assert!(error.contains("疑似二进制"));
+        fs::remove_file(path).expect("remove binary markdown fixture");
+    }
+
+    #[test]
     fn extracts_titles_from_frontmatter_atx_and_setext_headings() {
         let file = WorkspaceFile {
             path: "C:/Notes/fallback.md".to_string(),
