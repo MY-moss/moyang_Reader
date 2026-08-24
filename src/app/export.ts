@@ -168,6 +168,67 @@ export function buildBatchHtmlExport(title: string, documents: HtmlExportDocumen
   return buildHtmlExport(title, content);
 }
 
+export function printHtmlDocument(html: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.title = "Moyang Reader 打印预览";
+    Object.assign(frame.style, {
+      position: "fixed",
+      right: "0",
+      bottom: "0",
+      width: "1px",
+      height: "1px",
+      border: "0",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    document.body.appendChild(frame);
+
+    let triggered = false;
+    let cleanupTimer: number | null = null;
+    const cleanup = () => {
+      if (cleanupTimer !== null) window.clearTimeout(cleanupTimer);
+      frame.remove();
+    };
+    const fail = (cause: unknown) => {
+      cleanup();
+      reject(cause instanceof Error ? cause : new Error("无法打开打印预览。"));
+    };
+    const triggerPrint = () => {
+      if (triggered) return;
+      triggered = true;
+
+      const printWindow = frame.contentWindow;
+      if (!printWindow) {
+        fail(new Error("无法创建打印预览窗口。"));
+        return;
+      }
+
+      printWindow.addEventListener("afterprint", cleanup, { once: true });
+      try {
+        printWindow.focus();
+        printWindow.print();
+        cleanupTimer = window.setTimeout(cleanup, 60_000);
+        resolve();
+      } catch (cause) {
+        fail(cause);
+      }
+    };
+
+    frame.onload = () => window.setTimeout(triggerPrint, 0);
+    const frameDocument = frame.contentDocument;
+    if (!frameDocument) {
+      fail(new Error("无法创建打印预览文档。"));
+      return;
+    }
+    frameDocument.open();
+    frameDocument.write(html);
+    frameDocument.close();
+    window.setTimeout(triggerPrint, 120);
+  });
+}
+
 type DocxImage = {
   bytes: Uint8Array;
   contentType: string;

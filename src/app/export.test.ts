@@ -11,6 +11,7 @@ import {
   inlineLocalImages,
   pathWithExtension,
   pathWithNameSuffix,
+  printHtmlDocument,
 } from "./export";
 
 describe("document export helpers", () => {
@@ -104,6 +105,50 @@ describe("document export helpers", () => {
     expect(html).toContain('href="#moyang-document-0"');
     expect(html).toContain('id="moyang-document-1"');
     expect(html).toContain("第二篇");
+  });
+
+  it("opens a generated HTML document in a temporary print frame", async () => {
+    vi.useFakeTimers();
+    const print = vi.fn();
+    const focus = vi.fn();
+    let afterPrint: (() => void) | undefined;
+    const printWindow = {
+      addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "afterprint") {
+          afterPrint = () => {
+            if (typeof listener === "function") listener(new Event("afterprint"));
+          };
+        }
+      }),
+      focus,
+      print,
+    } as unknown as Window;
+    const previousContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, "contentWindow");
+    Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", {
+      configurable: true,
+      get: () => printWindow,
+    });
+
+    try {
+      const pending = printHtmlDocument("<!doctype html><p>批量内容</p>");
+      await vi.advanceTimersByTimeAsync(120);
+      await pending;
+
+      const frame = document.querySelector<HTMLIFrameElement>('iframe[title="Moyang Reader 打印预览"]');
+      expect(frame).not.toBeNull();
+      expect(printWindow.addEventListener).toHaveBeenCalledOnce();
+      expect(print).toHaveBeenCalledOnce();
+      expect(focus).toHaveBeenCalledOnce();
+
+      afterPrint?.();
+      expect(document.querySelector('iframe[title="Moyang Reader 打印预览"]')).toBeNull();
+    } finally {
+      if (previousContentWindow)
+        Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", previousContentWindow);
+      else Reflect.deleteProperty(HTMLIFrameElement.prototype, "contentWindow");
+      vi.useRealTimers();
+      document.querySelector('iframe[title="Moyang Reader 打印预览"]')?.remove();
+    }
   });
 
   it("builds a DOCX package with core blocks and embedded images", async () => {

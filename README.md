@@ -39,7 +39,7 @@ v0.5.3 本地候选版（文件夹入口增强），继续基于轻量本地阅�
 - 打印样式会为无标题文档补充文档名，并优化分页、代码块和表格；可通过系统打印对话框保存为 PDF
 - Windows 文档文件关联配置和应用图标
 - Markdown、纯文本和 DOCX 内容可另存为 HTML（桌面版会尝试内嵌本地图片）；也可按需导出真正的 DOCX Word 文档；Markdown/纯文本还能另存为源文件
-- 工作区可按当前筛选批量导出为带目录的单文件 HTML 或 Word（DOCX），支持 Markdown、纯文本和 DOCX
+- 工作区可按当前筛选批量导出为带目录的单文件 HTML、Word（DOCX），或打开批量打印 / PDF 预览，支持 Markdown、纯文本和 DOCX
 - 更新检查和远程图片访问均可在顶部“设置”中控制，默认只进行本地阅读；顶部按钮始终可以手动检查 GitHub Release，签名更新包安装后自动重启
 
 生产构建会把 Markdown、DOCX 适配器拆成按需加载的 chunk：空白启动页不需要加载完整文档解析器，打开对应类型时才加载。
@@ -65,7 +65,7 @@ npm run tauri dev
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
 
-更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。当前版本的 PDF 交付方式是系统打印对话框中的“保存为 PDF”；真正的 PDF 模板和批量 PDF 导出列入后续版本。
+更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”，后续再增加更完整的 PDF 模板和分页预览。
 
 顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
 

@@ -67,6 +67,7 @@ import {
   inlineLocalImages,
   pathWithExtension,
   pathWithNameSuffix,
+  printHtmlDocument,
 } from "./export";
 import {
   loadRecentFiles,
@@ -1504,12 +1505,15 @@ export function App() {
   }, [openTabs, recentFiles, workspaceFiles]);
 
   const handleExportWorkspace = useCallback(
-    async (format: "html" | "docx") => {
+    async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
 
       const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
-      const savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
-      if (!savePath) return;
+      const savePath =
+        format === "pdf"
+          ? null
+          : await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+      if (format !== "pdf" && !savePath) return;
 
       setWorkspaceExporting(true);
       setWorkspaceExportNotice(null);
@@ -1556,14 +1560,19 @@ export function App() {
         if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
         const exportTitle = `${workspaceName} 阅读库`;
         if (format === "html") {
+          if (!savePath) throw new Error("没有选择 HTML 保存位置。");
           await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents));
-        } else {
+        } else if (format === "docx") {
+          if (!savePath) throw new Error("没有选择 Word 保存位置。");
           await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents));
+        } else {
+          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents));
         }
+        const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
         setWorkspaceExportNotice(
-          `已导出 ${exported} 篇文档为 ${format === "html" ? "HTML" : "Word"}${
-            skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""
-          }。`,
+          `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
+            format === "pdf" ? `${exported} 篇文档` : ""
+          }${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
         );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "批量导出失败。");

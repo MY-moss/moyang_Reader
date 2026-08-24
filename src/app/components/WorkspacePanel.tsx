@@ -15,7 +15,7 @@ type WorkspacePanelProps = {
   selectedTag: string | null;
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
-  onExportWorkspace: (format: "html" | "docx") => void;
+  onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   workspaceExporting: boolean;
   workspaceExportNotice: string | null;
   workspaceIndexLoading: boolean;
@@ -82,6 +82,17 @@ export function WorkspacePanel({
                 onClick={() => onExportWorkspace("docx")}
               >
                 单文件 Word
+              </button>
+              <button
+                type="button"
+                disabled={
+                  !workspacePath ||
+                  workspaceExporting ||
+                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                }
+                onClick={() => onExportWorkspace("pdf")}
+              >
+                批量打印 / PDF
               </button>
             </div>
           </details>
