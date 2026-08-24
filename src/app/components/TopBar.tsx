@@ -16,6 +16,9 @@ type TopBarProps = {
   onQuickOpen: () => void;
   onToggleMode: () => void;
   onSave: () => void;
+  onCopy: () => void;
+  copyFeedback: boolean;
+  canCopy: boolean;
   onExport: () => void;
   exportLabel?: string;
   canExportMarkdown: boolean;
@@ -54,6 +57,9 @@ export function TopBar({
   onQuickOpen,
   onToggleMode,
   onSave,
+  onCopy,
+  copyFeedback,
+  canCopy,
   onExport,
   exportLabel = "打印 / PDF",
   canExportMarkdown,
@@ -131,6 +137,9 @@ export function TopBar({
         </button>
         <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
           保存
+        </button>
+        <button type="button" className="toolbar-button" onClick={onCopy} disabled={!canCopy} title="复制当前文档内容">
+          {copyFeedback ? "已复制" : "复制"}
         </button>
         <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
           {themeLabel}

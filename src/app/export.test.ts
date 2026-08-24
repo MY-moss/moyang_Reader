@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import {
   buildBatchHtmlExport,
   buildBatchDocxExport,
   buildDocxExport,
   buildHtmlExport,
+  copyRichText,
+  htmlToPlainText,
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
@@ -28,6 +30,29 @@ describe("document export helpers", () => {
     expect(html).toContain('src="cover.png"');
     expect(html).toContain('href="下一篇.md"');
     expect(html).toContain("<!doctype html>");
+  });
+
+  it("converts rendered HTML into a compact plain-text fallback", () => {
+    expect(htmlToPlainText("<h1>标题</h1><p>第一段</p><p>第二段&nbsp;内容</p>")).toBe("标题第一段第二段 内容");
+  });
+
+  it("falls back to plain text when rich clipboard writing is unavailable", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const previousClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await copyRichText("<h1>标题</h1><p>正文</p>");
+      expect(writeText).toHaveBeenCalledWith("标题正文");
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: previousClipboard,
+      });
+    }
   });
 
   it("embeds readable local images while preserving external images", async () => {

@@ -30,6 +30,38 @@ function normalizeExportLinks(html: string): string {
     });
 }
 
+export function htmlToPlainText(html: string): string {
+  const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  return (parsed.body.textContent ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export async function copyRichText(html: string): Promise<void> {
+  const normalizedHtml = normalizeExportLinks(html);
+  const plainText = htmlToPlainText(normalizedHtml);
+
+  if (!navigator.clipboard) throw new Error("当前环境不支持复制到剪贴板。");
+
+  if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function") {
+    const clipboardItem = new ClipboardItem({
+      "text/html": new Blob([normalizedHtml], { type: "text/html" }),
+      "text/plain": new Blob([plainText], { type: "text/plain" }),
+    });
+    await navigator.clipboard.write([clipboardItem]);
+    return;
+  }
+
+  if (typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(plainText);
+    return;
+  }
+
+  throw new Error("当前环境不支持复制到剪贴板。");
+}
+
 const MAX_INLINE_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function bytesToBase64(bytes: Uint8Array): string {

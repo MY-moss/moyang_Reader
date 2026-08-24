@@ -62,6 +62,7 @@ import {
   buildBatchHtmlExport,
   buildDocxExport,
   buildHtmlExport,
+  copyRichText,
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
@@ -217,6 +218,7 @@ export function App() {
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
@@ -1079,6 +1081,19 @@ export function App() {
     window.print();
   }, [documentState?.kind, documentState?.previewUrl]);
 
+  const handleCopy = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    try {
+      await copyRichText(documentState.rendered.html);
+      setCopyFeedback(true);
+      window.setTimeout(() => setCopyFeedback(false), 1_600);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制文档失败。");
+    }
+  }, [documentState]);
+
   const handleExportMarkdown = useCallback(async () => {
     if (!documentState || !isEditableDocument(documentState.kind)) return;
 
@@ -1568,6 +1583,8 @@ export function App() {
         onQuickOpen={() => setQuickOpen(true)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
+        onCopy={() => void handleCopy()}
+        copyFeedback={copyFeedback}
         onExport={handleExport}
         exportLabel={
           documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
@@ -1575,6 +1592,7 @@ export function App() {
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        canCopy={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         onExportMarkdown={() => void handleExportMarkdown()}
         onExportHtml={() => void handleExportHtml()}
         onExportDocx={() => void handleExportDocx()}
