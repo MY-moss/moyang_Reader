@@ -267,6 +267,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
@@ -319,6 +320,7 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
@@ -369,6 +371,10 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
 
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
@@ -772,7 +778,7 @@ export function App() {
           throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
         }
         const rendered = await renderSource(path, source, {
-          allowRemoteResources: preferences.allowRemoteResources,
+          allowRemoteResources: preferencesRef.current.allowRemoteResources,
         });
         releaseDocumentResources(path);
         if (path.startsWith("browser://")) {
@@ -804,7 +810,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [preferences.allowRemoteResources, releaseDocumentResources],
+    [releaseDocumentResources],
   );
 
   const openBinary = useCallback(
@@ -820,7 +826,7 @@ export function App() {
       try {
         const rendered =
           kind === "docx"
-            ? await renderDocx(bytes, { allowRemoteResources: preferences.allowRemoteResources })
+            ? await renderDocx(bytes, { allowRemoteResources: preferencesRef.current.allowRemoteResources })
             : emptyRenderedDocument();
         let previewUrl: string | undefined;
         if (kind === "pdf" || kind === "image") {
@@ -865,7 +871,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [preferences.allowRemoteResources, releaseDocumentResources],
+    [releaseDocumentResources],
   );
 
   const openPath = useCallback(
@@ -1668,6 +1674,11 @@ export function App() {
   }, [selectedTag, workspaceIndex, workspacePath]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 160);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const root = articleRef.current;
     if (!root || mode !== "rendered") {
       setSearchResultCount(0);
@@ -1683,7 +1694,7 @@ export function App() {
       parent.normalize();
     });
 
-    const query = searchQuery.trim().toLocaleLowerCase();
+    const query = debouncedSearchQuery.trim().toLocaleLowerCase();
     if (!query) {
       setSearchResultCount(0);
       setSearchResultIndex(0);
@@ -1723,12 +1734,19 @@ export function App() {
     }
 
     const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
-    const nextIndex = hits.length ? Math.min(searchResultIndex, hits.length - 1) : 0;
     setSearchResultCount(hits.length);
-    setSearchResultIndex(nextIndex);
+    setSearchResultIndex((current) => (hits.length ? Math.min(current, hits.length - 1) : 0));
+  }, [debouncedSearchQuery, documentState?.rendered.html, mode]);
+
+  useEffect(() => {
+    const root = articleRef.current;
+    if (!root || mode !== "rendered") return;
+
+    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
+    const nextIndex = hits.length ? Math.min(searchResultIndex, hits.length - 1) : 0;
     hits.forEach((hit, index) => hit.classList.toggle("active", index === nextIndex));
     hits[nextIndex]?.scrollIntoView({ block: "center" });
-  }, [documentState?.rendered.html, mode, searchQuery, searchResultIndex]);
+  }, [debouncedSearchQuery, documentState?.rendered.html, mode, searchResultIndex]);
 
   useEffect(() => {
     const root = articleRef.current;
