@@ -335,6 +335,23 @@ describe("document export helpers", () => {
     expect(textRuns).toContain("2. 第二项");
   });
 
+  it("indents nested lists and preserves deep heading styles in DOCX exports", async () => {
+    const bytes = await buildDocxExport(
+      "层级结构",
+      "<h5>第五级标题</h5><h6>第六级标题</h6><ul><li>一级<ul><li>二级<ol><li>三级</li></ol></li></ul></li></ul>",
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const stylesXml = await zip.file("word/styles.xml")?.async("string");
+
+    expect(documentXml).toContain('w:pStyle w:val="Heading5"');
+    expect(documentXml).toContain('w:pStyle w:val="Heading6"');
+    expect(documentXml).toContain('<w:ind w:left="720" w:hanging="360"/>');
+    expect(documentXml).toContain('<w:ind w:left="1440" w:hanging="360"/>');
+    expect(stylesXml).toContain('w:style w:type="paragraph" w:styleId="Heading5"');
+    expect(stylesXml).toContain('w:style w:type="paragraph" w:styleId="Heading6"');
+  });
+
   it("preserves safe external hyperlinks in DOCX exports", async () => {
     const bytes = await buildDocxExport(
       "链接",
