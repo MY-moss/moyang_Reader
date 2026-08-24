@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { shouldConfirmDocumentReplacement, shouldConfirmWorkspaceSwitch } from "./document-transition";
+import {
+  isSameDocumentPath,
+  shouldConfirmDocumentReplacement,
+  shouldConfirmWorkspaceSwitch,
+} from "./document-transition";
 
 describe("document transition guards", () => {
   const modifiedDocument = { path: "C:\\Notes\\draft.md", modified: true };
@@ -13,6 +17,11 @@ describe("document transition guards", () => {
 
   it("does not confirm when the next path is the active document", () => {
     expect(shouldConfirmDocumentReplacement(modifiedDocument, ["c:/notes/draft.md/"])).toBe(false);
+  });
+
+  it("compares document paths without depending on separator or case", () => {
+    expect(isSameDocumentPath("C:\\Notes\\draft.md", "c:/notes/draft.md/")).toBe(true);
+    expect(isSameDocumentPath("C:\\Notes\\draft.md", "C:/Notes/other.md")).toBe(false);
   });
 
   it("confirms when any next document would replace the active document", () => {
