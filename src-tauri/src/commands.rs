@@ -170,6 +170,14 @@ pub struct WorkspaceIndexEntry {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkspaceRefreshResult {
+    pub scope_paths: Vec<String>,
+    pub files: Vec<WorkspaceFile>,
+    pub index: Vec<WorkspaceIndexEntry>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceChangeEvent {
     pub root: String,
     pub paths: Vec<String>,
@@ -1091,32 +1099,99 @@ pub fn index_workspace(
     index_workspace_inner(PathBuf::from(root))
 }
 
+#[tauri::command]
+pub fn refresh_workspace(
+    root: String,
+    paths: Vec<String>,
+    access: State<'_, AccessRegistry>,
+) -> Result<WorkspaceRefreshResult, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加工作区。".to_string());
+    }
+    refresh_workspace_inner(PathBuf::from(root), paths)
+}
+
+fn index_entry_for_file(file: WorkspaceFile) -> Option<WorkspaceIndexEntry> {
+    if file.kind != "markdown" || file.size > MAX_INDEX_FILE_BYTES {
+        return None;
+    }
+
+    let source = read_text_file_inner(PathBuf::from(file.path.clone())).ok()?;
+    let mut links = extract_wiki_links(&source);
+    for link in extract_markdown_links(&source) {
+        push_unique(&mut links, link);
+    }
+    Some(WorkspaceIndexEntry {
+        title: extract_title(&source, &file),
+        links,
+        tags: extract_tags(&source),
+        file,
+    })
+}
+
 fn index_workspace_inner(root: PathBuf) -> Result<Vec<WorkspaceIndexEntry>, String> {
     let files = sorted_workspace_files(&root)?;
     let mut entries = Vec::new();
 
     for file in files {
-        if file.kind != "markdown" || file.size > MAX_INDEX_FILE_BYTES {
-            continue;
+        if let Some(entry) = index_entry_for_file(file) {
+            entries.push(entry);
         }
-
-        let source = match read_text_file_inner(PathBuf::from(file.path.clone())) {
-            Ok(source) => source,
-            Err(_) => continue,
-        };
-        let mut links = extract_wiki_links(&source);
-        for link in extract_markdown_links(&source) {
-            push_unique(&mut links, link);
-        }
-        entries.push(WorkspaceIndexEntry {
-            title: extract_title(&source, &file),
-            links,
-            tags: extract_tags(&source),
-            file,
-        });
     }
 
     Ok(entries)
+}
+
+fn refresh_workspace_inner(
+    root: PathBuf,
+    paths: Vec<String>,
+) -> Result<WorkspaceRefreshResult, String> {
+    let root = fs::canonicalize(&root).map_err(|error| format!("无法确认工作区路径：{error}"))?;
+    if !root.is_dir() {
+        return Err("工作区路径不是文件夹。".to_string());
+    }
+
+    let mut scope_paths = Vec::new();
+    let mut files = Vec::new();
+    for raw_path in paths {
+        let requested = PathBuf::from(raw_path);
+        let Ok(scope) = normalize_access_path(&requested) else {
+            continue;
+        };
+        if !access_path_contains(&root, &scope) {
+            continue;
+        }
+
+        let display = display_path(&scope);
+        if !scope_paths
+            .iter()
+            .any(|existing| access_path_key(Path::new(existing)) == access_path_key(&scope))
+        {
+            scope_paths.push(display);
+        }
+
+        if scope.is_dir() {
+            collect_workspace_files(&root, &scope, &mut files)?;
+        } else if scope.is_file() && is_supported_document_path(&scope) {
+            files.push(workspace_file(&root, &scope)?);
+        }
+    }
+
+    files.sort_by_key(|file| file.relative_path.to_ascii_lowercase());
+    files.dedup_by(|left, right| {
+        access_path_key(Path::new(&left.path)) == access_path_key(Path::new(&right.path))
+    });
+
+    let index = files
+        .iter()
+        .filter_map(|file| index_entry_for_file(file.clone()))
+        .collect();
+
+    Ok(WorkspaceRefreshResult {
+        scope_paths,
+        files,
+        index,
+    })
 }
 
 #[tauri::command]
@@ -1237,8 +1312,9 @@ mod tests {
         clean_tag, create_markdown_file_inner, decode_text, extract_markdown_links, extract_tags,
         extract_title, extract_wiki_links, index_workspace_inner, is_supported_document_path,
         is_supported_text_path, list_workspace_files_inner, path_exists_inner,
-        read_text_file_inner, search_workspace_inner, should_skip_directory, write_text_file_inner,
-        AccessRegistry, WorkspaceFile, MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
+        read_text_file_inner, refresh_workspace_inner, search_workspace_inner,
+        should_skip_directory, write_text_file_inner, AccessRegistry, WorkspaceFile,
+        MAX_READ_FILE_BYTES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1525,5 +1601,44 @@ mod tests {
         assert!(results.iter().any(|result| result.file.name == "plain.txt"));
 
         fs::remove_dir_all(root).expect("remove test workspace");
+    }
+
+    #[test]
+    fn refreshes_only_changed_workspace_scopes_and_removes_deleted_files() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-refresh-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let notes = root.join("notes");
+        fs::create_dir_all(&notes).expect("create notes directory");
+        fs::write(root.join("README.md"), "unchanged").expect("write unchanged document");
+        let changed = notes.join("Changed.md");
+        fs::write(&changed, "# Before").expect("write changed document");
+
+        let delta =
+            refresh_workspace_inner(root.clone(), vec![notes.to_string_lossy().into_owned()])
+                .expect("refresh changed directory");
+        assert_eq!(delta.files.len(), 1);
+        assert_eq!(delta.index.len(), 1);
+        assert_eq!(delta.index[0].title, "Before");
+        assert!(!delta.files.iter().any(|file| file.name == "README.md"));
+
+        fs::write(&changed, "# After\n\n#topic").expect("update changed document");
+        let updated =
+            refresh_workspace_inner(root.clone(), vec![changed.to_string_lossy().into_owned()])
+                .expect("refresh changed file");
+        assert_eq!(updated.index[0].title, "After");
+        assert_eq!(updated.index[0].tags, vec!["topic"]);
+
+        fs::remove_file(&changed).expect("remove changed document");
+        let removed =
+            refresh_workspace_inner(root.clone(), vec![changed.to_string_lossy().into_owned()])
+                .expect("refresh deleted file");
+        assert_eq!(removed.scope_paths.len(), 1);
+        assert!(removed.files.is_empty());
+        assert!(removed.index.is_empty());
+
+        fs::remove_dir_all(root).expect("remove refresh workspace");
     }
 }
