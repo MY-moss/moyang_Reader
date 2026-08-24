@@ -362,7 +362,7 @@ fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
 pub fn read_binary_file(
     path: String,
     access: State<'_, AccessRegistry>,
-) -> Result<Vec<u8>, String> {
+) -> Result<tauri::ipc::Response, String> {
     let path = PathBuf::from(path);
     if !access.is_read_allowed(&path) {
         return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
@@ -371,7 +371,9 @@ pub fn read_binary_file(
     if metadata.len() > MAX_READ_FILE_BYTES {
         return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
     }
-    fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))
+    fs::read(&path)
+        .map(tauri::ipc::Response::new)
+        .map_err(|error| format!("无法读取文件：{error}"))
 }
 
 #[tauri::command]
