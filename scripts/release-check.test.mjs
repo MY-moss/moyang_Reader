@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   isSemver,
@@ -10,6 +11,7 @@ import {
   validateExpectedVersion,
   validateManifest,
   validatePublicDocumentation,
+  validateReleaseWorkflow,
 } from "./release-check.mjs";
 
 test("normalizes release versions and accepts semver", () => {
@@ -119,4 +121,9 @@ test("rejects private local paths and empty signing passwords in public docs", (
     true,
   );
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("guards release and mirror workflows against stale or incomplete publishing", () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  assert.deepEqual(validateReleaseWorkflow(root), []);
 });

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { EmptyState } from "./components/EmptyState";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
+import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
 import { PrintPreview } from "./components/PrintPreview";
+import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
@@ -50,6 +52,12 @@ import {
   relaunchApp,
   type UpdateStatus,
 } from "./updater";
+import {
+  clearUpdateRecovery,
+  formatUpdateRecoveryNotice,
+  loadUpdateRecovery,
+  saveUpdateRecovery,
+} from "./update-recovery";
 import type {
   DocumentKind,
   ExportMargin,
@@ -74,6 +82,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportFailureReport,
   formatExportCancellationNotice,
   fileNameWithExtension,
   inlineLocalImages,
@@ -101,10 +110,13 @@ import {
   saveSidebarCollapsed,
   saveMountedWorkspaces,
   saveWorkspaceSession,
+  saveWorkspaceSessions,
   forgetWorkspaceSession,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
+import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
+import { loadLocale, saveLocale, type Locale } from "./i18n";
 import {
   documentKindFromPath,
   emptyRenderedDocument,
@@ -137,7 +149,14 @@ import {
   insertTextAtSelection,
   MAX_CLIPBOARD_IMAGE_BYTES,
 } from "./clipboard-image";
-import { clearDraftSnapshot, findDraftSnapshot, saveDraftSnapshot, type DraftSnapshot } from "./draft-recovery";
+import {
+  clearAllDraftSnapshots,
+  clearDraftSnapshot,
+  findDraftSnapshot,
+  loadDraftSnapshots,
+  saveDraftSnapshot,
+  type DraftSnapshot,
+} from "./draft-recovery";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -356,6 +375,7 @@ export function App() {
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
+  const [locale, setLocale] = useState<Locale>(loadLocale);
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
@@ -374,6 +394,7 @@ export function App() {
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [workspaceOpening, setWorkspaceOpening] = useState(false);
   const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -391,6 +412,8 @@ export function App() {
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
+  const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
+  const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
@@ -460,6 +483,66 @@ export function App() {
     });
   }, []);
 
+  const exportPortableSettings = useCallback(async () => {
+    try {
+      const serialized = serializePortableSettings(
+        createPortableSettingsBundle({
+          preferences,
+          locale,
+          theme,
+          workspacePath,
+          lastDocumentPath: loadLastDocumentPath(),
+          mountedWorkspaces,
+          workspaceSessions: loadWorkspaceSessions(),
+          openTabs,
+        }),
+      );
+      if (isTauriRuntime()) {
+        const targetPath = await chooseSavePath("Moyang Reader - settings.json", "json");
+        if (!targetPath) return;
+        await writeTextFile(targetPath, serialized);
+        setSettingsNotice(`设置备份已保存：${fileNameFromPath(targetPath)}`);
+      } else {
+        downloadText("Moyang Reader - settings.json", serialized, "application/json");
+        setSettingsNotice("设置备份已下载，不包含文档正文或私钥。");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "设置备份导出失败。");
+    }
+  }, [locale, mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
+
+  const importPortableSettings = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      void file
+        .text()
+        .then((serialized) => {
+          const bundle = parsePortableSettings(serialized);
+          saveReaderPreferences(bundle.preferences);
+          saveWorkspaceSessions([...bundle.workspaceSessions]);
+          saveOpenTabs([...bundle.openTabs]);
+          saveMountedWorkspaces([...bundle.mountedWorkspaces]);
+          saveWorkspacePath(bundle.workspacePath);
+          saveLastDocumentPath(bundle.lastDocumentPath);
+          setPreferences(bundle.preferences);
+          setLocale(bundle.locale);
+          saveLocale(bundle.locale);
+          setTheme(bundle.theme);
+          setMountedWorkspaces([...bundle.mountedWorkspaces]);
+          setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
+        })
+        .catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : "设置备份导入失败。");
+        });
+    };
+    input.click();
+  }, []);
+
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
@@ -471,6 +554,12 @@ export function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    if (!settingsNotice) return;
+    const timer = window.setTimeout(() => setSettingsNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [settingsNotice]);
 
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
@@ -752,10 +841,18 @@ export function App() {
       }
     } catch (cause) {
       setUpdateStatus("error");
-      setUpdateError(describeUpdateError(cause));
+      const reason = describeUpdateError(cause);
+      const recovery = {
+        attemptedVersion: pending.version,
+        currentVersion,
+        failedAt: Date.now(),
+        reason,
+      };
+      saveUpdateRecovery(recovery);
+      setUpdateError(reason);
       setUpdateNoticeVisible(true);
     }
-  }, []);
+  }, [currentVersion]);
 
   const relaunchUpdatedApp = useCallback(async () => {
     try {
@@ -787,7 +884,17 @@ export function App() {
     let active = true;
     void getCurrentAppVersion()
       .then((version) => {
-        if (active && version) setCurrentVersion(version);
+        if (!active || !version) return;
+        setCurrentVersion(version);
+        const recovery = loadUpdateRecovery();
+        if (!recovery) return;
+        if (recovery.attemptedVersion.replace(/^v/i, "") === version.replace(/^v/i, "")) {
+          clearUpdateRecovery();
+          return;
+        }
+        setUpdateStatus("error");
+        setUpdateError(formatUpdateRecoveryNotice(recovery));
+        setUpdateNoticeVisible(true);
       })
       .catch(() => undefined);
 
@@ -1081,6 +1188,7 @@ export function App() {
         setSourceDraft(source);
         sourceDraftRef.current = source;
         setDraftRecovery(findDraftSnapshot(path, source));
+        setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -1144,6 +1252,7 @@ export function App() {
         setSourceDraft("");
         sourceDraftRef.current = "";
         setDraftRecovery(null);
+        setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -1325,6 +1434,7 @@ export function App() {
         current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
       );
       clearDraftSnapshot(documentState.path);
+      setDraftSnapshots(loadDraftSnapshots());
       setDraftRecovery(null);
       selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
@@ -1682,6 +1792,7 @@ export function App() {
         savedAt: Date.now(),
       });
       if (!stored) setError("草稿自动保存失败，仍保留在当前窗口中。");
+      else setDraftSnapshots(loadDraftSnapshots());
     }, 1_500);
     return () => window.clearTimeout(timer);
   }, [
@@ -1703,7 +1814,45 @@ export function App() {
   const discardDraft = useCallback(() => {
     if (draftRecovery) clearDraftSnapshot(draftRecovery.path);
     setDraftRecovery(null);
+    setDraftSnapshots(loadDraftSnapshots());
   }, [draftRecovery]);
+
+  const openDraftSnapshot = useCallback(
+    async (path: string) => {
+      try {
+        const authorizedPath = await authorizeStoredPath(path, false);
+        if (
+          !confirmDocumentReplacement(
+            [authorizedPath],
+            "当前文档有未保存修改，打开另一个草稿后将保留当前草稿。继续吗？",
+          )
+        ) {
+          return;
+        }
+        const opened = await openPath(authorizedPath);
+        if (opened) setDraftRecoveryOpen(false);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "草稿对应的文档无法打开，请确认文件仍然存在。");
+      }
+    },
+    [confirmDocumentReplacement, openPath],
+  );
+
+  const discardDraftByPath = useCallback(
+    (path: string) => {
+      clearDraftSnapshot(path);
+      setDraftSnapshots(loadDraftSnapshots());
+      if (isSameDocumentPath(draftRecovery?.path ?? "", path)) setDraftRecovery(null);
+    },
+    [draftRecovery?.path],
+  );
+
+  const clearAllDrafts = useCallback(() => {
+    if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
+    clearAllDraftSnapshots();
+    setDraftSnapshots([]);
+    setDraftRecovery(null);
+  }, [draftSnapshots.length]);
 
   const handleSourcePaste = useCallback(
     (context: SourceEditorPasteContext) => {
@@ -2261,6 +2410,11 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.lang = locale === "en-US" ? "en" : "zh-CN";
+    saveLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
     if (!selectedTag || !workspacePath || workspaceIndex.some((entry) => entry.tags.includes(selectedTag))) return;
     setSelectedTag(null);
   }, [selectedTag, workspaceIndex, workspacePath]);
@@ -2495,6 +2649,38 @@ export function App() {
     if (pdfBatchExportRef.current) finishPdfBatch(true);
   }, [finishPdfBatch]);
 
+  const copyWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持复制到剪贴板。");
+      await navigator.clipboard.writeText(formatExportFailureReport(workspaceExportFailures));
+      setWorkspaceExportNotice(`已复制 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制导出失败清单失败。");
+    }
+  }, [workspaceExportFailures]);
+
+  const saveWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    const report = formatExportFailureReport(workspaceExportFailures);
+    try {
+      if (isTauriRuntime()) {
+        const workspaceName = fileNameFromPath(workspacePath?.replace(/[\\/]+$/, "") ?? "") || "阅读库";
+        const defaultPath = pathWithExtension(`${workspacePath ?? ""}\\${workspaceName} - 导出失败清单.md`, "md");
+        const path = await chooseSavePath(defaultPath, "markdown");
+        if (!path) return;
+        await writeTextFile(path, report);
+      } else {
+        downloadText("moyang-reader-export-failures.md", report);
+      }
+      setWorkspaceExportNotice(`已保存 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "保存导出失败清单失败。");
+    }
+  }, [workspaceExportFailures, workspacePath]);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
@@ -2705,6 +2891,7 @@ export function App() {
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        locale={locale}
         readingScale={preferences.readingScale}
         readingWidth={preferences.readingWidth}
         exportPaper={preferences.exportPaper}
@@ -2719,9 +2906,13 @@ export function App() {
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
+        onExportSettings={() => void exportPortableSettings()}
+        onImportSettings={importPortableSettings}
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        draftCount={draftSnapshots.length}
+        onOpenRecovery={() => setDraftRecoveryOpen(true)}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
@@ -2758,8 +2949,14 @@ export function App() {
           setSearchQuery("");
         }}
         onCycleTheme={cycleTheme}
+        onLocaleChange={setLocale}
       />
       <div className="navigation-strip">
+        {settingsNotice && (
+          <div className="settings-notice" role="status">
+            {settingsNotice}
+          </div>
+        )}
         {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (
           <UpdateNotice
             status={updateStatus}
@@ -2788,6 +2985,8 @@ export function App() {
             workspaceExporting={workspaceExporting}
             workspaceExportProgress={workspaceExportProgress}
             workspaceExportFailures={workspaceExportFailures}
+            onCopyExportFailures={() => void copyWorkspaceExportFailures()}
+            onSaveExportFailures={() => void saveWorkspaceExportFailures()}
             workspaceExportNotice={workspaceExportNotice}
             workspaceOpening={workspaceOpening}
             workspaceOpenNotice={workspaceOpenNotice}
@@ -2924,7 +3123,7 @@ export function App() {
                       <div className="print-document-title">{documentState.name}</div>
                     </header>
                   )}
-                  <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+                  <ProgressiveReaderContent html={documentState.rendered.html} />
                 </article>
                 <ReadingRail
                   progress={readingProgress}
@@ -2998,6 +3197,15 @@ export function App() {
             setQuickOpen(false);
             void handleSelectTab(path);
           }}
+        />
+      )}
+      {draftRecoveryOpen && draftSnapshots.length > 0 && (
+        <DraftRecoveryCenter
+          snapshots={draftSnapshots}
+          onOpen={(path) => void openDraftSnapshot(path)}
+          onDiscard={discardDraftByPath}
+          onClearAll={clearAllDrafts}
+          onClose={() => setDraftRecoveryOpen(false)}
         />
       )}
     </div>

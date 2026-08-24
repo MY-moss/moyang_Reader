@@ -100,6 +100,14 @@ export function clearDraftSnapshot(path: string): void {
   }
 }
 
+export function clearAllDraftSnapshots(): void {
+  try {
+    localStorage.removeItem(draftStorageKey);
+  } catch {
+    // Draft cleanup is best-effort when local storage is unavailable.
+  }
+}
+
 export function formatDraftRecoveryTime(savedAt: number, now = Date.now()): string {
   const elapsedMinutes = Math.max(0, Math.floor((now - savedAt) / 60_000));
   if (elapsedMinutes < 1) return "刚刚";

@@ -1,5 +1,5 @@
 import { escapeHtml } from "../lib/text";
-import type { ExportMargin, ExportOrientation, ExportPaper, TocItem } from "./types";
+import type { ExportMargin, ExportOrientation, ExportPaper, TocItem, WorkspaceExportFailure } from "./types";
 
 export type ExportOptions = {
   paper: ExportPaper;
@@ -417,6 +417,16 @@ export function summarizeExportFailures(paths: string[], maxItems = 3): string {
   return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
 }
 
+export function formatExportFailureReport(failures: readonly WorkspaceExportFailure[]): string {
+  return [
+    "Moyang Reader 导出失败清单",
+    "",
+    ...failures.map((failure, index) => `${index + 1}. ${failure.fileName}：${failure.reason}`),
+    "",
+    "原文未被修改；请确认文件仍存在、格式受支持且未被其他程序占用。",
+  ].join("\n");
+}
+
 export function formatExportCancellationNotice(exported: number, writtenVolumes = 0): string {
   if (writtenVolumes > 0) return `已取消批量导出，已写入 ${writtenVolumes} 个文件，共整理 ${exported} 篇文档。`;
   return `已取消批量导出，已整理 ${exported} 篇文档，未写入文件。`;
@@ -483,6 +493,8 @@ export function buildHtmlExport(
     "    .export-kicker { margin-bottom: 8px; color: #6d716b; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: .12em; }\n" +
     "    .export-header h1 { margin: 0; font-size: 38px; }\n" +
     "    .export-footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid #d9d5cc; color: #8a8982; font-family: Arial, sans-serif; font-size: 11px; }\n" +
+    "    .export-page-number::after { content: counter(page); }\n" +
+    "    @media print { .export-footer { position: fixed; right: 0; bottom: 0; left: 0; margin: 0; padding: 6px 0; border-top: 1px solid #d9d5cc; background: #fff; text-align: center; } }\n" +
     "    .export-toc { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; break-inside: avoid; }\n" +
     "    .export-toc strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
     "    .export-toc ol { margin: 0; padding-left: 22px; }\n" +
@@ -510,7 +522,7 @@ export function buildHtmlExport(
     tocMarkup +
     '  <main class="reader-content">' +
     normalizeExportLinks(body) +
-    '</main><footer class="export-footer">由 Moyang Reader 导出</footer>\n' +
+    '</main><footer class="export-footer">由 Moyang Reader 导出 · 第 <span class="export-page-number"></span> 页</footer>\n' +
     "</body>\n" +
     "</html>\n"
   );

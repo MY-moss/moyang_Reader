@@ -7,6 +7,7 @@ import {
   renderDocx,
   renderHtmlFragment,
 } from "./document-adapters";
+import { documentAdapterForPath, listDocumentAdapters, registerDocumentAdapter } from "./adapters/registry";
 
 async function createMinimalDocx(): Promise<Uint8Array> {
   const zip = new JSZip();
@@ -56,6 +57,46 @@ describe("document adapters", () => {
     expect(isEditableDocument("text")).toBe(true);
     expect(isEditableDocument("docx")).toBe(false);
     expect(isEditableDocument("pdf")).toBe(false);
+  });
+
+  it("exposes built-in capabilities through the adapter registry", () => {
+    expect(documentAdapterForPath("notes/README.MD")).toMatchObject({
+      id: "markdown",
+      capabilities: { render: true, edit: true, exportHtml: true, exportDocx: true },
+    });
+    expect(documentAdapterForPath("notes/guide.docx")).toMatchObject({
+      id: "docx",
+      capabilities: { render: true, edit: false },
+    });
+    expect(listDocumentAdapters().map((adapter) => adapter.id)).toEqual([
+      "markdown",
+      "plain-text",
+      "docx",
+      "pdf",
+      "image",
+    ]);
+  });
+
+  it("supports isolated registration and rejects extension collisions", () => {
+    const unregister = registerDocumentAdapter({
+      id: "sample-text",
+      kind: "text",
+      extensions: ["sample"],
+      capabilities: { render: true, edit: false, exportHtml: true, exportDocx: false },
+    });
+
+    expect(documentAdapterForPath("example.SAMPLE")?.id).toBe("sample-text");
+    expect(() =>
+      registerDocumentAdapter({
+        id: "duplicate-markdown",
+        kind: "markdown",
+        extensions: ["md"],
+        capabilities: { render: true, edit: true, exportHtml: true, exportDocx: true },
+      }),
+    ).toThrow("已被其他文档适配器占用");
+
+    unregister();
+    expect(documentAdapterForPath("example.SAMPLE")).toBeNull();
   });
 
   it("provides an empty reading model for PDF previews", () => {

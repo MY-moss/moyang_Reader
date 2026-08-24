@@ -9,6 +9,7 @@ import {
   calculateDocxImageExtent,
   copyRichText,
   formatExportCancellationNotice,
+  formatExportFailureReport,
   htmlToPlainText,
   fileNameWithExtension,
   inlineLocalImages,
@@ -92,6 +93,8 @@ describe("document export helpers", () => {
     expect(html).toContain("<!doctype html>");
     expect(html).toContain("@page { size: A4 portrait; margin: 22mm 18mm; }");
     expect(html).toContain("MOYANG READER · EXPORT");
+    expect(html).toContain("counter(page)");
+    expect(html).toContain('class="export-page-number"');
   });
 
   it("applies custom paper, orientation, and margin settings to HTML export", () => {
@@ -197,6 +200,15 @@ describe("document export helpers", () => {
     expect(summarizeExportFailures([])).toBe("");
     expect(summarizeExportFailures(["a.md", "a.md", "b.docx"], 3)).toBe("a.md、b.docx");
     expect(summarizeExportFailures(["a.md", "b.docx", "c.txt", "d.pdf"], 3)).toBe("a.md、b.docx、c.txt 等 4 个");
+  });
+
+  it("creates a copyable failure report with every skipped file", () => {
+    expect(
+      formatExportFailureReport([
+        { fileName: "notes/a.md", reason: "读取失败" },
+        { fileName: "notes/b.docx", reason: "类型不支持" },
+      ]),
+    ).toContain("1. notes/a.md：读取失败\n2. notes/b.docx：类型不支持");
   });
 
   it("explains that cancelling a batch export leaves no partial output", () => {

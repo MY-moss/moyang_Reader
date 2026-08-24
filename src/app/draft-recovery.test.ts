@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  clearAllDraftSnapshots,
   clearDraftSnapshot,
   findDraftSnapshot,
   formatDraftRecoveryTime,
@@ -41,6 +42,15 @@ describe("draft recovery", () => {
     expect(loadDraftSnapshots()).toEqual([]);
     expect(formatDraftRecoveryTime(60_000, 60_000)).toBe("刚刚");
     expect(formatDraftRecoveryTime(0, 3_660_000)).toBe("1 小时前");
+  });
+
+  it("clears all saved snapshots from the local recovery center", () => {
+    saveDraftSnapshot({ path: "C:/Notes/one.md", draft: "one", baseSource: "", savedAt: 1 });
+    saveDraftSnapshot({ path: "C:/Notes/two.md", draft: "two", baseSource: "", savedAt: 2 });
+
+    clearAllDraftSnapshots();
+
+    expect(loadDraftSnapshots()).toEqual([]);
   });
 
   it("does not store unchanged or oversized drafts", () => {

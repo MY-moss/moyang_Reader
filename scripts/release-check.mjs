@@ -88,6 +88,31 @@ export function validateManifest(manifest, expectedVersion = null) {
   return errors;
 }
 
+export function validateReleaseWorkflow(projectRoot = defaultRoot) {
+  const errors = [];
+  const releasePath = path.join(projectRoot, ".github", "workflows", "release.yml");
+  const mirrorPath = path.join(projectRoot, ".github", "workflows", "mirror-release.yml");
+  const release = fs.readFileSync(releasePath, "utf8");
+  const mirror = fs.readFileSync(mirrorPath, "utf8");
+
+  if (!/workflow_dispatch:\s*\n\s+inputs:\s*\n\s+version:/m.test(release)) {
+    errors.push("release.yml 必须为手动发布提供 version 输入。");
+  }
+  if (!/INPUT_VERSION/.test(release) || !/EVENT_NAME\s*-eq\s*"workflow_dispatch"/.test(release)) {
+    errors.push("release.yml 必须根据 workflow_dispatch 输入解析发布版本，不能把分支名当作版本标签。");
+  }
+  for (const field of ["uploadUpdaterJson: true", "uploadUpdaterSignatures: true", "updaterJsonPreferNsis: true"]) {
+    if (!release.includes(field)) errors.push(`release.yml 缺少 ${field}。`);
+  }
+  if (!mirror.includes("release:") || !mirror.includes("types: [published]")) {
+    errors.push("mirror-release.yml 必须在 Release 发布后触发。");
+  }
+  if (!mirror.includes("scripts/prepare-mirror.mjs")) {
+    errors.push("mirror-release.yml 必须运行镜像清单自检脚本。");
+  }
+  return errors;
+}
+
 export function validateProject(projectRoot = defaultRoot) {
   const errors = [];
   const packageJson = readJson(path.join(projectRoot, "package.json"));
@@ -116,16 +141,29 @@ export function validateProject(projectRoot = defaultRoot) {
     if (typeof updater.pubkey !== "string" || updater.pubkey.trim().length < 40 || /private/i.test(updater.pubkey)) {
       errors.push("updater.pubkey 缺失或不是公开公钥内容。");
     }
-    if (!Array.isArray(updater.endpoints) || updater.endpoints.length === 0) {
-      errors.push("updater.endpoints 至少需要一个地址。");
+    if (!Array.isArray(updater.endpoints) || updater.endpoints.length < 2) {
+      errors.push("updater.endpoints 至少需要镜像和 GitHub 两个地址。");
     } else if (updater.endpoints.some((endpoint) => typeof endpoint !== "string" || !/^https:\/\//i.test(endpoint))) {
       errors.push("updater.endpoints 必须全部使用 HTTPS。");
+    } else {
+      if (!updater.endpoints.some((endpoint) => endpoint.includes("moyang-reader-mirror.pages.dev/latest.json"))) {
+        errors.push("updater.endpoints 缺少 Cloudflare Pages 镜像地址。");
+      }
+      if (
+        !updater.endpoints.some((endpoint) =>
+          endpoint.includes("github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json"),
+        )
+      ) {
+        errors.push("updater.endpoints 缺少 GitHub Release 回退地址。");
+      }
     }
   }
 
   if (releaseConfig.bundle?.createUpdaterArtifacts !== true) {
     errors.push("tauri.release.conf.json 必须启用 createUpdaterArtifacts: true。");
   }
+
+  errors.push(...validateReleaseWorkflow(projectRoot));
 
   return {
     version: normalizeVersion(packageJson.version),

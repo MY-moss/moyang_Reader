@@ -47,6 +47,30 @@ test("shows remembered files and workspaces on the next launch", async ({ page }
   await expect(page.getByRole("button", { name: /today\.md/ })).toBeVisible();
 });
 
+test("shows and manages local drafts from the recovery center", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "moyang-reader-drafts",
+      JSON.stringify([
+        {
+          path: "C:/Notes/recovery-note.md",
+          draft: "# Recovery note\n\n未保存内容",
+          baseSource: "# Recovery note",
+          savedAt: Date.now() - 60_000,
+        },
+      ]),
+    );
+  });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "草稿 1" }).click();
+  await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开 recovery-note.md 草稿" })).toBeVisible();
+
+  await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
+  await expect(page.getByRole("button", { name: "草稿 1" })).toHaveCount(0);
+});
+
 test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await page.goto("/");
 
@@ -85,8 +109,8 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   ]);
 
   await expect(page.getByRole("heading", { name: "Second note" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "first-note.md" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "first-note.md", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
 });
 
 test("keeps same-named browser documents in separate tabs", async ({ page }) => {
@@ -105,7 +129,7 @@ test("keeps same-named browser documents in separate tabs", async ({ page }) => 
     },
   ]);
 
-  const tabs = page.getByRole("tab", { name: "duplicate-note.md" });
+  const tabs = page.getByRole("button", { name: "duplicate-note.md", exact: true });
   await expect(tabs).toHaveCount(2);
   await expect(page.getByRole("heading", { name: "Second duplicate" })).toBeVisible();
 
@@ -352,6 +376,21 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出纸张")).toHaveValue("letter");
   await expect(page.getByLabel("导出方向")).toHaveValue("landscape");
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
+});
+
+test("switches and remembers the core interface locale", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator("summary", { hasText: "设置" }).click();
+  await page.getByLabel("界面语言").selectOption("en-US");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("button", { name: "Folder", exact: true })).toBeVisible();
+  await expect(page.getByText("LOCAL FIRST")).toBeVisible();
+
+  await page.reload();
+  await page.locator("summary", { hasText: "Settings" }).click();
+  await expect(page.getByLabel("Interface language")).toHaveValue("en-US");
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {

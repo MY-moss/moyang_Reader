@@ -43,6 +43,8 @@ type WorkspacePanelProps = {
   workspaceExporting: boolean;
   workspaceExportProgress: { current: number; total: number; fileName: string } | null;
   workspaceExportFailures: WorkspaceExportFailure[];
+  onCopyExportFailures: () => void;
+  onSaveExportFailures: () => void;
   workspaceExportNotice: string | null;
   workspaceOpening: boolean;
   workspaceOpenNotice: string | null;
@@ -83,6 +85,8 @@ export function WorkspacePanel({
   workspaceExporting,
   workspaceExportProgress,
   workspaceExportFailures,
+  onCopyExportFailures,
+  onSaveExportFailures,
   workspaceExportNotice,
   workspaceOpening,
   workspaceOpenNotice,
@@ -239,6 +243,14 @@ export function WorkspacePanel({
       {workspaceExportFailures.length > 0 && (
         <details className="workspace-export-failures">
           <summary>查看 {workspaceExportFailures.length} 个未导出文件</summary>
+          <div className="workspace-export-failure-actions">
+            <button type="button" className="quiet-button" onClick={onCopyExportFailures}>
+              复制清单
+            </button>
+            <button type="button" className="quiet-button" onClick={onSaveExportFailures}>
+              保存清单
+            </button>
+          </div>
           <ul>
             {workspaceExportFailures.map((failure) => (
               <li key={`${failure.fileName}-${failure.reason}`}>
