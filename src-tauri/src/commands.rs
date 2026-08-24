@@ -1060,8 +1060,10 @@ fn extract_tags(source: &str) -> Vec<String> {
 
         if trimmed.starts_with('#') && !trimmed.starts_with("# ") && !trimmed.starts_with("#\t") {
             for token in trimmed.split_whitespace() {
-                if let Some(tag) = clean_tag(token) {
-                    push_unique(&mut tags, tag);
+                if token.starts_with('#') && !token.starts_with("##") {
+                    if let Some(tag) = clean_tag(token) {
+                        push_unique(&mut tags, tag);
+                    }
                 }
             }
         }
@@ -1785,6 +1787,14 @@ mod tests {
                 "tags: [front, nested/path]\n\n#topic #second\n\n[[README]] #inline\n\n```md\n#inside-code\n```"
             ),
             vec!["front", "nested/path", "topic", "second"]
+        );
+    }
+
+    #[test]
+    fn ignores_heading_text_and_non_tag_words_in_tag_lines() {
+        assert_eq!(
+            extract_tags("## 背景\n### 安装步骤\n#tag 说明文字\n##Multi Word\n#topic #second"),
+            vec!["tag", "topic", "second"]
         );
     }
 
