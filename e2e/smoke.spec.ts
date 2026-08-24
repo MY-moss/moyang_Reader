@@ -139,6 +139,24 @@ test("protects unsaved browser edits before opening another document", async ({ 
   await expect(editor).toHaveValue("# Unsaved note\n\n尚未保存");
 });
 
+test("keeps unsaved edits when changing local resource preferences", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "preference-draft.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Preference draft\n\n原始内容"),
+  });
+  await page.getByRole("button", { name: "源文本" }).click();
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.fill("# Preference draft\n\n尚未保存的修改");
+
+  await page.locator("summary", { hasText: "设置" }).click();
+  await page.getByRole("checkbox", { name: "允许远程图片" }).check();
+
+  await expect(editor).toHaveValue("# Preference draft\n\n尚未保存的修改");
+});
+
 test("shows the latest source draft after switching back to reading", async ({ page }) => {
   await page.goto("/");
 
@@ -154,6 +172,31 @@ test("shows the latest source draft after switching back to reading", async ({ p
 
   await expect(page.getByRole("heading", { name: "Draft title" })).toBeVisible();
   await expect(page.getByText("最新草稿内容")).toBeVisible();
+});
+
+test("debounces in-document search and navigates highlighted matches", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "search-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Search note\n\nneedle one\n\nneedle two\n\nneedle three"),
+  });
+  await expect(page.getByRole("heading", { name: "Search note" })).toBeVisible();
+
+  await page.getByRole("button", { name: "搜索" }).click();
+  await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
+
+  await expect(page.locator("mark.moyang-search-hit")).toHaveCount(3);
+  await expect(page.locator(".find-count")).toHaveText("1 / 3");
+
+  await page.getByRole("button", { name: "下一个结果" }).click();
+  await expect(page.locator(".find-count")).toHaveText("2 / 3");
+  await expect(page.locator("mark.moyang-search-hit").nth(1)).toHaveClass(/active/);
+
+  await page.getByRole("button", { name: "上一个结果" }).click();
+  await expect(page.locator(".find-count")).toHaveText("1 / 3");
+  await expect(page.locator("mark.moyang-search-hit").nth(0)).toHaveClass(/active/);
 });
 
 test("enters and exits focus reading mode", async ({ page }) => {

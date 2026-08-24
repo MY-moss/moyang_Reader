@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   checks: write
@@ -42,9 +46,6 @@ jobs:
 
       - name: Configuration format check
         run: npm run format:check
-
-      - name: Frontend tests
-        run: npm test -- --run
 
       - name: Frontend coverage gate
         run: npm run test:coverage
