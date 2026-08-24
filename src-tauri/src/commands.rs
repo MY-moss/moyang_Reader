@@ -1557,7 +1557,7 @@ pub fn write_binary_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !access.is_write_allowed(&path) {
+    if !is_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
     }
     write_bytes_file_inner(path, &contents, false)
@@ -1584,7 +1584,7 @@ pub fn write_binary_file_raw(
             .to_str()
             .map_err(|_| "IPC 文件路径不是有效的请求头。".to_string())?,
     )?;
-    if !access.is_write_allowed(&path) {
+    if !is_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
     }
 
@@ -1595,6 +1595,22 @@ pub fn write_binary_file_raw(
     write_bytes_file_inner(path, contents, false)
 }
 
+fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
+    let mut candidate = path;
+    loop {
+        if candidate.exists() {
+            return access.is_write_allowed(candidate);
+        }
+        let Some(parent) = candidate.parent() else {
+            return false;
+        };
+        if parent == candidate {
+            return false;
+        }
+        candidate = parent;
+    }
+}
+
 fn write_bytes_file_inner(
     path: PathBuf,
     contents: &[u8],
@@ -1603,6 +1619,7 @@ fn write_bytes_file_inner(
     let parent = path
         .parent()
         .ok_or_else(|| "文件路径没有父目录。".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| format!("创建文件目录失败：{error}"))?;
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -1687,12 +1704,12 @@ mod tests {
         access_path_key, authorize_stored_path_inner, clean_tag, collect_open_paths,
         create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
         extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
-        is_supported_document_path, is_supported_text_path, list_workspace_files_inner,
-        path_exists_inner, prune_search_entries, read_text_file_inner, refresh_workspace_inner,
-        search_workspace_inner, search_workspace_inner_with_cache, should_skip_directory,
-        write_text_file_inner, AccessRegistry, CachedSearchText, OpenPath, OpenPathKind,
-        WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
-        MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
+        is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
+        list_workspace_files_inner, path_exists_inner, prune_search_entries, read_text_file_inner,
+        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
+        should_skip_directory, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
+        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
+        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1793,6 +1810,44 @@ mod tests {
         assert!(access.is_workspace_allowed(&vault));
 
         fs::remove_dir_all(root).expect("remove access test directory");
+    }
+
+    #[test]
+    fn allows_new_files_below_an_authorized_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-new-file-access-{}",
+            std::process::id()
+        ));
+        let vault = root.join("vault");
+        let asset = vault.join("assets").join("clip.png");
+        fs::create_dir_all(&vault).expect("create new file access workspace");
+
+        let access = AccessRegistry::default();
+        access
+            .register_workspace_path(&vault)
+            .expect("register new file access workspace");
+
+        assert!(is_write_allowed_for_new_path(&access, &asset));
+        assert!(!is_write_allowed_for_new_path(
+            &access,
+            &root.join("outside").join("clip.png")
+        ));
+
+        fs::remove_dir_all(root).expect("remove new file access workspace");
+    }
+
+    #[test]
+    fn creates_parent_directories_for_binary_asset_writes() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-binary-parent-{}",
+            std::process::id()
+        ));
+        let path = root.join("assets").join("clip.png");
+
+        write_bytes_file_inner(path.clone(), &[0, 1, 2, 3], false).expect("write binary asset");
+        assert_eq!(fs::read(path).expect("read binary asset"), vec![0, 1, 2, 3]);
+
+        fs::remove_dir_all(root).expect("remove binary parent workspace");
     }
 
     #[test]
