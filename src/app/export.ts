@@ -77,6 +77,27 @@ export async function copyRichText(html: string): Promise<void> {
 
 const MAX_INLINE_IMAGE_BYTES = 12 * 1024 * 1024;
 
+export type ImageDimensions = {
+  width: number;
+  height: number;
+};
+
+export type DocxImageExtent = {
+  cx: number;
+  cy: number;
+};
+
+const DEFAULT_DOCX_IMAGE_EXTENT: DocxImageExtent = { cx: 5486400, cy: 3657600 };
+const DOCX_MAX_IMAGE_EXTENT = DEFAULT_DOCX_IMAGE_EXTENT;
+const DOCX_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/avif": "avif",
+  "image/gif": "gif",
+  "image/jpeg": "jpeg",
+  "image/png": "png",
+  "image/svg+xml": "svg",
+  "image/webp": "webp",
+};
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunkSize = 0x8000;
@@ -84,6 +105,267 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
   }
   return btoa(binary);
+}
+
+function ascii(bytes: Uint8Array, offset: number, value: string): boolean {
+  return Array.from(value, (character) => character.charCodeAt(0)).every(
+    (character, index) => bytes[offset + index] === character,
+  );
+}
+
+function readUint16LittleEndian(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function readUint24LittleEndian(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+}
+
+function readUint32LittleEndian(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+}
+
+function readUint16BigEndian(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function readUint32BigEndian(bytes: Uint8Array, offset: number): number {
+  return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+}
+
+function validImageDimensions(width: number, height: number): ImageDimensions | null {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function pngDimensions(bytes: Uint8Array): ImageDimensions | null {
+  if (bytes.length < 24 || !ascii(bytes, 0, "\x89PNG\r\n\x1a\n") || !ascii(bytes, 12, "IHDR")) return null;
+  return validImageDimensions(readUint32BigEndian(bytes, 16), readUint32BigEndian(bytes, 20));
+}
+
+function gifDimensions(bytes: Uint8Array): ImageDimensions | null {
+  if (bytes.length < 10 || (!ascii(bytes, 0, "GIF87a") && !ascii(bytes, 0, "GIF89a"))) return null;
+  return validImageDimensions(readUint16LittleEndian(bytes, 6), readUint16LittleEndian(bytes, 8));
+}
+
+function isJpegSofMarker(marker: number): boolean {
+  return [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker);
+}
+
+function jpegDimensions(bytes: Uint8Array): ImageDimensions | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+
+  let offset = 2;
+  while (offset + 1 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    while (bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset];
+    offset += 1;
+    if (marker === undefined || marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 1 >= bytes.length) break;
+
+    const segmentLength = readUint16BigEndian(bytes, offset);
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+    if (isJpegSofMarker(marker) && segmentLength >= 7) {
+      const height = readUint16BigEndian(bytes, offset + 3);
+      const width = readUint16BigEndian(bytes, offset + 5);
+      return validImageDimensions(width, height);
+    }
+    offset += segmentLength;
+  }
+
+  return null;
+}
+
+function webpDimensions(bytes: Uint8Array): ImageDimensions | null {
+  if (bytes.length < 16 || !ascii(bytes, 0, "RIFF") || !ascii(bytes, 8, "WEBP")) return null;
+
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const chunkType = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const chunkSize = readUint32LittleEndian(bytes, offset + 4);
+    const dataOffset = offset + 8;
+    if (dataOffset + chunkSize > bytes.length) return null;
+
+    if (chunkType === "VP8X" && chunkSize >= 10) {
+      return validImageDimensions(
+        1 + readUint24LittleEndian(bytes, dataOffset + 4),
+        1 + readUint24LittleEndian(bytes, dataOffset + 7),
+      );
+    }
+    if (chunkType === "VP8 " && chunkSize >= 10 && ascii(bytes, dataOffset + 3, "\x9d\x01\x2a")) {
+      return validImageDimensions(
+        readUint16LittleEndian(bytes, dataOffset + 6) & 0x3fff,
+        readUint16LittleEndian(bytes, dataOffset + 8) & 0x3fff,
+      );
+    }
+    if (chunkType === "VP8L" && chunkSize >= 5 && bytes[dataOffset] === 0x2f) {
+      const bits =
+        bytes[dataOffset + 1] |
+        (bytes[dataOffset + 2] << 8) |
+        (bytes[dataOffset + 3] << 16) |
+        (bytes[dataOffset + 4] << 24);
+      const width = 1 + (bits & 0x3fff);
+      const height = 1 + ((bits >>> 14) & 0x3fff);
+      return validImageDimensions(width, height);
+    }
+
+    offset += 8 + chunkSize + (chunkSize & 1);
+  }
+
+  return null;
+}
+
+function avifDimensions(bytes: Uint8Array): ImageDimensions | null {
+  // AVIF is an ISO Base Media File. The `ispe` box stores the decoded canvas size.
+  for (let offset = 4; offset + 16 <= bytes.length; offset += 1) {
+    if (!ascii(bytes, offset, "ispe")) continue;
+    const width = readUint32BigEndian(bytes, offset + 8);
+    const height = readUint32BigEndian(bytes, offset + 12);
+    const dimensions = validImageDimensions(width, height);
+    if (dimensions) return dimensions;
+  }
+  return null;
+}
+
+function svgLength(value: string | null): number | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d+(?:\.\d+)?|\.\d+)(?:[a-z]+)?$/i);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function svgDimensions(bytes: Uint8Array): ImageDimensions | null {
+  const markup = new TextDecoder().decode(bytes);
+  const root = markup.match(/<svg\b[^>]*>/i)?.[0];
+  if (!root) return null;
+
+  const width = svgLength(root.match(/\bwidth\s*=\s*["']([^"']+)["']/i)?.[1] ?? null);
+  const height = svgLength(root.match(/\bheight\s*=\s*["']([^"']+)["']/i)?.[1] ?? null);
+  if (width && height) return validImageDimensions(Math.round(width), Math.round(height));
+
+  const viewBox = root.match(
+    /\bviewBox\s*=\s*["']\s*([\d.+-]+)[\s,]+([\d.+-]+)[\s,]+([\d.+-]+)[\s,]+([\d.+-]+)\s*["']/i,
+  );
+  if (!viewBox) return null;
+  const viewBoxWidth = Number(viewBox[3]);
+  const viewBoxHeight = Number(viewBox[4]);
+  if (!Number.isFinite(viewBoxWidth) || !Number.isFinite(viewBoxHeight)) return null;
+  if (width && viewBoxHeight > 0)
+    return validImageDimensions(Math.round(width), Math.round((width * viewBoxHeight) / viewBoxWidth));
+  if (height && viewBoxWidth > 0)
+    return validImageDimensions(Math.round((height * viewBoxWidth) / viewBoxHeight), Math.round(height));
+  return validImageDimensions(Math.round(viewBoxWidth), Math.round(viewBoxHeight));
+}
+
+export function readImageDimensions(bytes: Uint8Array, contentType: string): ImageDimensions | null {
+  const normalizedType = contentType.toLowerCase();
+  if (normalizedType === "image/png") return pngDimensions(bytes);
+  if (normalizedType === "image/gif") return gifDimensions(bytes);
+  if (normalizedType === "image/jpeg") return jpegDimensions(bytes);
+  if (normalizedType === "image/webp") return webpDimensions(bytes);
+  if (normalizedType === "image/avif") return avifDimensions(bytes);
+  if (normalizedType === "image/svg+xml") return svgDimensions(bytes);
+  return null;
+}
+
+export function calculateDocxImageExtent(dimensions: ImageDimensions | null): DocxImageExtent {
+  if (!dimensions) return DEFAULT_DOCX_IMAGE_EXTENT;
+
+  const scale = Math.min(DOCX_MAX_IMAGE_EXTENT.cx / dimensions.width, DOCX_MAX_IMAGE_EXTENT.cy / dimensions.height);
+  return {
+    cx: Math.max(1, Math.round(dimensions.width * scale)),
+    cy: Math.max(1, Math.round(dimensions.height * scale)),
+  };
+}
+
+type DataImage = {
+  contentType: string;
+  bytes: Uint8Array;
+};
+
+function parseDataImage(source: string): DataImage | null {
+  const match = source.match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) return null;
+
+  try {
+    const binary = atob(match[2]);
+    return {
+      contentType: match[1].toLowerCase(),
+      bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function rasterizeDocxImage(source: string, image: DataImage): Promise<string | null> {
+  if (typeof document === "undefined") return null;
+
+  try {
+    const blob = new Blob([image.bytes.slice().buffer as ArrayBuffer], { type: image.contentType });
+    if (typeof createImageBitmap === "function") {
+      try {
+        const bitmap = await createImageBitmap(blob);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, bitmap.width);
+        canvas.height = Math.max(1, bitmap.height);
+        const context = canvas.getContext("2d");
+        if (!context) {
+          bitmap.close();
+          return null;
+        }
+        context.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return canvas.toDataURL("image/png");
+      } catch {
+        // Fall through to the Image element decoder when createImageBitmap rejects the format.
+      }
+    }
+
+    if (typeof Image === "undefined") return null;
+    const loaded = await new Promise<HTMLImageElement | null>((resolve) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => resolve(null);
+      element.src = source;
+    });
+    if (!loaded) return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, loaded.naturalWidth || loaded.width);
+    canvas.height = Math.max(1, loaded.naturalHeight || loaded.height);
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(loaded, 0, 0);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
+async function normalizeDocxImageSources(html: string): Promise<string> {
+  const parsed = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  const root = parsed.body.firstElementChild;
+  if (!root) return html;
+
+  const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
+  await Promise.all(
+    images.map(async (element) => {
+      const source = element.getAttribute("src") ?? "";
+      const image = parseDataImage(source);
+      if (!image || !["image/avif", "image/webp"].includes(image.contentType)) return;
+      const converted = await rasterizeDocxImage(source, image);
+      if (converted) element.setAttribute("src", converted);
+    }),
+  );
+
+  return root.innerHTML;
 }
 
 export async function inlineLocalImages(
@@ -349,13 +631,7 @@ function runXml(value: string, properties = ""): string {
 }
 
 function imageExtension(contentType: string): string | null {
-  return (
-    {
-      "image/gif": "gif",
-      "image/jpeg": "jpeg",
-      "image/png": "png",
-    }[contentType] ?? null
-  );
+  return DOCX_IMAGE_EXTENSIONS[contentType] ?? null;
 }
 
 function imageXml(element: HTMLElement, state: DocxRenderState): string {
@@ -369,17 +645,22 @@ function imageXml(element: HTMLElement, state: DocxRenderState): string {
   try {
     const binary = atob(match[2]);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const contentType = match[1].toLowerCase();
     const relationshipId = `rId${state.nextImageId}`;
     state.nextImageId += 1;
     state.images.push({
       bytes,
-      contentType: match[1].toLowerCase(),
+      contentType,
       extension,
       relationshipId,
     });
 
     const imageId = state.images.length;
-    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5486400" cy="3657600"/><wp:docPr id="${imageId}" name="图片 ${imageId}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${imageId}" name="图片 ${imageId}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="3657600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+    const dimensions = readImageDimensions(bytes, contentType);
+    const { cx, cy } = calculateDocxImageExtent(dimensions);
+    const alt = element.getAttribute("alt") ?? "";
+    const description = alt ? ` descr="${escapeXml(alt)}"` : "";
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${imageId}" name="图片 ${imageId}"${description}/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${imageId}" name="图片 ${imageId}"${description}/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   } catch {
     return runXml("[图片无法读取]");
   }
@@ -599,7 +880,7 @@ export async function buildDocxExport(
 ): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
   const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
-  const normalizedBody = normalizeExportLinks(body);
+  const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(body));
   const zip = new JSZip();
   zip.file(
     "_rels/.rels",
