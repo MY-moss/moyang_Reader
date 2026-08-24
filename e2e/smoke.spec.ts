@@ -161,7 +161,7 @@ test("previews the print layout before exporting a document", async ({ page }) =
   await page.locator('input[type="file"]').setInputFiles({
     name: "print-preview-note.md",
     mimeType: "text/markdown",
-    buffer: Buffer.from("# Print preview\n\n打印版式预览测试"),
+    buffer: Buffer.from("# Print preview\n\n## 章节\n\n打印版式预览测试"),
   });
   await expect(page.getByRole("heading", { name: "Print preview" })).toBeVisible();
 
@@ -171,7 +171,9 @@ test("previews the print layout before exporting a document", async ({ page }) =
 
   const dialog = page.getByRole("dialog", { name: "打印版式预览" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('iframe[title="print-preview-note.md 打印版式"]')).toBeVisible();
+  const previewFrame = dialog.locator('iframe[title="print-preview-note.md 打印版式"]');
+  await expect(previewFrame).toBeVisible();
+  await expect(previewFrame).toHaveAttribute("srcdoc", /export-toc/);
   await expect(dialog.getByText("A4 · 纵向 · 标准页边距")).toBeVisible();
 
   await page.keyboard.press("Escape");

@@ -1,5 +1,5 @@
 import { escapeHtml } from "../lib/text";
-import type { ExportMargin, ExportOrientation, ExportPaper } from "./types";
+import type { ExportMargin, ExportOrientation, ExportPaper, TocItem } from "./types";
 
 export type ExportOptions = {
   paper: ExportPaper;
@@ -136,6 +136,18 @@ function exportPageSize(options: ExportOptions): string {
   return options.paper === "letter" ? "Letter" : "A4";
 }
 
+function exportTocMarkup(items: TocItem[]): string {
+  if (items.length < 2) return "";
+
+  const links = items
+    .map(
+      (item) =>
+        `<li style="padding-left:${Math.max(0, item.depth - 1) * 12}px"><a href="#${escapeHtml(item.id)}">${escapeHtml(item.text)}</a></li>`,
+    )
+    .join("");
+  return `<nav class="export-toc" aria-label="文档目录"><strong>文档目录</strong><ol>${links}</ol></nav>`;
+}
+
 function docxPageLayoutXml(options: ExportOptions): string {
   const isLetter = options.paper === "letter";
   const isLandscape = options.orientation === "landscape";
@@ -149,7 +161,13 @@ function docxPageLayoutXml(options: ExportOptions): string {
   return `<w:pgSz w:w="${width}" w:h="${height}"${orientation}/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="720" w:footer="720" w:gutter="0"/>`;
 }
 
-export function buildHtmlExport(title: string, body: string, options: ExportOptions = defaultExportOptions): string {
+export function buildHtmlExport(
+  title: string,
+  body: string,
+  options: ExportOptions = defaultExportOptions,
+  toc: TocItem[] = [],
+): string {
+  const tocMarkup = exportTocMarkup(toc);
   return (
     "<!doctype html>\n" +
     '<html lang="zh-CN">\n' +
@@ -171,6 +189,11 @@ export function buildHtmlExport(title: string, body: string, options: ExportOpti
     "    .export-kicker { margin-bottom: 8px; color: #6d716b; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: .12em; }\n" +
     "    .export-header h1 { margin: 0; font-size: 38px; }\n" +
     "    .export-footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid #d9d5cc; color: #8a8982; font-family: Arial, sans-serif; font-size: 11px; }\n" +
+    "    .export-toc { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; break-inside: avoid; }\n" +
+    "    .export-toc strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
+    "    .export-toc ol { margin: 0; padding-left: 22px; }\n" +
+    "    .export-toc li { margin: 3px 0; }\n" +
+    "    .export-toc a { color: #28655f; text-decoration: none; }\n" +
     "    .batch-index { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; }\n" +
     "    .batch-index strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
     "    .batch-index ol { margin: 0; padding-left: 22px; }\n" +
@@ -190,6 +213,7 @@ export function buildHtmlExport(title: string, body: string, options: ExportOpti
     '  <header class="export-header"><div class="export-kicker">MOYANG READER · EXPORT</div><h1>' +
     escapeHtml(title) +
     "</h1></header>\n" +
+    tocMarkup +
     '  <main class="reader-content">' +
     normalizeExportLinks(body) +
     '</main><footer class="export-footer">由 Moyang Reader 导出</footer>\n' +

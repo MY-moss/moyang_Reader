@@ -1239,11 +1239,16 @@ export function App() {
         )
       : documentState.rendered.html;
 
-    return buildHtmlExport(documentState.name, body, {
-      paper: preferences.exportPaper,
-      orientation: preferences.exportOrientation,
-      margin: preferences.exportMargin,
-    });
+    return buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
   }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleExport = useCallback(async () => {
@@ -1351,11 +1356,16 @@ export function App() {
           fileSize,
         )
       : documentState.rendered.html;
-    const contents = buildHtmlExport(documentState.name, body, {
-      paper: preferences.exportPaper,
-      orientation: preferences.exportOrientation,
-      margin: preferences.exportMargin,
-    });
+    const contents = buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
     try {
       if (isTauriRuntime()) {
         const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");

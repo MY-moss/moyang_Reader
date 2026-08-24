@@ -46,6 +46,18 @@ describe("document export helpers", () => {
     expect(html).toContain("@page { size: Letter landscape; margin: 14mm 14mm; }");
   });
 
+  it("adds a linked outline to a single-document HTML export", () => {
+    const html = buildHtmlExport("报告", '<h1 id="intro">介绍</h1><h2 id="details">细节</h2>', undefined, [
+      { id: "intro", depth: 1, text: "介绍" },
+      { id: "details", depth: 2, text: "细节" },
+    ]);
+
+    expect(html).toContain('class="export-toc"');
+    expect(html).toContain('href="#intro"');
+    expect(html).toContain('href="#details"');
+    expect(html).toContain("padding-left:12px");
+  });
+
   it("converts rendered HTML into a compact plain-text fallback", () => {
     expect(htmlToPlainText("<h1>标题</h1><p>第一段</p><p>第二段&nbsp;内容</p>")).toBe("标题第一段第二段 内容");
   });
