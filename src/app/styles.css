@@ -2021,6 +2021,68 @@ a:focus-visible {
   font-size: 14px;
   line-height: 1.75;
 }
+.code-mirror-editor {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+.code-mirror-editor .cm-editor {
+  min-height: calc(100vh - 150px);
+  background: transparent;
+  color: var(--ink);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.75;
+  outline: none;
+}
+.code-mirror-editor .cm-scroller {
+  padding: 62px 0 86px;
+  font-family: inherit;
+  overflow: auto;
+}
+.code-mirror-editor .cm-content {
+  min-height: calc(100vh - 212px);
+  padding: 0;
+  caret-color: var(--accent-deep);
+}
+.code-mirror-editor .cm-gutters {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.code-mirror-editor .cm-lineNumbers .cm-gutterElement {
+  min-width: 38px;
+  padding: 0 11px 0 0;
+  text-align: right;
+}
+.code-mirror-editor .cm-activeLine,
+.code-mirror-editor .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--accent-soft) 36%, transparent);
+}
+.code-mirror-editor .cm-selectionBackground,
+.code-mirror-editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+.code-mirror-editor .cm-search {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--ink);
+  padding: 8px;
+  box-shadow: var(--shadow-soft);
+}
+.code-mirror-editor .cm-search input,
+.code-mirror-editor .cm-search button,
+.code-mirror-editor .cm-search label {
+  color: var(--ink);
+}
+.source-editor-loading {
+  display: block;
+  padding: 62px 0 86px;
+  color: var(--muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
 .loading-state,
 .error-state {
   width: min(860px, calc(100% - 96px));
