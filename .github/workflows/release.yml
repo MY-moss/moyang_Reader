@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  checks: write
 
 jobs:
   publish:
@@ -40,6 +41,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Rust dependency audit
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri
 
       - name: Resolve release tag
         id: release
