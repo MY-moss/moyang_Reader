@@ -1,11 +1,22 @@
 import type { RecentFile, RecentWorkspace, WorkspaceFile, WorkspaceSearchResult } from "../types";
 import { WorkspaceTreeView } from "./WorkspaceTree";
+import type { WorkspaceKindFilter } from "../workspace-filter";
+
+const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
+  { value: "all", label: "全部类型" },
+  { value: "markdown", label: "Markdown" },
+  { value: "text", label: "纯文本" },
+  { value: "docx", label: "Word" },
+  { value: "pdf", label: "PDF" },
+  { value: "image", label: "图片" },
+];
 
 type WorkspacePanelProps = {
   workspacePath: string | null;
   files: WorkspaceFile[];
   visibleFiles: WorkspaceFile[];
   openableFiles: WorkspaceFile[];
+  exportableFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
   recentWorkspaces: RecentWorkspace[];
   activePath: string | null;
@@ -14,6 +25,7 @@ type WorkspacePanelProps = {
   searchLoading: boolean;
   tagOptions: string[];
   selectedTag: string | null;
+  selectedKind: WorkspaceKindFilter;
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
   onOpenVisibleFiles: () => void;
@@ -26,6 +38,7 @@ type WorkspacePanelProps = {
   onOpenFile: (path: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
+  onKindChange: (kind: WorkspaceKindFilter) => void;
 };
 
 function pathName(path: string): string {
@@ -37,6 +50,7 @@ export function WorkspacePanel({
   files,
   visibleFiles,
   openableFiles,
+  exportableFiles,
   recentFiles,
   recentWorkspaces,
   activePath,
@@ -45,6 +59,7 @@ export function WorkspacePanel({
   searchLoading,
   tagOptions,
   selectedTag,
+  selectedKind,
   onChooseWorkspace,
   onOpenWorkspace,
   onOpenVisibleFiles,
@@ -57,6 +72,7 @@ export function WorkspacePanel({
   onOpenFile,
   onSearchQueryChange,
   onTagChange,
+  onKindChange,
 }: WorkspacePanelProps) {
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -83,7 +99,7 @@ export function WorkspacePanel({
                 disabled={
                   !workspacePath ||
                   workspaceExporting ||
-                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
                 }
                 onClick={() => onExportWorkspace("html")}
               >
@@ -94,7 +110,7 @@ export function WorkspacePanel({
                 disabled={
                   !workspacePath ||
                   workspaceExporting ||
-                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
                 }
                 onClick={() => onExportWorkspace("docx")}
               >
@@ -105,7 +121,7 @@ export function WorkspacePanel({
                 disabled={
                   !workspacePath ||
                   workspaceExporting ||
-                  !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
                 }
                 onClick={() => onExportWorkspace("pdf")}
               >
@@ -171,6 +187,20 @@ export function WorkspacePanel({
               </select>
             </label>
           )}
+          <label className="tag-filter">
+            <span>类型</span>
+            <select
+              aria-label="按类型筛选工作区"
+              value={selectedKind}
+              onChange={(event) => onKindChange(event.target.value as WorkspaceKindFilter)}
+            >
+              {workspaceKindOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </>
       )}
 

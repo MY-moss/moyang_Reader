@@ -101,6 +101,7 @@ import {
   isSelfWrittenChangePending,
 } from "./workspace-refresh";
 import { createWorkspaceOpenPlan } from "./workspace-open";
+import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -240,6 +241,7 @@ export function App() {
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
@@ -557,6 +559,7 @@ export function App() {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
         setSelectedTag(null);
+        setSelectedFileKind("all");
       }
       setWorkspaceRevision((current) => current + 1);
       saveWorkspacePath(root);
@@ -1522,24 +1525,28 @@ export function App() {
   const availableTags = Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) =>
     a.localeCompare(b),
   );
-  const taggedFilePaths = new Set(
-    workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path),
-  );
-  const visibleWorkspaceFiles = selectedTag
-    ? workspaceFiles.filter((file) => taggedFilePaths.has(file.path))
-    : workspaceFiles;
-  const visibleWorkspaceResults = selectedTag
-    ? workspaceResults.filter((result) => taggedFilePaths.has(result.file.path))
-    : workspaceResults;
-  const workspaceOpenFiles = useMemo(
+  const taggedFilePaths = useMemo(
     () =>
-      workspaceQuery.trim()
-        ? workspaceQuery.trim().length >= 2
-          ? visibleWorkspaceResults.map((result) => result.file)
-          : []
-        : visibleWorkspaceFiles,
-    [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery],
+      new Set(workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path)),
+    [selectedTag, workspaceIndex],
   );
+  const visibleWorkspaceFiles = useMemo(
+    () => workspaceFiles.filter((file) => matchesWorkspaceFilter(file, selectedFileKind, selectedTag, taggedFilePaths)),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceFiles],
+  );
+  const visibleWorkspaceResults = useMemo(
+    () =>
+      workspaceResults.filter((result) =>
+        matchesWorkspaceFilter(result.file, selectedFileKind, selectedTag, taggedFilePaths),
+      ),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceResults],
+  );
+  const workspaceActionFiles = useMemo(() => {
+    const query = workspaceQuery.trim();
+    if (!query) return visibleWorkspaceFiles;
+    if (query.length < 2 || workspaceSearchLoading) return [];
+    return visibleWorkspaceResults.map((result) => result.file);
+  }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
     const add = (candidate: QuickOpenCandidate) => {
@@ -1556,9 +1563,9 @@ export function App() {
   }, [openTabs, recentFiles, workspaceFiles]);
 
   const handleOpenWorkspaceFiles = useCallback(async () => {
-    if (!workspacePath || workspaceOpenFiles.length === 0 || !isTauriRuntime()) return;
+    if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
 
-    const plan = createWorkspaceOpenPlan(workspaceOpenFiles);
+    const plan = createWorkspaceOpenPlan(workspaceActionFiles);
     if (plan.files.length === 0) return;
     if (
       documentStateRef.current?.modified &&
@@ -1588,11 +1595,11 @@ export function App() {
     } finally {
       setWorkspaceOpening(false);
     }
-  }, [openPath, workspaceOpenFiles, workspacePath]);
+  }, [openPath, workspaceActionFiles, workspacePath]);
 
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
-      if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+      if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
 
       const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
       const savePath =
@@ -1609,7 +1616,7 @@ export function App() {
       let skipped = 0;
       try {
         const documents = [];
-        for (const file of visibleWorkspaceFiles) {
+        for (const file of workspaceActionFiles) {
           try {
             let rendered;
             if (file.kind === "docx") {
@@ -1666,7 +1673,7 @@ export function App() {
         setWorkspaceExporting(false);
       }
     },
-    [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath],
+    [preferences.allowRemoteResources, workspaceActionFiles, workspacePath],
   );
 
   return (
@@ -1764,7 +1771,8 @@ export function App() {
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}
-            openableFiles={workspaceOpenFiles}
+            openableFiles={workspaceActionFiles}
+            exportableFiles={workspaceActionFiles}
             recentFiles={recentFiles}
             recentWorkspaces={recentWorkspaces}
             activePath={documentState?.path ?? null}
@@ -1773,11 +1781,13 @@ export function App() {
             searchLoading={workspaceSearchLoading}
             tagOptions={availableTags}
             selectedTag={selectedTag}
+            selectedKind={selectedFileKind}
             onChooseWorkspace={() => void handleChooseWorkspace()}
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onOpenFile={(path) => void handleSelectTab(path)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
+            onKindChange={setSelectedFileKind}
           />
           {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}
           {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}
