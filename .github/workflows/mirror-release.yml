@@ -3,28 +3,43 @@ name: Mirror release to Cloudflare Pages
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "要同步的 Release 标签，例如 v0.6.0"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   mirror:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     name: Publish updater mirror
     runs-on: windows-latest
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
       MIRROR_BASE_URL: https://moyang-reader-mirror.pages.dev
       MIRROR_PROJECT: moyang-reader-mirror
     steps:
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Download public release assets
         shell: pwsh
