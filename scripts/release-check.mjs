@@ -68,18 +68,21 @@ export function validateManifest(manifest, expectedVersion = null) {
     return errors;
   }
 
-  const windows = platforms["windows-x86_64"];
-  if (!windows || typeof windows !== "object") {
+  if (!platforms["windows-x86_64"] || typeof platforms["windows-x86_64"] !== "object") {
     errors.push("latest.json 缺少 windows-x86_64 平台。");
-    return errors;
   }
 
-  if (typeof windows.url !== "string" || !/^https:\/\//i.test(windows.url)) {
-    errors.push("windows-x86_64.url 必须是 HTTPS 地址。");
-  }
-
-  if (typeof windows.signature !== "string" || windows.signature.trim().length < 20) {
-    errors.push("windows-x86_64.signature 缺失或过短。");
+  for (const [platformName, platform] of Object.entries(platforms)) {
+    if (!platform || typeof platform !== "object" || Array.isArray(platform)) {
+      errors.push(`${platformName} 平台配置缺失或格式错误。`);
+      continue;
+    }
+    if (typeof platform.url !== "string" || !/^https:\/\//i.test(platform.url)) {
+      errors.push(`${platformName}.url 必须是 HTTPS 地址。`);
+    }
+    if (typeof platform.signature !== "string" || platform.signature.trim().length < 20) {
+      errors.push(`${platformName}.signature 缺失或过短。`);
+    }
   }
 
   return errors;
