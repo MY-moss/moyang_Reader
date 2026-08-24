@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findBacklinks, findLinkedEntry, linkMatchesEntry } from "./workspace-index";
+import { createBacklinkIndex, findBacklinks, findLinkedEntry, linkMatchesEntry } from "./workspace-index";
 import type { WorkspaceIndexEntry } from "./types";
 
 function entry(path: string, links: string[] = []): WorkspaceIndexEntry {
@@ -28,6 +28,17 @@ describe("workspace index", () => {
     const unrelated = entry("Other.md", ["Elsewhere"]);
 
     expect(findBacklinks([target, source, unrelated], target).map((item) => item.file.name)).toEqual(["Source.md"]);
+  });
+
+  it("reuses a backlink index for nested and name-only links", () => {
+    const target = entry("notes/deep/Target.md");
+    const nestedSource = entry("Source.md", ["deep/Target"]);
+    const nameSource = entry("Other.md", ["Target#Section"]);
+    const unrelated = entry("Else.md", ["deep/Other"]);
+    const entries = [target, nestedSource, nameSource, unrelated];
+    const index = createBacklinkIndex(entries);
+
+    expect(findBacklinks(entries, target, index).map((item) => item.file.name)).toEqual(["Source.md", "Other.md"]);
   });
 
   it("prefers a same-folder note before falling back to the workspace name", () => {

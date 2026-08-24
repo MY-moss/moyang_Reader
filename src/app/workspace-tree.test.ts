@@ -36,6 +36,14 @@ describe("workspace tree", () => {
     expect(tree.folders[0].folders[0].files[0].name).toBe("Plan.md");
   });
 
+  it("reuses a folder node for case-insensitive paths", () => {
+    const tree = buildWorkspaceTree([file("Notes/First.md"), file("notes/Second.md")]);
+
+    expect(tree.folders).toHaveLength(1);
+    expect(tree.folders[0].fileCount).toBe(2);
+    expect(tree.folders[0].files.map((item) => item.name)).toEqual(["First.md", "Second.md"]);
+  });
+
   it("does not mutate the source file list", () => {
     const files = [file("b.md"), file("a.md")];
     const originalOrder = files.map((item) => item.relativePath);

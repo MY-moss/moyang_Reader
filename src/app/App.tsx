@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { EmptyState } from "./components/EmptyState";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
@@ -81,7 +81,7 @@ import {
   renderDocx,
   renderSource,
 } from "../lib/document-adapters";
-import { findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
+import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
 import {
   applyWorkspaceFileDelta,
   applyWorkspaceIndexDelta,
@@ -1347,7 +1347,8 @@ export function App() {
 
   const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
   const currentIndexEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
-  const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry) : [];
+  const backlinkIndex = useMemo(() => createBacklinkIndex(workspaceIndex), [workspaceIndex]);
+  const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry, backlinkIndex) : [];
   const outgoing = currentIndexEntry
     ? currentIndexEntry.links.map((target) => ({
         target,
