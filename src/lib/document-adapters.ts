@@ -117,4 +117,3 @@ export async function renderDocx(bytes: Uint8Array, options: RenderOptions = {})
 export function emptyRenderedDocument(): RenderedMarkdown {
   return { html: "", toc: [], wordCount: 0, readingMinutes: 0 };
 }
-
