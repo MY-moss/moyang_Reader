@@ -1307,12 +1307,13 @@ fn write_bytes_file_inner(
         .and_then(|name| name.to_str())
         .ok_or_else(|| "文件名无法解析。".to_string())?;
 
-    if create_backup {
+    let backup = if create_backup && path.is_file() {
         let backup = parent.join(format!(".{file_name}.moyang.bak"));
-        if path.is_file() {
-            fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
-        }
-    }
+        fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
+        Some(backup)
+    } else {
+        None
+    };
 
     let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let temp = parent.join(format!(
@@ -1332,6 +1333,9 @@ fn write_bytes_file_inner(
         drop(file);
 
         replace_file(&temp, &path).map_err(|error| format!("完成文件替换失败：{error}"))?;
+        if let Some(backup) = backup.as_deref() {
+            fs::remove_file(backup).map_err(|error| format!("清理备份失败：{error}"))?;
+        }
         Ok(())
     })();
     if result.is_err() {
@@ -1441,7 +1445,7 @@ mod tests {
     }
 
     #[test]
-    fn replaces_existing_file_without_removing_the_original_first() {
+    fn replaces_existing_file_and_cleans_backup_after_success() {
         let root = std::env::temp_dir().join(format!(
             "moyang-reader-atomic-{}-{}",
             std::process::id(),
@@ -1457,10 +1461,7 @@ mod tests {
             fs::read_to_string(&path).expect("read replaced file"),
             "new"
         );
-        assert_eq!(
-            fs::read_to_string(root.join(".note.md.moyang.bak")).expect("read backup"),
-            "old"
-        );
+        assert!(!root.join(".note.md.moyang.bak").exists());
         fs::remove_dir_all(root).expect("remove atomic test directory");
     }
 
