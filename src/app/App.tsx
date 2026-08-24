@@ -104,6 +104,10 @@ function fileTypeLabel(kind: DocumentKind): string {
   return kind === "markdown" ? "MD" : kind === "image" ? "IMG" : kind.toUpperCase();
 }
 
+function startsWithHeading(html: string): boolean {
+  return /^\s*<h1(?:\s[^>]*)?>/i.test(html);
+}
+
 function comparablePath(path: string): string {
   return path
     .replace(/[\\/]+/g, "\\")
@@ -1695,12 +1699,15 @@ export function App() {
             documentState.kind !== "pdf" &&
             documentState.kind !== "image" &&
             mode === "rendered" && (
-              <article
-                ref={articleRef}
-                className="reader-content markdown-body"
-                onClick={handleReaderClick}
-                dangerouslySetInnerHTML={{ __html: documentState.rendered.html }}
-              />
+              <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                {!startsWithHeading(documentState.rendered.html) && (
+                  <header className="print-document-header" aria-hidden="true">
+                    <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
+                    <div className="print-document-title">{documentState.name}</div>
+                  </header>
+                )}
+                <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+              </article>
             )}
           {!loading && documentState && canEdit && mode === "source" && (
             <textarea

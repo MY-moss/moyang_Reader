@@ -1276,6 +1276,9 @@ a:focus-visible {
   margin: 0 auto;
   padding: 78px 0 120px;
 }
+.print-document-header {
+  display: none;
+}
 .markdown-body {
   color: var(--ink);
   font-family: var(--font-reading);
@@ -2032,6 +2035,10 @@ a:focus-visible {
 }
 
 @media print {
+  @page {
+    size: auto;
+    margin: 18mm 16mm 20mm;
+  }
   body {
     min-width: 0;
     background: white;
@@ -2081,6 +2088,29 @@ a:focus-visible {
     font-size: 11pt;
     line-height: 1.65;
   }
+  .print-document-header {
+    display: block;
+    margin: 0 0 24pt;
+    padding: 0 0 12pt;
+    border-bottom: 1px solid #c9c9c9;
+    break-after: avoid;
+  }
+  .print-document-kicker {
+    display: block;
+    margin-bottom: 6pt;
+    color: #666;
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.12em;
+  }
+  .print-document-title {
+    color: black;
+    font-family: Georgia, "Songti SC", "STSong", serif;
+    font-size: 24pt;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
   .markdown-body pre.plain-text {
     padding: 0;
     color: black;
@@ -2092,10 +2122,31 @@ a:focus-visible {
   .markdown-body h4 {
     break-after: avoid;
   }
+  .markdown-body p,
+  .markdown-body li {
+    orphans: 3;
+    widows: 3;
+  }
   .markdown-body pre,
   .markdown-body table,
   .markdown-body img {
     break-inside: avoid;
+  }
+  .markdown-body pre {
+    overflow: visible;
+    border: 1px solid #d0d0d0;
+    background: #f5f5f5;
+    color: #1f1f1f;
+    box-shadow: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .markdown-body blockquote {
+    background: #f6f6f6;
+    color: #444;
+  }
+  .markdown-body a {
+    color: black;
   }
   .source-editor {
     display: none;
