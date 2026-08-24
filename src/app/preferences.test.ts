@@ -19,6 +19,9 @@ describe("reader preferences", () => {
       startupUpdateCheck: true,
       readingScale: "large",
       readingWidth: "wide",
+      exportPaper: "letter",
+      exportOrientation: "landscape",
+      exportMargin: "compact",
     };
 
     saveReaderPreferences(preferences);
@@ -34,6 +37,9 @@ describe("reader preferences", () => {
       startupUpdateCheck: false,
       readingScale: "medium",
       readingWidth: "standard",
+      exportPaper: "a4",
+      exportOrientation: "portrait",
+      exportMargin: "standard",
     });
   });
 });

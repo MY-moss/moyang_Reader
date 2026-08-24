@@ -3,11 +3,15 @@ import {
   loadRecentFiles,
   loadRecentWorkspaces,
   loadLastDocumentPath,
+  loadOpenTabs,
   loadReadingPosition,
+  loadSidebarCollapsed,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
+  saveOpenTabs,
   saveReadingPosition,
+  saveSidebarCollapsed,
   saveRecentFiles,
   saveRecentWorkspaces,
 } from "./storage";
@@ -42,6 +46,36 @@ describe("reader storage", () => {
 
     saveLastDocumentPath(null);
     expect(loadLastDocumentPath()).toBeNull();
+  });
+
+  it("persists the sidebar collapsed state", () => {
+    expect(loadSidebarCollapsed()).toBe(false);
+
+    saveSidebarCollapsed(true);
+    expect(loadSidebarCollapsed()).toBe(true);
+
+    saveSidebarCollapsed(false);
+    expect(loadSidebarCollapsed()).toBe(false);
+  });
+
+  it("persists bounded native tabs and drops temporary browser documents", () => {
+    saveOpenTabs([
+      { path: "C:/Notes/first.md", name: "first.md" },
+      { path: "c:\\notes\\FIRST.md", name: "duplicate.md" },
+      { path: "browser://temporary.md", name: "temporary.md" },
+      ...Array.from({ length: 17 }, (_, index) => ({
+        path: `C:/Notes/${index + 2}.md`,
+        name: `${index + 2}.md`,
+      })),
+    ]);
+
+    const tabs = loadOpenTabs();
+    expect(tabs).toHaveLength(16);
+    expect(tabs[0]).toEqual({ path: "C:/Notes/first.md", name: "first.md" });
+    expect(tabs.some((tab) => tab.path.startsWith("browser://"))).toBe(false);
+    expect(
+      tabs.filter((tab) => tab.path.replace(/[\\/]+/g, "\\").toLocaleLowerCase() === "c:\\notes\\first.md"),
+    ).toHaveLength(1);
   });
 
   it("stores reading positions case-insensitively and keeps a bounded history", () => {

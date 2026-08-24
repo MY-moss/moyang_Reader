@@ -4,10 +4,29 @@ const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
 const recentWorkspacesKey = "moyang-reader-recent-workspaces";
 const lastDocumentKey = "moyang-reader-last-document";
+const openTabsKey = "moyang-reader-open-tabs";
 const readingPositionsKey = "moyang-reader-reading-positions";
+const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
+const maxOpenTabs = 16;
 const maxReadingPositions = 32;
+
+export function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(sidebarCollapsedKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(sidebarCollapsedKey, String(collapsed));
+  } catch {
+    // The layout preference remains available for the current session.
+  }
+}
 
 function comparablePath(path: string): string {
   return path
@@ -47,6 +66,55 @@ export function saveLastDocumentPath(path: string | null): void {
     else localStorage.removeItem(lastDocumentKey);
   } catch {
     // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+export function loadOpenTabs(): RecentFile[] {
+  try {
+    const raw = localStorage.getItem(openTabsKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    return parsed
+      .filter(
+        (item): item is RecentFile =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as RecentFile).path === "string" &&
+          typeof (item as RecentFile).name === "string" &&
+          (item as RecentFile).path.trim().length > 0 &&
+          (item as RecentFile).name.trim().length > 0,
+      )
+      .filter((item) => !item.path.startsWith("browser://"))
+      .filter((item) => {
+        const key = comparablePath(item.path);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxOpenTabs);
+  } catch {
+    return [];
+  }
+}
+
+export function saveOpenTabs(tabs: RecentFile[]): void {
+  try {
+    const seen = new Set<string>();
+    const next = tabs
+      .filter((tab) => tab.path.trim().length > 0 && tab.name.trim().length > 0 && !tab.path.startsWith("browser://"))
+      .filter((tab) => {
+        const key = comparablePath(tab.path);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxOpenTabs);
+    localStorage.setItem(openTabsKey, JSON.stringify(next));
+  } catch {
+    // Session restoration is best-effort when local storage is unavailable.
   }
 }
 

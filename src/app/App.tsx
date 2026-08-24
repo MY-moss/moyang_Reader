@@ -4,9 +4,11 @@ import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
+import { PrintPreview } from "./components/PrintPreview";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
+import { ReadingRail } from "./components/ReadingRail";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -47,12 +49,16 @@ import {
 } from "./updater";
 import type {
   DocumentKind,
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
   OpenPath,
   OpenDocument,
   ReaderMode,
   RecentFile,
   RecentWorkspace,
   ThemeMode,
+  WorkspaceExportFailure,
   WorkspaceFile,
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
@@ -68,17 +74,22 @@ import {
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
+  summarizeExportFailures,
 } from "./export";
 import {
   loadRecentFiles,
   loadRecentWorkspaces,
   loadLastDocumentPath,
+  loadOpenTabs,
   loadReadingPosition,
+  loadSidebarCollapsed,
   loadWorkspacePath,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
+  saveOpenTabs,
   saveReadingPosition,
+  saveSidebarCollapsed,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -98,6 +109,9 @@ import {
   isCurrentWorkspaceLoad,
   isSelfWrittenChangePending,
 } from "./workspace-refresh";
+import { createWorkspaceOpenPlan } from "./workspace-open";
+import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
+import { shouldConfirmDocumentReplacement, shouldConfirmWorkspaceSwitch } from "./document-transition";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -160,6 +174,38 @@ function safeDecode(value: string): string {
   }
 }
 
+type CurrentHeading = {
+  id: string;
+  text: string;
+};
+
+function currentHeadingFromArticle(
+  article: HTMLElement | null,
+  contentArea: HTMLElement | null,
+): CurrentHeading | null {
+  if (!article) return null;
+
+  const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));
+  if (headings.length === 0) return null;
+
+  const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+  const isAtBottom = Boolean(contentArea && contentArea.scrollTop >= maxScrollTop - 2);
+  let currentHeading: HTMLElement | undefined;
+  if (isAtBottom) {
+    currentHeading = headings[headings.length - 1];
+  } else {
+    const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;
+      else break;
+    }
+  }
+
+  const heading = currentHeading ?? headings[0];
+  const text = heading.textContent?.trim() ?? "";
+  return text ? { id: heading.id, text } : null;
+}
+
 function readSavedTheme(): ThemeMode {
   try {
     const saved = localStorage.getItem("moyang-reader-theme");
@@ -197,6 +243,20 @@ type BrowserDocument = {
   previewUrl?: string;
 };
 
+type PrintPreviewState = {
+  title: string;
+  html: string;
+  paper: ExportPaper;
+  orientation: ExportOrientation;
+  margin: ExportMargin;
+};
+
+type WorkspaceExportProgress = {
+  current: number;
+  total: number;
+  fileName: string;
+};
+
 export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -209,6 +269,7 @@ export function App() {
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
   const [focusMode, setFocusMode] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -219,7 +280,11 @@ export function App() {
   const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
   const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
+  const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
+  const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
+  const [workspaceOpening, setWorkspaceOpening] = useState(false);
+  const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -235,9 +300,15 @@ export function App() {
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [currentHeading, setCurrentHeading] = useState<string | null>(null);
+  const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
+  const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
@@ -252,6 +323,37 @@ export function App() {
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
 
+  const confirmDocumentReplacement = useCallback((nextPaths: readonly string[], message: string) => {
+    if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;
+    return window.confirm(message);
+  }, []);
+
+  const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, message: string) => {
+    const currentDocument = documentStateRef.current;
+    if (
+      !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)
+    ) {
+      return true;
+    }
+    return window.confirm(message);
+  }, []);
+
+  const updateReadingRail = useCallback(() => {
+    const contentArea = contentAreaRef.current;
+    const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+    const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;
+    setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));
+    const heading = currentHeadingFromArticle(articleRef.current, contentArea);
+    setCurrentHeading((current) => (current === (heading?.text ?? null) ? current : (heading?.text ?? null)));
+    setCurrentHeadingId((current) => (current === (heading?.id || null) ? current : heading?.id || null));
+  }, []);
+
+  const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+    contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });
+  }, []);
+
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
     setPreferences((current) => {
       const next = { ...current, ...changes };
@@ -263,6 +365,19 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    if (tabSessionReady) saveOpenTabs(openTabs);
+  }, [openTabs, tabSessionReady]);
+
+  useEffect(() => {
+    saveSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    setWorkspaceExportFailures([]);
+    setWorkspaceExportNotice(null);
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -296,6 +411,34 @@ export function App() {
       saveReadingPosition(path, contentArea.scrollTop);
     };
   }, [documentState?.path]);
+
+  useEffect(() => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    let frame: number | null = null;
+    const update = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        updateReadingRail();
+      });
+    };
+
+    contentArea.addEventListener("scroll", update, { passive: true });
+    updateReadingRail();
+    return () => {
+      contentArea.removeEventListener("scroll", update);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);
+
+  useEffect(() => {
+    if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
+    setReadingProgress(0);
+    setCurrentHeading(null);
+    setCurrentHeadingId(null);
+  }, [documentState, mode]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -547,6 +690,7 @@ export function App() {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
         setSelectedTag(null);
+        setSelectedFileKind("all");
       }
       setWorkspaceRevision((current) => current + 1);
       saveWorkspacePath(root);
@@ -593,23 +737,28 @@ export function App() {
 
   const handleChooseWorkspace = useCallback(async () => {
     const selected = await chooseWorkspacePath();
-    if (selected) await loadWorkspace(selected);
-  }, [loadWorkspace]);
+    if (selected && confirmWorkspaceSwitch(selected, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")) {
+      await loadWorkspace(selected);
+    }
+  }, [confirmWorkspaceSwitch, loadWorkspace]);
 
   const handleOpenRecentWorkspace = useCallback(
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, true);
+        if (!confirmWorkspaceSwitch(authorizedPath, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")) {
+          return;
+        }
         await loadWorkspace(authorizedPath);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "最近阅读库无法打开，请重新选择文件夹。");
       }
     },
-    [loadWorkspace],
+    [confirmWorkspaceSwitch, loadWorkspace],
   );
 
   const openSource = useCallback(
-    async (path: string, source: string) => {
+    async (path: string, source: string): Promise<boolean> => {
       setLoading(true);
       setError(null);
 
@@ -640,8 +789,10 @@ export function App() {
           saveLastDocumentPath(path);
         }
         setMode("rendered");
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -650,7 +801,7 @@ export function App() {
   );
 
   const openBinary = useCallback(
-    async (path: string, bytes: Uint8Array) => {
+    async (path: string, bytes: Uint8Array): Promise<boolean> => {
       const kind = documentKindFromPath(path);
       if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
         throw new Error("当前文件不是可预览的文档。");
@@ -699,8 +850,10 @@ export function App() {
           saveLastDocumentPath(path);
         }
         setMode("rendered");
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档预览失败。");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -709,29 +862,29 @@ export function App() {
   );
 
   const openPath = useCallback(
-    async (path: string) => {
+    async (path: string): Promise<boolean> => {
       try {
         if (path.startsWith("browser://")) {
           const cached = browserDocumentsRef.current.get(path);
           if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
           if (cached.bytes) {
-            await openBinary(path, cached.bytes);
+            return await openBinary(path, cached.bytes);
           } else if (cached.source !== undefined) {
-            await openSource(path, cached.source);
+            return await openSource(path, cached.source);
           }
-          return;
+          return false;
         }
 
         const kind = documentKindFromPath(path);
         if (kind === "docx" || kind === "pdf" || kind === "image") {
-          await openBinary(path, await readBinaryFile(path));
-          return;
+          return await openBinary(path, await readBinaryFile(path));
         }
 
         const source = await readTextFile(path);
-        await openSource(path, source);
+        return await openSource(path, source);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文件打开失败。");
+        return false;
       }
     },
     [openBinary, openSource],
@@ -739,6 +892,22 @@ export function App() {
 
   const handleOpenPaths = useCallback(
     async (paths: OpenPath[]) => {
+      const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);
+      const workspacePathToConfirm = workspacePaths.find((path) =>
+        shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
+      );
+      if (
+        workspacePathToConfirm &&
+        !confirmWorkspaceSwitch(workspacePathToConfirm, "当前文档有未保存修改，切换阅读库后将丢失这些修改。继续吗？")
+      ) {
+        return;
+      }
+
+      const documentPaths = paths.filter((entry) => entry.kind === "document").map((entry) => entry.path);
+      if (!confirmDocumentReplacement(documentPaths, "当前文档有未保存修改，打开新文档后将丢失这些修改。继续吗？")) {
+        return;
+      }
+
       const seen = new Set<string>();
       for (const entry of paths) {
         const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
@@ -759,7 +928,7 @@ export function App() {
         }
       }
     },
-    [loadWorkspace, openPath],
+    [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
   );
 
   const handleCreateNote = useCallback(
@@ -842,8 +1011,26 @@ export function App() {
         }
 
         if (paths.length === 0) {
+          const restoredTabs: RecentFile[] = [];
+          for (const tab of loadOpenTabs()) {
+            try {
+              const authorizedDocument = await authorizeStoredPath(tab.path, false);
+              if (!active) return;
+              restoredTabs.push({ path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });
+            } catch {
+              // Stale tabs are discarded without blocking the next launch.
+            }
+          }
+          if (!active) return;
+          setOpenTabs(restoredTabs);
+
           const lastDocument = loadLastDocumentPath();
-          if (lastDocument) {
+          const activeTab =
+            restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??
+            restoredTabs[restoredTabs.length - 1];
+          if (activeTab) {
+            await openPath(activeTab.path);
+          } else if (lastDocument) {
             try {
               const authorizedDocument = await authorizeStoredPath(lastDocument, false);
               if (!active) return;
@@ -856,11 +1043,8 @@ export function App() {
       }
 
       if (active) await handleOpenPaths(paths);
-      const dispose = await subscribeToOpenPaths((nextPaths) => {
-        if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
-          return;
-        void handleOpenPaths(nextPaths);
-      });
+      if (active) setTabSessionReady(true);
+      const dispose = await subscribeToOpenPaths((nextPaths) => void handleOpenPaths(nextPaths));
       if (active) unlisten = dispose;
       else dispose?.();
     })();
@@ -878,7 +1062,6 @@ export function App() {
     let unlisten: (() => void) | null = null;
     void subscribeToFileDrop((paths) => {
       if (!active) return;
-      if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开拖入的路径吗？")) return;
       void resolveOpenPaths(paths)
         .then((entries) => {
           if (active) return handleOpenPaths(entries);
@@ -1015,6 +1198,10 @@ export function App() {
         event.preventDefault();
         setQuickOpen(true);
       }
+      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setSidebarCollapsed((current) => !current);
+      }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
         setFocusMode(false);
@@ -1081,7 +1268,36 @@ export function App() {
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
 
-  const handleExport = useCallback(() => {
+  const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
+
+    const body = isTauriRuntime()
+      ? await inlineLocalImages(
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        )
+      : documentState.rendered.html;
+
+    return buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+
+  const handleExport = useCallback(async () => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
       const anchor = document.createElement("a");
       anchor.href = documentState.previewUrl;
@@ -1090,8 +1306,53 @@ export function App() {
       anchor.click();
       return;
     }
-    window.print();
-  }, [documentState?.kind, documentState?.previewUrl]);
+
+    try {
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      await printHtmlDocument(html);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+    }
+  }, [buildCurrentExportHtml, documentState]);
+
+  const handlePreviewPrint = useCallback(async () => {
+    if (!documentState) return;
+
+    try {
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      setPrintPreview({
+        title: documentState.name,
+        html,
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "生成打印版式预览失败。");
+    }
+  }, [
+    buildCurrentExportHtml,
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+  ]);
+
+  const handlePrintPreview = useCallback(async () => {
+    if (!printPreview) return;
+
+    try {
+      await printHtmlDocument(printPreview.html);
+      setPrintPreview(null);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+    }
+  }, [printPreview]);
 
   const handleCopy = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -1141,7 +1402,16 @@ export function App() {
           fileSize,
         )
       : documentState.rendered.html;
-    const contents = buildHtmlExport(documentState.name, body);
+    const contents = buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
     try {
       if (isTauriRuntime()) {
         const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");
@@ -1154,7 +1424,7 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");
     }
-  }, [documentState]);
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleExportDocx = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
@@ -1173,7 +1443,11 @@ export function App() {
             fileSize,
           )
         : documentState.rendered.html;
-      const contents = await buildDocxExport(documentState.name, body);
+      const contents = await buildDocxExport(documentState.name, body, {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
 
       if (isTauriRuntime()) {
         const defaultPath =
@@ -1194,16 +1468,14 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 Word 失败。");
     }
-  }, [documentState]);
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleBrowserFiles = useCallback(
     async (files: FileList | File[] | null | undefined) => {
       const selectedFiles = Array.from(files ?? []);
       if (selectedFiles.length === 0) return;
-      if (
-        documentStateRef.current?.modified &&
-        !window.confirm("当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")
-      ) {
+      const nextPaths = selectedFiles.map((file) => `browser://${file.name}`);
+      if (!confirmDocumentReplacement(nextPaths, "当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")) {
         return;
       }
 
@@ -1217,13 +1489,13 @@ export function App() {
         }
       }
     },
-    [openBinary, openSource],
+    [confirmDocumentReplacement, openBinary, openSource],
   );
 
   const handleSelectTab = useCallback(
     async (path: string) => {
       if (path === documentState?.path) return;
-      if (documentState?.modified && !window.confirm("当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
+      if (!confirmDocumentReplacement([path], "当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
       try {
         const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
         await openPath(authorizedPath);
@@ -1231,7 +1503,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");
       }
     },
-    [documentState, openPath],
+    [confirmDocumentReplacement, documentState, openPath],
   );
 
   const handleCloseTab = useCallback(
@@ -1292,7 +1564,7 @@ export function App() {
           setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
           return;
         }
-        void openPath(path).then(() => {
+        void handleSelectTab(path).then(() => {
           if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
         });
         return;
@@ -1335,11 +1607,11 @@ export function App() {
         setError("无法解析这个本地文档链接。");
         return;
       }
-      void openPath(path).then(() => {
+      void handleSelectTab(path).then(() => {
         if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
       });
     },
-    [documentState, openPath, workspaceIndex],
+    [documentState, handleSelectTab, workspaceIndex],
   );
 
   useEffect(() => {
@@ -1489,15 +1761,28 @@ export function App() {
   const availableTags = Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) =>
     a.localeCompare(b),
   );
-  const taggedFilePaths = new Set(
-    workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path),
+  const taggedFilePaths = useMemo(
+    () =>
+      new Set(workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path)),
+    [selectedTag, workspaceIndex],
   );
-  const visibleWorkspaceFiles = selectedTag
-    ? workspaceFiles.filter((file) => taggedFilePaths.has(file.path))
-    : workspaceFiles;
-  const visibleWorkspaceResults = selectedTag
-    ? workspaceResults.filter((result) => taggedFilePaths.has(result.file.path))
-    : workspaceResults;
+  const visibleWorkspaceFiles = useMemo(
+    () => workspaceFiles.filter((file) => matchesWorkspaceFilter(file, selectedFileKind, selectedTag, taggedFilePaths)),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceFiles],
+  );
+  const visibleWorkspaceResults = useMemo(
+    () =>
+      workspaceResults.filter((result) =>
+        matchesWorkspaceFilter(result.file, selectedFileKind, selectedTag, taggedFilePaths),
+      ),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceResults],
+  );
+  const workspaceActionFiles = useMemo(() => {
+    const query = workspaceQuery.trim();
+    if (!query) return visibleWorkspaceFiles;
+    if (query.length < 2 || workspaceSearchLoading) return [];
+    return visibleWorkspaceResults.map((result) => result.file);
+  }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
     const add = (candidate: QuickOpenCandidate) => {
@@ -1513,9 +1798,46 @@ export function App() {
     return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
   }, [openTabs, recentFiles, workspaceFiles]);
 
+  const handleOpenWorkspaceFiles = useCallback(async () => {
+    if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
+
+    const plan = createWorkspaceOpenPlan(workspaceActionFiles);
+    if (plan.files.length === 0) return;
+    if (
+      !confirmDocumentReplacement(
+        plan.files.map((file) => file.path),
+        "当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？",
+      )
+    ) {
+      return;
+    }
+
+    setWorkspaceOpening(true);
+    setWorkspaceOpenNotice(null);
+    setError(null);
+
+    let opened = 0;
+    try {
+      for (const file of plan.files) {
+        if (await openPath(file.path)) opened += 1;
+      }
+
+      const failed = plan.files.length - opened;
+      const details = [
+        `已打开 ${opened} 个文档`,
+        failed > 0 ? `失败 ${failed} 个` : "",
+        plan.skippedCount > 0 ? `为保持轻量跳过 ${plan.skippedCount} 个` : "",
+      ].filter(Boolean);
+      setWorkspaceOpenNotice(`${details.join("，")}。`);
+      if (failed > 0) setError(`有 ${failed} 个文档无法打开，请查看当前文件是否仍然存在。`);
+    } finally {
+      setWorkspaceOpening(false);
+    }
+  }, [confirmDocumentReplacement, openPath, workspaceActionFiles, workspacePath]);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
-      if (!workspacePath || visibleWorkspaceFiles.length === 0 || !isTauriRuntime()) return;
+      if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
 
       const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
       const savePath =
@@ -1525,14 +1847,25 @@ export function App() {
       if (format !== "pdf" && !savePath) return;
 
       setWorkspaceExporting(true);
+      setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
+      setWorkspaceExportFailures([]);
       setWorkspaceExportNotice(null);
       setError(null);
 
       let exported = 0;
-      let skipped = 0;
+      const skippedFiles: WorkspaceExportFailure[] = [];
+      const recordSkippedFile = (fileName: string, reason: string) => {
+        skippedFiles.push({ fileName, reason });
+        setWorkspaceExportFailures([...skippedFiles]);
+      };
       try {
         const documents = [];
-        for (const file of visibleWorkspaceFiles) {
+        for (const [index, file] of workspaceActionFiles.entries()) {
+          setWorkspaceExportProgress({
+            current: index + 1,
+            total: workspaceActionFiles.length,
+            fileName: file.relativePath,
+          });
           try {
             let rendered;
             if (file.kind === "docx") {
@@ -1544,7 +1877,7 @@ export function App() {
                 allowRemoteResources: preferences.allowRemoteResources,
               });
             } else {
-              skipped += 1;
+              recordSkippedFile(file.relativePath, "类型不支持");
               continue;
             }
 
@@ -1562,41 +1895,72 @@ export function App() {
             documents.push({ title: file.relativePath, body });
             exported += 1;
           } catch {
-            skipped += 1;
+            recordSkippedFile(file.relativePath, "读取失败");
           }
         }
 
-        if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
+        if (documents.length === 0) {
+          const failureSummary = summarizeExportFailures(
+            skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+          );
+          throw new Error(
+            failureSummary
+              ? `当前筛选中没有可导出的文档。跳过 ${skippedFiles.length} 个：${failureSummary}`
+              : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",
+          );
+        }
         const exportTitle = `${workspaceName} 阅读库`;
+        const exportOptions = {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        };
         if (format === "html") {
           if (!savePath) throw new Error("没有选择 HTML 保存位置。");
-          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents));
+          await writeTextFile(savePath, buildBatchHtmlExport(exportTitle, documents, exportOptions));
         } else if (format === "docx") {
           if (!savePath) throw new Error("没有选择 Word 保存位置。");
-          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents));
+          await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents, exportOptions));
         } else {
-          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents));
+          setPrintPreview({
+            title: `${exportTitle} · 批量打印`,
+            html: buildBatchHtmlExport(exportTitle, documents, exportOptions),
+            paper: exportOptions.paper,
+            orientation: exportOptions.orientation,
+            margin: exportOptions.margin,
+          });
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
+        const failureSummary = summarizeExportFailures(
+          skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+        );
         setWorkspaceExportNotice(
           `${format === "pdf" ? "已打开批量打印预览，共 " : `已导出 ${exported} 篇文档为 ${formatLabel}`}${
             format === "pdf" ? `${exported} 篇文档` : ""
-          }${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
+          }${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
         );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "批量导出失败。");
       } finally {
         setWorkspaceExporting(false);
+        setWorkspaceExportProgress(null);
       }
     },
-    [preferences.allowRemoteResources, visibleWorkspaceFiles, workspacePath],
+    [
+      preferences.allowRemoteResources,
+      preferences.exportMargin,
+      preferences.exportOrientation,
+      preferences.exportPaper,
+      workspaceActionFiles,
+      workspacePath,
+    ],
   );
 
   return (
     <div
       className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
-      }`}
+      }${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -1612,8 +1976,14 @@ export function App() {
         theme={theme}
         readingScale={preferences.readingScale}
         readingWidth={preferences.readingWidth}
+        exportPaper={preferences.exportPaper}
+        exportOrientation={preferences.exportOrientation}
+        exportMargin={preferences.exportMargin}
         onReadingScaleChange={(scale) => setReaderPreferences({ readingScale: scale })}
         onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
+        onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}
+        onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}
+        onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
@@ -1621,16 +1991,20 @@ export function App() {
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
         onCopy={() => void handleCopy()}
         copyFeedback={copyFeedback}
-        onExport={handleExport}
+        onExport={() => void handleExport()}
         exportLabel={
           documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
         }
+        canPreviewPrint={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        onPreviewPrint={() => void handlePreviewPrint()}
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
@@ -1677,13 +2051,20 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
+            onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             workspaceExporting={workspaceExporting}
+            workspaceExportProgress={workspaceExportProgress}
+            workspaceExportFailures={workspaceExportFailures}
             workspaceExportNotice={workspaceExportNotice}
+            workspaceOpening={workspaceOpening}
+            workspaceOpenNotice={workspaceOpenNotice}
             workspaceIndexLoading={workspaceIndexLoading}
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}
+            openableFiles={workspaceActionFiles}
+            exportableFiles={workspaceActionFiles}
             recentFiles={recentFiles}
             recentWorkspaces={recentWorkspaces}
             activePath={documentState?.path ?? null}
@@ -1692,11 +2073,17 @@ export function App() {
             searchLoading={workspaceSearchLoading}
             tagOptions={availableTags}
             selectedTag={selectedTag}
+            selectedKind={selectedFileKind}
             onChooseWorkspace={() => void handleChooseWorkspace()}
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onOpenFile={(path) => void handleSelectTab(path)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
+            onKindChange={setSelectedFileKind}
+            onClearFilters={() => {
+              setSelectedTag(null);
+              setSelectedFileKind("all");
+            }}
           />
           {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}
           {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}
@@ -1718,7 +2105,7 @@ export function App() {
                   </div>
                 </div>
               </div>
-              <Outline items={documentState.rendered.toc} />
+              <Outline items={documentState.rendered.toc} activeId={currentHeadingId} />
               <RelatedPanel
                 entry={currentIndexEntry}
                 backlinks={backlinks}
@@ -1740,6 +2127,16 @@ export function App() {
         </aside>
 
         <main ref={contentAreaRef} className="content-area" aria-live="polite">
+          {sidebarCollapsed && !focusMode && (
+            <button
+              type="button"
+              className="sidebar-restore"
+              onClick={() => setSidebarCollapsed(false)}
+              title="显示侧栏 (Ctrl+Shift+B)"
+            >
+              显示侧栏 <span>Ctrl+Shift+B</span>
+            </button>
+          )}
           {focusMode && (
             <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
               退出专注 <span>Esc</span>
@@ -1775,15 +2172,31 @@ export function App() {
             documentState.kind !== "pdf" &&
             documentState.kind !== "image" &&
             mode === "rendered" && (
-              <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
-                {!startsWithHeading(documentState.rendered.html) && (
-                  <header className="print-document-header" aria-hidden="true">
-                    <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
-                    <div className="print-document-title">{documentState.name}</div>
-                  </header>
-                )}
-                <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
-              </article>
+              <div className="reader-stage">
+                <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                  <div className="reader-meta" aria-label="文档信息">
+                    <span className="reader-meta-kicker">DOCUMENT</span>
+                    <span>
+                      {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")}{" "}
+                      字 · {documentState.rendered.readingMinutes} 分钟阅读
+                    </span>
+                  </div>
+                  {!startsWithHeading(documentState.rendered.html) && (
+                    <header className="print-document-header" aria-hidden="true">
+                      <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
+                      <div className="print-document-title">{documentState.name}</div>
+                    </header>
+                  )}
+                  <div dangerouslySetInnerHTML={{ __html: documentState.rendered.html }} />
+                </article>
+                <ReadingRail
+                  progress={readingProgress}
+                  currentHeading={currentHeading}
+                  headingCount={documentState.rendered.toc.length}
+                  onScrollToTop={() => scrollToReaderEdge("top")}
+                  onScrollToBottom={() => scrollToReaderEdge("bottom")}
+                />
+              </div>
             )}
           {!loading && documentState && canEdit && mode === "source" && (
             <textarea
@@ -1828,6 +2241,17 @@ export function App() {
           entries={workspaceIndex}
           onClose={() => setGraphOpen(false)}
           onOpenFile={(path) => void handleSelectTab(path)}
+        />
+      )}
+      {printPreview && (
+        <PrintPreview
+          title={printPreview.title}
+          html={printPreview.html}
+          paper={printPreview.paper}
+          orientation={printPreview.orientation}
+          margin={printPreview.margin}
+          onPrint={handlePrintPreview}
+          onClose={() => setPrintPreview(null)}
         />
       )}
       {quickOpen && (

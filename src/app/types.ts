@@ -8,6 +8,12 @@ export type ReadingScale = "small" | "medium" | "large";
 
 export type ReadingWidth = "narrow" | "standard" | "wide";
 
+export type ExportPaper = "a4" | "letter";
+
+export type ExportOrientation = "portrait" | "landscape";
+
+export type ExportMargin = "compact" | "standard" | "wide";
+
 export type OpenPath = {
   path: string;
   kind: "document" | "workspace";
@@ -24,6 +30,11 @@ export type WorkspaceFile = {
 export type WorkspaceSearchResult = {
   file: WorkspaceFile;
   preview: string;
+};
+
+export type WorkspaceExportFailure = {
+  fileName: string;
+  reason: string;
 };
 
 export type WorkspaceIndexEntry = {

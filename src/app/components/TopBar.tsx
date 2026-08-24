@@ -1,4 +1,5 @@
-import type { ReadingScale, ReadingWidth, ThemeMode } from "../types";
+import { useRef } from "react";
+import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth, ThemeMode } from "../types";
 import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
@@ -13,11 +14,19 @@ type TopBarProps = {
   theme: ThemeMode;
   readingScale: ReadingScale;
   readingWidth: ReadingWidth;
+  exportPaper: ExportPaper;
+  exportOrientation: ExportOrientation;
+  exportMargin: ExportMargin;
   onReadingScaleChange: (scale: ReadingScale) => void;
   onReadingWidthChange: (width: ReadingWidth) => void;
+  onExportPaperChange: (paper: ExportPaper) => void;
+  onExportOrientationChange: (orientation: ExportOrientation) => void;
+  onExportMarginChange: (margin: ExportMargin) => void;
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   focusMode: boolean;
   onToggleFocusMode: () => void;
   onToggleMode: () => void;
@@ -27,6 +36,8 @@ type TopBarProps = {
   canCopy: boolean;
   onExport: () => void;
   exportLabel?: string;
+  canPreviewPrint: boolean;
+  onPreviewPrint: () => void;
   canExportMarkdown: boolean;
   canExportHtml: boolean;
   canExportDocx: boolean;
@@ -60,11 +71,19 @@ export function TopBar({
   theme,
   readingScale,
   readingWidth,
+  exportPaper,
+  exportOrientation,
+  exportMargin,
   onReadingScaleChange,
   onReadingWidthChange,
+  onExportPaperChange,
+  onExportOrientationChange,
+  onExportMarginChange,
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  sidebarCollapsed,
+  onToggleSidebar,
   focusMode,
   onToggleFocusMode,
   onToggleMode,
@@ -74,6 +93,8 @@ export function TopBar({
   canCopy,
   onExport,
   exportLabel = "打印 / PDF",
+  canPreviewPrint,
+  onPreviewPrint,
   canExportMarkdown,
   canExportHtml,
   canExportDocx,
@@ -94,6 +115,7 @@ export function TopBar({
   onCloseSearch,
   onCycleTheme,
 }: TopBarProps) {
+  const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const updateLabel =
     updateStatus === "checking"
@@ -140,6 +162,15 @@ export function TopBar({
         </button>
         <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
           快速打开
+        </button>
+        <button
+          type="button"
+          className="toolbar-button sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-pressed={sidebarCollapsed}
+          title={sidebarCollapsed ? "显示侧栏 (Ctrl+Shift+B)" : "隐藏侧栏 (Ctrl+Shift+B)"}
+        >
+          {sidebarCollapsed ? "显示侧栏" : "侧栏"}
         </button>
         <button
           type="button"
@@ -218,6 +249,42 @@ export function TopBar({
                 <option value="wide">宽</option>
               </select>
             </label>
+            <div className="settings-divider">导出排版</div>
+            <label className="settings-select-option">
+              <span>导出纸张</span>
+              <select
+                aria-label="导出纸张"
+                value={exportPaper}
+                onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
+              >
+                <option value="a4">A4</option>
+                <option value="letter">Letter</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>导出方向</span>
+              <select
+                aria-label="导出方向"
+                value={exportOrientation}
+                onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
+              >
+                <option value="portrait">纵向</option>
+                <option value="landscape">横向</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>导出页边距</span>
+              <select
+                aria-label="导出页边距"
+                value={exportMargin}
+                onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
+              >
+                <option value="compact">紧凑</option>
+                <option value="standard">标准</option>
+                <option value="wide">宽松</option>
+              </select>
+            </label>
+            <small className="settings-note">应用于打印 / PDF、HTML 和 Word 导出。</small>
           </div>
         </details>
         <button
@@ -233,11 +300,28 @@ export function TopBar({
           {exportLabel}
         </button>
         {(canExportMarkdown || canExportHtml || canExportDocx) && (
-          <details className="export-menu">
+          <details ref={exportMenuRef} className="export-menu">
             <summary className="toolbar-button" title="导出文件">
               导出
             </summary>
             <div className="export-menu-panel">
+              {canPreviewPrint && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const menu = exportMenuRef.current;
+                    if (menu) {
+                      menu.open = false;
+                      menu.removeAttribute("open");
+                    }
+                    onPreviewPrint();
+                  }}
+                >
+                  预览打印版式
+                </button>
+              )}
               {canExportMarkdown && (
                 <button type="button" onClick={onExportMarkdown}>
                   导出 Markdown / 文本

@@ -12,6 +12,7 @@ import {
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
+  summarizeExportFailures,
 } from "./export";
 
 describe("document export helpers", () => {
@@ -31,6 +32,30 @@ describe("document export helpers", () => {
     expect(html).toContain('src="cover.png"');
     expect(html).toContain('href="下一篇.md"');
     expect(html).toContain("<!doctype html>");
+    expect(html).toContain("@page { size: A4 portrait; margin: 22mm 18mm; }");
+    expect(html).toContain("MOYANG READER · EXPORT");
+  });
+
+  it("applies custom paper, orientation, and margin settings to HTML export", () => {
+    const html = buildHtmlExport("报告", "<p>正文</p>", {
+      paper: "letter",
+      orientation: "landscape",
+      margin: "compact",
+    });
+
+    expect(html).toContain("@page { size: Letter landscape; margin: 14mm 14mm; }");
+  });
+
+  it("adds a linked outline to a single-document HTML export", () => {
+    const html = buildHtmlExport("报告", '<h1 id="intro">介绍</h1><h2 id="details">细节</h2>', undefined, [
+      { id: "intro", depth: 1, text: "介绍" },
+      { id: "details", depth: 2, text: "细节" },
+    ]);
+
+    expect(html).toContain('class="export-toc"');
+    expect(html).toContain('href="#intro"');
+    expect(html).toContain('href="#details"');
+    expect(html).toContain("padding-left:12px");
   });
 
   it("converts rendered HTML into a compact plain-text fallback", () => {
@@ -93,6 +118,12 @@ describe("document export helpers", () => {
     expect(sizes).toEqual(["C:\\Notes\\large.png"]);
     expect(reads).toEqual([]);
     expect(html).toContain('src="moyang-embed:large.png"');
+  });
+
+  it("summarizes unique export failures without hiding the count", () => {
+    expect(summarizeExportFailures([])).toBe("");
+    expect(summarizeExportFailures(["a.md", "a.md", "b.docx"], 3)).toBe("a.md、b.docx");
+    expect(summarizeExportFailures(["a.md", "b.docx", "c.txt", "d.pdf"], 3)).toBe("a.md、b.docx、c.txt 等 4 个");
   });
 
   it("builds a single HTML document with a linked table of contents", () => {
@@ -185,5 +216,38 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("第一篇正文");
     expect(documentXml).toContain("第二篇正文");
     expect(documentXml).toContain("<w:pageBreakBefore/>");
+  });
+
+  it("applies custom page layout settings to DOCX export", async () => {
+    const bytes = await buildDocxExport("Letter", "<p>正文</p>", {
+      paper: "letter",
+      orientation: "landscape",
+      margin: "wide",
+    });
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+
+    expect(documentXml).toContain('w:w="15840" w:h="12240" w:orient="landscape"');
+    expect(documentXml).toContain('w:top="2160" w:right="2160" w:bottom="2160" w:left="2160"');
+  });
+
+  it("adds reusable header, footer, and page-number fields to DOCX exports", async () => {
+    const bytes = await buildDocxExport("页眉页脚示例", "<p>正文</p>");
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const headerXml = await zip.file("word/header1.xml")?.async("string");
+    const footerXml = await zip.file("word/footer1.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+    const contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
+
+    expect(documentXml).toContain('w:headerReference w:type="default" r:id="rIdHeader"');
+    expect(documentXml).toContain('w:footerReference w:type="default" r:id="rIdFooter"');
+    expect(headerXml).toContain("页眉页脚示例");
+    expect(footerXml).toContain('w:fldSimple w:instr="PAGE"');
+    expect(footerXml).toContain('w:fldSimple w:instr="NUMPAGES"');
+    expect(relationshipsXml).toContain('Id="rIdHeader"');
+    expect(relationshipsXml).toContain('Id="rIdFooter"');
+    expect(contentTypesXml).toContain("/word/header1.xml");
+    expect(contentTypesXml).toContain("/word/footer1.xml");
   });
 });

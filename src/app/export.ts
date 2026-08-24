@@ -1,4 +1,17 @@
 import { escapeHtml } from "../lib/text";
+import type { ExportMargin, ExportOrientation, ExportPaper, TocItem } from "./types";
+
+export type ExportOptions = {
+  paper: ExportPaper;
+  orientation: ExportOrientation;
+  margin: ExportMargin;
+};
+
+export const defaultExportOptions: ExportOptions = {
+  paper: "a4",
+  orientation: "portrait",
+  margin: "standard",
+};
 
 export function fileNameWithExtension(name: string, extension: string): string {
   const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
@@ -106,7 +119,55 @@ export async function inlineLocalImages(
   });
 }
 
-export function buildHtmlExport(title: string, body: string): string {
+export function summarizeExportFailures(paths: string[], maxItems = 3): string {
+  const unique = Array.from(new Set(paths.map((path) => path.trim()).filter(Boolean)));
+  if (unique.length === 0) return "";
+
+  const limit = Number.isFinite(maxItems) ? Math.max(1, Math.floor(maxItems)) : 3;
+  const preview = unique.slice(0, limit).join("、");
+  return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
+}
+
+function exportMargin(options: ExportOptions): string {
+  return options.margin === "compact" ? "14mm 14mm" : options.margin === "wide" ? "28mm 24mm" : "22mm 18mm";
+}
+
+function exportPageSize(options: ExportOptions): string {
+  return options.paper === "letter" ? "Letter" : "A4";
+}
+
+function exportTocMarkup(items: TocItem[]): string {
+  if (items.length < 2) return "";
+
+  const links = items
+    .map(
+      (item) =>
+        `<li style="padding-left:${Math.max(0, item.depth - 1) * 12}px"><a href="#${escapeHtml(item.id)}">${escapeHtml(item.text)}</a></li>`,
+    )
+    .join("");
+  return `<nav class="export-toc" aria-label="文档目录"><strong>文档目录</strong><ol>${links}</ol></nav>`;
+}
+
+function docxPageLayoutXml(options: ExportOptions): string {
+  const isLetter = options.paper === "letter";
+  const isLandscape = options.orientation === "landscape";
+  const portraitWidth = isLetter ? 12240 : 11906;
+  const portraitHeight = isLetter ? 15840 : 16838;
+  const width = isLandscape ? portraitHeight : portraitWidth;
+  const height = isLandscape ? portraitWidth : portraitHeight;
+  const margin = options.margin === "compact" ? 720 : options.margin === "wide" ? 2160 : 1440;
+  const orientation = isLandscape ? ' w:orient="landscape"' : "";
+
+  return `<w:headerReference w:type="default" r:id="rIdHeader"/><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="${width}" w:h="${height}"${orientation}/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="720" w:footer="720" w:gutter="0"/>`;
+}
+
+export function buildHtmlExport(
+  title: string,
+  body: string,
+  options: ExportOptions = defaultExportOptions,
+  toc: TocItem[] = [],
+): string {
+  const tocMarkup = exportTocMarkup(toc);
   return (
     "<!doctype html>\n" +
     '<html lang="zh-CN">\n' +
@@ -117,13 +178,22 @@ export function buildHtmlExport(title: string, body: string): string {
     escapeHtml(title) +
     "</title>\n" +
     "  <style>\n" +
-    "    @page { size: auto; margin: 22mm 18mm; }\n" +
+    `    @page { size: ${exportPageSize(options)} ${options.orientation}; margin: ${exportMargin(options)}; }\n` +
     "    :root { color-scheme: light; }\n" +
     '    body { max-width: 860px; margin: 0 auto; color: #35332f; background: #fff; font-family: Georgia, "Songti SC", "STSong", serif; font-size: 17px; line-height: 1.85; }\n' +
     '    h1, h2, h3, h4 { color: #292825; font-family: Georgia, "Songti SC", "STSong", serif; font-weight: 500; line-height: 1.25; }\n' +
     "    h1 { margin: 0 0 30px; font-size: 42px; }\n" +
     "    h2 { margin: 50px 0 16px; font-size: 29px; }\n" +
     "    h3 { margin: 35px 0 12px; font-size: 23px; }\n" +
+    "    .export-header { margin: 0 0 42px; padding: 0 0 18px; border-bottom: 1px solid #d9d5cc; break-after: avoid; }\n" +
+    "    .export-kicker { margin-bottom: 8px; color: #6d716b; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: .12em; }\n" +
+    "    .export-header h1 { margin: 0; font-size: 38px; }\n" +
+    "    .export-footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid #d9d5cc; color: #8a8982; font-family: Arial, sans-serif; font-size: 11px; }\n" +
+    "    .export-toc { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; break-inside: avoid; }\n" +
+    "    .export-toc strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
+    "    .export-toc ol { margin: 0; padding-left: 22px; }\n" +
+    "    .export-toc li { margin: 3px 0; }\n" +
+    "    .export-toc a { color: #28655f; text-decoration: none; }\n" +
     "    .batch-index { margin: 0 0 42px; padding: 16px 20px; border: 1px solid #d9d5cc; background: #f8f7f3; }\n" +
     "    .batch-index strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
     "    .batch-index ol { margin: 0; padding-left: 22px; }\n" +
@@ -140,9 +210,13 @@ export function buildHtmlExport(title: string, body: string): string {
     "  </style>\n" +
     "</head>\n" +
     "<body>\n" +
+    '  <header class="export-header"><div class="export-kicker">MOYANG READER · EXPORT</div><h1>' +
+    escapeHtml(title) +
+    "</h1></header>\n" +
+    tocMarkup +
     '  <main class="reader-content">' +
     normalizeExportLinks(body) +
-    "</main>\n" +
+    '</main><footer class="export-footer">由 Moyang Reader 导出</footer>\n' +
     "</body>\n" +
     "</html>\n"
   );
@@ -153,7 +227,11 @@ export type HtmlExportDocument = {
   body: string;
 };
 
-export function buildBatchHtmlExport(title: string, documents: HtmlExportDocument[]): string {
+export function buildBatchHtmlExport(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+): string {
   const index = documents
     .map((document, index) => `<li><a href="#moyang-document-${index}">${escapeHtml(document.title)}</a></li>`)
     .join("");
@@ -165,7 +243,7 @@ export function buildBatchHtmlExport(title: string, documents: HtmlExportDocumen
     ),
   ].join("\n");
 
-  return buildHtmlExport(title, content);
+  return buildHtmlExport(title, content, options);
 }
 
 export function printHtmlDocument(html: string): Promise<void> {
@@ -432,7 +510,15 @@ function docxStylesXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="等线"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="6D716B"/></w:rPr></w:style></w:styles>`;
 }
 
-function docxDocumentXml(title: string, body: string, state: DocxRenderState): string {
+function docxHeaderXml(title: string): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="right"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="6" w:color="D9D5CC"/></w:pBdr></w:pPr><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">Moyang Reader · ${escapeXml(title)}</w:t></w:r></w:p></w:hdr>`;
+}
+
+function docxFooterXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">由 Moyang Reader 导出 · 第 </w:t></w:r><w:fldSimple w:instr="PAGE"><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve"> / </w:t></w:r><w:fldSimple w:instr="NUMPAGES"><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple></w:p></w:ftr>`;
+}
+
+function docxDocumentXml(title: string, body: string, state: DocxRenderState, options: ExportOptions): string {
   const parsed = new DOMParser().parseFromString(`<div>${body}</div>`, "text/html");
   const root = parsed.body.firstElementChild;
   const content = root
@@ -441,27 +527,33 @@ function docxDocumentXml(title: string, body: string, state: DocxRenderState): s
         .join("")
     : "";
   const titleParagraph = paragraphXml(runXml(title), "Title");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}${content}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}${content}<w:sectPr>${docxPageLayoutXml(options)}</w:sectPr></w:body></w:document>`;
 }
 
 function docxContentTypesXml(images: DocxImage[]): string {
   const imageTypes = Array.from(new Map(images.map((image) => [image.extension, image.contentType])))
     .map(([extension, contentType]) => `<Default Extension="${extension}" ContentType="${contentType}"/>`)
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageTypes}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageTypes}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
 }
 
 function docxRelationshipsXml(images: DocxImage[]): string {
-  const relationships = images
-    .map(
+  const relationships = [
+    '<Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>',
+    '<Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>',
+    ...images.map(
       (image, index) =>
         `<Relationship Id="${image.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${index + 1}.${image.extension}"/>`,
-    )
-    .join("");
+    ),
+  ].join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`;
 }
 
-export async function buildDocxExport(title: string, body: string): Promise<Uint8Array> {
+export async function buildDocxExport(
+  title: string,
+  body: string,
+  options: ExportOptions = defaultExportOptions,
+): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
   const state: DocxRenderState = { images: [], nextImageId: 1 };
   const zip = new JSZip();
@@ -470,8 +562,10 @@ export async function buildDocxExport(title: string, body: string): Promise<Uint
     "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
   );
-  zip.file("word/document.xml", docxDocumentXml(title, body, state));
+  zip.file("word/document.xml", docxDocumentXml(title, body, state, options));
   zip.file("word/styles.xml", docxStylesXml());
+  zip.file("word/header1.xml", docxHeaderXml(title));
+  zip.file("word/footer1.xml", docxFooterXml());
   zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
   zip.file(
     "docProps/core.xml",
@@ -489,7 +583,11 @@ export async function buildDocxExport(title: string, body: string): Promise<Uint
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }
 
-export async function buildBatchDocxExport(title: string, documents: HtmlExportDocument[]): Promise<Uint8Array> {
+export async function buildBatchDocxExport(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+): Promise<Uint8Array> {
   const content = documents
     .map(
       (document, index) =>
@@ -497,5 +595,5 @@ export async function buildBatchDocxExport(title: string, documents: HtmlExportD
     )
     .join("");
 
-  return buildDocxExport(title, content);
+  return buildDocxExport(title, content, options);
 }

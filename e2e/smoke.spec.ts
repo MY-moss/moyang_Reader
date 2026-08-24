@@ -77,6 +77,31 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("protects unsaved browser edits before opening another document", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "unsaved-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Unsaved note\n\n原始内容"),
+  });
+  await page.getByRole("button", { name: "源文本" }).click();
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.fill("# Unsaved note\n\n尚未保存");
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("未保存修改");
+    await dialog.dismiss();
+  });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "replacement-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Replacement note"),
+  });
+
+  await expect(editor).toHaveValue("# Unsaved note\n\n尚未保存");
+});
+
 test("enters and exits focus reading mode", async ({ page }) => {
   await page.goto("/");
 
@@ -97,17 +122,107 @@ test("enters and exits focus reading mode", async ({ page }) => {
   await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
 });
 
+test("collapses and restores the reading sidebar", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "sidebar-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Sidebar note\n\n侧栏切换测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Sidebar note" })).toBeVisible();
+
+  const toggle = page.locator(".sidebar-toggle");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
+  await expect(page.locator(".sidebar")).toBeHidden();
+  await expect(page.locator(".sidebar-restore")).toBeVisible();
+
+  await page.keyboard.press("Control+Shift+B");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".app-shell")).not.toHaveClass(/sidebar-collapsed/);
+  await expect(page.locator(".sidebar")).toBeVisible();
+});
+
+test("shows a reading rail with progress and edge navigation", async ({ page }) => {
+  await page.goto("/");
+
+  const sections = Array.from(
+    { length: 36 },
+    (_, index) => `## Section ${index + 1}\n\n这一段用于验证阅读进度和当前章节提示。\n\n`,
+  );
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "reading-rail-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(`# Reading rail\n\n阅读轨道测试。\n\n${sections.join("")}`),
+  });
+
+  const rail = page.getByRole("complementary", { name: "阅读进度" });
+  await expect(rail).toBeVisible();
+  const progress = rail.getByRole("progressbar", { name: "文档阅读进度" });
+  await expect(progress).toHaveAttribute("aria-valuenow", "0");
+  await expect(rail.getByText("Reading rail")).toBeVisible();
+  await expect(page.locator(".outline-list a.active")).toHaveText("Reading rail");
+
+  await page.locator(".content-area").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect(progress).toHaveAttribute("aria-valuenow", "100");
+  await expect(page.locator(".outline-list a.active")).toHaveText("Section 36");
+
+  await rail.getByRole("button", { name: "顶部" }).click();
+  await expect.poll(() => page.locator(".content-area").evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(progress).toHaveAttribute("aria-valuenow", "0");
+
+  await page.getByRole("link", { name: "Section 10" }).click();
+  await expect(page.locator(".outline-list a.active")).toHaveText("Section 10");
+});
+
+test("previews the print layout before exporting a document", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "print-preview-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Print preview\n\n## 章节\n\n打印版式预览测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Print preview" })).toBeVisible();
+
+  await page.getByText("导出", { exact: true }).click();
+  await page.getByRole("button", { name: "预览打印版式" }).click();
+  await expect(page.locator(".topbar .export-menu")).not.toHaveAttribute("open");
+
+  const dialog = page.getByRole("dialog", { name: "打印版式预览" });
+  await expect(dialog).toBeVisible();
+  const previewFrame = dialog.locator('iframe[title="print-preview-note.md 打印版式"]');
+  await expect(previewFrame).toBeVisible();
+  await expect(previewFrame).toHaveAttribute("srcdoc", /export-toc/);
+  await expect(dialog.getByText("A4 · 纵向 · 标准页边距")).toBeVisible();
+  await expect(dialog.getByRole("status", { name: "打印分页估算" })).toHaveText(/预计 1 页/);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
 
   await page.locator("summary", { hasText: "设置" }).click();
   await page.getByLabel("正文字号").selectOption("large");
   await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.getByLabel("导出纸张").selectOption("letter");
+  await page.getByLabel("导出方向").selectOption("landscape");
+  await page.getByLabel("导出页边距").selectOption("compact");
   await page.reload();
   await page.locator("summary", { hasText: "设置" }).click();
 
   await expect(page.getByLabel("正文字号")).toHaveValue("large");
   await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
+  await expect(page.getByLabel("导出纸张")).toHaveValue("letter");
+  await expect(page.getByLabel("导出方向")).toHaveValue("landscape");
+  await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
