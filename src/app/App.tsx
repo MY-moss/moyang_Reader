@@ -9,6 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import { EmptyState } from "./components/EmptyState";
+import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
 import { Outline } from "./components/Outline";
@@ -138,6 +139,7 @@ import {
   insertTextAtSelection,
   MAX_CLIPBOARD_IMAGE_BYTES,
 } from "./clipboard-image";
+import { clearDraftSnapshot, findDraftSnapshot, saveDraftSnapshot, type DraftSnapshot } from "./draft-recovery";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -327,6 +329,7 @@ export function App() {
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
+  const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
@@ -344,6 +347,7 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const sourceDraftRef = useRef(sourceDraft);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const workspaceLoadRequestRef = useRef(0);
@@ -395,6 +399,10 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    sourceDraftRef.current = sourceDraft;
+  }, [sourceDraft]);
 
   useEffect(() => {
     preferencesRef.current = preferences;
@@ -476,6 +484,15 @@ export function App() {
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const current = documentStateRef.current;
+      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
+        saveDraftSnapshot({
+          path: current.path,
+          draft: sourceDraftRef.current,
+          baseSource: current.source,
+          savedAt: Date.now(),
+        });
+      }
       if (isTauriRuntime() || !documentStateRef.current?.modified) return;
       event.preventDefault();
       event.returnValue = "";
@@ -491,6 +508,14 @@ export function App() {
     let unlisten: (() => void) | null = null;
     const handleCloseRequest = () => {
       const current = documentStateRef.current;
+      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
+        saveDraftSnapshot({
+          path: current.path,
+          draft: sourceDraftRef.current,
+          baseSource: current.source,
+          savedAt: Date.now(),
+        });
+      }
       if (current?.modified && !window.confirm("当前文档有未保存修改，确定退出 Moyang Reader 吗？")) return;
       void closeWindow().catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
@@ -818,6 +843,8 @@ export function App() {
         });
         setExternalChangePath(null);
         setSourceDraft(source);
+        sourceDraftRef.current = source;
+        setDraftRecovery(findDraftSnapshot(path, source));
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -879,6 +906,8 @@ export function App() {
         });
         setExternalChangePath(null);
         setSourceDraft("");
+        sourceDraftRef.current = "";
+        setDraftRecovery(null);
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -1022,6 +1051,8 @@ export function App() {
       setDocumentState((current) =>
         current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
       );
+      clearDraftSnapshot(documentState.path);
+      setDraftRecovery(null);
       selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
     } catch (cause) {
@@ -1308,9 +1339,47 @@ export function App() {
   const updateSource = useCallback((nextSource: string) => {
     const current = documentStateRef.current;
     if (!current || !isEditableDocument(current.kind)) return;
+    sourceDraftRef.current = nextSource;
     setSourceDraft(nextSource);
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
+
+  useEffect(() => {
+    const current = documentState;
+    if (!current || !current.modified || !isEditableDocument(current.kind) || current.path.startsWith("browser://")) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const stored = saveDraftSnapshot({
+        path: current.path,
+        draft: sourceDraft,
+        baseSource: current.source,
+        savedAt: Date.now(),
+      });
+      if (!stored) setError("草稿自动保存失败，仍保留在当前窗口中。");
+    }, 1_500);
+    return () => window.clearTimeout(timer);
+  }, [
+    documentState,
+    documentState?.kind,
+    documentState?.modified,
+    documentState?.path,
+    documentState?.source,
+    sourceDraft,
+  ]);
+
+  const recoverDraft = useCallback(() => {
+    if (!draftRecovery || !isSameDocumentPath(documentStateRef.current?.path ?? "", draftRecovery.path)) return;
+    updateSource(draftRecovery.draft);
+    setDraftRecovery(null);
+    setMode("source");
+  }, [draftRecovery, updateSource]);
+
+  const discardDraft = useCallback(() => {
+    if (draftRecovery) clearDraftSnapshot(draftRecovery.path);
+    setDraftRecovery(null);
+  }, [draftRecovery]);
 
   const handleSourcePaste = useCallback(
     async (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -2356,6 +2425,9 @@ export function App() {
               }}
               onDismiss={() => setExternalChangePath(null)}
             />
+          )}
+          {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
+            <DraftRecoveryNotice snapshot={draftRecovery} onRecover={recoverDraft} onDiscard={discardDraft} />
           )}
           {error && (
             <div className="error-state" role="alert">
