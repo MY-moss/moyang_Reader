@@ -155,6 +155,12 @@ function comparablePath(path: string): string {
     .toLocaleLowerCase();
 }
 
+function pathBelongsToWorkspace(path: string, workspacePath: string): boolean {
+  const candidate = comparablePath(path);
+  const root = comparablePath(workspacePath);
+  return candidate === root || candidate.startsWith(`${root}\\`);
+}
+
 function pathWasChanged(changedPath: string, currentPath: string): boolean {
   const changed = comparablePath(changedPath);
   const current = comparablePath(currentPath);
@@ -303,6 +309,8 @@ type CachedWorkspace = {
   selectedTag: string | null;
   selectedFileKind: WorkspaceKindFilter;
   searchQuery: string;
+  tabs: RecentFile[];
+  activeDocumentPath: string | null;
 };
 
 function updateCachedWorkspace(
@@ -390,6 +398,7 @@ export function App() {
   const sourceDraftRef = useRef(sourceDraft);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
+  const openTabsRef = useRef<RecentFile[]>(openTabs);
   const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
@@ -582,6 +591,10 @@ export function App() {
   }, [workspacePath]);
 
   useEffect(() => {
+    openTabsRef.current = openTabs;
+  }, [openTabs]);
+
+  useEffect(() => {
     if (!workspacePath) return;
     updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
       selectedTag,
@@ -589,6 +602,22 @@ export function App() {
       searchQuery: workspaceQuery,
     });
   }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
+
+  useEffect(() => {
+    if (!workspacePath) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      tabs: openTabsRef.current.filter(
+        (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, workspacePath),
+      ),
+    });
+  }, [openTabs, workspacePath]);
+
+  useEffect(() => {
+    if (!workspacePath || !documentState?.path || !pathBelongsToWorkspace(documentState.path, workspacePath)) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      activeDocumentPath: documentState.path,
+    });
+  }, [documentState?.path, workspacePath]);
 
   useEffect(
     () => () => {
@@ -795,6 +824,22 @@ export function App() {
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
 
+    const previousWorkspacePath = workspacePathRef.current;
+    const switchedWorkspace =
+      comparablePath(previousWorkspacePath ?? "") !== comparablePath(root) && Boolean(previousWorkspacePath);
+    if (switchedWorkspace && previousWorkspacePath) {
+      const currentDocument = documentStateRef.current;
+      updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {
+        tabs: openTabsRef.current.filter(
+          (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, previousWorkspacePath),
+        ),
+        activeDocumentPath:
+          currentDocument && pathBelongsToWorkspace(currentDocument.path, previousWorkspacePath)
+            ? currentDocument.path
+            : null,
+      });
+    }
+
     const requestId = ++workspaceLoadRequestRef.current;
     workspaceRefreshRequestRef.current += 1;
     setWorkspaceLoading(true);
@@ -811,7 +856,10 @@ export function App() {
         setWorkspaceQuery(cached.searchQuery);
         setSelectedTag(cached.selectedTag);
         setSelectedFileKind(cached.selectedFileKind);
-        if (switchedWorkspace) setWorkspaceResults([]);
+        if (switchedWorkspace) {
+          setWorkspaceResults([]);
+          setOpenTabs(cached.tabs ?? []);
+        }
         saveWorkspacePath(cached.path);
         setRecentWorkspaces(
           rememberRecentWorkspace({
@@ -878,6 +926,8 @@ export function App() {
         selectedTag: null,
         selectedFileKind: "all",
         searchQuery: "",
+        tabs: [],
+        activeDocumentPath: null,
       });
       workspacePathRef.current = root;
       setWorkspacePath(root);
@@ -888,6 +938,7 @@ export function App() {
         setWorkspaceQuery("");
         setSelectedTag(null);
         setSelectedFileKind("all");
+        setOpenTabs([]);
       }
       setWorkspaceRevision((current) => {
         const next = current + 1;
@@ -1115,6 +1166,40 @@ export function App() {
     },
     [openBinary, openSource],
   );
+
+  useEffect(() => {
+    if (!workspacePath || !isTauriRuntime()) return;
+
+    const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));
+    const targetPath = cached?.activeDocumentPath ?? null;
+    const currentPath = documentStateRef.current?.path ?? null;
+    const currentBelongs = currentPath ? pathBelongsToWorkspace(currentPath, workspacePath) : false;
+    const targetBelongs = targetPath ? pathBelongsToWorkspace(targetPath, workspacePath) : false;
+
+    if (currentPath && !currentBelongs) {
+      releaseDocumentResources(currentPath);
+      setDocumentState(null);
+      setSourceDraft("");
+      sourceDraftRef.current = "";
+      setDraftRecovery(null);
+      setExternalChangePath(null);
+      setMode("rendered");
+      setSearchQuery("");
+      saveLastDocumentPath(null);
+    }
+
+    if (!targetPath || !targetBelongs || targetPath === currentPath) return;
+
+    let active = true;
+    void openPath(targetPath).then((opened) => {
+      if (active && !opened) {
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [openPath, releaseDocumentResources, workspacePath]);
 
   const handleOpenPaths = useCallback(
     async (paths: OpenPath[]) => {
@@ -2036,9 +2121,12 @@ export function App() {
         setSearchQuery("");
         setError(null);
         saveLastDocumentPath(null);
+        if (workspacePath) {
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+        }
       }
     },
-    [documentState, openPath, openTabs, releaseDocumentResources],
+    [documentState, openPath, openTabs, releaseDocumentResources, workspacePath],
   );
 
   const handleDrop = useCallback(
