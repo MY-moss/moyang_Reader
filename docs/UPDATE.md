@@ -17,6 +17,12 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## 开发期与稳定批次
+
+功能快速迭代阶段只在本地开发、测试和提交，不为每个小改动推送 main、创建 Tag 或生成 Release。可以在同一个本地候选版本上连续累积多个功能，版本号和更新说明在准备稳定批次时统一整理。
+
+准备发布时再集中完成一次完整门禁：复查 Issues、运行前端/Rust 测试、构建安装包、检查更新清单和在线 Release，然后一次性同步 main、推送版本标签并验证旧版本在线更新。只有稳定批次才会进入公开更新通道。
+
 ## 首次配置 GitHub Secrets
 
 更新私钥不能提交到仓库，也不能写进 workflow 文件。
