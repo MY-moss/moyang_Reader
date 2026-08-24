@@ -914,7 +914,14 @@ export async function buildDocxExport(
   zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
   zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
-  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+  return zip.generateAsync(
+    {
+      type: "uint8array",
+      compression: "DEFLATE",
+      streamFiles: true,
+    },
+    () => throwIfExportAborted(signal),
+  );
 }
 
 export async function buildBatchDocxExport(
