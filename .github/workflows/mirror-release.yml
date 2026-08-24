@@ -12,7 +12,6 @@ jobs:
     name: Publish updater mirror
     runs-on: windows-latest
     env:
-      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
       RELEASE_TAG: ${{ github.event.release.tag_name }}
       MIRROR_BASE_URL: https://moyang-reader-mirror.pages.dev
       MIRROR_PROJECT: moyang-reader-mirror
@@ -26,10 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Download public release assets
         shell: pwsh
