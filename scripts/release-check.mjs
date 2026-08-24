@@ -29,6 +29,27 @@ export function validateExpectedVersion(expectedVersion, projectVersion) {
   return [];
 }
 
+export function validatePublicDocumentation(projectRoot = defaultRoot) {
+  const errors = [];
+  const updateDocPath = path.join(projectRoot, "docs", "UPDATE.md");
+  const contents = fs.readFileSync(updateDocPath, "utf8");
+
+  if (
+    /[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s]+[\\/]/i.test(contents) ||
+    /(?:^|[\s`"'(])\/(?:Users|home)\/[^\s`"')]+/i.test(contents)
+  ) {
+    errors.push("docs/UPDATE.md 不得包含本机用户绝对路径。");
+  }
+  if (/TAURI_SIGNING_PRIVATE_KEY_PASSWORD\s*=\s*(?:["']{2}|`{2})/i.test(contents)) {
+    errors.push("docs/UPDATE.md 不得示例化空的签名私钥密码。");
+  }
+  if (/(?:当前|目前).{0,12}(?:未设置密码|无密码)/i.test(contents)) {
+    errors.push("docs/UPDATE.md 不得披露或鼓励使用无密码签名密钥。");
+  }
+
+  return errors;
+}
+
 export function validateManifest(manifest, expectedVersion = null) {
   const errors = [];
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
@@ -70,6 +91,7 @@ export function validateProject(projectRoot = defaultRoot) {
   const tauriConfig = readJson(path.join(projectRoot, "src-tauri", "tauri.conf.json"));
   const releaseConfig = readJson(path.join(projectRoot, "src-tauri", "tauri.release.conf.json"));
   const cargoText = fs.readFileSync(path.join(projectRoot, "src-tauri", "Cargo.toml"), "utf8");
+  errors.push(...validatePublicDocumentation(projectRoot));
   const cargoVersion = cargoText.match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? "";
 
   const versions = [

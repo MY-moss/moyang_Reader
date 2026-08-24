@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-import { isSemver, normalizeVersion, validateExpectedVersion, validateManifest } from "./release-check.mjs";
+import {
+  isSemver,
+  normalizeVersion,
+  validateExpectedVersion,
+  validateManifest,
+  validatePublicDocumentation,
+} from "./release-check.mjs";
 
 test("normalizes release versions and accepts semver", () => {
   assert.equal(normalizeVersion("v0.5.1"), "0.5.1");
@@ -58,4 +67,23 @@ test("rejects incomplete or unsafe updater metadata", () => {
     errors.some((error) => error.includes("signature")),
     true,
   );
+});
+
+test("rejects private local paths and empty signing passwords in public docs", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-docs-"));
+  fs.mkdirSync(path.join(root, "docs"));
+  const windowsPath = ["C:", "Users", "Example", ".moyang-reader", "signing.key"].join("\\");
+  const emptyPassword = ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "=", String.fromCharCode(34, 34)].join("");
+  fs.writeFileSync(path.join(root, "docs", "UPDATE.md"), [`Key path: ${windowsPath}`, emptyPassword].join("\n"));
+
+  const errors = validatePublicDocumentation(root);
+  assert.equal(
+    errors.some((error) => error.includes("绝对路径")),
+    true,
+  );
+  assert.equal(
+    errors.some((error) => error.includes("空的签名私钥密码")),
+    true,
+  );
+  fs.rmSync(root, { recursive: true, force: true });
 });
