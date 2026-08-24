@@ -1890,7 +1890,13 @@ export function App() {
           if (!savePath) throw new Error("没有选择 Word 保存位置。");
           await writeBinaryFile(savePath, await buildBatchDocxExport(exportTitle, documents, exportOptions));
         } else {
-          await printHtmlDocument(buildBatchHtmlExport(exportTitle, documents, exportOptions));
+          setPrintPreview({
+            title: `${exportTitle} · 批量打印`,
+            html: buildBatchHtmlExport(exportTitle, documents, exportOptions),
+            paper: exportOptions.paper,
+            orientation: exportOptions.orientation,
+            margin: exportOptions.margin,
+          });
         }
         const formatLabel = format === "html" ? "HTML" : format === "docx" ? "Word" : "打印 / PDF";
         const failureSummary = summarizeExportFailures(
