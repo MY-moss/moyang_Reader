@@ -35,7 +35,7 @@ describe("renderMarkdown", () => {
   it("renders plain text with preserved line breaks and escaped markup", async () => {
     const result = await renderPlainText("第一行\n<script>alert('x')</script>");
 
-    expect(result.html).toContain("<pre class=\"plain-text\">第一行\n&lt;script&gt;");
+    expect(result.html).toContain('<pre class="plain-text">第一行\n&lt;script&gt;');
     expect(result.html).not.toContain("<script");
     expect(result.toc).toEqual([]);
   });

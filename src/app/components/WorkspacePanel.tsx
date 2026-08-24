@@ -62,7 +62,11 @@ export function WorkspacePanel({
             type="button"
             className="quiet-button"
             onClick={onExportWorkspace}
-            disabled={!workspacePath || workspaceExporting || !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))}
+            disabled={
+              !workspacePath ||
+              workspaceExporting ||
+              !files.some((file) => ["markdown", "text", "docx"].includes(file.kind))
+            }
           >
             {workspaceExporting ? "导出中…" : "批量导出"}
           </button>
@@ -81,8 +85,16 @@ export function WorkspacePanel({
       ) : (
         <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
       )}
-      {workspaceExportNotice && <div className="workspace-export-note" role="status">{workspaceExportNotice}</div>}
-      {workspaceIndexLoading && <div className="workspace-index-note" role="status">目录已打开，正在整理链接与标签…</div>}
+      {workspaceExportNotice && (
+        <div className="workspace-export-note" role="status">
+          {workspaceExportNotice}
+        </div>
+      )}
+      {workspaceIndexLoading && (
+        <div className="workspace-index-note" role="status">
+          目录已打开，正在整理链接与标签…
+        </div>
+      )}
 
       {workspacePath && (
         <>
@@ -103,7 +115,11 @@ export function WorkspacePanel({
                 onChange={(event) => onTagChange(event.target.value || null)}
               >
                 <option value="">全部标签</option>
-                {tagOptions.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+                {tagOptions.map((tag) => (
+                  <option key={tag} value={tag}>
+                    #{tag}
+                  </option>
+                ))}
               </select>
             </label>
           )}
@@ -114,18 +130,21 @@ export function WorkspacePanel({
         <div className="workspace-results" aria-live="polite">
           {searchQuery.trim().length < 2 && <p className="muted-copy">再输入一个字符开始搜索。</p>}
           {searchLoading && <p className="muted-copy">正在搜索…</p>}
-          {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && <p className="muted-copy">没有找到匹配文档。</p>}
-          {!searchLoading && searchResults.map((result) => (
-            <button
-              type="button"
-              className="workspace-result"
-              key={result.file.path}
-              onClick={() => onOpenFile(result.file.path)}
-            >
-              <strong>{result.file.name}</strong>
-              <span>{result.preview || result.file.relativePath}</span>
-            </button>
-          ))}
+          {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
+            <p className="muted-copy">没有找到匹配文档。</p>
+          )}
+          {!searchLoading &&
+            searchResults.map((result) => (
+              <button
+                type="button"
+                className="workspace-result"
+                key={result.file.path}
+                onClick={() => onOpenFile(result.file.path)}
+              >
+                <strong>{result.file.name}</strong>
+                <span>{result.preview || result.file.relativePath}</span>
+              </button>
+            ))}
         </div>
       ) : (
         <>
@@ -136,9 +155,7 @@ export function WorkspacePanel({
             </div>
           )}
 
-          {workspacePath && visibleFiles.length === 0 && (
-            <p className="muted-copy">当前标签下没有文件。</p>
-          )}
+          {workspacePath && visibleFiles.length === 0 && <p className="muted-copy">当前标签下没有文件。</p>}
 
           {!workspacePath && recentWorkspaces.length > 0 && (
             <div className="workspace-files recent-files" aria-label="最近阅读库">

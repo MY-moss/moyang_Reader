@@ -53,7 +53,15 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
-import { buildBatchHtmlExport, buildDocxExport, buildHtmlExport, fileNameWithExtension, inlineLocalImages, pathWithExtension, pathWithNameSuffix } from "./export";
+import {
+  buildBatchHtmlExport,
+  buildDocxExport,
+  buildHtmlExport,
+  fileNameWithExtension,
+  inlineLocalImages,
+  pathWithExtension,
+  pathWithNameSuffix,
+} from "./export";
 import {
   loadRecentFiles,
   loadRecentWorkspaces,
@@ -84,7 +92,10 @@ function fileTypeLabel(kind: DocumentKind): string {
 }
 
 function comparablePath(path: string): string {
-  return path.replace(/[\\/]+/g, "\\").replace(/\\$/, "").toLocaleLowerCase();
+  return path
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\$/, "")
+    .toLocaleLowerCase();
 }
 
 function pathWasChanged(changedPath: string, currentPath: string): boolean {
@@ -259,10 +270,13 @@ export function App() {
     workspacePathRef.current = workspacePath;
   }, [workspacePath]);
 
-  useEffect(() => () => {
-    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    browserDocumentsRef.current.clear();
-  }, []);
+  useEffect(
+    () => () => {
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      browserDocumentsRef.current.clear();
+    },
+    [],
+  );
 
   const releaseBrowserDocument = useCallback((path: string) => {
     const cached = browserDocumentsRef.current.get(path);
@@ -280,53 +294,56 @@ export function App() {
     if (pending) await pending.close().catch(() => undefined);
   }, []);
 
-  const checkForUpdates = useCallback(async (manual = true) => {
-    if (!isTauriRuntime()) {
-      if (manual) {
-        setUpdateStatus("error");
-        setUpdateError("浏览器预览模式不支持应用更新。");
-        setUpdateNoticeVisible(true);
-      }
-      return;
-    }
-
-    if (updateCheckInFlightRef.current) return;
-    updateCheckInFlightRef.current = true;
-    setUpdateStatus("checking");
-    setUpdateError(null);
-    setUpdateProgress(null);
-    if (manual) setUpdateNoticeVisible(false);
-
-    try {
-      const version = await getCurrentAppVersion();
-      if (version) setCurrentVersion(version);
-      await closePendingUpdate();
-
-      const found = await checkForAppUpdate();
-      if (!found) {
-        setUpdateStatus(manual ? "up-to-date" : "idle");
-        setUpdateNoticeVisible(manual);
+  const checkForUpdates = useCallback(
+    async (manual = true) => {
+      if (!isTauriRuntime()) {
+        if (manual) {
+          setUpdateStatus("error");
+          setUpdateError("浏览器预览模式不支持应用更新。");
+          setUpdateNoticeVisible(true);
+        }
         return;
       }
 
-      updateRef.current = found;
-      setAvailableUpdate(found);
-      setUpdateStatus("available");
-      setUpdateNoticeVisible(true);
-    } catch (cause) {
-      if (manual) {
-        setUpdateStatus("error");
-        setUpdateError(describeUpdateError(cause));
+      if (updateCheckInFlightRef.current) return;
+      updateCheckInFlightRef.current = true;
+      setUpdateStatus("checking");
+      setUpdateError(null);
+      setUpdateProgress(null);
+      if (manual) setUpdateNoticeVisible(false);
+
+      try {
+        const version = await getCurrentAppVersion();
+        if (version) setCurrentVersion(version);
+        await closePendingUpdate();
+
+        const found = await checkForAppUpdate();
+        if (!found) {
+          setUpdateStatus(manual ? "up-to-date" : "idle");
+          setUpdateNoticeVisible(manual);
+          return;
+        }
+
+        updateRef.current = found;
+        setAvailableUpdate(found);
+        setUpdateStatus("available");
         setUpdateNoticeVisible(true);
-      } else {
-        setUpdateStatus("idle");
-        setUpdateError(null);
-        setUpdateNoticeVisible(false);
+      } catch (cause) {
+        if (manual) {
+          setUpdateStatus("error");
+          setUpdateError(describeUpdateError(cause));
+          setUpdateNoticeVisible(true);
+        } else {
+          setUpdateStatus("idle");
+          setUpdateError(null);
+          setUpdateNoticeVisible(false);
+        }
+      } finally {
+        updateCheckInFlightRef.current = false;
       }
-    } finally {
-      updateCheckInFlightRef.current = false;
-    }
-  }, [closePendingUpdate]);
+    },
+    [closePendingUpdate],
+  );
 
   const installUpdate = useCallback(async () => {
     const pending = updateRef.current;
@@ -385,11 +402,14 @@ export function App() {
     void closePendingUpdate();
   }, [closePendingUpdate]);
 
-  useEffect(() => () => {
-    const pending = updateRef.current;
-    updateRef.current = null;
-    if (pending) void pending.close().catch(() => undefined);
-  }, []);
+  useEffect(
+    () => () => {
+      const pending = updateRef.current;
+      updateRef.current = null;
+      if (pending) void pending.close().catch(() => undefined);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -432,16 +452,19 @@ export function App() {
       }
       setWorkspaceRevision((current) => current + 1);
       saveWorkspacePath(root);
-      setRecentWorkspaces(rememberRecentWorkspace({
-        path: root,
-        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
-      }));
+      setRecentWorkspaces(
+        rememberRecentWorkspace({
+          path: root,
+          name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
+        }),
+      );
       if (!silent) setError(null);
       setWorkspaceLoading(false);
 
       void indexWorkspace(root)
         .then((index) => {
-          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current)) return;
+          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))
+            return;
           setWorkspaceIndex(index);
         })
         .catch((cause) => {
@@ -475,142 +498,156 @@ export function App() {
     if (selected) await loadWorkspace(selected);
   }, [loadWorkspace]);
 
-  const openSource = useCallback(async (path: string, source: string) => {
-    setLoading(true);
-    setError(null);
+  const openSource = useCallback(
+    async (path: string, source: string) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const kind = documentKindFromPath(path);
-      const rendered = await renderSource(path, source);
-      if (path.startsWith("browser://")) {
-        releaseBrowserDocument(path);
-        browserDocumentsRef.current.set(path, { kind, source });
-      }
-      setDocumentState({
-        path,
-        name: fileNameFromPath(path),
-        kind,
-        source,
-        rendered,
-        modified: false,
-      });
-      setExternalChangePath(null);
-      setSourceDraft(source);
-      setOpenTabs((current) => current.some((tab) => tab.path === path)
-        ? current
-        : [...current, { path, name: fileNameFromPath(path) }]);
-      if (!path.startsWith("browser://")) {
-        setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
-      }
-      setMode("rendered");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "文档渲染失败。");
-    } finally {
-      setLoading(false);
-    }
-  }, [releaseBrowserDocument]);
-
-  const openBinary = useCallback(async (path: string, bytes?: Uint8Array) => {
-    const kind = documentKindFromPath(path);
-    if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
-      throw new Error("当前文件不是可预览的文档。");
-    }
-    if (kind === "docx" && !bytes) {
-      throw new Error("Word 文档内容读取失败。");
-    }
-    if ((kind === "pdf" || kind === "image") && path.startsWith("browser://") && !bytes) {
-      throw new Error("浏览器预览文件已失效，请重新选择。");
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const rendered = kind === "docx" ? await renderDocx(bytes as Uint8Array) : emptyRenderedDocument();
-      let previewUrl: string | undefined;
-      if (kind === "pdf" || kind === "image") {
-        const pdfBytes = bytes
-          ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-          : null;
-        previewUrl = path.startsWith("browser://")
-          ? URL.createObjectURL(new Blob([pdfBytes as ArrayBuffer], {
-            type: kind === "pdf" ? "application/pdf" : imageMimeType(path),
-          }))
-          : convertFileSrc(path, "asset");
-        if (path.startsWith("browser://")) previewUrlsRef.current.add(previewUrl);
-      }
-
-      if (path.startsWith("browser://")) {
-        releaseBrowserDocument(path);
-        browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });
-      }
-
-      setDocumentState({
-        path,
-        name: fileNameFromPath(path),
-        kind,
-        source: "",
-        rendered,
-        previewUrl,
-        modified: false,
-      });
-      setExternalChangePath(null);
-      setSourceDraft("");
-      setOpenTabs((current) => current.some((tab) => tab.path === path)
-        ? current
-        : [...current, { path, name: fileNameFromPath(path) }]);
-      if (!path.startsWith("browser://")) {
-        setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
-      }
-      setMode("rendered");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "文档预览失败。");
-    } finally {
-      setLoading(false);
-    }
-  }, [releaseBrowserDocument]);
-
-  const openPath = useCallback(async (path: string) => {
-    try {
-      if (path.startsWith("browser://")) {
-        const cached = browserDocumentsRef.current.get(path);
-        if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
-        if (cached.bytes) {
-          await openBinary(path, cached.bytes);
-        } else if (cached.source !== undefined) {
-          await openSource(path, cached.source);
+      try {
+        const kind = documentKindFromPath(path);
+        const rendered = await renderSource(path, source);
+        if (path.startsWith("browser://")) {
+          releaseBrowserDocument(path);
+          browserDocumentsRef.current.set(path, { kind, source });
         }
-        return;
+        setDocumentState({
+          path,
+          name: fileNameFromPath(path),
+          kind,
+          source,
+          rendered,
+          modified: false,
+        });
+        setExternalChangePath(null);
+        setSourceDraft(source);
+        setOpenTabs((current) =>
+          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
+        );
+        if (!path.startsWith("browser://")) {
+          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+        }
+        setMode("rendered");
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+      } finally {
+        setLoading(false);
       }
+    },
+    [releaseBrowserDocument],
+  );
 
+  const openBinary = useCallback(
+    async (path: string, bytes?: Uint8Array) => {
       const kind = documentKindFromPath(path);
-      if (kind === "docx" || kind === "pdf" || kind === "image") {
-        await openBinary(path, kind === "docx" ? await readBinaryFile(path) : undefined);
-        return;
+      if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
+        throw new Error("当前文件不是可预览的文档。");
+      }
+      if (kind === "docx" && !bytes) {
+        throw new Error("Word 文档内容读取失败。");
+      }
+      if ((kind === "pdf" || kind === "image") && path.startsWith("browser://") && !bytes) {
+        throw new Error("浏览器预览文件已失效，请重新选择。");
       }
 
-      const source = await readTextFile(path);
-      await openSource(path, source);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "文件打开失败。");
-    }
-  }, [openBinary, openSource]);
+      setLoading(true);
+      setError(null);
 
-  const handleCreateNote = useCallback(async (target: string) => {
-    if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
-      setError("请先添加一个工作区文件夹，再创建未解析链接。");
-      return;
-    }
-    if (documentState.modified && !window.confirm("当前文档有未保存修改，创建后将切换到新文档。继续吗？")) return;
+      try {
+        const rendered = kind === "docx" ? await renderDocx(bytes as Uint8Array) : emptyRenderedDocument();
+        let previewUrl: string | undefined;
+        if (kind === "pdf" || kind === "image") {
+          const pdfBytes = bytes
+            ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
+            : null;
+          previewUrl = path.startsWith("browser://")
+            ? URL.createObjectURL(
+                new Blob([pdfBytes as ArrayBuffer], {
+                  type: kind === "pdf" ? "application/pdf" : imageMimeType(path),
+                }),
+              )
+            : convertFileSrc(path, "asset");
+          if (path.startsWith("browser://")) previewUrlsRef.current.add(previewUrl);
+        }
 
-    try {
-      const path = await createMarkdownFile(workspacePath, documentState.path, target);
-      await loadWorkspace(workspacePath, true);
-      await openPath(path);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法创建新文档。");
-    }
-  }, [documentState, loadWorkspace, openPath, workspacePath]);
+        if (path.startsWith("browser://")) {
+          releaseBrowserDocument(path);
+          browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });
+        }
+
+        setDocumentState({
+          path,
+          name: fileNameFromPath(path),
+          kind,
+          source: "",
+          rendered,
+          previewUrl,
+          modified: false,
+        });
+        setExternalChangePath(null);
+        setSourceDraft("");
+        setOpenTabs((current) =>
+          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
+        );
+        if (!path.startsWith("browser://")) {
+          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+        }
+        setMode("rendered");
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文档预览失败。");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [releaseBrowserDocument],
+  );
+
+  const openPath = useCallback(
+    async (path: string) => {
+      try {
+        if (path.startsWith("browser://")) {
+          const cached = browserDocumentsRef.current.get(path);
+          if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
+          if (cached.bytes) {
+            await openBinary(path, cached.bytes);
+          } else if (cached.source !== undefined) {
+            await openSource(path, cached.source);
+          }
+          return;
+        }
+
+        const kind = documentKindFromPath(path);
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          await openBinary(path, kind === "docx" ? await readBinaryFile(path) : undefined);
+          return;
+        }
+
+        const source = await readTextFile(path);
+        await openSource(path, source);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文件打开失败。");
+      }
+    },
+    [openBinary, openSource],
+  );
+
+  const handleCreateNote = useCallback(
+    async (target: string) => {
+      if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
+        setError("请先添加一个工作区文件夹，再创建未解析链接。");
+        return;
+      }
+      if (documentState.modified && !window.confirm("当前文档有未保存修改，创建后将切换到新文档。继续吗？")) return;
+
+      try {
+        const path = await createMarkdownFile(workspacePath, documentState.path, target);
+        await loadWorkspace(workspacePath, true);
+        await openPath(path);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新文档。");
+      }
+    },
+    [documentState, loadWorkspace, openPath, workspacePath],
+  );
 
   const openSelectedFile = useCallback(async () => {
     const nativePath = await chooseDocumentPath();
@@ -633,7 +670,9 @@ export function App() {
       }
 
       const rendered = await renderSource(documentState.path, sourceDraft);
-      setDocumentState((current) => current ? { ...current, source: sourceDraft, rendered, modified: false } : current);
+      setDocumentState((current) =>
+        current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
+      );
       selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
     } catch (cause) {
@@ -653,8 +692,8 @@ export function App() {
         await openPath(path);
       }
       const dispose = await subscribeToOpenPaths((nextPaths) => {
-        if (documentStateRef.current?.modified
-          && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？")) return;
+        if (documentStateRef.current?.modified && !window.confirm("当前文档有未保存修改，确定打开外部传入的文件吗？"))
+          return;
         void (async () => {
           for (const path of [...new Set(nextPaths)]) {
             if (!active) break;
@@ -683,10 +722,12 @@ export function App() {
     if (!isTauriRuntime()) return;
 
     let active = true;
-    void Promise.all(loadRecentFiles().map(async (file) => ({
-      file,
-      exists: await fileExists(file.path),
-    })))
+    void Promise.all(
+      loadRecentFiles().map(async (file) => ({
+        file,
+        exists: await fileExists(file.path),
+      })),
+    )
       .then((entries) => {
         if (!active) return;
         const validFiles = entries.filter((entry) => entry.exists).map((entry) => entry.file);
@@ -706,10 +747,12 @@ export function App() {
     if (!isTauriRuntime()) return;
 
     let active = true;
-    void Promise.all(loadRecentWorkspaces().map(async (workspace) => ({
-      workspace,
-      exists: await fileExists(workspace.path),
-    })))
+    void Promise.all(
+      loadRecentWorkspaces().map(async (workspace) => ({
+        workspace,
+        exists: await fileExists(workspace.path),
+      })),
+    )
       .then((entries) => {
         if (!active) return;
         const validWorkspaces = entries.filter((entry) => entry.exists).map((entry) => entry.workspace);
@@ -843,14 +886,16 @@ export function App() {
 
     const nextSource = sourceDraft;
     const timer = window.setTimeout(() => {
-      void renderSource(path, nextSource).then((rendered) => {
-        if (requestId !== sourceRenderRequestRef.current) return;
-        setDocumentState((current) => current?.path === path ? { ...current, rendered } : current);
-      }).catch((cause) => {
-        if (requestId === sourceRenderRequestRef.current) {
-          setError(cause instanceof Error ? cause.message : "文档渲染失败。");
-        }
-      });
+      void renderSource(path, nextSource)
+        .then((rendered) => {
+          if (requestId !== sourceRenderRequestRef.current) return;
+          setDocumentState((current) => (current?.path === path ? { ...current, rendered } : current));
+        })
+        .catch((cause) => {
+          if (requestId === sourceRenderRequestRef.current) {
+            setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+          }
+        });
     }, 180);
 
     return () => window.clearTimeout(timer);
@@ -860,7 +905,7 @@ export function App() {
     const current = documentStateRef.current;
     if (!current || !isEditableDocument(current.kind)) return;
     setSourceDraft(nextSource);
-    setDocumentState((document) => document ? { ...document, modified: nextSource !== document.source } : document);
+    setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
   }, []);
 
   const handleExport = useCallback(() => {
@@ -899,16 +944,16 @@ export function App() {
 
     const body = isTauriRuntime()
       ? await inlineLocalImages(
-        documentState.rendered.html,
-        (source) => {
-          const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-          if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-          return resolveRelativePath(documentState.path, safeDecode(target));
-        },
-        readBinaryFile,
-        imageMimeType,
-        fileSize,
-      )
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        )
       : documentState.rendered.html;
     const contents = buildHtmlExport(documentState.name, body);
     try {
@@ -931,23 +976,24 @@ export function App() {
     try {
       const body = isTauriRuntime()
         ? await inlineLocalImages(
-          documentState.rendered.html,
-          (source) => {
-            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-            return resolveRelativePath(documentState.path, safeDecode(target));
-          },
-          readBinaryFile,
-          imageMimeType,
-          fileSize,
-        )
+            documentState.rendered.html,
+            (source) => {
+              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+              return resolveRelativePath(documentState.path, safeDecode(target));
+            },
+            readBinaryFile,
+            imageMimeType,
+            fileSize,
+          )
         : documentState.rendered.html;
       const contents = await buildDocxExport(documentState.name, body);
 
       if (isTauriRuntime()) {
-        const defaultPath = documentState.kind === "docx"
-          ? pathWithNameSuffix(documentState.path, " - 导出", "docx")
-          : pathWithExtension(documentState.path, "docx");
+        const defaultPath =
+          documentState.kind === "docx"
+            ? pathWithNameSuffix(documentState.path, " - 导出", "docx")
+            : pathWithExtension(documentState.path, "docx");
         const path = await chooseSavePath(defaultPath, "docx");
         if (!path) return;
         await writeBinaryFile(path, contents);
@@ -964,115 +1010,135 @@ export function App() {
     }
   }, [documentState]);
 
-  const handleBrowserFile = useCallback(async (file: File | undefined) => {
-    if (!file) return;
-    const path = `browser://${file.name}`;
-    const kind = documentKindFromPath(file.name);
-    if (kind === "docx" || kind === "pdf" || kind === "image") {
-      await openBinary(path, new Uint8Array(await file.arrayBuffer()));
-    } else {
-      await openSource(path, await file.text());
-    }
-  }, [openBinary, openSource]);
+  const handleBrowserFile = useCallback(
+    async (file: File | undefined) => {
+      if (!file) return;
+      const path = `browser://${file.name}`;
+      const kind = documentKindFromPath(file.name);
+      if (kind === "docx" || kind === "pdf" || kind === "image") {
+        await openBinary(path, new Uint8Array(await file.arrayBuffer()));
+      } else {
+        await openSource(path, await file.text());
+      }
+    },
+    [openBinary, openSource],
+  );
 
-  const handleSelectTab = useCallback(async (path: string) => {
-    if (path === documentState?.path) return;
-    if (documentState?.modified && !window.confirm("当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
-    await openPath(path);
-  }, [documentState, openPath]);
+  const handleSelectTab = useCallback(
+    async (path: string) => {
+      if (path === documentState?.path) return;
+      if (documentState?.modified && !window.confirm("当前文档有未保存修改，切换后将丢失这些修改。继续吗？")) return;
+      await openPath(path);
+    },
+    [documentState, openPath],
+  );
 
-  const handleCloseTab = useCallback(async (path: string) => {
-    const index = openTabs.findIndex((tab) => tab.path === path);
-    if (index < 0) return;
-    if (documentState?.path === path && documentState.modified && !window.confirm("当前文档有未保存修改，关闭后将丢失这些修改。继续吗？")) return;
+  const handleCloseTab = useCallback(
+    async (path: string) => {
+      const index = openTabs.findIndex((tab) => tab.path === path);
+      if (index < 0) return;
+      if (
+        documentState?.path === path &&
+        documentState.modified &&
+        !window.confirm("当前文档有未保存修改，关闭后将丢失这些修改。继续吗？")
+      )
+        return;
 
-    const nextTabs = openTabs.filter((tab) => tab.path !== path);
-    if (path.startsWith("browser://")) releaseBrowserDocument(path);
-    setOpenTabs(nextTabs);
-    if (documentState?.path !== path) return;
+      const nextTabs = openTabs.filter((tab) => tab.path !== path);
+      if (path.startsWith("browser://")) releaseBrowserDocument(path);
+      setOpenTabs(nextTabs);
+      if (documentState?.path !== path) return;
 
-    const nextTab = nextTabs[index] ?? nextTabs[index - 1];
-    if (nextTab) {
-      await openPath(nextTab.path);
-    } else {
-      setDocumentState(null);
-      setSourceDraft("");
-      setMode("rendered");
-      setSearchQuery("");
-      setError(null);
-    }
-  }, [documentState, openPath, openTabs, releaseBrowserDocument]);
+      const nextTab = nextTabs[index] ?? nextTabs[index - 1];
+      if (nextTab) {
+        await openPath(nextTab.path);
+      } else {
+        setDocumentState(null);
+        setSourceDraft("");
+        setMode("rendered");
+        setSearchQuery("");
+        setError(null);
+      }
+    },
+    [documentState, openPath, openTabs, releaseBrowserDocument],
+  );
 
-  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    void handleBrowserFile(event.dataTransfer.files[0]);
-  }, [handleBrowserFile]);
-
-  const handleReaderClick = useCallback((event: MouseEvent<HTMLElement>) => {
-    const anchor = (event.target as HTMLElement).closest("a");
-    const href = anchor?.getAttribute("href");
-    if (!anchor || !href) return;
-
-    if (href.startsWith("moyang-wiki:")) {
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const target = safeDecode(href.slice("moyang-wiki:".length));
+      void handleBrowserFile(event.dataTransfer.files[0]);
+    },
+    [handleBrowserFile],
+  );
+
+  const handleReaderClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const anchor = (event.target as HTMLElement).closest("a");
+      const href = anchor?.getAttribute("href");
+      if (!anchor || !href) return;
+
+      if (href.startsWith("moyang-wiki:")) {
+        event.preventDefault();
+        const target = safeDecode(href.slice("moyang-wiki:".length));
+        const [rawPath, rawAnchor] = target.split("#", 2);
+        const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
+        const linkedEntry = currentEntry ? findLinkedEntry(workspaceIndex, currentEntry, rawPath) : undefined;
+        const path =
+          linkedEntry?.file.path ??
+          (documentState ? resolveWikiPath(documentState.path, rawPath || documentState.path) : null);
+        if (!path) {
+          setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
+          return;
+        }
+        void openPath(path).then(() => {
+          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
+        });
+        return;
+      }
+
+      const target = safeDecode(href);
+      if (target.startsWith("#")) {
+        event.preventDefault();
+        scrollToHeading(target.slice(1));
+        return;
+      }
+
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {
+        event.preventDefault();
+        const normalized = target.startsWith("//") ? `https:${target}` : target;
+        try {
+          const externalUrl = new URL(normalized, window.location.href);
+          if (!["http:", "https:", "mailto:", "tel:"].includes(externalUrl.protocol)) {
+            setError("已阻止不受支持的外部链接协议。");
+            return;
+          }
+          void openExternalUrl(externalUrl.toString()).catch((cause) => {
+            setError(cause instanceof Error ? cause.message : "无法打开外部链接。");
+          });
+        } catch {
+          setError("无法解析这个外部链接。");
+        }
+        return;
+      }
+      if (!documentState || documentState.path.startsWith("browser://")) {
+        event.preventDefault();
+        setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");
+        return;
+      }
+
+      event.preventDefault();
       const [rawPath, rawAnchor] = target.split("#", 2);
-      const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
-      const linkedEntry = currentEntry ? findLinkedEntry(workspaceIndex, currentEntry, rawPath) : undefined;
-      const path = linkedEntry?.file.path ?? (documentState
-        ? resolveWikiPath(documentState.path, rawPath || documentState.path)
-        : null);
+      const path = resolveRelativePath(documentState.path, rawPath);
       if (!path) {
-        setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
+        setError("无法解析这个本地文档链接。");
         return;
       }
       void openPath(path).then(() => {
         if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
       });
-      return;
-    }
-
-    const target = safeDecode(href);
-    if (target.startsWith("#")) {
-      event.preventDefault();
-      scrollToHeading(target.slice(1));
-      return;
-    }
-
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {
-      event.preventDefault();
-      const normalized = target.startsWith("//") ? `https:${target}` : target;
-      try {
-        const externalUrl = new URL(normalized, window.location.href);
-        if (!["http:", "https:", "mailto:", "tel:"].includes(externalUrl.protocol)) {
-          setError("已阻止不受支持的外部链接协议。");
-          return;
-        }
-        void openExternalUrl(externalUrl.toString()).catch((cause) => {
-          setError(cause instanceof Error ? cause.message : "无法打开外部链接。");
-        });
-      } catch {
-        setError("无法解析这个外部链接。");
-      }
-      return;
-    }
-    if (!documentState || documentState.path.startsWith("browser://")) {
-      event.preventDefault();
-      setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");
-      return;
-    }
-
-    event.preventDefault();
-    const [rawPath, rawAnchor] = target.split("#", 2);
-    const path = resolveRelativePath(documentState.path, rawPath);
-    if (!path) {
-      setError("无法解析这个本地文档链接。");
-      return;
-    }
-    void openPath(path).then(() => {
-      if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
-    });
-  }, [documentState, openPath, workspaceIndex]);
+    },
+    [documentState, openPath, workspaceIndex],
+  );
 
   useEffect(() => {
     const root = document.documentElement;
@@ -1179,13 +1245,16 @@ export function App() {
     };
   }, [documentState?.path, documentState?.rendered.html, mode]);
 
-  const moveSearchResult = useCallback((step: number) => {
-    if (!searchResultCount) return;
-    setSearchResultIndex((current) => (current + step + searchResultCount) % searchResultCount);
-  }, [searchResultCount]);
+  const moveSearchResult = useCallback(
+    (step: number) => {
+      if (!searchResultCount) return;
+      setSearchResultIndex((current) => (current + step + searchResultCount) % searchResultCount);
+    },
+    [searchResultCount],
+  );
 
   const cycleTheme = useCallback(() => {
-    setTheme((current) => current === "system" ? "light" : current === "light" ? "dark" : "system");
+    setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));
   }, []);
 
   const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
@@ -1193,11 +1262,13 @@ export function App() {
   const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry) : [];
   const outgoing = currentIndexEntry
     ? currentIndexEntry.links.map((target) => ({
-      target,
-      entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),
-    }))
+        target,
+        entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),
+      }))
     : [];
-  const availableTags = Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b));
+  const availableTags = Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) =>
+    a.localeCompare(b),
+  );
   const taggedFilePaths = new Set(
     workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path),
   );
@@ -1255,7 +1326,9 @@ export function App() {
 
       if (documents.length === 0) throw new Error("当前筛选中没有可导出的 Markdown、文本或 Word 文档。");
       await writeTextFile(savePath, buildBatchHtmlExport(`${workspaceName} 阅读库`, documents));
-      setWorkspaceExportNotice(`已导出 ${exported} 篇文档${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`);
+      setWorkspaceExportNotice(
+        `已导出 ${exported} 篇文档${skipped ? `，跳过 ${skipped} 个不支持或读取失败的文件` : ""}。`,
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "批量导出失败。");
     } finally {
@@ -1276,10 +1349,12 @@ export function App() {
         searchResultIndex={searchResultIndex}
         theme={theme}
         onOpen={() => void openSelectedFile()}
-        onToggleMode={() => setMode((current) => current === "rendered" ? "source" : "rendered")}
+        onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
         onExport={handleExport}
-        exportLabel={documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"}
+        exportLabel={
+          documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
+        }
         canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
         canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
@@ -1356,7 +1431,13 @@ export function App() {
                   <span className="file-type">{fileTypeLabel(documentState.kind)}</span>
                   <div>
                     <strong>{documentState.name}</strong>
-                    <span>{documentState.kind === "pdf" ? "PDF 预览" : documentState.kind === "image" ? "图片预览" : `${documentState.rendered.readingMinutes} 分钟阅读`}</span>
+                    <span>
+                      {documentState.kind === "pdf"
+                        ? "PDF 预览"
+                        : documentState.kind === "image"
+                          ? "图片预览"
+                          : `${documentState.rendered.readingMinutes} 分钟阅读`}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1393,7 +1474,11 @@ export function App() {
               onDismiss={() => setExternalChangePath(null)}
             />
           )}
-          {error && <div className="error-state" role="alert">{error}</div>}
+          {error && (
+            <div className="error-state" role="alert">
+              {error}
+            </div>
+          )}
           {!loading && !documentState && <EmptyState onOpen={() => void openSelectedFile()} />}
           {!loading && documentState && documentState.kind === "pdf" && mode === "rendered" && (
             <PdfPreview name={documentState.name} src={documentState.previewUrl} />
@@ -1401,14 +1486,18 @@ export function App() {
           {!loading && documentState && documentState.kind === "image" && mode === "rendered" && (
             <ImagePreview name={documentState.name} src={documentState.previewUrl} />
           )}
-          {!loading && documentState && documentState.kind !== "pdf" && documentState.kind !== "image" && mode === "rendered" && (
-            <article
-              ref={articleRef}
-              className="reader-content markdown-body"
-              onClick={handleReaderClick}
-              dangerouslySetInnerHTML={{ __html: documentState.rendered.html }}
-            />
-          )}
+          {!loading &&
+            documentState &&
+            documentState.kind !== "pdf" &&
+            documentState.kind !== "image" &&
+            mode === "rendered" && (
+              <article
+                ref={articleRef}
+                className="reader-content markdown-body"
+                onClick={handleReaderClick}
+                dangerouslySetInnerHTML={{ __html: documentState.rendered.html }}
+              />
+            )}
           {!loading && documentState && canEdit && mode === "source" && (
             <textarea
               className="source-editor"
@@ -1423,7 +1512,15 @@ export function App() {
 
       <footer className="statusbar">
         <span>{documentState?.path ?? "等待打开文件"}</span>
-        {documentState && <span>{documentState.kind === "pdf" ? "PDF" : documentState.kind === "image" ? "图片" : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}</span>}
+        {documentState && (
+          <span>
+            {documentState.kind === "pdf"
+              ? "PDF"
+              : documentState.kind === "image"
+                ? "图片"
+                : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}
+          </span>
+        )}
         <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>
       </footer>
 

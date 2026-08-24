@@ -19,19 +19,20 @@ const GRAPH_HEIGHT = 420;
 
 function connectedEntries(current: WorkspaceIndexEntry, entries: WorkspaceIndexEntry[]): WorkspaceIndexEntry[] {
   return entries
-    .filter((entry) => entry.file.path === current.file.path || (
-      current.links.some((link) => findLinkedEntry(entries, current, link)?.file.path === entry.file.path)
-      || entry.links.some((link) => findLinkedEntry(entries, entry, link)?.file.path === current.file.path)
-    ))
+    .filter(
+      (entry) =>
+        entry.file.path === current.file.path ||
+        current.links.some((link) => findLinkedEntry(entries, current, link)?.file.path === entry.file.path) ||
+        entry.links.some((link) => findLinkedEntry(entries, entry, link)?.file.path === current.file.path),
+    )
     .slice(0, 25);
 }
 
 function graphNodes(current: WorkspaceIndexEntry, entries: WorkspaceIndexEntry[]): GraphNode[] {
   const related = connectedEntries(current, entries);
   const center = related.findIndex((entry) => entry.file.path === current.file.path);
-  const ordered = center < 0
-    ? [current, ...related]
-    : [related[center], ...related.slice(0, center), ...related.slice(center + 1)];
+  const ordered =
+    center < 0 ? [current, ...related] : [related[center], ...related.slice(0, center), ...related.slice(center + 1)];
   const others = ordered.slice(1);
   const radius = Math.min(166, 84 + others.length * 5);
 
@@ -80,7 +81,9 @@ export function RelationGraph({ current, entries, onClose, onOpenFile }: Relatio
             <div className="panel-kicker">RELATIONS</div>
             <h2 id="graph-title">文档关系图</h2>
           </div>
-          <button type="button" className="find-button" onClick={onClose} aria-label="关闭关系图">×</button>
+          <button type="button" className="find-button" onClick={onClose} aria-label="关闭关系图">
+            ×
+          </button>
         </header>
         <div className="graph-stage">
           <svg viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`} role="img" aria-label="当前文档及直接关联文档">

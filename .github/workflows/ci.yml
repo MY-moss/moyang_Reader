@@ -25,8 +25,19 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Configuration format check
+        run: npm run format:check
 
       - name: Frontend tests
         run: npm test -- --run
@@ -54,6 +65,9 @@ jobs:
 
       - name: Rust format
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Rust clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml

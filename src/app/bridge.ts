@@ -27,7 +27,10 @@ export async function chooseWorkspacePath(): Promise<string | null> {
   return invoke<string | null>("choose_workspace_path");
 }
 
-export async function chooseSavePath(defaultPath: string, format: "markdown" | "html" | "docx"): Promise<string | null> {
+export async function chooseSavePath(
+  defaultPath: string,
+  format: "markdown" | "html" | "docx",
+): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invoke<string | null>("choose_save_path", { defaultPath, format });
 }
@@ -122,9 +125,7 @@ export async function subscribeToCloseRequest(onRequest: () => void): Promise<Un
   return listen("close-requested", () => onRequest());
 }
 
-export async function subscribeToOpenPaths(
-  onPaths: (paths: string[]) => void,
-): Promise<UnlistenFn | null> {
+export async function subscribeToOpenPaths(onPaths: (paths: string[]) => void): Promise<UnlistenFn | null> {
   if (!isTauriRuntime()) return null;
   return listen<string[]>("open-paths", (event) => onPaths(event.payload));
 }

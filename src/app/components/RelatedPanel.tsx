@@ -54,24 +54,26 @@ export function RelatedPanel({
         <>
           <div className="related-subheading">出链</div>
           <div className="outgoing-list">
-            {outgoing.map(({ target, entry: targetEntry }) => targetEntry ? (
-              <button type="button" key={target} onClick={() => onOpenFile(targetEntry.file.path)}>
-                <strong>{targetEntry.title}</strong>
-                <small>{targetEntry.file.relativePath}</small>
-              </button>
-            ) : (
-              <div className="unresolved-link" key={target} title="工作区中没有找到对应 Markdown 文档">
-                <span>
-                  <strong>{target}</strong>
-                  <small>未找到文档</small>
-                </span>
-                {canCreateNote && (
-                  <button type="button" onClick={() => onCreateNote(target)}>
-                    创建
-                  </button>
-                )}
-              </div>
-            ))}
+            {outgoing.map(({ target, entry: targetEntry }) =>
+              targetEntry ? (
+                <button type="button" key={target} onClick={() => onOpenFile(targetEntry.file.path)}>
+                  <strong>{targetEntry.title}</strong>
+                  <small>{targetEntry.file.relativePath}</small>
+                </button>
+              ) : (
+                <div className="unresolved-link" key={target} title="工作区中没有找到对应 Markdown 文档">
+                  <span>
+                    <strong>{target}</strong>
+                    <small>未找到文档</small>
+                  </span>
+                  {canCreateNote && (
+                    <button type="button" onClick={() => onCreateNote(target)}>
+                      创建
+                    </button>
+                  )}
+                </div>
+              ),
+            )}
           </div>
         </>
       )}

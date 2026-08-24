@@ -17,10 +17,7 @@ export async function checkForAppUpdate(): Promise<Update | null> {
   return check({ timeout: 8_000 });
 }
 
-export async function installAppUpdate(
-  update: Update,
-  onEvent: (event: DownloadEvent) => void,
-): Promise<void> {
+export async function installAppUpdate(update: Update, onEvent: (event: DownloadEvent) => void): Promise<void> {
   await update.downloadAndInstall(onEvent, { timeout: 10 * 60_000 });
 }
 

@@ -13,7 +13,20 @@ export function normalizeVersion(value) {
 }
 
 export function isSemver(value) {
-  return typeof value === "string" && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(normalizeVersion(value));
+  return (
+    typeof value === "string" &&
+    /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(normalizeVersion(value))
+  );
+}
+
+export function validateExpectedVersion(expectedVersion, projectVersion) {
+  if (!isSemver(expectedVersion)) {
+    return ["发布版本不是有效的 SemVer。"];
+  }
+  if (normalizeVersion(expectedVersion) !== normalizeVersion(projectVersion)) {
+    return ["发布版本必须与项目当前版本一致。"];
+  }
+  return [];
 }
 
 export function validateManifest(manifest, expectedVersion = null) {
@@ -99,6 +112,11 @@ export function runReleaseCheck(args = [], projectRoot = defaultRoot) {
   const project = validateProject(projectRoot);
   const errors = [...project.errors];
   const manifestFlag = args.find((arg) => arg.startsWith("--manifest="));
+  const versionFlag = args.find((arg) => arg.startsWith("--version="));
+
+  if (versionFlag) {
+    errors.push(...validateExpectedVersion(versionFlag.slice("--version=".length), project.version));
+  }
 
   if (manifestFlag) {
     const manifestPath = path.resolve(projectRoot, manifestFlag.slice("--manifest=".length));
@@ -116,7 +134,9 @@ export function runReleaseCheck(args = [], projectRoot = defaultRoot) {
     return 1;
   }
 
-  console.log("Release preflight passed for v" + project.version + (manifestFlag ? " and latest.json" : " configuration"));
+  console.log(
+    "Release preflight passed for v" + project.version + (manifestFlag ? " and latest.json" : " configuration"),
+  );
   return 0;
 }
 

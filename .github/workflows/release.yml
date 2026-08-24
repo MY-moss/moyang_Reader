@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "要发布的版本，必须与 package.json/Cargo.toml 一致，例如 0.5.1"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -28,21 +33,50 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve release tag
+        id: release
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $rawVersion = if ($env:EVENT_NAME -eq "workflow_dispatch") { $env:INPUT_VERSION } else { $env:REF_NAME }
+          if ([string]::IsNullOrWhiteSpace($rawVersion)) {
+            throw "无法确定发布版本。"
+          }
+          $tag = if ($rawVersion.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) { $rawVersion } else { "v$rawVersion" }
+          npm run release:check -- --version=$tag
+          if ($LASTEXITCODE -ne 0) {
+            throw "发布版本未通过版本一致性检查。"
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
       - name: Quality gate
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
+          npm run lint
+          npm run format:check
           npm test -- --run
           npm run test:coverage
           npm run build
           npx playwright install chromium
           npm run test:e2e
           npm audit --audit-level=high
-          npm run release:check
+          npm run release:check -- --version=$env:RELEASE_TAG
           npm run test:release
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Build signed installer and publish release
@@ -52,10 +86,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Moyang Reader ${{ github.ref_name }}
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: Moyang Reader ${{ steps.release.outputs.tag }}
           releaseBody: |
-            Moyang Reader ${{ github.ref_name }}：快速打开本地 Markdown、文本和常见附件。
+            Moyang Reader ${{ steps.release.outputs.tag }}：快速打开本地 Markdown、文本和常见附件。
             已安装的 Moyang Reader 会通过签名更新包检测并提示升级。
           releaseDraft: false
           prerelease: false
