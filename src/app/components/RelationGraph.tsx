@@ -1,5 +1,6 @@
+import { useMemo } from "react";
 import type { WorkspaceIndexEntry } from "../types";
-import { findLinkedEntry } from "../workspace-index";
+import { createLinkIndex, findLinkedEntry, type WorkspaceLinkIndex } from "../workspace-index";
 
 type RelationGraphProps = {
   current?: WorkspaceIndexEntry;
@@ -17,19 +18,29 @@ type GraphNode = {
 const GRAPH_WIDTH = 720;
 const GRAPH_HEIGHT = 420;
 
-function connectedEntries(current: WorkspaceIndexEntry, entries: WorkspaceIndexEntry[]): WorkspaceIndexEntry[] {
+function connectedEntries(
+  current: WorkspaceIndexEntry,
+  entries: WorkspaceIndexEntry[],
+  linkIndex: WorkspaceLinkIndex,
+): WorkspaceIndexEntry[] {
   return entries
     .filter(
       (entry) =>
         entry.file.path === current.file.path ||
-        current.links.some((link) => findLinkedEntry(entries, current, link)?.file.path === entry.file.path) ||
-        entry.links.some((link) => findLinkedEntry(entries, entry, link)?.file.path === current.file.path),
+        current.links.some(
+          (link) => findLinkedEntry(entries, current, link, linkIndex)?.file.path === entry.file.path,
+        ) ||
+        entry.links.some((link) => findLinkedEntry(entries, entry, link, linkIndex)?.file.path === current.file.path),
     )
     .slice(0, 25);
 }
 
-function graphNodes(current: WorkspaceIndexEntry, entries: WorkspaceIndexEntry[]): GraphNode[] {
-  const related = connectedEntries(current, entries);
+function graphNodes(
+  current: WorkspaceIndexEntry,
+  entries: WorkspaceIndexEntry[],
+  linkIndex: WorkspaceLinkIndex,
+): GraphNode[] {
+  const related = connectedEntries(current, entries, linkIndex);
   const center = related.findIndex((entry) => entry.file.path === current.file.path);
   const ordered =
     center < 0 ? [current, ...related] : [related[center], ...related.slice(0, center), ...related.slice(center + 1)];
@@ -48,16 +59,17 @@ function graphNodes(current: WorkspaceIndexEntry, entries: WorkspaceIndexEntry[]
 }
 
 export function RelationGraph({ current, entries, onClose, onOpenFile }: RelationGraphProps) {
+  const linkIndex = useMemo(() => createLinkIndex(entries), [entries]);
   if (!current) return null;
 
-  const nodes = graphNodes(current, entries);
+  const nodes = graphNodes(current, entries, linkIndex);
   const nodeByPath = new Map(nodes.map((node) => [node.entry.file.path, node]));
   const edges: Array<{ from: GraphNode; to: GraphNode }> = [];
   const edgeKeys = new Set<string>();
 
   for (const node of nodes) {
     for (const link of node.entry.links) {
-      const target = findLinkedEntry(entries, node.entry, link);
+      const target = findLinkedEntry(entries, node.entry, link, linkIndex);
       const targetNode = target ? nodeByPath.get(target.file.path) : undefined;
       if (!targetNode || targetNode.entry.file.path === node.entry.file.path) continue;
       const key = [node.entry.file.path, targetNode.entry.file.path].sort().join("\n");
