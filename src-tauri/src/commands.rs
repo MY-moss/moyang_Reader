@@ -6,10 +6,10 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -25,6 +25,9 @@ const MAX_SEARCH_CACHE_ENTRIES: usize = 256;
 const MAX_SEARCH_CACHE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_SEARCH_INDEX_ROOTS: usize = 8;
 const MAX_SEARCH_INDEX_POSTINGS: usize = 500_000;
+const SEARCH_INDEX_CACHE_VERSION: u32 = 1;
+const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -86,6 +89,38 @@ struct IndexedSearchFile {
     size: u64,
     modified: Option<SystemTime>,
     shingles: HashSet<String>,
+}
+
+#[derive(Deserialize)]
+struct PersistedSearchIndex {
+    version: u32,
+    root: String,
+    disabled: bool,
+    files: Vec<PersistedIndexedSearchFile>,
+}
+
+#[derive(Deserialize)]
+struct PersistedIndexedSearchFile {
+    path: String,
+    size: u64,
+    modified_nanos: Option<u64>,
+    shingles: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct SearchIndexSnapshot<'a> {
+    version: u32,
+    root: String,
+    disabled: bool,
+    files: Vec<PersistedIndexedSearchFileSnapshot<'a>>,
+}
+
+#[derive(Serialize)]
+struct PersistedIndexedSearchFileSnapshot<'a> {
+    path: &'a str,
+    size: u64,
+    modified_nanos: Option<u64>,
+    shingles: Vec<&'a String>,
 }
 
 fn collect_workspace_directory_stamps(
@@ -176,6 +211,134 @@ fn source_shingles(source: &str) -> HashSet<String> {
         .collect()
 }
 
+fn system_time_marker(modified: Option<SystemTime>) -> Option<u64> {
+    modified
+        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| duration.as_nanos().try_into().ok())
+}
+
+fn marker_system_time(marker: Option<u64>) -> Option<SystemTime> {
+    marker.and_then(|value| UNIX_EPOCH.checked_add(Duration::from_nanos(value)))
+}
+
+fn persistent_search_index_key(root: &Path) -> String {
+    let mut hash = 14_695_981_039_346_656_037_u64;
+    for byte in access_path_key(root).as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(1_099_511_628_211_u64);
+    }
+    format!("{hash:016x}")
+}
+
+fn persistent_search_index_path(cache_directory: &Path, root: &Path) -> PathBuf {
+    cache_directory
+        .join("search-index")
+        .join(format!("{}.json", persistent_search_index_key(root)))
+}
+
+fn add_indexed_file_with_shingles(
+    index: &mut CachedSearchIndex,
+    path: String,
+    size: u64,
+    modified: Option<SystemTime>,
+    shingles: HashSet<String>,
+) -> bool {
+    for shingle in &shingles {
+        let paths = index.postings.entry(shingle.clone()).or_default();
+        if paths.insert(path.clone()) {
+            index.posting_count += 1;
+            if index.posting_count > MAX_SEARCH_INDEX_POSTINGS {
+                return false;
+            }
+        }
+    }
+    index.files.insert(
+        path,
+        IndexedSearchFile {
+            size,
+            modified,
+            shingles,
+        },
+    );
+    true
+}
+
+fn load_persisted_search_index(cache_directory: &Path, root: &Path) -> Option<CachedSearchIndex> {
+    let path = persistent_search_index_path(cache_directory, root);
+    let metadata = fs::metadata(&path).ok()?;
+    if metadata.len() > MAX_PERSISTED_SEARCH_INDEX_BYTES {
+        return None;
+    }
+    let bytes = fs::read(path).ok()?;
+    let snapshot = serde_json::from_slice::<PersistedSearchIndex>(&bytes).ok()?;
+    if snapshot.version != SEARCH_INDEX_CACHE_VERSION
+        || snapshot.root != access_path_key(root)
+        || snapshot.files.len() > MAX_PERSISTED_SEARCH_INDEX_FILES
+    {
+        return None;
+    }
+
+    let mut index = CachedSearchIndex {
+        disabled: snapshot.disabled,
+        ..CachedSearchIndex::default()
+    };
+    if index.disabled {
+        return Some(index);
+    }
+
+    for file in snapshot.files {
+        let shingles = file.shingles.into_iter().collect::<HashSet<_>>();
+        if !add_indexed_file_with_shingles(
+            &mut index,
+            file.path,
+            file.size,
+            marker_system_time(file.modified_nanos),
+            shingles,
+        ) {
+            return None;
+        }
+    }
+    Some(index)
+}
+
+fn persist_search_index(cache_directory: &Path, root: &Path, index: &CachedSearchIndex) {
+    let directory = cache_directory.join("search-index");
+    if fs::create_dir_all(&directory).is_err() {
+        return;
+    }
+
+    let snapshot = SearchIndexSnapshot {
+        version: SEARCH_INDEX_CACHE_VERSION,
+        root: access_path_key(root),
+        disabled: index.disabled,
+        files: index
+            .files
+            .iter()
+            .map(|(path, file)| PersistedIndexedSearchFileSnapshot {
+                path,
+                size: file.size,
+                modified_nanos: system_time_marker(file.modified),
+                shingles: file.shingles.iter().collect(),
+            })
+            .collect(),
+    };
+    let Ok(bytes) = serde_json::to_vec(&snapshot) else {
+        return;
+    };
+    if bytes.len() as u64 > MAX_PERSISTED_SEARCH_INDEX_BYTES {
+        return;
+    }
+
+    let path = persistent_search_index_path(cache_directory, root);
+    let temporary_path = path.with_extension(format!(
+        "json.tmp-{}",
+        TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    if fs::write(&temporary_path, bytes).is_ok() {
+        let _ = fs::rename(temporary_path, path);
+    }
+}
+
 fn remove_indexed_file(index: &mut CachedSearchIndex, path: &str) {
     let Some(file) = index.files.remove(path) else {
         return;
@@ -200,25 +363,7 @@ fn add_indexed_file(
     modified: Option<SystemTime>,
     source: &str,
 ) -> bool {
-    let shingles = source_shingles(source);
-    for shingle in &shingles {
-        let paths = index.postings.entry(shingle.clone()).or_default();
-        if paths.insert(path.clone()) {
-            index.posting_count += 1;
-            if index.posting_count > MAX_SEARCH_INDEX_POSTINGS {
-                return false;
-            }
-        }
-    }
-    index.files.insert(
-        path,
-        IndexedSearchFile {
-            size,
-            modified,
-            shingles,
-        },
-    );
-    true
+    add_indexed_file_with_shingles(index, path, size, modified, source_shingles(source))
 }
 
 impl WorkspaceSearchCache {
@@ -314,14 +459,25 @@ impl WorkspaceSearchCache {
         Some(source)
     }
 
-    fn refresh_search_index(&self, root: &Path, files: &[WorkspaceFile]) {
+    fn refresh_search_index(
+        &self,
+        root: &Path,
+        files: &[WorkspaceFile],
+        persistence_directory: Option<&Path>,
+    ) {
         let key = access_path_key(root);
         let access = self.next_access();
-        let mut index = if let Ok(mut indexes) = self.search_indexes.lock() {
-            indexes.remove(&key).unwrap_or_default()
+        let index = if let Ok(mut indexes) = self.search_indexes.lock() {
+            indexes.remove(&key)
         } else {
             return;
         };
+        let mut index = index
+            .or_else(|| {
+                persistence_directory
+                    .and_then(|directory| load_persisted_search_index(directory, root))
+            })
+            .unwrap_or_default();
 
         if !index.disabled {
             let eligible_paths = files
@@ -374,6 +530,9 @@ impl WorkspaceSearchCache {
         }
 
         index.last_used = access;
+        if let Some(directory) = persistence_directory {
+            persist_search_index(directory, root, &index);
+        }
         if let Ok(mut indexes) = self.search_indexes.lock() {
             indexes.insert(key, index);
             prune_search_indexes(&mut indexes);
@@ -1163,11 +1322,18 @@ pub fn search_workspace(
     query: String,
     access: State<'_, AccessRegistry>,
     cache: State<'_, WorkspaceSearchCache>,
+    app: AppHandle,
 ) -> Result<Vec<WorkspaceSearchResult>, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
-    search_workspace_inner_with_cache(PathBuf::from(root), query, &cache)
+    let persistence_directory = app.path().app_cache_dir().ok();
+    search_workspace_inner_with_cache_and_persistence(
+        PathBuf::from(root),
+        query,
+        &cache,
+        persistence_directory.as_deref(),
+    )
 }
 
 #[cfg(test)]
@@ -1179,10 +1345,20 @@ fn search_workspace_inner(
     search_workspace_inner_with_cache(root, query, &cache)
 }
 
+#[cfg(test)]
 fn search_workspace_inner_with_cache(
     root: PathBuf,
     query: String,
     cache: &WorkspaceSearchCache,
+) -> Result<Vec<WorkspaceSearchResult>, String> {
+    search_workspace_inner_with_cache_and_persistence(root, query, cache, None)
+}
+
+fn search_workspace_inner_with_cache_and_persistence(
+    root: PathBuf,
+    query: String,
+    cache: &WorkspaceSearchCache,
+    persistence_directory: Option<&Path>,
 ) -> Result<Vec<WorkspaceSearchResult>, String> {
     let query = query.trim().to_lowercase();
     if query.is_empty() {
@@ -1190,7 +1366,7 @@ fn search_workspace_inner_with_cache(
     }
 
     let files = cache.list_files(&root)?;
-    cache.refresh_search_index(&root, &files);
+    cache.refresh_search_index(&root, &files, persistence_directory);
     let content_candidates = cache.content_candidates(&root, &query);
     let mut results = Vec::new();
 
@@ -1905,11 +2081,13 @@ mod tests {
         create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
         extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
         is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
-        list_workspace_files_inner, path_exists_inner, prune_search_entries, read_text_file_inner,
-        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
-        should_skip_directory, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
-        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
+        list_workspace_files_inner, path_exists_inner, persistent_search_index_path,
+        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
+        search_workspace_inner, search_workspace_inner_with_cache,
+        search_workspace_inner_with_cache_and_persistence, should_skip_directory,
+        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchText, OpenPath,
+        OpenPathKind, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
+        MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -2427,6 +2605,67 @@ mod tests {
             .any(|result| result.file.name == "first.md"));
 
         fs::remove_dir_all(root).expect("remove search index workspace");
+    }
+
+    #[test]
+    fn persists_search_index_and_rebuilds_when_snapshot_is_corrupt() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-index-persist-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let cache_directory = std::env::temp_dir().join(format!(
+            "moyang-reader-search-index-cache-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create persistent search workspace");
+        fs::write(root.join("note.md"), "persistent needle").expect("write persistent search note");
+
+        let first_cache = WorkspaceSearchCache::default();
+        let first = search_workspace_inner_with_cache_and_persistence(
+            root.clone(),
+            "needle".to_string(),
+            &first_cache,
+            Some(&cache_directory),
+        )
+        .expect("search and persist index");
+        assert_eq!(first.len(), 1);
+        let snapshot_path = persistent_search_index_path(&cache_directory, &root);
+        assert!(snapshot_path.is_file());
+
+        let second_cache = WorkspaceSearchCache::default();
+        let reused = search_workspace_inner_with_cache_and_persistence(
+            root.clone(),
+            "needle".to_string(),
+            &second_cache,
+            Some(&cache_directory),
+        )
+        .expect("reuse persisted index");
+        assert_eq!(reused.len(), 1);
+        assert_eq!(
+            second_cache
+                .search_indexes
+                .lock()
+                .expect("lock persisted search index")
+                .get(&access_path_key(&root))
+                .map(|index| index.files.len()),
+            Some(1)
+        );
+
+        fs::write(&snapshot_path, b"not valid json").expect("corrupt persisted index");
+        let rebuilt_cache = WorkspaceSearchCache::default();
+        let rebuilt = search_workspace_inner_with_cache_and_persistence(
+            root.clone(),
+            "needle".to_string(),
+            &rebuilt_cache,
+            Some(&cache_directory),
+        )
+        .expect("rebuild corrupt persisted index");
+        assert_eq!(rebuilt.len(), 1);
+
+        fs::remove_dir_all(root).expect("remove persistent search workspace");
+        fs::remove_dir_all(cache_directory).expect("remove persistent search cache");
     }
 
     #[test]
