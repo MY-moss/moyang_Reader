@@ -814,6 +814,15 @@ a:focus-visible {
   cursor: not-allowed;
   opacity: 0.45;
 }
+.workspace-export-cancel {
+  border-color: color-mix(in srgb, var(--accent-warm) 45%, var(--line));
+  color: var(--accent-warm);
+}
+.workspace-export-cancel:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-warm) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent-warm) 10%, var(--surface-strong));
+  color: var(--accent-warm);
+}
 .workspace-heading h2 {
   margin: 7px 0 0;
   font-family: var(--font-display);

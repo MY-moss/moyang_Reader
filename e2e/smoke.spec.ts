@@ -77,6 +77,43 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("keeps same-named browser documents in separate tabs", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "duplicate-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# First duplicate"),
+    },
+    {
+      name: "duplicate-note.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Second duplicate"),
+    },
+  ]);
+
+  const tabs = page.getByRole("tab", { name: "duplicate-note.md" });
+  await expect(tabs).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Second duplicate" })).toBeVisible();
+
+  await tabs.nth(0).click();
+  await expect(page.getByRole("heading", { name: "First duplicate" })).toBeVisible();
+});
+
+test("rejects unsupported browser files instead of rendering them as markdown", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "unknown-binary.exe",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from([0, 1, 2, 3]),
+  });
+
+  await expect(page.getByRole("alert")).toHaveText(/已跳过 1 个不支持的文件：unknown-binary\.exe/);
+  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+});
+
 test("protects unsaved browser edits before opening another document", async ({ page }) => {
   await page.goto("/");
 
@@ -100,6 +137,23 @@ test("protects unsaved browser edits before opening another document", async ({ 
   });
 
   await expect(editor).toHaveValue("# Unsaved note\n\n尚未保存");
+});
+
+test("shows the latest source draft after switching back to reading", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "draft-preview-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Original title\n\n原始内容"),
+  });
+  await page.getByRole("button", { name: "源文本" }).click();
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.fill("# Draft title\n\n最新草稿内容");
+  await page.getByRole("button", { name: "阅读" }).click();
+
+  await expect(page.getByRole("heading", { name: "Draft title" })).toBeVisible();
+  await expect(page.getByText("最新草稿内容")).toBeVisible();
 });
 
 test("enters and exits focus reading mode", async ({ page }) => {

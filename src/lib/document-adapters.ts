@@ -42,13 +42,16 @@ const imageMimeTypes: Record<string, string> = {
   webp: "image/webp",
 };
 
-export function documentKindFromPath(path: string): DocumentKind {
+const markdownExtensions = ["md", "markdown", "mdown", "mkd"];
+
+export function documentKindFromPath(path: string): DocumentKind | null {
   const extension = extensionOf(path);
   if (extension === "docx") return "docx";
   if (extension === "pdf") return "pdf";
-  if (extension in imageMimeTypes) return "image";
+  if (Object.hasOwn(imageMimeTypes, extension)) return "image";
   if (["txt", "text", "log"].includes(extension)) return "text";
-  return "markdown";
+  if (markdownExtensions.includes(extension)) return "markdown";
+  return null;
 }
 
 export function imageMimeType(path: string): string {
@@ -82,7 +85,9 @@ export async function renderSource(
   options: RenderOptions = {},
 ): Promise<RenderedMarkdown> {
   const { renderMarkdown, renderPlainText } = await import("./markdown");
-  return documentKindFromPath(path) === "text" ? renderPlainText(source) : renderMarkdown(source, options);
+  const kind = documentKindFromPath(path);
+  if (!kind) throw new Error("不支持的文档类型。");
+  return kind === "text" ? renderPlainText(source) : renderMarkdown(source, options);
 }
 
 export async function renderDocx(bytes: Uint8Array, options: RenderOptions = {}): Promise<RenderedMarkdown> {

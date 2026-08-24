@@ -63,12 +63,14 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
+import { nextReaderModeAfterOpen } from "./reader-mode";
 import {
   buildBatchDocxExport,
   buildBatchHtmlExport,
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportCancellationNotice,
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
@@ -294,6 +296,7 @@ export function App() {
   const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
   const updateRef = useRef<Update | null>(null);
   const updateCheckInFlightRef = useRef(false);
+  const workspaceExportAbortRef = useRef<AbortController | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
@@ -313,6 +316,7 @@ export function App() {
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
+  const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
   const workspacePathRef = useRef<string | null>(workspacePath);
@@ -758,12 +762,15 @@ export function App() {
   );
 
   const openSource = useCallback(
-    async (path: string, source: string): Promise<boolean> => {
+    async (path: string, source: string, preserveMode = false): Promise<boolean> => {
       setLoading(true);
       setError(null);
 
       try {
         const kind = documentKindFromPath(path);
+        if (!kind || (kind !== "markdown" && kind !== "text")) {
+          throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
+        }
         const rendered = await renderSource(path, source, {
           allowRemoteResources: preferences.allowRemoteResources,
         });
@@ -788,7 +795,7 @@ export function App() {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
           saveLastDocumentPath(path);
         }
-        setMode("rendered");
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode));
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档渲染失败。");
@@ -801,7 +808,7 @@ export function App() {
   );
 
   const openBinary = useCallback(
-    async (path: string, bytes: Uint8Array): Promise<boolean> => {
+    async (path: string, bytes: Uint8Array, preserveMode = false): Promise<boolean> => {
       const kind = documentKindFromPath(path);
       if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
         throw new Error("当前文件不是可预览的文档。");
@@ -849,7 +856,7 @@ export function App() {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
           saveLastDocumentPath(path);
         }
-        setMode("rendered");
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode));
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档预览失败。");
@@ -862,26 +869,29 @@ export function App() {
   );
 
   const openPath = useCallback(
-    async (path: string): Promise<boolean> => {
+    async (path: string, preserveMode = false): Promise<boolean> => {
       try {
         if (path.startsWith("browser://")) {
           const cached = browserDocumentsRef.current.get(path);
           if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
           if (cached.bytes) {
-            return await openBinary(path, cached.bytes);
+            return await openBinary(path, cached.bytes, preserveMode);
           } else if (cached.source !== undefined) {
-            return await openSource(path, cached.source);
+            return await openSource(path, cached.source, preserveMode);
           }
           return false;
         }
 
         const kind = documentKindFromPath(path);
+        if (!kind) {
+          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
+        }
         if (kind === "docx" || kind === "pdf" || kind === "image") {
-          return await openBinary(path, await readBinaryFile(path));
+          return await openBinary(path, await readBinaryFile(path), preserveMode);
         }
 
         const source = await readTextFile(path);
-        return await openSource(path, source);
+        return await openSource(path, source, preserveMode);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文件打开失败。");
         return false;
@@ -1119,7 +1129,7 @@ export function App() {
       if (current.modified) {
         setExternalChangePath(current.path);
       } else {
-        void openPath(current.path);
+        void openPath(current.path, true);
       }
     })
       .then((dispose) => {
@@ -1247,7 +1257,7 @@ export function App() {
 
     const requestId = ++sourceRenderRequestRef.current;
     const path = current.path;
-    void renderSource(path, current.source, {
+    void renderSource(path, sourceDraft, {
       allowRemoteResources: preferences.allowRemoteResources,
     })
       .then((rendered) => {
@@ -1259,7 +1269,7 @@ export function App() {
           setError(cause instanceof Error ? cause.message : "文档渲染失败。");
         }
       });
-  }, [mode, preferences.allowRemoteResources]);
+  }, [mode, preferences.allowRemoteResources, sourceDraft]);
 
   const updateSource = useCallback((nextSource: string) => {
     const current = documentStateRef.current;
@@ -1474,19 +1484,42 @@ export function App() {
     async (files: FileList | File[] | null | undefined) => {
       const selectedFiles = Array.from(files ?? []);
       if (selectedFiles.length === 0) return;
-      const nextPaths = selectedFiles.map((file) => `browser://${file.name}`);
+      const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];
+      const unsupportedNames: string[] = [];
+      for (const file of selectedFiles) {
+        const kind = documentKindFromPath(file.name);
+        if (!kind) {
+          unsupportedNames.push(file.name);
+          continue;
+        }
+        supportedFiles.push({
+          file,
+          kind,
+          path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,
+        });
+      }
+      const unsupportedNotice =
+        unsupportedNames.length > 0
+          ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
+          : null;
+      if (supportedFiles.length === 0) {
+        if (unsupportedNotice) setError(unsupportedNotice);
+        return;
+      }
+      const nextPaths = supportedFiles.map((entry) => entry.path);
       if (!confirmDocumentReplacement(nextPaths, "当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")) {
         return;
       }
 
-      for (const file of selectedFiles) {
-        const path = `browser://${file.name}`;
-        const kind = documentKindFromPath(file.name);
+      for (const { file, kind, path } of supportedFiles) {
         if (kind === "docx" || kind === "pdf" || kind === "image") {
           await openBinary(path, new Uint8Array(await file.arrayBuffer()));
         } else {
           await openSource(path, await file.text());
         }
+      }
+      if (unsupportedNotice) {
+        setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));
       }
     },
     [confirmDocumentReplacement, openBinary, openSource],
@@ -1835,6 +1868,10 @@ export function App() {
     }
   }, [confirmDocumentReplacement, openPath, workspaceActionFiles, workspacePath]);
 
+  const handleCancelWorkspaceExport = useCallback(() => {
+    workspaceExportAbortRef.current?.abort();
+  }, []);
+
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
       if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
@@ -1846,6 +1883,8 @@ export function App() {
           : await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
       if (format !== "pdf" && !savePath) return;
 
+      const controller = new AbortController();
+      workspaceExportAbortRef.current = controller;
       setWorkspaceExporting(true);
       setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
       setWorkspaceExportFailures([]);
@@ -1861,6 +1900,10 @@ export function App() {
       try {
         const documents = [];
         for (const [index, file] of workspaceActionFiles.entries()) {
+          if (controller.signal.aborted) {
+            setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+            return;
+          }
           setWorkspaceExportProgress({
             current: index + 1,
             total: workspaceActionFiles.length,
@@ -1897,6 +1940,11 @@ export function App() {
           } catch {
             recordSkippedFile(file.relativePath, "读取失败");
           }
+        }
+
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+          return;
         }
 
         if (documents.length === 0) {
@@ -1940,8 +1988,13 @@ export function App() {
           }${failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""}。`,
         );
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "批量导出失败。");
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported));
+        } else {
+          setError(cause instanceof Error ? cause.message : "批量导出失败。");
+        }
       } finally {
+        if (workspaceExportAbortRef.current === controller) workspaceExportAbortRef.current = null;
         setWorkspaceExporting(false);
         setWorkspaceExportProgress(null);
       }
@@ -2053,6 +2106,7 @@ export function App() {
           <WorkspacePanel
             onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
+            onCancelWorkspaceExport={handleCancelWorkspaceExport}
             workspaceExporting={workspaceExporting}
             workspaceExportProgress={workspaceExportProgress}
             workspaceExportFailures={workspaceExportFailures}
@@ -2148,7 +2202,7 @@ export function App() {
               fileName={documentState.name}
               onReload={() => {
                 setExternalChangePath(null);
-                void openPath(documentState.path);
+                void openPath(documentState.path, true);
               }}
               onDismiss={() => setExternalChangePath(null)}
             />

@@ -128,6 +128,10 @@ export function summarizeExportFailures(paths: string[], maxItems = 3): string {
   return unique.length > limit ? `${preview} 等 ${unique.length} 个` : preview;
 }
 
+export function formatExportCancellationNotice(exported: number): string {
+  return `已取消批量导出，已整理 ${exported} 篇文档，未写入文件。`;
+}
+
 function exportMargin(options: ExportOptions): string {
   return options.margin === "compact" ? "14mm 14mm" : options.margin === "wide" ? "28mm 24mm" : "22mm 18mm";
 }
@@ -314,9 +318,16 @@ type DocxImage = {
   relationshipId: string;
 };
 
+type DocxLink = {
+  relationshipId: string;
+  target: string;
+};
+
 type DocxRenderState = {
   images: DocxImage[];
   nextImageId: number;
+  links: DocxLink[];
+  nextLinkId: number;
 };
 
 function escapeXml(value: string): string {
@@ -374,6 +385,11 @@ function imageXml(element: HTMLElement, state: DocxRenderState): string {
   }
 }
 
+function isExternalDocxLink(value: string): boolean {
+  if (/^(?:https?:\/\/|mailto:|tel:|file:)/i.test(value)) return true;
+  return Boolean(value && !value.startsWith("#") && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value));
+}
+
 function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = ""): string {
   if (node.nodeType === Node.TEXT_NODE) {
     return runXml(node.nodeValue ?? "", inheritedProperties);
@@ -391,6 +407,19 @@ function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = "")
   if (tag === "code" || tag === "kbd")
     properties += '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F0EEE9"/>';
   if (tag === "a") properties += '<w:color w:val="28655F"/><w:u w:val="single"/>';
+
+  if (tag === "a") {
+    const content = Array.from(node.childNodes)
+      .map((child) => inlineXml(child, state, properties))
+      .join("");
+    const target = node.getAttribute("href") ?? "";
+    if (!isExternalDocxLink(target)) return content;
+
+    const relationshipId = `rIdLink${state.nextLinkId}`;
+    state.nextLinkId += 1;
+    state.links.push({ relationshipId, target });
+    return `<w:hyperlink r:id="${relationshipId}">${content}</w:hyperlink>`;
+  }
 
   return Array.from(node.childNodes)
     .map((child) => inlineXml(child, state, properties))
@@ -443,6 +472,12 @@ function blockXml(node: Node, state: DocxRenderState): string {
   }
   if (tag === "li") {
     const parentTag = node.parentElement?.tagName.toLowerCase();
+    const orderedIndex =
+      parentTag === "ol" && node.parentElement
+        ? Array.from(node.parentElement.children)
+            .filter((child) => child.tagName.toLowerCase() === "li")
+            .indexOf(node) + 1
+        : 0;
     const content = Array.from(node.childNodes)
       .filter((child) => !(child instanceof HTMLElement && ["ul", "ol"].includes(child.tagName.toLowerCase())))
       .map((child) => inlineXml(child, state))
@@ -451,7 +486,11 @@ function blockXml(node: Node, state: DocxRenderState): string {
       .filter((child) => ["ul", "ol"].includes(child.tagName.toLowerCase()))
       .map((child) => blockXml(child, state))
       .join("");
-    return pageBreakPrefix + paragraphXml(runXml(parentTag === "ol" ? "1. " : "• ") + content, "Normal") + nested;
+    return (
+      pageBreakPrefix +
+      paragraphXml(runXml(parentTag === "ol" ? `${orderedIndex}. ` : "• ") + content, "Normal") +
+      nested
+    );
   }
   if (/^h[1-4]$/.test(tag)) {
     return (
@@ -537,13 +576,17 @@ function docxContentTypesXml(images: DocxImage[]): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${imageTypes}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
 }
 
-function docxRelationshipsXml(images: DocxImage[]): string {
+function docxRelationshipsXml(images: DocxImage[], links: DocxLink[]): string {
   const relationships = [
     '<Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>',
     '<Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>',
     ...images.map(
       (image, index) =>
         `<Relationship Id="${image.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${index + 1}.${image.extension}"/>`,
+    ),
+    ...links.map(
+      (link) =>
+        `<Relationship Id="${link.relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escapeXml(link.target)}" TargetMode="External"/>`,
     ),
   ].join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`;
@@ -555,18 +598,17 @@ export async function buildDocxExport(
   options: ExportOptions = defaultExportOptions,
 ): Promise<Uint8Array> {
   const { default: JSZip } = await import("jszip");
-  const state: DocxRenderState = { images: [], nextImageId: 1 };
+  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const normalizedBody = normalizeExportLinks(body);
   const zip = new JSZip();
-  zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
   zip.file(
     "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
   );
-  zip.file("word/document.xml", docxDocumentXml(title, body, state, options));
+  zip.file("word/document.xml", docxDocumentXml(title, normalizedBody, state, options));
   zip.file("word/styles.xml", docxStylesXml());
   zip.file("word/header1.xml", docxHeaderXml(title));
   zip.file("word/footer1.xml", docxFooterXml());
-  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
   zip.file(
     "docProps/core.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Moyang Reader</dc:creator></cp:coreProperties>`,
@@ -578,7 +620,7 @@ export async function buildDocxExport(
 
   // The document XML is built before the content types and relationships are finalized.
   zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
-  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images));
+  zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }

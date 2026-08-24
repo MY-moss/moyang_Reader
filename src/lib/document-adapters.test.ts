@@ -47,6 +47,8 @@ describe("document adapters", () => {
     expect(documentKindFromPath("C:\\Notes\\Cover.PNG")).toBe("image");
     expect(documentKindFromPath("C:\\Notes\\Today.LOG")).toBe("text");
     expect(documentKindFromPath("C:\\Notes\\Today.markdown")).toBe("markdown");
+    expect(documentKindFromPath("C:\\Notes\\Legacy.doc")).toBeNull();
+    expect(documentKindFromPath("C:\\Notes\\binary")).toBeNull();
   });
 
   it("only exposes source editing for text-based documents", () => {

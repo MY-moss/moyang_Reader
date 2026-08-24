@@ -6,6 +6,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  formatExportCancellationNotice,
   htmlToPlainText,
   fileNameWithExtension,
   inlineLocalImages,
@@ -126,6 +127,10 @@ describe("document export helpers", () => {
     expect(summarizeExportFailures(["a.md", "b.docx", "c.txt", "d.pdf"], 3)).toBe("a.md、b.docx、c.txt 等 4 个");
   });
 
+  it("explains that cancelling a batch export leaves no partial output", () => {
+    expect(formatExportCancellationNotice(4)).toBe("已取消批量导出，已整理 4 篇文档，未写入文件。");
+  });
+
   it("builds a single HTML document with a linked table of contents", () => {
     const html = buildBatchHtmlExport("阅读库", [
       { title: "notes/第一篇.md", body: "<p>第一篇</p>" },
@@ -216,6 +221,48 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("第一篇正文");
     expect(documentXml).toContain("第二篇正文");
     expect(documentXml).toContain("<w:pageBreakBefore/>");
+  });
+
+  it("keeps ordered list numbers in DOCX exports", async () => {
+    const bytes = await buildDocxExport(
+      "有序列表",
+      "<ol><li>第一项<ol><li>嵌套第一项</li></ol></li><li>第二项</li></ol>",
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const documentXmlTree = new DOMParser().parseFromString(documentXml ?? "", "application/xml");
+    const textRuns = Array.from(
+      documentXmlTree.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"),
+    )
+      .map((node) => node.textContent ?? "")
+      .join("");
+
+    expect(textRuns).toContain("1. 第一项");
+    expect(textRuns).toContain("1. 嵌套第一项");
+    expect(textRuns).toContain("2. 第二项");
+  });
+
+  it("preserves safe external hyperlinks in DOCX exports", async () => {
+    const bytes = await buildDocxExport(
+      "链接",
+      '<p><a href="https://example.com/?a=1&amp;b=2">官网</a> <a href="mailto:hello@example.com">邮件</a> <a href="tel:+8613800138000">电话</a> <a href="guide/intro.md">相对文档</a> <a href="moyang-wiki:Note">内部笔记</a></p>',
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink1">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink2">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink3">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink4">');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink5">');
+    expect(relationshipsXml).toContain('Target="https://example.com/?a=1&amp;b=2"');
+    expect(relationshipsXml).toContain('Target="mailto:hello@example.com"');
+    expect(relationshipsXml).toContain('Target="tel:+8613800138000"');
+    expect(relationshipsXml).toContain('Target="guide/intro.md"');
+    expect(relationshipsXml).toContain('Target="Note.md"');
+    expect(relationshipsXml).toContain('TargetMode="External"');
+    expect(relationshipsXml).not.toContain("moyang-wiki:");
   });
 
   it("applies custom page layout settings to DOCX export", async () => {

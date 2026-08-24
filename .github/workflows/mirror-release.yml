@@ -1,0 +1,74 @@
+name: Mirror release to Cloudflare Pages
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Publish updater mirror
+    runs-on: windows-latest
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      MIRROR_BASE_URL: https://moyang-reader-mirror.pages.dev
+      MIRROR_PROJECT: moyang-reader-mirror
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download public release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assetDir = Join-Path $env:RUNNER_TEMP "moyang-reader-release-assets"
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern "latest.json" --dir $assetDir
+          $manifest = Get-Content -Raw -LiteralPath (Join-Path $assetDir "latest.json") | ConvertFrom-Json
+          $assetNames = foreach ($entry in $manifest.platforms.PSObject.Properties) {
+            $uri = [Uri]$entry.Value.url
+            [IO.Path]::GetFileName($uri.AbsolutePath)
+          }
+          foreach ($assetName in ($assetNames | Sort-Object -Unique)) {
+            gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sig" --dir $assetDir
+          }
+          "ASSET_DIR=$assetDir" >> $env:GITHUB_ENV
+
+      - name: Prepare mirror files
+        shell: pwsh
+        run: |
+          $outputDir = Join-Path $env:RUNNER_TEMP "moyang-reader-mirror"
+          node scripts/prepare-mirror.mjs --manifest="$env:ASSET_DIR/latest.json" --asset-dir="$env:ASSET_DIR" --output="$outputDir" --base-url="$env:MIRROR_BASE_URL" --version="$env:RELEASE_TAG"
+          "MIRROR_DIR=$outputDir" >> $env:GITHUB_ENV
+
+      - name: Verify Cloudflare credentials
+        shell: pwsh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) {
+            throw "请配置 CLOUDFLARE_API_TOKEN 和 CLOUDFLARE_ACCOUNT_ID 后再启用镜像自动同步。"
+          }
+
+      - name: Deploy Cloudflare Pages mirror
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy "${{ runner.temp }}/moyang-reader-mirror" --project-name=${{ env.MIRROR_PROJECT }}
