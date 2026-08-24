@@ -223,6 +223,25 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("<w:pageBreakBefore/>");
   });
 
+  it("keeps ordered list numbers in DOCX exports", async () => {
+    const bytes = await buildDocxExport(
+      "有序列表",
+      "<ol><li>第一项<ol><li>嵌套第一项</li></ol></li><li>第二项</li></ol>",
+    );
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const documentXmlTree = new DOMParser().parseFromString(documentXml ?? "", "application/xml");
+    const textRuns = Array.from(
+      documentXmlTree.getElementsByTagNameNS("http://schemas.openxmlformats.org/wordprocessingml/2006/main", "t"),
+    )
+      .map((node) => node.textContent ?? "")
+      .join("");
+
+    expect(textRuns).toContain("1. 第一项");
+    expect(textRuns).toContain("1. 嵌套第一项");
+    expect(textRuns).toContain("2. 第二项");
+  });
+
   it("applies custom page layout settings to DOCX export", async () => {
     const bytes = await buildDocxExport("Letter", "<p>正文</p>", {
       paper: "letter",

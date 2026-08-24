@@ -447,6 +447,12 @@ function blockXml(node: Node, state: DocxRenderState): string {
   }
   if (tag === "li") {
     const parentTag = node.parentElement?.tagName.toLowerCase();
+    const orderedIndex =
+      parentTag === "ol" && node.parentElement
+        ? Array.from(node.parentElement.children)
+            .filter((child) => child.tagName.toLowerCase() === "li")
+            .indexOf(node) + 1
+        : 0;
     const content = Array.from(node.childNodes)
       .filter((child) => !(child instanceof HTMLElement && ["ul", "ol"].includes(child.tagName.toLowerCase())))
       .map((child) => inlineXml(child, state))
@@ -455,7 +461,11 @@ function blockXml(node: Node, state: DocxRenderState): string {
       .filter((child) => ["ul", "ol"].includes(child.tagName.toLowerCase()))
       .map((child) => blockXml(child, state))
       .join("");
-    return pageBreakPrefix + paragraphXml(runXml(parentTag === "ol" ? "1. " : "• ") + content, "Normal") + nested;
+    return (
+      pageBreakPrefix +
+      paragraphXml(runXml(parentTag === "ol" ? `${orderedIndex}. ` : "• ") + content, "Normal") +
+      nested
+    );
   }
   if (/^h[1-4]$/.test(tag)) {
     return (
