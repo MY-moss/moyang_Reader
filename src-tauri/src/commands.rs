@@ -362,6 +362,37 @@ pub async fn choose_workspace_path(
 }
 
 #[tauri::command]
+pub fn authorize_stored_path(
+    path: String,
+    workspace: bool,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    authorize_stored_path_inner(PathBuf::from(path), workspace, access.inner())
+}
+
+fn authorize_stored_path_inner(
+    path: PathBuf,
+    workspace: bool,
+    access: &AccessRegistry,
+) -> Result<String, String> {
+    let path =
+        fs::canonicalize(&path).map_err(|_| "记住的路径已不存在，请重新选择。".to_string())?;
+    if workspace {
+        if !path.is_dir() {
+            return Err("记住的阅读库路径不是文件夹，请重新选择。".to_string());
+        }
+        access.register_workspace_path(&path)?;
+    } else {
+        if !path.is_file() || !is_supported_document_path(&path) {
+            return Err("记住的文档已不存在或格式不受支持，请重新选择。".to_string());
+        }
+        access.register_document_path(&path)?;
+    }
+
+    Ok(display_path(&path))
+}
+
+#[tauri::command]
 pub async fn choose_save_path(
     app: AppHandle,
     default_path: String,
@@ -1383,8 +1414,8 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        access_path_key, clean_tag, create_markdown_file_inner, decode_text,
-        extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
+        access_path_key, authorize_stored_path_inner, clean_tag, create_markdown_file_inner,
+        decode_text, extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
         index_workspace_inner, is_supported_document_path, is_supported_text_path,
         list_workspace_files_inner, path_exists_inner, read_text_file_inner,
         refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
@@ -1442,6 +1473,44 @@ mod tests {
         assert!(access.is_workspace_allowed(&vault));
 
         fs::remove_dir_all(root).expect("remove access test directory");
+    }
+
+    #[test]
+    fn authorizes_existing_stored_documents_and_workspaces_only() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-stored-path-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let workspace = root.join("vault");
+        let note = workspace.join("note.md");
+        let unsupported = workspace.join("note.doc");
+        fs::create_dir_all(&workspace).expect("create stored path workspace");
+        fs::write(&note, "note").expect("write stored path note");
+        fs::write(&unsupported, "unsupported").expect("write unsupported document");
+
+        let access = AccessRegistry::default();
+        let authorized_note = authorize_stored_path_inner(note.clone(), false, &access)
+            .expect("authorize stored document");
+        assert_eq!(
+            fs::canonicalize(&authorized_note).expect("canonicalize authorized document"),
+            fs::canonicalize(&note).expect("canonicalize expected document")
+        );
+        assert!(access.is_read_allowed(&note));
+        assert!(access.is_write_allowed(&note));
+        assert!(authorize_stored_path_inner(unsupported, false, &access).is_err());
+        assert!(authorize_stored_path_inner(root.join("missing.md"), false, &access).is_err());
+
+        let authorized_workspace = authorize_stored_path_inner(workspace.clone(), true, &access)
+            .expect("authorize stored workspace");
+        assert_eq!(
+            fs::canonicalize(&authorized_workspace).expect("canonicalize authorized workspace"),
+            fs::canonicalize(&workspace).expect("canonicalize expected workspace")
+        );
+        assert!(access.is_workspace_allowed(&workspace));
+        assert!(authorize_stored_path_inner(note, true, &access).is_err());
+
+        fs::remove_dir_all(root).expect("remove stored path workspace");
     }
 
     #[test]

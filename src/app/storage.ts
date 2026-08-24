@@ -3,6 +3,7 @@ import type { RecentFile, RecentWorkspace } from "./types";
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
 const recentWorkspacesKey = "moyang-reader-recent-workspaces";
+const lastDocumentKey = "moyang-reader-last-document";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 
@@ -25,6 +26,23 @@ export function saveWorkspacePath(path: string | null): void {
   try {
     if (path) localStorage.setItem(workspaceKey, path);
     else localStorage.removeItem(workspaceKey);
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+export function loadLastDocumentPath(): string | null {
+  try {
+    return localStorage.getItem(lastDocumentKey);
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastDocumentPath(path: string | null): void {
+  try {
+    if (path) localStorage.setItem(lastDocumentKey, path);
+    else localStorage.removeItem(lastDocumentKey);
   } catch {
     // Local storage may be unavailable in a restricted browser preview.
   }

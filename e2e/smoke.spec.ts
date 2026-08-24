@@ -7,10 +7,7 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
   await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "文件夹", exact: true })).toHaveAttribute(
-    "title",
-    /Ctrl\+Shift\+O/,
-  );
+  await expect(page.getByRole("button", { name: "文件夹", exact: true })).toHaveAttribute("title", /Ctrl\+Shift\+O/);
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
 });
 
@@ -19,6 +16,23 @@ test("keeps the folder shortcut available from the landing page", async ({ page 
 
   await page.keyboard.press("Control+Shift+O");
   await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+});
+
+test("shows remembered files and workspaces on the next launch", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "moyang-reader-recent-workspaces",
+      JSON.stringify([{ path: "C:/Notes/Library", name: "Library" }]),
+    );
+    localStorage.setItem(
+      "moyang-reader-recent-files",
+      JSON.stringify([{ path: "C:/Notes/Library/today.md", name: "today.md" }]),
+    );
+  });
+  await page.goto("/");
+
+  await expect(page.locator('button[title="C:/Notes/Library"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: /today\.md/ })).toBeVisible();
 });
 
 test("opens the quick-open palette from the keyboard", async ({ page }) => {
@@ -40,7 +54,6 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
-
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
