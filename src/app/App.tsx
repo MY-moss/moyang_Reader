@@ -208,6 +208,7 @@ export function App() {
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
+  const [focusMode, setFocusMode] = useState(false);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -1014,11 +1015,19 @@ export function App() {
         event.preventDefault();
         setQuickOpen(true);
       }
+      if (event.key === "Escape" && focusMode) {
+        event.preventDefault();
+        setFocusMode(false);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === "Enter" && documentStateRef.current) {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+      }
     };
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [handleChooseWorkspace, openSelectedFile, saveDocument]);
+  }, [focusMode, handleChooseWorkspace, openSelectedFile, saveDocument]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1584,7 +1593,11 @@ export function App() {
   );
 
   return (
-    <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
+    <div
+      className={`app-shell${focusMode ? " focus-mode" : ""}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
       <TopBar
         fileName={documentState?.name ?? null}
         mode={mode}
@@ -1602,6 +1615,8 @@ export function App() {
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
         onQuickOpen={() => setQuickOpen(true)}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
         onSave={() => void saveDocument()}
         onCopy={() => void handleCopy()}
@@ -1719,6 +1734,11 @@ export function App() {
         </aside>
 
         <main ref={contentAreaRef} className="content-area" aria-live="polite">
+          {focusMode && (
+            <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
+              退出专注 <span>Esc</span>
+            </button>
+          )}
           {loading && <div className="loading-state">正在打开文档…</div>}
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice

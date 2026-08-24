@@ -175,6 +175,9 @@ a:focus-visible {
   color: white;
   box-shadow: 0 5px 14px rgba(50, 114, 105, 0.2);
 }
+.focus-button {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+}
 .export-menu {
   position: relative;
 }
@@ -1136,6 +1139,54 @@ a:focus-visible {
   overflow: auto;
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--canvas)) 0%, var(--surface) 180px);
 }
+.focus-exit {
+  display: none;
+  position: fixed;
+  z-index: 8;
+  top: 18px;
+  right: 24px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+  color: var(--muted);
+  padding: 7px 11px;
+  box-shadow: var(--shadow-soft);
+  font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+.focus-exit span {
+  margin-left: 5px;
+  color: var(--accent-deep);
+  font-size: 10px;
+}
+.focus-exit:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+.app-shell.focus-mode {
+  grid-template-rows: minmax(0, 1fr);
+}
+.focus-mode .topbar,
+.focus-mode .navigation-strip,
+.focus-mode .sidebar,
+.focus-mode .statusbar {
+  display: none;
+}
+.focus-mode .workspace-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.focus-mode .content-area {
+  min-height: 100vh;
+  background: var(--surface);
+}
+.focus-mode .focus-exit {
+  display: block;
+}
+.focus-mode .reader-content {
+  width: min(920px, calc(100% - 72px));
+  padding-top: 92px;
+}
 .pdf-preview {
   display: flex;
   flex-direction: column;
@@ -2051,7 +2102,8 @@ a:focus-visible {
   .tab-strip,
   .sidebar,
   .statusbar,
-  .graph-backdrop {
+  .graph-backdrop,
+  .focus-exit {
     display: none !important;
   }
   .content-area {

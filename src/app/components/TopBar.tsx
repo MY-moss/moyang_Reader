@@ -14,6 +14,8 @@ type TopBarProps = {
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  focusMode: boolean;
+  onToggleFocusMode: () => void;
   onToggleMode: () => void;
   onSave: () => void;
   onCopy: () => void;
@@ -55,6 +57,8 @@ export function TopBar({
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  focusMode,
+  onToggleFocusMode,
   onToggleMode,
   onSave,
   onCopy,
@@ -128,6 +132,15 @@ export function TopBar({
         </button>
         <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
           快速打开
+        </button>
+        <button
+          type="button"
+          className="toolbar-button focus-button"
+          onClick={onToggleFocusMode}
+          disabled={!fileName}
+          title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
+        >
+          {focusMode ? "退出专注" : "专注"}
         </button>
         <button type="button" className="toolbar-button" onClick={onToggleSearch} title="查找文档内容 (Ctrl+F)">
           搜索

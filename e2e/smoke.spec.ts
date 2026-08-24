@@ -77,6 +77,26 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("enters and exits focus reading mode", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "focus-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Focus note\n\n专注阅读测试"),
+  });
+  await expect(page.getByRole("heading", { name: "Focus note" })).toBeVisible();
+
+  await page.getByRole("button", { name: "专注", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+  await expect(page.getByRole("button", { name: /退出专注/ })).toBeVisible();
+  await expect(page.locator(".sidebar")).toBeHidden();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".app-shell")).not.toHaveClass(/focus-mode/);
+  await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
+});
+
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 
