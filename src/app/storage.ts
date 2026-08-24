@@ -3,12 +3,14 @@ import type { RecentFile, RecentWorkspace } from "./types";
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
 const recentWorkspacesKey = "moyang-reader-recent-workspaces";
+const mountedWorkspacesKey = "moyang-reader-mounted-workspaces";
 const lastDocumentKey = "moyang-reader-last-document";
 const openTabsKey = "moyang-reader-open-tabs";
 const readingPositionsKey = "moyang-reader-reading-positions";
 const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
+const maxMountedWorkspaces = 5;
 const maxOpenTabs = 16;
 const maxReadingPositions = 32;
 
@@ -173,42 +175,54 @@ export function saveReadingPosition(path: string, top: number): void {
   }
 }
 
-export function loadRecentWorkspaces(): RecentWorkspace[] {
-  try {
-    const raw = localStorage.getItem(recentWorkspacesKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
+function parseWorkspaceList(raw: string | null, limit: number): RecentWorkspace[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) return [];
 
-    const seen = new Set<string>();
-    return parsed
-      .filter(
-        (item): item is RecentWorkspace =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof (item as RecentWorkspace).path === "string" &&
-          typeof (item as RecentWorkspace).name === "string" &&
-          (item as RecentWorkspace).path.trim().length > 0 &&
-          (item as RecentWorkspace).name.trim().length > 0,
-      )
-      .filter((workspace) => {
-        const key = comparablePath(workspace.path);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, maxRecentWorkspaces);
+  const seen = new Set<string>();
+  return parsed
+    .filter(
+      (item): item is RecentWorkspace =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as RecentWorkspace).path === "string" &&
+        typeof (item as RecentWorkspace).name === "string" &&
+        (item as RecentWorkspace).path.trim().length > 0 &&
+        (item as RecentWorkspace).name.trim().length > 0,
+    )
+    .filter((workspace) => {
+      const key = comparablePath(workspace.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function loadWorkspaceList(key: string, limit: number): RecentWorkspace[] {
+  try {
+    return parseWorkspaceList(localStorage.getItem(key), limit);
   } catch {
     return [];
   }
 }
 
-export function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {
+function saveWorkspaceList(key: string, workspaces: RecentWorkspace[], limit: number): void {
   try {
-    localStorage.setItem(recentWorkspacesKey, JSON.stringify(workspaces.slice(0, maxRecentWorkspaces)));
+    const normalized = parseWorkspaceList(JSON.stringify(workspaces), limit);
+    localStorage.setItem(key, JSON.stringify(normalized));
   } catch {
-    // Recent workspaces remain available for the current session.
+    // Workspace lists remain available for the current session.
   }
+}
+
+export function loadRecentWorkspaces(): RecentWorkspace[] {
+  return loadWorkspaceList(recentWorkspacesKey, maxRecentWorkspaces);
+}
+
+export function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {
+  saveWorkspaceList(recentWorkspacesKey, workspaces, maxRecentWorkspaces);
 }
 
 export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
@@ -218,6 +232,31 @@ export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorks
     maxRecentWorkspaces,
   );
   saveRecentWorkspaces(next);
+  return next;
+}
+
+export function loadMountedWorkspaces(): RecentWorkspace[] {
+  return loadWorkspaceList(mountedWorkspacesKey, maxMountedWorkspaces);
+}
+
+export function saveMountedWorkspaces(workspaces: RecentWorkspace[]): void {
+  saveWorkspaceList(mountedWorkspacesKey, workspaces, maxMountedWorkspaces);
+}
+
+export function rememberMountedWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
+  const key = comparablePath(workspace.path);
+  const next = [workspace, ...loadMountedWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    maxMountedWorkspaces,
+  );
+  saveMountedWorkspaces(next);
+  return next;
+}
+
+export function forgetMountedWorkspace(path: string): RecentWorkspace[] {
+  const key = comparablePath(path);
+  const next = loadMountedWorkspaces().filter((workspace) => comparablePath(workspace.path) !== key);
+  saveMountedWorkspaces(next);
   return next;
 }
 
