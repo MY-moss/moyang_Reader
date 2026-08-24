@@ -3,9 +3,11 @@ import {
   loadRecentFiles,
   loadRecentWorkspaces,
   loadLastDocumentPath,
+  loadReadingPosition,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
+  saveReadingPosition,
   saveRecentFiles,
   saveRecentWorkspaces,
 } from "./storage";
@@ -40,6 +42,21 @@ describe("reader storage", () => {
 
     saveLastDocumentPath(null);
     expect(loadLastDocumentPath()).toBeNull();
+  });
+
+  it("stores reading positions case-insensitively and keeps a bounded history", () => {
+    saveReadingPosition("C:/Notes/Guide.md", 420.6);
+    expect(loadReadingPosition("c:\\notes\\guide.md")).toBe(421);
+
+    saveReadingPosition("c:\\NOTES\\GUIDE.md", 90);
+    expect(loadReadingPosition("C:/Notes/Guide.md")).toBe(90);
+
+    for (let index = 0; index < 40; index += 1) {
+      saveReadingPosition(`C:/Notes/${index}.md`, index);
+    }
+    expect(loadReadingPosition("C:/Notes/0.md")).toBe(0);
+    expect(loadReadingPosition("C:/Notes/39.md")).toBe(39);
+    expect(JSON.parse(localStorage.getItem("moyang-reader-reading-positions") ?? "[]")).toHaveLength(32);
   });
 
   it("deduplicates recent workspaces case-insensitively and keeps the newest eight", () => {

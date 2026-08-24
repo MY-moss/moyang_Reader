@@ -67,10 +67,12 @@ import {
   loadRecentFiles,
   loadRecentWorkspaces,
   loadLastDocumentPath,
+  loadReadingPosition,
   loadWorkspacePath,
   rememberRecentFile,
   rememberRecentWorkspace,
   saveLastDocumentPath,
+  saveReadingPosition,
   saveWorkspacePath,
 } from "./storage";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
@@ -225,6 +227,7 @@ export function App() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const previewUrlsRef = useRef(new Map<string, string>());
@@ -248,6 +251,39 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    if (!path || path.startsWith("browser://")) return;
+
+    const timer = window.setTimeout(() => {
+      const contentArea = contentAreaRef.current;
+      if (contentArea) contentArea.scrollTop = loadReadingPosition(path);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [documentState?.path]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    const contentArea = contentAreaRef.current;
+    if (!path || path.startsWith("browser://") || !contentArea) return;
+
+    let timer: number | null = null;
+    const persistPosition = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        saveReadingPosition(path, contentArea.scrollTop);
+      }, 180);
+    };
+
+    contentArea.addEventListener("scroll", persistPosition, { passive: true });
+    return () => {
+      contentArea.removeEventListener("scroll", persistPosition);
+      if (timer !== null) window.clearTimeout(timer);
+      saveReadingPosition(path, contentArea.scrollTop);
+    };
+  }, [documentState?.path]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1580,7 +1616,7 @@ export function App() {
           )}
         </aside>
 
-        <main className="content-area" aria-live="polite">
+        <main ref={contentAreaRef} className="content-area" aria-live="polite">
           {loading && <div className="loading-state">正在打开文档…</div>}
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
