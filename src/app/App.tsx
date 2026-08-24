@@ -12,7 +12,7 @@ import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { UpdateNotice } from "./components/UpdateNotice";
 import {
-  chooseDocumentPath,
+  chooseDocumentPaths,
   chooseSavePath,
   chooseWorkspacePath,
   authorizeStoredPath,
@@ -780,13 +780,15 @@ export function App() {
   );
 
   const openSelectedFile = useCallback(async () => {
-    const nativePath = await chooseDocumentPath();
-    if (nativePath) {
-      await openPath(nativePath);
+    const nativePaths = await chooseDocumentPaths();
+    if (isTauriRuntime()) {
+      if (nativePaths.length > 0) {
+        await handleOpenPaths(nativePaths.map((path) => ({ path, kind: "document" as const })));
+      }
       return;
     }
     inputRef.current?.click();
-  }, [openPath]);
+  }, [handleOpenPaths]);
 
   const saveDocument = useCallback(async () => {
     if (!documentState || !documentState.modified || !isEditableDocument(documentState.kind)) return;

@@ -23,9 +23,9 @@ export async function openExternalUrl(url: string): Promise<void> {
   window.open(normalized, "_blank", "noopener,noreferrer");
 }
 
-export async function chooseDocumentPath(): Promise<string | null> {
-  if (!isTauriRuntime()) return null;
-  return invoke<string | null>("choose_document_path");
+export async function chooseDocumentPaths(): Promise<string[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<string[]>("choose_document_paths");
 }
 
 export async function chooseWorkspacePath(): Promise<string | null> {

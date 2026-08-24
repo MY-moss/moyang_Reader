@@ -74,7 +74,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::initial_paths,
             commands::resolve_open_paths,
-            commands::choose_document_path,
+            commands::choose_document_paths,
             commands::choose_workspace_path,
             commands::authorize_stored_path,
             commands::choose_save_path,

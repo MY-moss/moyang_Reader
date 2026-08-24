@@ -7,7 +7,7 @@
 v0.5.3 本地候选版（文件夹入口增强），继续基于轻量本地阅读核心完善：
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
-- 双击传入文件路径、单实例接收后续打开请求
+- 双击传入文件路径、单实例接收后续打开请求；桌面“打开”对话框支持一次选择多个文档并依次打开
 - Markdown、GFM、YAML/TOML frontmatter、数学公式和安全 HTML 清洗
 - TXT、TEXT、LOG 纯文本保留换行阅读
 - DOCX 转安全 HTML 阅读，保留常见标题、段落、列表、表格和内嵌图片

@@ -373,10 +373,10 @@ pub(crate) fn register_open_path(access: &AccessRegistry, path: &OpenPath) -> Re
 }
 
 #[tauri::command]
-pub async fn choose_document_path(
+pub async fn choose_document_paths(
     app: AppHandle,
     access: State<'_, AccessRegistry>,
-) -> Result<Option<String>, String> {
+) -> Result<Vec<String>, String> {
     let selected = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .file()
@@ -388,11 +388,11 @@ pub async fn choose_document_path(
                     "gif", "jpeg", "jpg", "png", "svg", "webp",
                 ],
             )
-            .blocking_pick_file()
+            .blocking_pick_files()
     })
     .await
     .map_err(|error| format!("打开文件选择器失败：{error}"))?;
-    register_selected_path(access, selected, false)
+    register_selected_paths(access, selected, false)
 }
 
 #[tauri::command]
@@ -492,6 +492,26 @@ fn register_selected_path(
     let Some(selected) = selected else {
         return Ok(None);
     };
+    register_selected_file_path(access.inner(), selected, workspace).map(Some)
+}
+
+fn register_selected_paths(
+    access: State<'_, AccessRegistry>,
+    selected: Option<Vec<FilePath>>,
+    workspace: bool,
+) -> Result<Vec<String>, String> {
+    selected
+        .unwrap_or_default()
+        .into_iter()
+        .map(|selected| register_selected_file_path(access.inner(), selected, workspace))
+        .collect()
+}
+
+fn register_selected_file_path(
+    access: &AccessRegistry,
+    selected: FilePath,
+    workspace: bool,
+) -> Result<String, String> {
     let path = selected
         .into_path()
         .map_err(|_| "系统返回的选择路径不可访问。".to_string())?;
@@ -511,7 +531,7 @@ fn register_selected_path(
             access.register_path(&path)?;
         }
     }
-    Ok(Some(path_string))
+    Ok(path_string)
 }
 
 #[tauri::command]
