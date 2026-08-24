@@ -77,6 +77,19 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "second-note.md" })).toBeVisible();
 });
 
+test("rejects unsupported browser files instead of rendering them as markdown", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "unknown-binary.exe",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from([0, 1, 2, 3]),
+  });
+
+  await expect(page.getByRole("alert")).toHaveText(/已跳过 1 个不支持的文件：unknown-binary\.exe/);
+  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+});
+
 test("protects unsaved browser edits before opening another document", async ({ page }) => {
   await page.goto("/");
 

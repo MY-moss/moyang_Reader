@@ -766,6 +766,9 @@ export function App() {
 
       try {
         const kind = documentKindFromPath(path);
+        if (!kind || (kind !== "markdown" && kind !== "text")) {
+          throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
+        }
         const rendered = await renderSource(path, source, {
           allowRemoteResources: preferences.allowRemoteResources,
         });
@@ -878,6 +881,9 @@ export function App() {
         }
 
         const kind = documentKindFromPath(path);
+        if (!kind) {
+          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
+        }
         if (kind === "docx" || kind === "pdf" || kind === "image") {
           return await openBinary(path, await readBinaryFile(path));
         }
@@ -1476,19 +1482,35 @@ export function App() {
     async (files: FileList | File[] | null | undefined) => {
       const selectedFiles = Array.from(files ?? []);
       if (selectedFiles.length === 0) return;
-      const nextPaths = selectedFiles.map((file) => `browser://${file.name}`);
+      const supportedFiles = selectedFiles.filter((file) => documentKindFromPath(file.name));
+      const unsupportedNames = selectedFiles
+        .filter((file) => !documentKindFromPath(file.name))
+        .map((file) => file.name);
+      const unsupportedNotice =
+        unsupportedNames.length > 0
+          ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
+          : null;
+      if (supportedFiles.length === 0) {
+        if (unsupportedNotice) setError(unsupportedNotice);
+        return;
+      }
+      const nextPaths = supportedFiles.map((file) => `browser://${file.name}`);
       if (!confirmDocumentReplacement(nextPaths, "当前文档有未保存修改，打开新文件后将丢失这些修改。继续吗？")) {
         return;
       }
 
-      for (const file of selectedFiles) {
+      for (const file of supportedFiles) {
         const path = `browser://${file.name}`;
         const kind = documentKindFromPath(file.name);
+        if (!kind) continue;
         if (kind === "docx" || kind === "pdf" || kind === "image") {
           await openBinary(path, new Uint8Array(await file.arrayBuffer()));
         } else {
           await openSource(path, await file.text());
         }
+      }
+      if (unsupportedNotice) {
+        setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));
       }
     },
     [confirmDocumentReplacement, openBinary, openSource],
