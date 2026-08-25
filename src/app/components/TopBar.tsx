@@ -129,8 +129,33 @@ export function TopBar({
   onLocaleChange,
 }: TopBarProps) {
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
+  const settingsMenuRef = useRef<HTMLDetailsElement>(null);
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
+  const closeDropdownMenus = () => {
+    settingsMenuRef.current?.removeAttribute("open");
+    exportMenuRef.current?.removeAttribute("open");
+    moreMenuRef.current?.removeAttribute("open");
+  };
+  const closeNestedMenusWhenClosed = () => {
+    if (!moreMenuRef.current?.open) {
+      settingsMenuRef.current?.removeAttribute("open");
+      exportMenuRef.current?.removeAttribute("open");
+    }
+  };
+  const closeSearchIfOpen = () => {
+    if (searchOpen) onCloseSearch();
+  };
+  const dismissTopbarOverlays = () => {
+    closeDropdownMenus();
+    closeSearchIfOpen();
+  };
+  const toggleSearch = () => {
+    closeDropdownMenus();
+    if (searchOpen) onCloseSearch();
+    else onToggleSearch();
+  };
   const updateLabel =
     updateStatus === "checking"
       ? "检查中…"
@@ -163,18 +188,37 @@ export function TopBar({
       </div>
 
       <nav className="toolbar" aria-label="文档操作">
-        <button type="button" className="toolbar-button" onClick={onOpen} title="打开文件 (Ctrl+O)">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => {
+            dismissTopbarOverlays();
+            onOpen();
+          }}
+          title="打开文件 (Ctrl+O)"
+        >
           {t("action.open")}
         </button>
         <button
           type="button"
           className="toolbar-button"
-          onClick={onChooseWorkspace}
+          onClick={() => {
+            dismissTopbarOverlays();
+            onChooseWorkspace();
+          }}
           title="添加整个文件夹 (Ctrl+Shift+O)"
         >
           {t("action.folder")}
         </button>
-        <button type="button" className="toolbar-button" onClick={onQuickOpen} title="快速打开文档 (Ctrl+P)">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => {
+            dismissTopbarOverlays();
+            onQuickOpen();
+          }}
+          title="快速打开文档 (Ctrl+P)"
+        >
           {t("action.quickOpen")}
         </button>
         {draftCount > 0 && (
@@ -205,192 +249,238 @@ export function TopBar({
         >
           {focusMode ? t("action.exitFocus") : t("action.focus")}
         </button>
-        <button type="button" className="toolbar-button" onClick={onToggleSearch} title="查找文档内容 (Ctrl+F)">
+        <button type="button" className="toolbar-button" onClick={toggleSearch} title="查找文档内容 (Ctrl+F)">
           {t("action.search")}
         </button>
-        <button type="button" className="toolbar-button" onClick={onToggleMode} disabled={!fileName || !canEdit}>
-          {mode === "rendered" ? t("action.source") : t("action.read")}
-        </button>
-        <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
-          {t("action.save")}
-        </button>
-        <button type="button" className="toolbar-button" onClick={onCopy} disabled={!canCopy} title="复制当前文档内容">
-          {copyFeedback ? t("action.copied") : t("action.copy")}
-        </button>
-        <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
-          {locale === "en-US"
-            ? theme === "system"
-              ? t("action.theme.system")
-              : theme === "light"
-                ? t("action.theme.light")
-                : t("action.theme.dark")
-            : themeLabel}
-        </button>
-        <details className="settings-menu">
-          <summary className="toolbar-button" title="隐私与更新设置">
-            {t("settings.title")}
+        <details ref={moreMenuRef} className="toolbar-overflow" onToggle={closeNestedMenusWhenClosed}>
+          <summary className="toolbar-button toolbar-overflow-trigger" title={t("action.moreTools")}>
+            {t("action.more")}
           </summary>
-          <div className="settings-menu-panel">
-            <div className="settings-menu-title">{t("settings.localFirst")}</div>
-            <label className="settings-select-option">
-              <span>{t("settings.language")}</span>
-              <select
-                aria-label={t("settings.language")}
-                value={locale}
-                onChange={(event) => onLocaleChange(event.target.value as Locale)}
-              >
-                <option value="zh-CN">{t("settings.language.zh")}</option>
-                <option value="en-US">{t("settings.language.en")}</option>
-              </select>
-            </label>
-            <label className="settings-option">
-              <input
-                type="checkbox"
-                checked={allowRemoteResources}
-                onChange={(event) => onAllowRemoteResourcesChange(event.target.checked)}
-              />
-              <span>
-                <strong>{t("settings.allowRemoteImages")}</strong>
-                <small>{t("settings.remoteImagesNote")}</small>
-              </span>
-            </label>
-            <label className="settings-option">
-              <input
-                type="checkbox"
-                checked={startupUpdateCheck}
-                onChange={(event) => onStartupUpdateCheckChange(event.target.checked)}
-              />
-              <span>
-                <strong>{t("settings.startupUpdates")}</strong>
-                <small>{t("settings.startupUpdatesNote")}</small>
-              </span>
-            </label>
-            <div className="settings-divider">{t("settings.reading")}</div>
-            <label className="settings-select-option">
-              <span>{t("settings.fontSize")}</span>
-              <select
-                aria-label="正文字号"
-                value={readingScale}
-                onChange={(event) => onReadingScaleChange(event.target.value as ReadingScale)}
-              >
-                <option value="small">{t("settings.fontSize.compact")}</option>
-                <option value="medium">{t("settings.fontSize.standard")}</option>
-                <option value="large">{t("settings.fontSize.comfortable")}</option>
-              </select>
-            </label>
-            <label className="settings-select-option">
-              <span>{t("settings.width")}</span>
-              <select
-                aria-label="正文宽度"
-                value={readingWidth}
-                onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
-              >
-                <option value="narrow">{t("settings.width.narrow")}</option>
-                <option value="standard">{t("settings.width.standard")}</option>
-                <option value="wide">{t("settings.width.wide")}</option>
-              </select>
-            </label>
-            <div className="settings-divider">{t("settings.export")}</div>
-            <label className="settings-select-option">
-              <span>{t("settings.paper")}</span>
-              <select
-                aria-label="导出纸张"
-                value={exportPaper}
-                onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
-              >
-                <option value="a4">A4</option>
-                <option value="letter">Letter</option>
-              </select>
-            </label>
-            <label className="settings-select-option">
-              <span>{t("settings.orientation")}</span>
-              <select
-                aria-label="导出方向"
-                value={exportOrientation}
-                onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
-              >
-                <option value="portrait">{t("settings.orientation.portrait")}</option>
-                <option value="landscape">{t("settings.orientation.landscape")}</option>
-              </select>
-            </label>
-            <label className="settings-select-option">
-              <span>{t("settings.margin")}</span>
-              <select
-                aria-label="导出页边距"
-                value={exportMargin}
-                onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
-              >
-                <option value="compact">{t("settings.margin.compact")}</option>
-                <option value="standard">{t("settings.margin.standard")}</option>
-                <option value="wide">{t("settings.margin.wide")}</option>
-              </select>
-            </label>
-            <small className="settings-note">{t("settings.exportNote")}</small>
-            <div className="settings-divider">{t("settings.migration")}</div>
-            <div className="settings-actions">
-              <button type="button" className="quiet-button" onClick={onExportSettings}>
-                {t("settings.exportSettings")}
-              </button>
-              <button type="button" className="quiet-button" onClick={onImportSettings}>
-                {t("settings.importSettings")}
-              </button>
-            </div>
-            <small className="settings-note">{t("settings.backupNote")}</small>
-          </div>
-        </details>
-        <button
-          type="button"
-          className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
-          onClick={onCheckUpdates}
-          disabled={updateStatus === "checking" || updateStatus === "downloading"}
-          title={updateTitle}
-        >
-          {updateLabel}
-        </button>
-        <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
-          {exportLabel}
-        </button>
-        {(canExportMarkdown || canExportHtml || canExportDocx) && (
-          <details ref={exportMenuRef} className="export-menu">
-            <summary className="toolbar-button" title="导出文件">
-              导出
-            </summary>
-            <div className="export-menu-panel">
-              {canPreviewPrint && (
+          <div className="toolbar-overflow-panel">
+            <div className="toolbar-overflow-group">
+              <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
+              <div className="toolbar-overflow-actions">
                 <button
                   type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const menu = exportMenuRef.current;
-                    if (menu) {
-                      menu.open = false;
-                      menu.removeAttribute("open");
-                    }
-                    onPreviewPrint();
+                  className="toolbar-button"
+                  onClick={onToggleMode}
+                  disabled={!fileName || !canEdit}
+                >
+                  {mode === "rendered" ? t("action.source") : t("action.read")}
+                </button>
+                <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
+                  {t("action.save")}
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={onCopy}
+                  disabled={!canCopy}
+                  title="复制当前文档内容"
+                >
+                  {copyFeedback ? t("action.copied") : t("action.copy")}
+                </button>
+              </div>
+            </div>
+            <div className="toolbar-overflow-group">
+              <div className="toolbar-overflow-label">{t("action.appearance")}</div>
+              <div className="toolbar-overflow-actions">
+                <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
+                  {locale === "en-US"
+                    ? theme === "system"
+                      ? t("action.theme.system")
+                      : theme === "light"
+                        ? t("action.theme.light")
+                        : t("action.theme.dark")
+                    : themeLabel}
+                </button>
+                <button
+                  type="button"
+                  className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
+                  onClick={onCheckUpdates}
+                  disabled={updateStatus === "checking" || updateStatus === "downloading"}
+                  title={updateTitle}
+                >
+                  {updateLabel}
+                </button>
+              </div>
+            </div>
+            <div className="toolbar-overflow-group toolbar-overflow-settings">
+              <details
+                ref={settingsMenuRef}
+                className="settings-menu"
+                onClick={() => {
+                  closeSearchIfOpen();
+                  exportMenuRef.current?.removeAttribute("open");
+                }}
+              >
+                <summary className="toolbar-button" title="隐私与更新设置">
+                  {t("settings.title")}
+                </summary>
+                <div className="settings-menu-panel">
+                  <div className="settings-menu-title">{t("settings.localFirst")}</div>
+                  <label className="settings-select-option">
+                    <span>{t("settings.language")}</span>
+                    <select
+                      aria-label={t("settings.language")}
+                      value={locale}
+                      onChange={(event) => onLocaleChange(event.target.value as Locale)}
+                    >
+                      <option value="zh-CN">{t("settings.language.zh")}</option>
+                      <option value="en-US">{t("settings.language.en")}</option>
+                    </select>
+                  </label>
+                  <label className="settings-option">
+                    <input
+                      type="checkbox"
+                      checked={allowRemoteResources}
+                      onChange={(event) => onAllowRemoteResourcesChange(event.target.checked)}
+                    />
+                    <span>
+                      <strong>{t("settings.allowRemoteImages")}</strong>
+                      <small>{t("settings.remoteImagesNote")}</small>
+                    </span>
+                  </label>
+                  <label className="settings-option">
+                    <input
+                      type="checkbox"
+                      checked={startupUpdateCheck}
+                      onChange={(event) => onStartupUpdateCheckChange(event.target.checked)}
+                    />
+                    <span>
+                      <strong>{t("settings.startupUpdates")}</strong>
+                      <small>{t("settings.startupUpdatesNote")}</small>
+                    </span>
+                  </label>
+                  <div className="settings-divider">{t("settings.reading")}</div>
+                  <label className="settings-select-option">
+                    <span>{t("settings.fontSize")}</span>
+                    <select
+                      aria-label="正文字号"
+                      value={readingScale}
+                      onChange={(event) => onReadingScaleChange(event.target.value as ReadingScale)}
+                    >
+                      <option value="small">{t("settings.fontSize.compact")}</option>
+                      <option value="medium">{t("settings.fontSize.standard")}</option>
+                      <option value="large">{t("settings.fontSize.comfortable")}</option>
+                    </select>
+                  </label>
+                  <label className="settings-select-option">
+                    <span>{t("settings.width")}</span>
+                    <select
+                      aria-label="正文宽度"
+                      value={readingWidth}
+                      onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+                    >
+                      <option value="narrow">{t("settings.width.narrow")}</option>
+                      <option value="standard">{t("settings.width.standard")}</option>
+                      <option value="wide">{t("settings.width.wide")}</option>
+                    </select>
+                  </label>
+                  <div className="settings-divider">{t("settings.export")}</div>
+                  <label className="settings-select-option">
+                    <span>{t("settings.paper")}</span>
+                    <select
+                      aria-label="导出纸张"
+                      value={exportPaper}
+                      onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
+                    >
+                      <option value="a4">A4</option>
+                      <option value="letter">Letter</option>
+                    </select>
+                  </label>
+                  <label className="settings-select-option">
+                    <span>{t("settings.orientation")}</span>
+                    <select
+                      aria-label="导出方向"
+                      value={exportOrientation}
+                      onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
+                    >
+                      <option value="portrait">{t("settings.orientation.portrait")}</option>
+                      <option value="landscape">{t("settings.orientation.landscape")}</option>
+                    </select>
+                  </label>
+                  <label className="settings-select-option">
+                    <span>{t("settings.margin")}</span>
+                    <select
+                      aria-label="导出页边距"
+                      value={exportMargin}
+                      onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
+                    >
+                      <option value="compact">{t("settings.margin.compact")}</option>
+                      <option value="standard">{t("settings.margin.standard")}</option>
+                      <option value="wide">{t("settings.margin.wide")}</option>
+                    </select>
+                  </label>
+                  <small className="settings-note">{t("settings.exportNote")}</small>
+                  <div className="settings-divider">{t("settings.migration")}</div>
+                  <div className="settings-actions">
+                    <button type="button" className="quiet-button" onClick={onExportSettings}>
+                      {t("settings.exportSettings")}
+                    </button>
+                    <button type="button" className="quiet-button" onClick={onImportSettings}>
+                      {t("settings.importSettings")}
+                    </button>
+                  </div>
+                  <small className="settings-note">{t("settings.backupNote")}</small>
+                </div>
+              </details>
+            </div>
+            <div className="toolbar-overflow-group toolbar-overflow-settings">
+              <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
+                {exportLabel}
+              </button>
+              {(canExportMarkdown || canExportHtml || canExportDocx) && (
+                <details
+                  ref={exportMenuRef}
+                  className="export-menu"
+                  onClick={() => {
+                    closeSearchIfOpen();
+                    settingsMenuRef.current?.removeAttribute("open");
                   }}
                 >
-                  预览打印版式
-                </button>
-              )}
-              {canExportMarkdown && (
-                <button type="button" onClick={onExportMarkdown}>
-                  导出 Markdown / 文本
-                </button>
-              )}
-              {canExportHtml && (
-                <button type="button" onClick={onExportHtml}>
-                  导出 HTML（含图片）
-                </button>
-              )}
-              {canExportDocx && (
-                <button type="button" onClick={onExportDocx}>
-                  导出 Word（DOCX）
-                </button>
+                  <summary className="toolbar-button" title="导出文件">
+                    导出
+                  </summary>
+                  <div className="export-menu-panel">
+                    {canPreviewPrint && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const menu = exportMenuRef.current;
+                          if (menu) {
+                            menu.open = false;
+                            menu.removeAttribute("open");
+                          }
+                          onPreviewPrint();
+                        }}
+                      >
+                        预览打印版式
+                      </button>
+                    )}
+                    {canExportMarkdown && (
+                      <button type="button" onClick={onExportMarkdown}>
+                        导出 Markdown / 文本
+                      </button>
+                    )}
+                    {canExportHtml && (
+                      <button type="button" onClick={onExportHtml}>
+                        导出 HTML（含图片）
+                      </button>
+                    )}
+                    {canExportDocx && (
+                      <button type="button" onClick={onExportDocx}>
+                        导出 Word（DOCX）
+                      </button>
+                    )}
+                  </div>
+                </details>
               )}
             </div>
-          </details>
-        )}
+          </div>
+        </details>
       </nav>
 
       {searchOpen && (

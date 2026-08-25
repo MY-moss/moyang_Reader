@@ -36,7 +36,8 @@ test("keeps the reader shell and key dialogs accessible", async ({ page }) => {
   await expectNoSeriousA11yViolations(page);
   await page.keyboard.press("Escape");
 
-  await page.locator("summary", { hasText: "设置" }).click();
+  await page.locator(".toolbar-overflow-trigger").click();
+  await page.locator(".topbar .settings-menu summary", { hasText: "设置" }).click();
   await expect(page.getByRole("checkbox", { name: "允许远程图片" })).toBeVisible();
   await expect(page.getByRole("button", { name: "导出设置" })).toBeVisible();
   await expect(page.getByRole("button", { name: "导入设置" })).toBeVisible();

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"eslint.config.mjs\" \".prettierrc.json\" \".github/**/*.{yml,yaml}\" \"docs/**/*.md\" \"scripts/*.mjs\"",
     "preview": "vite preview",
+    "desktop": "tauri dev",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",

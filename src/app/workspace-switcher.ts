@@ -1,10 +1,8 @@
 import type { RecentWorkspace } from "./types";
+import { normalizePathKey } from "./path-key";
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 export function filterSwitchableWorkspaces(

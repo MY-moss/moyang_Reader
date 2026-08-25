@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function expectEditorText(editor: Locator, expected: string): Promise<void> {
   const normalizedExpected = expected.replace(/\s+/g, "");
@@ -10,6 +10,23 @@ async function expectEditorText(editor: Locator, expected: string): Promise<void
       return value.replace(/\s+/g, "");
     })
     .toBe(normalizedExpected);
+}
+
+async function openMoreMenu(page: Page): Promise<void> {
+  const menu = page.locator(".toolbar-overflow");
+  if ((await menu.getAttribute("open")) === null) {
+    await page.locator(".toolbar-overflow-trigger").click();
+  }
+}
+
+async function openSettingsMenu(page: Page, label = "设置"): Promise<void> {
+  await openMoreMenu(page);
+  await page.locator(".topbar .settings-menu summary", { hasText: label }).click();
+}
+
+async function clickToolbarAction(page: Page, name: string): Promise<void> {
+  await openMoreMenu(page);
+  await page.getByRole("button", { name, exact: true }).click();
 }
 
 test("renders the local reader landing page", async ({ page }) => {
@@ -158,7 +175,7 @@ test("protects unsaved browser edits before opening another document", async ({ 
     mimeType: "text/markdown",
     buffer: Buffer.from("# Unsaved note\n\n原始内容"),
   });
-  await page.getByRole("button", { name: "源文本" }).click();
+  await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.fill("# Unsaved note\n\n尚未保存");
 
@@ -183,11 +200,11 @@ test("keeps unsaved edits when changing local resource preferences", async ({ pa
     mimeType: "text/markdown",
     buffer: Buffer.from("# Preference draft\n\n原始内容"),
   });
-  await page.getByRole("button", { name: "源文本" }).click();
+  await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.fill("# Preference draft\n\n尚未保存的修改");
 
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
   await page.getByRole("checkbox", { name: "允许远程图片" }).check();
 
   await expectEditorText(editor, "# Preference draft\n\n尚未保存的修改");
@@ -201,10 +218,10 @@ test("shows the latest source draft after switching back to reading", async ({ p
     mimeType: "text/markdown",
     buffer: Buffer.from("# Original title\n\n原始内容"),
   });
-  await page.getByRole("button", { name: "源文本" }).click();
+  await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.fill("# Draft title\n\n最新草稿内容");
-  await page.getByRole("button", { name: "阅读" }).click();
+  await clickToolbarAction(page, "阅读");
 
   await expect(page.getByRole("heading", { name: "Draft title" })).toBeVisible();
   await expect(page.getByText("最新草稿内容")).toBeVisible();
@@ -218,7 +235,7 @@ test("opens editor-local find from source mode", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# Editor search\n\nneedle one\n\nneedle two"),
   });
-  await page.getByRole("button", { name: "源文本" }).click();
+  await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.press("Control+f");
 
@@ -343,7 +360,8 @@ test("previews the print layout before exporting a document", async ({ page }) =
   });
   await expect(page.getByRole("heading", { name: "Print preview" })).toBeVisible();
 
-  await page.getByText("导出", { exact: true }).click();
+  await openMoreMenu(page);
+  await page.locator(".topbar .export-menu summary").click();
   await page.getByRole("button", { name: "预览打印版式" }).click();
   await expect(page.locator(".topbar .export-menu")).not.toHaveAttribute("open");
 
@@ -362,14 +380,14 @@ test("previews the print layout before exporting a document", async ({ page }) =
 test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
 
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
   await page.getByLabel("正文字号").selectOption("large");
   await page.getByLabel("正文宽度").selectOption("narrow");
   await page.getByLabel("导出纸张").selectOption("letter");
   await page.getByLabel("导出方向").selectOption("landscape");
   await page.getByLabel("导出页边距").selectOption("compact");
   await page.reload();
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
 
   await expect(page.getByLabel("正文字号")).toHaveValue("large");
   await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
@@ -381,7 +399,7 @@ test("persists reading layout preferences", async ({ page }) => {
 test("switches and remembers the core interface locale", async ({ page }) => {
   await page.goto("/");
 
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
   await page.getByLabel("界面语言").selectOption("en-US");
 
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -389,14 +407,14 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   await expect(page.getByText("LOCAL FIRST")).toBeVisible();
 
   await page.reload();
-  await page.locator("summary", { hasText: "Settings" }).click();
+  await openSettingsMenu(page, "Settings");
   await expect(page.getByLabel("Interface language")).toHaveValue("en-US");
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {
   await page.goto("/");
 
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
   await expect(page.getByRole("checkbox", { name: "允许远程图片" })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "启动时检查更新" })).not.toBeChecked();
 
@@ -414,7 +432,7 @@ test("keeps remote images off until the local privacy setting is enabled", async
   await expect(image).toHaveAttribute("src", "https://example.com/pixel.png");
 
   await page.reload();
-  await page.locator("summary", { hasText: "设置" }).click();
+  await openSettingsMenu(page);
   await expect(page.getByRole("checkbox", { name: "允许远程图片" })).toBeChecked();
 });
 
@@ -433,4 +451,57 @@ test("opens external links outside the reader window", async ({ page }) => {
 
   await expect(popup).toHaveURL("https://example.com/reference");
   await expect(page).toHaveTitle("Moyang Reader");
+});
+
+test("keeps the reader inside a narrow viewport when long inline content wraps", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const extensions = Array.from({ length: 24 }, (_, index) => `\`.format-${index}\``).join("、");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "mobile-layout.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(`# Mobile layout\n\n运行安装程序后会注册 ${extensions}，并继续保持本地阅读。`),
+  });
+
+  await expect(page.getByRole("heading", { name: "Mobile layout" })).toBeVisible();
+  const metrics = await page.evaluate(() => ({
+    viewportWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    contentScrollWidth: document.querySelector(".content-area")?.scrollWidth ?? 0,
+    contentClientWidth: document.querySelector(".content-area")?.clientWidth ?? 0,
+    articleScrollWidth: document.querySelector(".reader-content")?.scrollWidth ?? 0,
+    articleClientWidth: document.querySelector(".reader-content")?.clientWidth ?? 0,
+  }));
+
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.contentScrollWidth).toBe(metrics.contentClientWidth);
+  expect(metrics.articleScrollWidth).toBe(metrics.articleClientWidth);
+});
+
+test("keeps topbar overlays mutually exclusive", async ({ page }) => {
+  await page.goto("/");
+
+  await openSettingsMenu(page);
+  await expect(page.locator(".settings-menu")).toHaveAttribute("open", "");
+  await expect(page.locator(".toolbar-overflow-panel")).toBeVisible();
+  const menuGeometry = await page.locator(".toolbar-overflow-panel").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      bottom: rect.bottom,
+      right: rect.right,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(menuGeometry.bottom).toBeLessThanOrEqual(menuGeometry.viewportHeight);
+  expect(menuGeometry.right).toBeLessThanOrEqual(menuGeometry.viewportWidth);
+
+  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(page.locator(".settings-menu")).not.toHaveAttribute("open");
+  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toBeVisible();
+
+  await openSettingsMenu(page);
+  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveCount(0);
+  await expect(page.locator(".settings-menu")).toHaveAttribute("open", "");
 });

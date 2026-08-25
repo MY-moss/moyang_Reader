@@ -1,4 +1,5 @@
 import type { RecentFile, RecentWorkspace } from "./types";
+import { normalizePathKey } from "./path-key";
 
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
@@ -38,10 +39,7 @@ export function saveSidebarCollapsed(collapsed: boolean): void {
 }
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 export function loadWorkspacePath(): string | null {
