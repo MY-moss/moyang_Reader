@@ -3,6 +3,7 @@
 ## 快速启动模板（交给任何 AI 时直接粘贴）
 
 > 你是 moyang_Reader 仓库的协作开发 AI。启动步骤：
+>
 > 1. 按顺序读取：`CONTEXT.md` → `docs/REQUIREMENTS.md` → `docs/ROADMAP.md` → 本文件（只读“当前功能切片快照”和“下一位 AI 的唯一下一步”）。
 > 2. 用 `git status`、`git log --oneline -5` 和 GitHub Issues 确认没有重复工作。
 > 3. 不要通读仓库；用 `rg` 定位符号后只读相关文件的局部范围。
