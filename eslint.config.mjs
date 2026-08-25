@@ -18,11 +18,17 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
   {
-    files: ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,js}"],
+    files: ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,js}", "desktop-e2e/**/*.mjs"],
     languageOptions: {
       globals: {
+        browser: "readonly",
         console: "readonly",
+        describe: "readonly",
+        document: "readonly",
+        HTMLElement: "readonly",
+        it: "readonly",
         process: "readonly",
+        window: "readonly",
       },
     },
     rules: {
