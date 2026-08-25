@@ -25,6 +25,18 @@ describe("external document changes", () => {
     ).toBe("ignore");
   });
 
+  it("ignores watcher events while the app's write is still in flight", () => {
+    expect(
+      resolveExternalChangeAction({
+        changedPaths: ["C:/Vault/today.md"],
+        currentPath: "C:/Vault/today.md",
+        modified: true,
+        selfWriting: true,
+        now: 200,
+      }),
+    ).toBe("ignore");
+  });
+
   it("reloads an unmodified active document", () => {
     expect(
       resolveExternalChangeAction({

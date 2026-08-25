@@ -18,6 +18,8 @@ type TopBarProps = {
   documentKind: DocumentKind | null;
   canEdit: boolean;
   modified: boolean;
+  externallyModified: boolean;
+  onShowExternalChange: () => void;
   searchOpen: boolean;
   searchQuery: string;
   searchResultCount: number;
@@ -85,6 +87,8 @@ export function TopBar({
   documentKind,
   canEdit,
   modified,
+  externallyModified,
+  onShowExternalChange,
   searchOpen,
   searchQuery,
   searchResultCount,
@@ -207,6 +211,17 @@ export function TopBar({
       <div className="document-title" title={fileName ?? undefined}>
         {fileName ?? t("document.empty")}
         {modified && <span className="modified-dot" aria-label="有未保存修改" />}
+        {externallyModified && (
+          <button
+            type="button"
+            className="external-modified-indicator"
+            aria-label="文件已被外部修改，查看处理选项"
+            title="文件已被外部修改，查看处理选项"
+            onClick={onShowExternalChange}
+          >
+            !
+          </button>
+        )}
       </div>
 
       <nav className="toolbar" aria-label="文档操作">

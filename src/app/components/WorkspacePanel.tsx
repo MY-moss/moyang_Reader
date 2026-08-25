@@ -57,6 +57,10 @@ function pathName(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
 
+function isBatchExportable(file: WorkspaceFile): boolean {
+  return file.kind === "markdown" || file.kind === "text" || file.kind === "docx";
+}
+
 export function WorkspacePanel({
   workspacePath,
   files,
@@ -94,6 +98,7 @@ export function WorkspacePanel({
   const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
   const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
+  const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));
 
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -103,44 +108,34 @@ export function WorkspacePanel({
           <h2 id="workspace-title">阅读库</h2>
         </div>
         <div className="workspace-actions">
-          <details className="export-menu workspace-export-menu">
-            <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
-            <div className="export-menu-panel">
-              <button
-                type="button"
-                disabled={
-                  !workspacePath ||
-                  workspaceExporting ||
-                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
-                }
-                onClick={() => onExportWorkspace("html")}
-              >
-                单文件 HTML
-              </button>
-              <button
-                type="button"
-                disabled={
-                  !workspacePath ||
-                  workspaceExporting ||
-                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
-                }
-                onClick={() => onExportWorkspace("docx")}
-              >
-                单文件 Word
-              </button>
-              <button
-                type="button"
-                disabled={
-                  !workspacePath ||
-                  workspaceExporting ||
-                  !exportableFiles.some((file) => ["markdown", "text", "docx"].includes(file.kind))
-                }
-                onClick={() => onExportWorkspace("pdf")}
-              >
-                批量打印 / PDF
-              </button>
-            </div>
-          </details>
+          {(canBatchExport || workspaceExporting) && (
+            <details className="export-menu workspace-export-menu">
+              <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
+              <div className="export-menu-panel">
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("html")}
+                >
+                  单文件 HTML
+                </button>
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("docx")}
+                >
+                  单文件 Word
+                </button>
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("pdf")}
+                >
+                  批量打印 / PDF
+                </button>
+              </div>
+            </details>
+          )}
           {workspaceExporting && (
             <button type="button" className="quiet-button workspace-export-cancel" onClick={onCancelWorkspaceExport}>
               取消导出

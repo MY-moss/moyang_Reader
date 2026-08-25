@@ -81,6 +81,12 @@ describe("reader storage", () => {
     expect(loadContextPanelTab()).toBe("properties");
   });
 
+  it("falls back from the removed graph placeholder tab", () => {
+    localStorage.setItem("moyang-reader-context-panel-tab", "graph");
+
+    expect(loadContextPanelTab()).toBe("outline");
+  });
+
   it("persists bounded native tabs and drops temporary browser documents", () => {
     saveOpenTabs([
       { path: "C:/I-NOTES/INDEX.md", name: "first.md" },
