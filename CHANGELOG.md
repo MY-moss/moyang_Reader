@@ -10,6 +10,12 @@
 - 新增 Milkdown 支持语法 round-trip 样例 e2e：标题、行内样式、双链、嵌套/任务列表、引用、代码块、表格、图片和分隔线经 WYSIWYG 编辑器序列化后内容无损。
 - 同步新增 `CONTEXT.md`、需求、路线、UI 交互、AI 交接和两份 ADR，统一后续 AI 接手与发布流程。
 
+### Fixed
+
+- 修复 WYSIWYG 编辑器自 v0.9.0 起从未真正挂载的严重缺陷：`@milkdown/preset-gfm` 7.22.x 的 `gfm` 预设不再内含 commonmark 基础节点，ProseMirror schema 因缺少 `doc` 顶层节点创建失败，编辑区静默空白。现显式注册 commonmark + gfm 预设，新增编辑器挂载回归单测，round-trip e2e 改为等待真实 contenteditable 并在编辑后校验序列化结果；编辑面挂载失败时会显示可见错误提示而不是空白。
+- 修复 round-trip e2e 误报“末段丢失”的读取缺陷：CodeMirror 只渲染可视区内的 `.cm-line`，直接读 DOM 会把长文档尾部截断。现通过 CM 内部 view state 读取完整文档文本，并完善序列化样式归一化（`*`/`-` 列表符、`***`/`---` 分隔线、`\[\[` 双链转义、表格分隔行宽度）。
+- 为 WYSIWYG 编辑面补充 ProseMirror 要求的 `white-space: pre-wrap`，消除控制台告警并避免尾随空格/软换行在渲染层被折叠。
+
 ### Planned
 
 - v0.9.0：未知语法回退提示和真实 Tauri 桌面路径继续完善。

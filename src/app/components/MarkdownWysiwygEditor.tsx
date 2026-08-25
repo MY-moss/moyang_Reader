@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultValueCtx, Editor, rootCtx } from "@milkdown/kit/core";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
-import { gfm } from "@milkdown/kit/preset/gfm";
 import { replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
+import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import {
   filterWikiLinkCandidates,
   formatWikiLinkInsert,
@@ -110,7 +110,7 @@ function MilkdownSurface({
           ctx.set(rootCtx, root);
           ctx.set(defaultValueCtx, source);
         })
-        .use(gfm)
+        .use(buildWysiwygEditorPlugins())
         .use(listener)
         .config((ctx) => {
           ctx.get(listenerCtx).markdownUpdated((_context, markdown) => {
@@ -136,9 +136,13 @@ function MilkdownSurface({
     completionRef.current = null;
   }, [documentKey]);
 
+  const [mountFailed, setMountFailed] = useState(false);
+
   useEffect(() => {
     if (loading || !containerRef.current) return;
     const editable = containerRef.current.querySelector<HTMLElement>('[contenteditable="true"]');
+    // Surface editor bootstrap failures instead of silently showing a blank area.
+    setMountFailed(!editable);
     editable?.setAttribute("aria-label", ariaLabel);
     editable?.setAttribute("aria-multiline", "true");
   }, [ariaLabel, loading]);
@@ -263,6 +267,11 @@ function MilkdownSurface({
       }}
     >
       {loading && <div className="wysiwyg-loading">正在准备所见即所得编辑器…</div>}
+      {mountFailed && (
+        <div className="wysiwyg-error" role="alert">
+          所见即所得编辑器初始化失败，内容未被修改。请切换到“源文本”模式继续编辑。
+        </div>
+      )}
       <Milkdown />
       {completion && (
         <div

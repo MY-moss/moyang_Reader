@@ -3575,6 +3575,9 @@ a:focus-visible {
     font-family: var(--font-reading);
     font-size: 18px;
     line-height: 1.85;
+    /* ProseMirror requires pre-wrap so trailing spaces and soft breaks keep
+       their meaning; without it the console warns and editing can shift. */
+    white-space: pre-wrap;
   }
   .wysiwyg-editor .editor:focus {
     outline: 0;
@@ -3640,6 +3643,16 @@ a:focus-visible {
   .wysiwyg-loading-state {
     color: var(--muted);
     font-size: 12px;
+  }
+  .wysiwyg-error {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid color-mix(in srgb, #d92d20 45%, var(--line));
+    border-radius: 8px;
+    background: color-mix(in srgb, #d92d20 8%, var(--surface-strong));
+    color: #b42318;
+    font-size: 13px;
+    line-height: 1.6;
   }
   .wysiwyg-loading-state {
     padding: 48px;
