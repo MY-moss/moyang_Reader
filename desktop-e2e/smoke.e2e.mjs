@@ -65,6 +65,23 @@ async function waitForWorkspaceEntry(selector, text, expected, description) {
   });
 }
 
+async function requestCloseRequest() {
+  await browser.execute(async () => {
+    const tauriEvent = window.__TAURI__?.event;
+    if (!tauriEvent?.emit) throw new Error("Tauri event API is unavailable");
+    await tauriEvent.emit("close-requested");
+  });
+}
+
+async function waitForCloseConfirmation() {
+  const dialog = await browser.$('[role="dialog"][aria-labelledby="close-confirm-title"]');
+  await browser.waitUntil(() => dialog.isDisplayed(), {
+    timeout: 15_000,
+    timeoutMsg: "the close request did not show the unsaved confirmation",
+  });
+  return dialog;
+}
+
 describe("Moyang Reader desktop runtime", () => {
   it("opens an initial Markdown path, edits it, and writes it back to disk", async () => {
     await browser.execute(() => window.localStorage.clear());
@@ -221,5 +238,35 @@ describe("Moyang Reader desktop runtime", () => {
     assert.match(await notice.getText(), /已被其他程序修改/);
     assert.match(await editor.getText(), new RegExp(localText));
     assert.equal(await browser.$("button=重新载入").isDisplayed(), true);
+  });
+
+  it("keeps the window and local edits after cancelling a close request", async () => {
+    await requestCloseRequest();
+    const firstDialog = await waitForCloseConfirmation();
+    assert.match(await firstDialog.getText(), /未保存修改/);
+    await firstDialog.$('[data-testid="close-confirm-cancel"]').click();
+    await browser.waitUntil(
+      async () => {
+        try {
+          return !(await browser.$('[role="dialog"][aria-labelledby="close-confirm-title"]').isDisplayed());
+        } catch {
+          return true;
+        }
+      },
+      {
+        timeout: 5_000,
+        timeoutMsg: "the close confirmation did not dismiss",
+      },
+    );
+
+    const editor = await browser.$('[aria-label="Markdown 源文本"]');
+    await editor.waitForDisplayed();
+    assert.match(await editor.getText(), /本地未保存内容/);
+
+    await requestCloseRequest();
+    const secondDialog = await waitForCloseConfirmation();
+    assert.match(await secondDialog.getText(), /未保存修改/);
+    assert.equal(await secondDialog.$('[data-testid="close-confirm-confirm"]').getText(), "退出 Moyang Reader");
+    await secondDialog.$('[data-testid="close-confirm-cancel"]').click();
   });
 });

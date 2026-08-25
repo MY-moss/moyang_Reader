@@ -734,6 +734,32 @@ a:focus-visible {
   padding: 5px 8px;
   font-size: 10px;
 }
+.close-confirm-backdrop {
+  z-index: 70;
+  align-items: center;
+}
+.close-confirm-dialog {
+  width: min(460px, 100%);
+}
+.close-confirm-body {
+  padding: 0 20px 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.close-confirm-body p {
+  margin: 0;
+}
+.close-confirm-actions {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 14px;
+}
+.close-confirm-actions .toolbar-button,
+.close-confirm-actions .quiet-button {
+  min-height: 32px;
+}
 @keyframes quick-open-fade {
   from {
     opacity: 0;

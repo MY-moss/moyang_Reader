@@ -11,6 +11,7 @@ import {
 } from "react";
 import { EmptyState } from "./components/EmptyState";
 import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
+import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
@@ -426,6 +427,7 @@ export function App() {
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
@@ -444,6 +446,7 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const closeConfirmationOpenRef = useRef(false);
   const sourceDraftRef = useRef(sourceDraft);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
@@ -508,6 +511,19 @@ export function App() {
       setSettingsNotice(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`);
     }
     return true;
+  }, []);
+
+  const cancelCloseConfirmation = useCallback(() => {
+    closeConfirmationOpenRef.current = false;
+    setCloseConfirmationOpen(false);
+  }, []);
+
+  const confirmClose = useCallback(() => {
+    closeConfirmationOpenRef.current = false;
+    setCloseConfirmationOpen(false);
+    void closeWindow().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+    });
   }, []);
 
   const exportPortableSettings = useCallback(async () => {
@@ -696,6 +712,7 @@ export function App() {
     let active = true;
     let unlisten: (() => void) | null = null;
     const handleCloseRequest = () => {
+      if (closeConfirmationOpenRef.current) return;
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
         const result = saveDraftSnapshot({
@@ -706,7 +723,11 @@ export function App() {
         });
         if (!handleDraftSaveResult(result)) return;
       }
-      if (current?.modified && !window.confirm("当前文档有未保存修改，确定退出 Moyang Reader 吗？")) return;
+      if (current?.modified) {
+        closeConfirmationOpenRef.current = true;
+        setCloseConfirmationOpen(true);
+        return;
+      }
       void closeWindow().catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
       });
@@ -3396,6 +3417,7 @@ export function App() {
           onClose={() => setDraftRecoveryOpen(false)}
         />
       )}
+      {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
     </div>
   );
 }
