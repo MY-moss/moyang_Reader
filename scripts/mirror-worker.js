@@ -1,3 +1,5 @@
+/* global Headers, Response, URL, fetch */
+
 const REPO = "MY-moss/moyang_Reader";
 const RELEASE_BASE = "https://github.com/" + REPO + "/releases/download";
 const LATEST_MANIFEST = "https://github.com/" + REPO + "/releases/latest/download/latest.json";
