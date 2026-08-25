@@ -87,4 +87,35 @@ describe("Moyang Reader desktop runtime", () => {
 
     assert.match(await browser.$(".document-title").getText(), /desktop-e2e\.md/);
   });
+
+  it("shows a conflict notice without replacing unsaved local edits", async () => {
+    const localText = "本地未保存内容。";
+    const externalText = "外部冲突内容。";
+
+    await clickToolbarAction("编辑");
+    await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
+    await clickToolbarAction("源文本");
+    const editor = await browser.$('[aria-label="Markdown 源文本"]');
+    await editor.waitForDisplayed();
+    await browser.execute((text) => {
+      const target = document.querySelector('[aria-label="Markdown 源文本"]');
+      if (!(target instanceof HTMLElement)) throw new Error("source editor was not found");
+      const view = target.cmTile?.root?.view;
+      if (!view) throw new Error("CodeMirror view is unavailable");
+      view.dispatch({ changes: { from: view.state.doc.length, insert: `\n${text}` } });
+    }, localText);
+    await browser.waitUntil(() => editor.getText().then((value) => value.includes(localText)), {
+      timeout: 5_000,
+      timeoutMsg: "the local unsaved edit was not applied before the conflict test",
+    });
+
+    await browser.pause(2_000);
+    fs.appendFileSync(documentPath, `\n${externalText}\n`, "utf8");
+
+    const notice = await browser.$(".external-change-notice");
+    await notice.waitForDisplayed();
+    assert.match(await notice.getText(), /已被其他程序修改/);
+    assert.match(await editor.getText(), new RegExp(localText));
+    assert.equal(await browser.$("button=重新载入").isDisplayed(), true);
+  });
 });
