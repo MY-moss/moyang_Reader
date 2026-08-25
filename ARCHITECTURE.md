@@ -45,6 +45,7 @@ Tauri/Rust
 - 远程资源策略由本地偏好控制：默认只允许 data 和工作区附件协议，开启远程图片后才允许 Markdown 中的 http/https 图片；更新检查同样默认手动，可选开启启动检查。
 - 外部链接采用双层防护：前端点击处理将允许的 `http(s)`、`mailto`、`tel` 链接交给系统打开，Rust/Tauri 的 `on_navigation` 钩子只放行应用来源、开发服务器和本地 asset 协议，阻止主窗口意外导航到外部网页。
 - v0.9 编辑边界：Markdown 编辑时 Milkdown 只负责交互和 Markdown 序列化，`renderSource` 仍负责阅读、搜索和导出；`ContextPanel` 只接收当前文档快照和索引结果，不直接拥有文件树或保存状态。
+- 外部修改同步由工作区 watcher 和编辑器源同步跟踪器共同完成：未保存文档只通知不替换，确认重载前先写入本地草稿；无冲突刷新使用 Milkdown 的状态重建，不回传为本地编辑事件，避免误报脏状态。
 
 更详细的发布决策见 [`docs/UPDATE.md`](docs/UPDATE.md)；后续重大架构变化应新增 ADR，而不是覆盖历史说明。
 

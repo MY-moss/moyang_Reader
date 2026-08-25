@@ -8,7 +8,7 @@ export function ExternalChangeNotice({ fileName, onReload, onDismiss }: External
   return (
     <div className="external-change-notice" role="status">
       <span>
-        <strong>{fileName}</strong> 已被其他程序修改。
+        <strong>{fileName}</strong> 已被其他程序修改；重新载入会覆盖当前未保存修改，应用会先保留恢复草稿。
       </span>
       <div>
         <button type="button" onClick={onReload}>

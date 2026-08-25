@@ -49,11 +49,13 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-- 基线：`v0.8.1`；当前目标：`v0.9.0 UI 三栏 + Markdown WYSIWYG 最小垂直切片`。
-- 已完成：三栏布局职责、右侧上下文面板（目录/关联/属性/关系图入口）、左右面板记忆、Milkdown 按需加载、Markdown 安全回退、`Ctrl+E`、`Ctrl+K`、`Ctrl+Shift+P`、命令面板和对应 E2E 迁移。
-- 仍需继续：Milkdown 与复杂 Markdown 的 round-trip 细节、双链补全、外部修改时编辑器内容同步、真实 Tauri 桌面 E2E；这些属于 v0.9.0/v0.9.1 后续切片，不能在交接时误报为完成。
-- 关键入口：`src/app/App.tsx` 负责组合；`src/app/components/ContextPanel.tsx` 负责右栏；`src/app/components/MarkdownWysiwygEditor.tsx` 负责懒加载编辑器；`src/app/markdown-editor-support.ts` 负责安全预检。
-- 验证基线：`npm test -- --run`、`npm run lint`、`npm run format:check`、`npm run build`、`npm run test:e2e`。
+- 基线：`v0.8.1`；已合并基础切片 PR #153，当前分支正在推进 v0.9.1 编辑稳定化。
+- 已完成：三栏布局职责、右侧上下文面板（目录/关联/属性/关系图入口）、左右面板记忆、Milkdown 按需加载、Markdown 安全回退、`Ctrl+E`、`Ctrl+K`、`Ctrl+Shift+P`、命令面板和对应浏览器 E2E 迁移。
+- 本切片新增：外部变更决策边界（忽略/自动刷新/提示）、WYSIWYG 同路径源码同步、应用自身保存事件抑制、未保存外部冲突的草稿保护与二次确认。
+- 仍需继续：Milkdown 与复杂 Markdown 的完整 round-trip 细节、双链 `[[` 补全、真实 Tauri 桌面 E2E、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
+- 关键入口：`src/app/App.tsx` 负责组合和外部修改流程；`src/app/components/ContextPanel.tsx` 负责右栏；`src/app/components/MarkdownWysiwygEditor.tsx` 负责懒加载与同路径同步；`src/app/markdown-editor-support.ts` 负责安全预检和源同步跟踪；`src/app/external-change.ts` 负责 watcher 决策。
+- 相关测试：`src/app/external-change.test.ts`、`src/app/markdown-editor-support.test.ts`、`src/app/workspace-refresh.test.ts`。
+- 已运行：针对性测试 12/12；全量 `npm test -- --run` 为 26 个文件、117 个测试通过；`npm run lint`、`npm run format:check`、`npx tsc -b --pretty false`、`npm run build` 均通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
-- 回滚方式：回滚本功能分支的 UI/编辑器提交即可；不需要迁移用户文档，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，再为 v0.9.0 补 Markdown WYSIWYG round-trip/外部修改测试，不要重复搭建三栏布局。
+- 回滚方式：回滚本功能分支的外部修改和编辑器同步提交即可；不需要迁移用户文档，Markdown 文件仍是唯一真源。
+- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，再补 Milkdown 支持语法的 round-trip 样例和 `[[` 双链补全，不要重复实现外部修改同步或三栏布局。
