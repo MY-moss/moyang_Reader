@@ -12,6 +12,10 @@ export type MessageKey =
   | "action.focus"
   | "action.exitFocus"
   | "action.search"
+  | "action.edit"
+  | "action.showContext"
+  | "action.hideContext"
+  | "action.commands"
   | "action.source"
   | "action.read"
   | "action.save"
@@ -70,6 +74,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.focus": "专注",
     "action.exitFocus": "退出专注",
     "action.search": "搜索",
+    "action.edit": "编辑",
+    "action.showContext": "显示上下文",
+    "action.hideContext": "隐藏上下文",
+    "action.commands": "命令面板",
     "action.source": "源文本",
     "action.read": "阅读",
     "action.save": "保存",
@@ -127,6 +135,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.focus": "Focus",
     "action.exitFocus": "Exit focus",
     "action.search": "Search",
+    "action.edit": "Edit",
+    "action.showContext": "Show context",
+    "action.hideContext": "Hide context",
+    "action.commands": "Commands",
     "action.source": "Source",
     "action.read": "Read",
     "action.save": "Save",

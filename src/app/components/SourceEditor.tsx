@@ -5,6 +5,7 @@ type SourceEditorProps = {
   ariaLabel: string;
   onChange: (value: string) => void;
   onPaste?: (context: SourceEditorPasteContext) => boolean;
+  onInsertLink?: (context: SourceEditorLinkContext) => void;
 };
 
 type EditorViewInstance = import("@codemirror/view").EditorView;
@@ -17,12 +18,20 @@ export type SourceEditorPasteContext = {
   preventDefault: () => void;
 };
 
-export function SourceEditor({ value, ariaLabel, onChange, onPaste }: SourceEditorProps) {
+export type SourceEditorLinkContext = {
+  selectionStart: number;
+  selectionEnd: number;
+  value: string;
+  replace: (value: string) => void;
+};
+
+export function SourceEditor({ value, ariaLabel, onChange, onPaste, onInsertLink }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorViewInstance | null>(null);
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const onPasteRef = useRef(onPaste);
+  const onInsertLinkRef = useRef(onInsertLink);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -43,6 +52,10 @@ export function SourceEditor({ value, ariaLabel, onChange, onPaste }: SourceEdit
   useEffect(() => {
     onPasteRef.current = onPaste;
   }, [onPaste]);
+
+  useEffect(() => {
+    onInsertLinkRef.current = onInsertLink;
+  }, [onInsertLink]);
 
   useEffect(() => {
     const parent = containerRef.current;
@@ -72,6 +85,27 @@ export function SourceEditor({ value, ariaLabel, onChange, onPaste }: SourceEdit
               view.keymap.of(search.searchKeymap),
               view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
               view.EditorView.domEventHandlers({
+                keydown: (event, editorView) => {
+                  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return false;
+                  const handler = onInsertLinkRef.current;
+                  if (!handler) return false;
+
+                  event.preventDefault();
+                  const selection = editorView.state.selection.main;
+                  const currentValue = editorView.state.doc.toString();
+                  handler({
+                    selectionStart: selection.from,
+                    selectionEnd: selection.to,
+                    value: currentValue,
+                    replace: (nextValue) => {
+                      editorView.dispatch({
+                        changes: { from: selection.from, to: selection.to, insert: nextValue },
+                        selection: { anchor: selection.from + nextValue.length },
+                      });
+                    },
+                  });
+                  return true;
+                },
                 paste: (event, editorView) => {
                   const handler = onPasteRef.current;
                   if (!handler || !event.clipboardData) return false;

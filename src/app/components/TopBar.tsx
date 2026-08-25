@@ -1,11 +1,21 @@
 import { useRef } from "react";
-import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth, ThemeMode } from "../types";
+import type {
+  DocumentKind,
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
+  ReadingScale,
+  ReadingWidth,
+  ReaderMode,
+  ThemeMode,
+} from "../types";
 import { translate, type Locale, type MessageKey } from "../i18n";
 import type { UpdateStatus } from "../updater";
 
 type TopBarProps = {
   fileName: string | null;
-  mode: "rendered" | "source";
+  mode: ReaderMode;
+  documentKind: DocumentKind | null;
   canEdit: boolean;
   modified: boolean;
   searchOpen: boolean;
@@ -34,6 +44,9 @@ type TopBarProps = {
   focusMode: boolean;
   onToggleFocusMode: () => void;
   onToggleMode: () => void;
+  rightPanelOpen: boolean;
+  onToggleRightPanel: () => void;
+  onOpenCommandPalette: () => void;
   onSave: () => void;
   onCopy: () => void;
   copyFeedback: boolean;
@@ -69,6 +82,7 @@ type TopBarProps = {
 export function TopBar({
   fileName,
   mode,
+  documentKind,
   canEdit,
   modified,
   searchOpen,
@@ -97,6 +111,9 @@ export function TopBar({
   focusMode,
   onToggleFocusMode,
   onToggleMode,
+  rightPanelOpen,
+  onToggleRightPanel,
+  onOpenCommandPalette,
   onSave,
   onCopy,
   copyFeedback,
@@ -242,6 +259,15 @@ export function TopBar({
         </button>
         <button
           type="button"
+          className="toolbar-button context-toggle"
+          onClick={onToggleRightPanel}
+          aria-pressed={rightPanelOpen}
+          title={rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板"}
+        >
+          {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
+        </button>
+        <button
+          type="button"
           className="toolbar-button focus-button"
           onClick={onToggleFocusMode}
           disabled={!fileName}
@@ -260,13 +286,22 @@ export function TopBar({
             <div className="toolbar-overflow-group">
               <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
               <div className="toolbar-overflow-actions">
+                <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
+                  {t("action.commands")}
+                </button>
                 <button
                   type="button"
                   className="toolbar-button"
                   onClick={onToggleMode}
                   disabled={!fileName || !canEdit}
                 >
-                  {mode === "rendered" ? t("action.source") : t("action.read")}
+                  {mode === "rendered"
+                    ? documentKind === "markdown"
+                      ? t("action.edit")
+                      : t("action.source")
+                    : mode === "wysiwyg"
+                      ? t("action.source")
+                      : t("action.read")}
                 </button>
                 <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
                   {t("action.save")}

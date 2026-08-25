@@ -1,4 +1,16 @@
-export type ReaderMode = "rendered" | "source";
+export type ReaderMode = "rendered" | "source" | "wysiwyg";
+
+export type ContextPanelTab = "outline" | "backlinks" | "properties" | "graph";
+
+export type LayoutState = {
+  leftPanelOpen: boolean;
+  rightPanelOpen: boolean;
+  activeContextTab: ContextPanelTab;
+  focusMode: boolean;
+};
+
+export type EditorResult =
+  { status: "changed"; markdown: string } | { status: "fallback"; markdown: string; reason: string };
 
 export type DocumentKind = "markdown" | "text" | "docx" | "pdf" | "image";
 

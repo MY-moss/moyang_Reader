@@ -21,6 +21,8 @@
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/search": "^6.7.1",
+    "@milkdown/kit": "7.22.1",
+    "@milkdown/react": "7.22.1",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.5.4",

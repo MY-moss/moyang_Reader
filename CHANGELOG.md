@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- v0.9.0 首个功能切片：三栏阅读工作区、右侧上下文面板状态持久化、Markdown Milkdown WYSIWYG 按需加载、复杂语法源码安全回退、命令面板和 Markdown 链接快捷键。
+- 同步新增 `CONTEXT.md`、需求、路线、UI 交互、AI 交接和两份 ADR，统一后续 AI 接手与发布流程。
+
+### Planned
+
+- v0.9.0：编辑器 round-trip 细节、双链补全、未知语法回退提示和真实 Tauri 桌面路径继续完善。
+- v0.9.1：编辑器 round-trip 保真、桌面 E2E、a11y 和基础 i18n 稳定化。
+
 ## [0.8.0] - 2026-08-25
 
 ### Added

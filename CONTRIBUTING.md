@@ -59,6 +59,8 @@ Pop-Location
 - Rust 格式、clippy 和测试通过。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
+- 每个功能切片必须同步更新交接文档；没有目标、验收、测试结果和下一步的 PR 不算完成。
+- 开始阅读代码前先读取 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)，不要把完整仓库或整段流水线日志复制进 AI 上下文。
 
 ## 提交与 Pull Request
 
@@ -70,3 +72,7 @@ Pop-Location
 4. 是否需要同步更新 Release、更新清单或用户文档。
 
 主分支不接受强制推送。发布版本通过版本标签触发，详见 [`docs/UPDATE.md`](docs/UPDATE.md)。
+
+## AI 交接
+
+功能分支与 `main` 无冲突且 Quality checks 全绿时可自动合并；权限、安全、更新器、发布工作流和数据迁移变更需要人工确认。代码、测试、需求/架构文档和下一步交接说明应在同一个 PR 中提交。完整流程见 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。
