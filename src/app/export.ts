@@ -90,6 +90,12 @@ export type DocxImageExtent = {
 const DEFAULT_DOCX_IMAGE_EXTENT: DocxImageExtent = { cx: 5486400, cy: 3657600 };
 const DOCX_MAX_IMAGE_EXTENT = DEFAULT_DOCX_IMAGE_EXTENT;
 export const BATCH_EXPORT_CHUNK_SIZE = 32;
+export const BATCH_EXPORT_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
+
+export function shouldFlushBatchExport(documentCount: number, estimatedBytes: number): boolean {
+  return documentCount >= BATCH_EXPORT_CHUNK_SIZE || estimatedBytes >= BATCH_EXPORT_MAX_ESTIMATED_BYTES;
+}
+
 const DOCX_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/avif": "avif",
   "image/gif": "gif",
