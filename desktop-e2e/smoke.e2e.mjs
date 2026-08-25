@@ -65,6 +65,17 @@ async function waitForWorkspaceEntry(selector, text, expected, description) {
   });
 }
 
+async function clickWorkspaceFile(name) {
+  const files = await browser.$$(".workspace-file");
+  for (const file of files) {
+    if ((await file.getText()).includes(name)) {
+      await file.click();
+      return;
+    }
+  }
+  throw new Error(`workspace file ${name} was not found`);
+}
+
 async function requestCloseRequest() {
   await browser.execute(async () => {
     const tauriEvent = window.__TAURI__?.event;
@@ -207,6 +218,106 @@ describe("Moyang Reader desktop runtime", () => {
       false,
       "the workspace watcher did not remove the deleted file from the file tree",
     );
+  });
+
+  it("keeps each real document reading position when switching files", async () => {
+    const workspacePath = path.dirname(documentPath);
+    const longName = "position-long.md";
+    const shortName = "position-short.md";
+    const longPath = path.join(workspacePath, longName);
+    const shortPath = path.join(workspacePath, shortName);
+    const sections = Array.from(
+      { length: 36 },
+      (_, index) => `## Position section ${index + 1}\n\n用于验证切换文件时阅读位置不会被另一个文档覆盖。\n\n`,
+    );
+
+    fs.writeFileSync(longPath, `# Long position note\n\n${sections.join("")}`, "utf8");
+    fs.writeFileSync(shortPath, "# Short position note\n\n短文档", "utf8");
+
+    try {
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        longName,
+        true,
+        "the long reading-position fixture did not appear",
+      );
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        shortName,
+        true,
+        "the short reading-position fixture did not appear",
+      );
+
+      await clickWorkspaceFile(longName);
+      await clickToolbarAction("源文本");
+      await clickToolbarAction("阅读");
+      await browser.$("h1=Long position note").waitForDisplayed();
+
+      await browser.waitUntil(
+        () =>
+          browser.execute(() => {
+            const contentArea = document.querySelector(".content-area");
+            return contentArea instanceof HTMLElement && contentArea.scrollHeight > contentArea.clientHeight;
+          }),
+        { timeout: 15_000, timeoutMsg: "the long reading-position fixture did not become scrollable" },
+      );
+      await browser.execute(() => {
+        const contentArea = document.querySelector(".content-area");
+        if (!(contentArea instanceof HTMLElement)) throw new Error("the reader content area was not found");
+        contentArea.scrollTop = contentArea.scrollHeight;
+        const EventConstructor = document.defaultView?.Event;
+        if (!EventConstructor) throw new Error("the browser Event constructor was not found");
+        contentArea.dispatchEvent(new EventConstructor("scroll"));
+      });
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            () =>
+              (document.querySelector(".content-area") instanceof HTMLElement
+                ? document.querySelector(".content-area").scrollTop
+                : 0) > 0,
+          ),
+        { timeout: 5_000, timeoutMsg: "the long document did not record a non-zero reading position" },
+      );
+      await clickWorkspaceFile(shortName);
+      await clickToolbarAction("源文本");
+      await clickToolbarAction("阅读");
+      await browser.$("h1=Short position note").waitForDisplayed();
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            () =>
+              (document.querySelector(".content-area") instanceof HTMLElement
+                ? document.querySelector(".content-area").scrollTop
+                : -1) === 0,
+          ),
+        { timeout: 5_000, timeoutMsg: "the short document did not reset the reading position" },
+      );
+      await clickWorkspaceFile(longName);
+      await clickToolbarAction("源文本");
+      await clickToolbarAction("阅读");
+      await browser.$("h1=Long position note").waitForDisplayed();
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            () =>
+              (document.querySelector(".content-area") instanceof HTMLElement
+                ? document.querySelector(".content-area").scrollTop
+                : 0) > 0,
+          ),
+        { timeout: 5_000, timeoutMsg: "the long document did not restore its reading position" },
+      );
+    } finally {
+      try {
+        await clickWorkspaceFile(path.basename(documentPath));
+        await clickToolbarAction("源文本");
+        await clickToolbarAction("阅读");
+      } catch {
+        // The fixture cleanup must still run if the document-switch assertion failed.
+      }
+      fs.rmSync(longPath, { force: true });
+      fs.rmSync(shortPath, { force: true });
+    }
   });
 
   it("shows a conflict notice without replacing unsaved local edits", async () => {

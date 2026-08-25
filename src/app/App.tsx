@@ -29,6 +29,7 @@ import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { scheduleSourceRender } from "./source-render-scheduler";
+import { createReadingPositionTracker } from "./reading-position";
 import {
   chooseDocumentPaths,
   chooseSavePath,
@@ -446,6 +447,7 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
+  const readingPositionRef = useRef<{ path: string; top: number } | null>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
@@ -632,14 +634,16 @@ export function App() {
 
   useEffect(() => {
     const path = documentState?.path;
-    if (!path || path.startsWith("browser://")) return;
+    if (!path || path.startsWith("browser://") || mode !== "rendered") return;
 
     const timer = window.setTimeout(() => {
       const contentArea = contentAreaRef.current;
-      if (contentArea) contentArea.scrollTop = loadReadingPosition(path);
+      if (!contentArea) return;
+      contentArea.scrollTop = loadReadingPosition(path);
+      readingPositionRef.current = { path, top: contentArea.scrollTop };
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [documentState?.path]);
+  }, [documentState?.path, documentState?.rendered.html, mode]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -647,11 +651,20 @@ export function App() {
     if (!path || path.startsWith("browser://") || !contentArea) return;
 
     let timer: number | null = null;
+    const initialTop =
+      readingPositionRef.current?.path === path ? readingPositionRef.current.top : contentArea.scrollTop;
+    const tracker = createReadingPositionTracker(path, initialTop, (trackedPath, top) => {
+      readingPositionRef.current = { path: trackedPath, top };
+      saveReadingPosition(trackedPath, top);
+    });
     const persistPosition = () => {
+      const top = contentArea.scrollTop;
+      tracker.update(top);
+      readingPositionRef.current = { path, top: tracker.current() };
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = null;
-        saveReadingPosition(path, contentArea.scrollTop);
+        tracker.flush();
       }, 180);
     };
 
@@ -659,7 +672,10 @@ export function App() {
     return () => {
       contentArea.removeEventListener("scroll", persistPosition);
       if (timer !== null) window.clearTimeout(timer);
-      saveReadingPosition(path, contentArea.scrollTop);
+      const latestKnownTop =
+        readingPositionRef.current?.path === path ? readingPositionRef.current.top : tracker.current();
+      tracker.update(latestKnownTop);
+      tracker.flush();
     };
   }, [documentState?.path]);
 
