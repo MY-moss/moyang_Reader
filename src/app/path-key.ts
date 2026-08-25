@@ -6,7 +6,14 @@
  * `toLocaleLowerCase()`.
  */
 export function normalizePathKey(path: string): string {
-  return path
+  const windowsPath = path.replace(/\//g, "\\");
+  const withoutNamespacePrefix = windowsPath.startsWith("\\\\?\\UNC\\")
+    ? `\\\\${windowsPath.slice("\\\\?\\UNC\\".length)}`
+    : windowsPath.startsWith("\\\\?\\")
+      ? windowsPath.slice("\\\\?\\".length)
+      : windowsPath;
+
+  return withoutNamespacePrefix
     .replace(/[\\/]+/g, "\\")
     .replace(/\\$/, "")
     .toLowerCase();

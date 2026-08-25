@@ -64,4 +64,27 @@ describe("Moyang Reader desktop runtime", () => {
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
   });
+
+  it("reloads an unmodified document after an external workspace change", async () => {
+    const externalText = "外部程序已经更新内容。";
+    await clickToolbarAction("阅读");
+    await browser.$(".reader-content").waitForDisplayed();
+    // The previous case just saved this file; let the intentional self-write
+    // suppression window expire before simulating another process.
+    await browser.pause(2_000);
+    fs.appendFileSync(documentPath, `\n${externalText}\n`, "utf8");
+
+    await browser.waitUntil(
+      async () => {
+        const editor = await browser.$(".reader-content");
+        return (await editor.getText()).includes(externalText);
+      },
+      {
+        timeout: 15_000,
+        timeoutMsg: "the workspace watcher did not reload the unmodified document",
+      },
+    );
+
+    assert.match(await browser.$(".document-title").getText(), /desktop-e2e\.md/);
+  });
 });
