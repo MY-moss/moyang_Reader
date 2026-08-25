@@ -3511,6 +3511,7 @@ a:focus-visible {
     margin: 28px auto 48px;
   }
   .wysiwyg-editor {
+    position: relative;
     min-height: calc(100% - 76px);
     padding: 42px 58px 110px;
     border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
@@ -3521,6 +3522,52 @@ a:focus-visible {
   .wysiwyg-editor .milkdown {
     min-height: 480px;
   }
+  .wiki-completion {
+    position: absolute;
+    z-index: 30;
+    display: grid;
+    width: min(320px, calc(100% - 24px));
+    max-height: 264px;
+    overflow: auto;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+    border-radius: 8px;
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-soft);
+  }
+  .wiki-completion button {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink);
+    padding: 7px 9px;
+    text-align: left;
+  }
+  .wiki-completion button:hover,
+  .wiki-completion button.is-active {
+    border-color: color-mix(in srgb, var(--accent) 54%, var(--line));
+    background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  }
+  .wiki-completion-label {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wiki-completion-detail {
+    overflow: hidden;
+    color: var(--muted);
+    flex-shrink: 0;
+    font-size: 10px;
+    max-width: 46%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .wysiwyg-editor .editor {
     min-height: 440px;
     outline: 0;
@@ -3528,6 +3575,9 @@ a:focus-visible {
     font-family: var(--font-reading);
     font-size: 18px;
     line-height: 1.85;
+    /* ProseMirror requires pre-wrap so trailing spaces and soft breaks keep
+       their meaning; without it the console warns and editing can shift. */
+    white-space: pre-wrap;
   }
   .wysiwyg-editor .editor:focus {
     outline: 0;
@@ -3593,6 +3643,16 @@ a:focus-visible {
   .wysiwyg-loading-state {
     color: var(--muted);
     font-size: 12px;
+  }
+  .wysiwyg-error {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid color-mix(in srgb, #d92d20 45%, var(--line));
+    border-radius: 8px;
+    background: color-mix(in srgb, #d92d20 8%, var(--surface-strong));
+    color: #b42318;
+    font-size: 13px;
+    line-height: 1.6;
   }
   .wysiwyg-loading-state {
     padding: 48px;

@@ -1,13 +1,40 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+async function readEditorText(editor: Locator): Promise<string> {
+  return editor.evaluate((node) => {
+    // CodeMirror renders only the visible viewport, so reading .cm-line DOM
+    // truncates long documents. Pull the authoritative text from the internal
+    // view state instead: .cm-content -> cmTile -> root -> view -> state.doc.
+    const content = (
+      node.classList.contains("cm-content") ? node : node.querySelector(".cm-content")
+    ) as (HTMLElement & { cmTile?: { root?: { view?: { state?: { doc?: { toString(): string } } } } } }) | null;
+    const docText = content?.cmTile?.root?.view?.state?.doc?.toString();
+    if (typeof docText === "string") return docText;
+    return node instanceof HTMLTextAreaElement ? node.value : (node.textContent ?? "");
+  });
+}
+
+/**
+ * Milkdown serializes a few syntaxes to an equivalent-but-different style:
+ * `-` bullets become `*`, `---` becomes `***`, table separators are re-padded,
+ * and the brackets of wiki links are escaped (`[[x]]` -> `\[\[x]]`). Map those
+ * known rewrites back so the round-trip check compares semantics, not style.
+ */
+function normalizeSerializedMarkdown(value: string): string {
+  return value
+    .replace(/\\([[\]])/g, "$1")
+    .replace(/^(\s*)\* /gm, "$1- ")
+    .replace(/^(\s*)\*\*\*\s*$/gm, "$1---")
+    .replace(/^\|[\s|:-]+\|$/gm, "|---|")
+    .replace(/\s+/g, "");
+}
+
 async function expectEditorText(editor: Locator, expected: string): Promise<void> {
-  const normalizedExpected = expected.replace(/\s+/g, "");
+  const normalizedExpected = normalizeSerializedMarkdown(expected);
   await expect
     .poll(async () => {
-      const value = await editor.evaluate((node) =>
-        node instanceof HTMLTextAreaElement ? node.value : (node.textContent ?? ""),
-      );
-      return value.replace(/\s+/g, "");
+      const value = await readEditorText(editor);
+      return normalizeSerializedMarkdown(value);
     })
     .toBe(normalizedExpected);
 }
@@ -129,6 +156,71 @@ test("opens the command palette from the keyboard", async ({ page }) => {
 
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
+});
+
+test("keeps supported markdown syntax through the wysiwyg editor", async ({ page }) => {
+  const corpus = [
+    "# 回归样例 Round Trip",
+    "",
+    "## 行内样式",
+    "",
+    "段落包含**加粗**、*斜体*、~~删除线~~和`行内代码`，以及一个[外部链接](https://example.com)。",
+    "",
+    "普通 Wiki 双链：[[Another note]]。",
+    "",
+    "## 列表与任务",
+    "",
+    "- 一级列表",
+    "- 嵌套列表",
+    "  1. 有序项",
+    "  2. 另一个有序项",
+    "",
+    "- [ ] 未完成任务",
+    "- [x] 已完成任务",
+    "",
+    "> 引用一行文字。",
+    "",
+    "## 代码与表格",
+    "",
+    "```ts",
+    "const answer = 42;",
+    "```",
+    "",
+    "| 列一 | 列二 |",
+    "| ---- | ---- |",
+    "| A | B |",
+    "",
+    "![示例图片](image.png)",
+    "",
+    "---",
+    "",
+    "结束段落。",
+  ].join("\n");
+
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "round-trip-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(corpus),
+  });
+
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  // The Milkdown editing surface must actually mount; before the commonmark
+  // preset fix the wrapper was visible while the contenteditable stayed blank.
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+
+  // Make a net-zero edit (type a space, delete it) so the editor serializes
+  // the document itself while keeping the content unchanged.
+  await editable.click();
+  await page.keyboard.type(" ");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(300);
+
+  await clickToolbarAction(page, "源文本");
+
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expectEditorText(editor, corpus);
 });
 
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {

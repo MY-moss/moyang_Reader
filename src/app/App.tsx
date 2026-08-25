@@ -86,6 +86,7 @@ import type {
 } from "./types";
 import { nextReaderModeAfterOpen } from "./reader-mode";
 import { checkMarkdownEditorSafety } from "./markdown-editor-support";
+import { buildWikiLinkCandidates } from "./wiki-link-completion";
 import {
   BATCH_EXPORT_CHUNK_SIZE,
   BATCH_EXPORT_MAX_ESTIMATED_BYTES,
@@ -2702,6 +2703,10 @@ export function App() {
     if (query.length < 2 || workspaceSearchLoading) return [];
     return visibleWorkspaceResults.map((result) => result.file);
   }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);
+  const wikiLinkCandidates = useMemo(
+    () => buildWikiLinkCandidates(workspaceFiles, documentState?.path),
+    [workspaceFiles, documentState?.path],
+  );
   const executeCommand = useCallback(
     (commandId: string) => {
       switch (commandId) {
@@ -3320,6 +3325,7 @@ export function App() {
                 ariaLabel="Markdown 所见即所得编辑器"
                 onChange={(value) => void updateSource(value)}
                 onInsertLink={() => handleInsertLink()}
+                wikiCandidates={wikiLinkCandidates}
               />
             </Suspense>
           )}
@@ -3330,6 +3336,7 @@ export function App() {
               onChange={(value) => void updateSource(value)}
               onPaste={handleSourcePaste}
               onInsertLink={handleInsertLink}
+              wikiCompletions={wikiLinkCandidates}
             />
           )}
         </main>
