@@ -77,8 +77,10 @@ npm run test
 npm run test:coverage
 npm run build
 npm run test:e2e
-npm run tauri dev
+npm run desktop
 ```
+
+`npm run dev` 只启动浏览器版 Vite 服务，因此会保留一个命令行窗口作为开发服务器；桌面调试请使用 `npm run desktop`。Windows 桌面调试会把 Tauri 需要的前端服务放在隐藏的辅助进程中，界面只保留一个 Moyang Reader 窗口。发布后的安装版不依赖 Vite 服务，也不会打开命令行窗口。
 
 `npm run tauri -- build --no-bundle` 已在 Windows 上成功生成：
 

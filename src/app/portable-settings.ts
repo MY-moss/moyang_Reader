@@ -2,6 +2,7 @@ import type { RecentFile, RecentWorkspace, ThemeMode } from "./types";
 import type { WorkspaceSession } from "./storage";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
 import type { Locale } from "./i18n";
+import { normalizePathKey } from "./path-key";
 
 const PORTABLE_SETTINGS_FORMAT = "moyang-reader-settings";
 const PORTABLE_SETTINGS_VERSION = 1;
@@ -90,7 +91,7 @@ function parseWorkspaces(value: unknown): RecentWorkspace[] {
     .map(parseRecentWorkspace)
     .filter((workspace): workspace is RecentWorkspace => workspace !== null)
     .filter((workspace) => {
-      const key = workspace.path.replace(/[\\/]+/g, "\\").toLocaleLowerCase();
+      const key = normalizePathKey(workspace.path);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -105,7 +106,7 @@ function parseTabs(value: unknown): RecentFile[] {
     .map(parseRecentFile)
     .filter((tab): tab is RecentFile => tab !== null)
     .filter((tab) => {
-      const key = tab.path.replace(/[\\/]+/g, "\\").toLocaleLowerCase();
+      const key = normalizePathKey(tab.path);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -130,7 +131,7 @@ function parseSessions(value: unknown): WorkspaceSession[] {
     })
     .filter((session): session is WorkspaceSession => session !== null)
     .filter((session) => {
-      const key = session.path.replace(/[\\/]+/g, "\\").toLocaleLowerCase();
+      const key = normalizePathKey(session.path);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

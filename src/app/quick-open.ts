@@ -12,7 +12,7 @@ function normalize(value: string): string {
   return value
     .replace(/[\\/]+/g, "/")
     .trim()
-    .toLocaleLowerCase();
+    .toLowerCase();
 }
 
 function subsequenceScore(value: string, query: string): number | null {

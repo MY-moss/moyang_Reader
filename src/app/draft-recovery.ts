@@ -1,6 +1,9 @@
+import { normalizePathKey } from "./path-key";
+
 const draftStorageKey = "moyang-reader-drafts";
 const maxDrafts = 8;
-const maxDraftCharacters = 2_000_000;
+export const MAX_DRAFT_CHARACTERS = 1_000_000;
+export const MAX_DRAFT_STORAGE_BYTES = 3_000_000;
 
 export type DraftSnapshot = {
   path: string;
@@ -9,11 +12,13 @@ export type DraftSnapshot = {
   savedAt: number;
 };
 
+export type DraftSaveResult = {
+  ok: boolean;
+  prunedCount: number;
+};
+
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 function isDraftSnapshot(value: unknown): value is DraftSnapshot {
@@ -28,6 +33,23 @@ function isDraftSnapshot(value: unknown): value is DraftSnapshot {
     Number.isFinite(snapshot.savedAt) &&
     snapshot.savedAt > 0
   );
+}
+
+function localStorageBytes(value: string): number {
+  // localStorage is generally quota-counted as UTF-16 code units.
+  return value.length * 2;
+}
+
+function isQuotaExceeded(cause: unknown): boolean {
+  if (typeof DOMException !== "undefined" && cause instanceof DOMException) {
+    return cause.name === "QuotaExceededError" || cause.code === 22;
+  }
+  return cause instanceof Error && /quota|storage/i.test(`${cause.name} ${cause.message}`);
+}
+
+function serializeDrafts(snapshots: DraftSnapshot[]): string | null {
+  const serialized = JSON.stringify(snapshots);
+  return localStorageBytes(serialized) <= MAX_DRAFT_STORAGE_BYTES ? serialized : null;
 }
 
 export function loadDraftSnapshots(): DraftSnapshot[] {
@@ -62,30 +84,51 @@ export function findDraftSnapshot(path: string, source: string): DraftSnapshot |
   return snapshot;
 }
 
-export function saveDraftSnapshot(snapshot: DraftSnapshot): boolean {
+export function saveDraftSnapshot(snapshot: DraftSnapshot): DraftSaveResult {
   if (snapshot.draft === snapshot.baseSource) {
     clearDraftSnapshot(snapshot.path);
-    return true;
+    return { ok: true, prunedCount: 0 };
   }
   if (
     snapshot.path.trim().length === 0 ||
-    snapshot.draft.length > maxDraftCharacters ||
+    snapshot.draft.length > MAX_DRAFT_CHARACTERS ||
     !Number.isFinite(snapshot.savedAt) ||
     snapshot.savedAt <= 0
   ) {
-    return false;
+    return { ok: false, prunedCount: 0 };
   }
 
+  const key = comparablePath(snapshot.path);
+  let next = [snapshot, ...loadDraftSnapshots().filter((item) => comparablePath(item.path) !== key)].sort(
+    (left, right) => right.savedAt - left.savedAt,
+  );
+  let prunedCount = Math.max(0, next.length - maxDrafts);
+  next = next.slice(0, maxDrafts);
+
+  let serialized = serializeDrafts(next);
+  while (!serialized && next.length > 1) {
+    next = next.slice(0, -1);
+    prunedCount += 1;
+    serialized = serializeDrafts(next);
+  }
+  if (!serialized) return { ok: false, prunedCount: 0 };
+
   try {
-    const key = comparablePath(snapshot.path);
-    const next = [snapshot, ...loadDraftSnapshots().filter((item) => comparablePath(item.path) !== key)].slice(
-      0,
-      maxDrafts,
-    );
-    localStorage.setItem(draftStorageKey, JSON.stringify(next));
-    return true;
-  } catch {
-    return false;
+    localStorage.setItem(draftStorageKey, serialized);
+    return { ok: true, prunedCount };
+  } catch (cause) {
+    if (!isQuotaExceeded(cause) || next.length <= 1) return { ok: false, prunedCount: 0 };
+
+    const retry = next.slice(0, -1);
+    const retrySerialized = serializeDrafts(retry);
+    if (!retrySerialized) return { ok: false, prunedCount: 0 };
+
+    try {
+      localStorage.setItem(draftStorageKey, retrySerialized);
+      return { ok: true, prunedCount: prunedCount + 1 };
+    } catch {
+      return { ok: false, prunedCount: 0 };
+    }
   }
 }
 

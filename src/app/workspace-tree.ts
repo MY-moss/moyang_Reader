@@ -1,4 +1,5 @@
 import type { WorkspaceFile } from "./types";
+import { normalizePathKey } from "./path-key";
 
 export type WorkspaceTreeFolder = {
   name: string;
@@ -41,7 +42,7 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
 
     for (const part of parts) {
       const folderPath = current.path ? `${current.path}/${part}` : part;
-      const folderKey = folderPath.toLocaleLowerCase();
+      const folderKey = normalizePathKey(folderPath);
       let folder = foldersByPath.get(folderKey);
       if (!folder) {
         folder = {

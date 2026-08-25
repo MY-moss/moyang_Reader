@@ -1,12 +1,10 @@
 import type { WorkspaceFile } from "./types";
+import { normalizePathKey } from "./path-key";
 
 export const workspaceBatchOpenLimit = 40;
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 export type WorkspaceOpenPlan = {

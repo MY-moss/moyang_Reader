@@ -20,6 +20,10 @@ export type MessageKey =
   | "action.theme.system"
   | "action.theme.light"
   | "action.theme.dark"
+  | "action.more"
+  | "action.moreTools"
+  | "action.documentTools"
+  | "action.appearance"
   | "settings.title"
   | "settings.localFirst"
   | "settings.allowRemoteImages"
@@ -74,6 +78,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.system": "系统",
     "action.theme.light": "浅色",
     "action.theme.dark": "深色",
+    "action.more": "更多",
+    "action.moreTools": "更多文档工具",
+    "action.documentTools": "文档操作",
+    "action.appearance": "外观与更新",
     "settings.title": "设置",
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
@@ -127,6 +135,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.system": "System",
     "action.theme.light": "Light",
     "action.theme.dark": "Dark",
+    "action.more": "More",
+    "action.moreTools": "More document tools",
+    "action.documentTools": "Document actions",
+    "action.appearance": "Appearance & updates",
     "settings.title": "Settings",
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",

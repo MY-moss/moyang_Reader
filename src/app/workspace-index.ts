@@ -14,7 +14,7 @@ function normalizeWorkspacePath(value: string): string {
       parts.push(part);
     }
   }
-  return parts.join("/").toLocaleLowerCase();
+  return parts.join("/").toLowerCase();
 }
 
 function withoutMarkdownExtension(value: string): string {
