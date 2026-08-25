@@ -157,6 +157,7 @@ import {
   loadDraftSnapshots,
   saveDraftSnapshot,
   type DraftSnapshot,
+  type DraftSaveResult,
 } from "./draft-recovery";
 
 function fileNameFromPath(path: string): string {
@@ -481,6 +482,20 @@ export function App() {
     });
   }, []);
 
+  const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {
+    if (!result.ok) {
+      setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");
+      return false;
+    }
+
+    const snapshots = loadDraftSnapshots();
+    setDraftSnapshots(snapshots);
+    if (result.prunedCount > 0) {
+      setSettingsNotice(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`);
+    }
+    return true;
+  }, []);
+
   const exportPortableSettings = useCallback(async () => {
     try {
       const serialized = serializePortableSettings(
@@ -637,12 +652,13 @@ export function App() {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
-        saveDraftSnapshot({
+        const result = saveDraftSnapshot({
           path: current.path,
           draft: sourceDraftRef.current,
           baseSource: current.source,
           savedAt: Date.now(),
         });
+        handleDraftSaveResult(result);
       }
       if (isTauriRuntime() || !documentStateRef.current?.modified) return;
       event.preventDefault();
@@ -650,7 +666,7 @@ export function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
+  }, [handleDraftSaveResult]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -660,12 +676,13 @@ export function App() {
     const handleCloseRequest = () => {
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
-        saveDraftSnapshot({
+        const result = saveDraftSnapshot({
           path: current.path,
           draft: sourceDraftRef.current,
           baseSource: current.source,
           savedAt: Date.now(),
         });
+        if (!handleDraftSaveResult(result)) return;
       }
       if (current?.modified && !window.confirm("当前文档有未保存修改，确定退出 Moyang Reader 吗？")) return;
       void closeWindow().catch((cause) => {
@@ -685,7 +702,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, []);
+  }, [handleDraftSaveResult]);
 
   useEffect(() => {
     workspacePathRef.current = workspacePath;
@@ -1783,14 +1800,13 @@ export function App() {
     }
 
     const timer = window.setTimeout(() => {
-      const stored = saveDraftSnapshot({
+      const result = saveDraftSnapshot({
         path: current.path,
         draft: sourceDraft,
         baseSource: current.source,
         savedAt: Date.now(),
       });
-      if (!stored) setError("草稿自动保存失败，仍保留在当前窗口中。");
-      else setDraftSnapshots(loadDraftSnapshots());
+      handleDraftSaveResult(result);
     }, 1_500);
     return () => window.clearTimeout(timer);
   }, [
@@ -1800,6 +1816,7 @@ export function App() {
     documentState?.path,
     documentState?.source,
     sourceDraft,
+    handleDraftSaveResult,
   ]);
 
   const recoverDraft = useCallback(() => {
