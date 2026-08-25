@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+import type { Completion, CompletionSource } from "@codemirror/autocomplete";
+import {
+  filterWikiLinkCandidates,
+  formatWikiLinkInsert,
+  matchWikiLinkTrigger,
+  type WikiLinkCandidate,
+} from "../wiki-link-completion";
 
 type SourceEditorProps = {
   value: string;
@@ -6,6 +13,7 @@ type SourceEditorProps = {
   onChange: (value: string) => void;
   onPaste?: (context: SourceEditorPasteContext) => boolean;
   onInsertLink?: (context: SourceEditorLinkContext) => void;
+  wikiCompletions?: readonly WikiLinkCandidate[];
 };
 
 type EditorViewInstance = import("@codemirror/view").EditorView;
@@ -25,15 +33,27 @@ export type SourceEditorLinkContext = {
   replace: (value: string) => void;
 };
 
-export function SourceEditor({ value, ariaLabel, onChange, onPaste, onInsertLink }: SourceEditorProps) {
+export function SourceEditor({
+  value,
+  ariaLabel,
+  onChange,
+  onPaste,
+  onInsertLink,
+  wikiCompletions,
+}: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorViewInstance | null>(null);
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const onPasteRef = useRef(onPaste);
   const onInsertLinkRef = useRef(onInsertLink);
+  const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    wikiCompletionsRef.current = wikiCompletions ?? [];
+  }, [wikiCompletions]);
 
   useEffect(() => {
     valueRef.current = value;
@@ -72,9 +92,38 @@ export function SourceEditor({ value, ariaLabel, onChange, onPaste, onInsertLink
       import("@codemirror/view"),
       import("@codemirror/lang-markdown"),
       import("@codemirror/search"),
+      import("@codemirror/autocomplete"),
     ])
-      .then(([codemirror, state, view, markdownLanguage, search]) => {
+      .then(([codemirror, state, view, markdownLanguage, search, autocomplete]) => {
         if (disposed) return;
+
+        const wikiCompletionSource: CompletionSource = (context) => {
+          const candidates = wikiCompletionsRef.current;
+          if (!candidates.length) return null;
+
+          const line = context.state.doc.lineAt(context.pos);
+          const trigger = matchWikiLinkTrigger(line.text.slice(0, context.pos - line.from));
+          if (!trigger) return null;
+
+          const items = filterWikiLinkCandidates(candidates, trigger.query);
+          if (!items.length) return null;
+
+          return {
+            from: context.pos - trigger.query.length,
+            options: items.map((item) => ({
+              label: item.label,
+              detail: item.detail,
+              type: "text",
+              apply: (editorView: EditorViewInstance, _completion: Completion, from: number, to: number) => {
+                editorView.dispatch({
+                  changes: { from: from - 2, to, insert: formatWikiLinkInsert(item) },
+                  selection: { anchor: from - 2 + item.value.length + 4 },
+                });
+              },
+            })),
+            validFor: /^[^\][|\n]*$/,
+          };
+        };
 
         createdView = new view.EditorView({
           state: state.EditorState.create({
@@ -83,6 +132,11 @@ export function SourceEditor({ value, ariaLabel, onChange, onPaste, onInsertLink
               codemirror.basicSetup,
               markdownLanguage.markdown(),
               view.keymap.of(search.searchKeymap),
+              autocomplete.autocompletion({
+                override: [wikiCompletionSource],
+                activateOnTyping: true,
+                icons: false,
+              }),
               view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
               view.EditorView.domEventHandlers({
                 keydown: (event, editorView) => {

@@ -49,13 +49,13 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-- 基线：`v0.8.1`；已合并基础切片 PR #153，当前分支正在推进 v0.9.1 编辑稳定化。
-- 已完成：三栏布局职责、右侧上下文面板（目录/关联/属性/关系图入口）、左右面板记忆、Milkdown 按需加载、Markdown 安全回退、`Ctrl+E`、`Ctrl+K`、`Ctrl+Shift+P`、命令面板和对应浏览器 E2E 迁移。
-- 本切片新增：外部变更决策边界（忽略/自动刷新/提示）、WYSIWYG 同路径源码同步、应用自身保存事件抑制、未保存外部冲突的草稿保护与二次确认。
-- 仍需继续：Milkdown 与复杂 Markdown 的完整 round-trip 细节、双链 `[[` 补全、真实 Tauri 桌面 E2E、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
-- 关键入口：`src/app/App.tsx` 负责组合和外部修改流程；`src/app/components/ContextPanel.tsx` 负责右栏；`src/app/components/MarkdownWysiwygEditor.tsx` 负责懒加载与同路径同步；`src/app/markdown-editor-support.ts` 负责安全预检和源同步跟踪；`src/app/external-change.ts` 负责 watcher 决策。
-- 相关测试：`src/app/external-change.test.ts`、`src/app/markdown-editor-support.test.ts`、`src/app/workspace-refresh.test.ts`。
-- 已运行：针对性测试 12/12；全量 `npm test -- --run` 为 26 个文件、117 个测试通过；`npm run lint`、`npm run format:check`、`npx tsc -b --pretty false`、`npm run build` 均通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
+- 基线：`v0.8.1`；已合并基础切片 PR #153 和外部修改同步 PR #154，分支 `codex/wiki-completion-2026-08-25` 推进 v0.9.1 编辑稳定化的双链补全切片。
+- 已完成：三栏布局职责、右侧上下文面板、左右面板记忆、Milkdown 按需加载、Markdown 安全回退、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步。
+- 本切片新增：源码模式（CodeMirror autocompletion）和 WYSIWYG 模式（caret 触发浮层）的 `[[` 双链补全，候选来自工作区 Markdown 文档并排除当前文档；Milkdown 支持语法 round-trip 样例 e2e（标题/行内样式/双链/嵌套与任务列表/引用/代码块/表格/图片/分隔线全部保真）。
+- 仍需继续：双链补全的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、编辑器内 `/` 触发器、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
+- 关键入口：`src/app/wiki-link-completion.ts` 是补全纯逻辑（候选构建、触发匹配、过滤排序、键盘映射）；`src/app/components/SourceEditor.tsx` 接 CodeMirror 补全；`src/app/components/MarkdownWysiwygEditor.tsx` 用原生 capture 监听接管浮层键盘；`src/app/App.tsx` 的 `wikiLinkCandidates` memo 负责喂数据。
+- 相关测试：`src/app/wiki-link-completion.test.ts`（12 个单测）；`e2e/smoke.spec.ts` 的 "keeps supported markdown syntax through the wysiwyg editor"。
+- 已运行：`npm test -- --run` 27 个文件 129 个测试通过；`npm run lint`、`npm run format:check`、`npx tsc -b --pretty false`、`npm run build`、`npx playwright test`（28 个 e2e）全部通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
-- 回滚方式：回滚本功能分支的外部修改和编辑器同步提交即可；不需要迁移用户文档，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，再补 Milkdown 支持语法的 round-trip 样例和 `[[` 双链补全，不要重复实现外部修改同步或三栏布局。
+- 回滚方式：回滚本功能分支即可；`@codemirror/autocomplete` 是既有传递依赖的显式声明，无数据迁移，Markdown 文件仍是唯一真源。
+- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，然后在 Tauri 桌面运行 `npm run desktop` 手动验证 `[[` 补全（含同名文档、IME 输入、代码块内不触发），再推进 `/` 触发器或 #88 桌面 E2E；不要重复实现双链补全。

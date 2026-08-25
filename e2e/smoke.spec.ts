@@ -131,6 +131,59 @@ test("opens the command palette from the keyboard", async ({ page }) => {
   await expect(palette).toHaveCount(0);
 });
 
+test("keeps supported markdown syntax through the wysiwyg editor", async ({ page }) => {
+  const corpus = [
+    "# 回归样例 Round Trip",
+    "",
+    "## 行内样式",
+    "",
+    "段落包含**加粗**、*斜体*、~~删除线~~和`行内代码`，以及一个[外部链接](https://example.com)。",
+    "",
+    "普通 Wiki 双链：[[Another note]]。",
+    "",
+    "## 列表与任务",
+    "",
+    "- 一级列表",
+    "- 嵌套列表",
+    "  1. 有序项",
+    "  2. 另一个有序项",
+    "",
+    "- [ ] 未完成任务",
+    "- [x] 已完成任务",
+    "",
+    "> 引用一行文字。",
+    "",
+    "## 代码与表格",
+    "",
+    "```ts",
+    "const answer = 42;",
+    "```",
+    "",
+    "| 列一 | 列二 |",
+    "| ---- | ---- |",
+    "| A | B |",
+    "",
+    "![示例图片](image.png)",
+    "",
+    "---",
+    "",
+    "结束段落。",
+  ].join("\n");
+
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "round-trip-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(corpus),
+  });
+
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  await clickToolbarAction(page, "源文本");
+
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expectEditorText(editor, corpus);
+});
+
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await page.goto("/");
 
