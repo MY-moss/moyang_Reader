@@ -59,7 +59,7 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-- 基线：`v0.8.1`；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例）、#159（`/` 块级命令菜单）、#160（序列化规范化固化与文档化，关闭 #157）。分支 `codex/heading-downgrade-156` 收尾 #156 调查。
+- 基线：`v0.8.2`；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例）、#159（`/` 块级命令菜单）、#160（序列化规范化固化与文档化，关闭 #157）、#204（外部修改保护与低价值入口收敛，关闭 #178）。分支 `codex/heading-downgrade-156` 收尾 #156 调查。
 - 已完成（历史切片）：三栏布局、上下文面板、Milkdown 按需加载与挂载修复、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步、`[[` 双链补全（两模式）、`/` 块级命令菜单（两模式，含 Enter 响应修复）、序列化规范化逐字节断言 + 决策文档 0004。
 - 本切片新增（#158）：`e2e/smoke.spec.ts` 的 `readEditorText` 保留 CodeMirror 内部 view state 读取以绕过视口虚拟化，但路径失效时不再静默回退到可视区 DOM，而是抛出 `CodeMirror internal view state path changed — update readEditorText`。现有 round-trip e2e 继续验证完整文档读取；后续若升级 CodeMirror，必须先处理该显式失败，再评估通过公开实例引用替代内部路径。
 - #156 已关闭：新增 e2e `downgrades a heading one level per Backspace at its start` 固化 Milkdown heading keymap 的降级语义（H2 起始 Backspace→H1，H1→段落，与 Obsidian/Typora 一致）。调查结论是该 keymap 属于预期 UX；原始 `<br />` 损坏在 #159 的竞态修复后无法复现。
@@ -74,8 +74,8 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 本切片（#178）修复外部修改保护：冲突提示“稍后处理”只隐藏提示，`OpenDocument.externallyModified` 持续标记并在标题、标签、正文信息和状态栏呈现；普通保存被拦截，处理选项提供重新载入、覆盖保存和另存为，覆盖保存使用应用内确认并在写入前复核磁盘内容。自身写入增加 in-flight 集合，写入完成后才开始 watcher 抑制窗口；决策细节见 `docs/decisions/0006-external-change-safety.md`。
 - 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改，且 `readEditorText` 是 CodeMirror 依赖升级的显式哨兵；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
 - 相关测试：`e2e/smoke.spec.ts` 的 heading 降级与 round-trip 场景；`src/app/components/CloseConfirmationDialog.test.tsx` 覆盖 Escape、焦点归还和确认回调；`src/app/components/ExternalChangeNotice.test.tsx` 与 `ExternalOverwriteDialog.test.tsx` 覆盖冲突处理动作和焦点；`src/app/components/WorkspaceTree.test.tsx` 防止工作区文件树重新引入任意 80 项截断；`desktop-e2e/smoke.e2e.mjs` 的真实桌面启动/编辑/保存/HTML+Word 导出/外部新增删除/外部刷新/冲突标记/覆盖保护/关闭确认取消。批量导出仍存在；合并前以实际门禁输出为准，不要沿用旧的场景计数。
-- 已运行：外部修改相关单测 8/8、lint、构建和真实 Tauri 桌面 smoke 7/7 通过；本次 UX 收敛新增旧版 `graph` 页签回退单测，完整前端单测、Rust 单测、格式检查、全量浏览器 e2e、桌面 e2e 和发布检查仍需在本切片合并前重新记录。构建仍可能有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO embedded provider 的 `tauri-driver`/mock store 诊断噪声不影响测试结果，但若它们变成失败必须单独定位。
-- 本切片新增版本与发布政策文档：用户功能 minor 版本必须有公开 Release 和安装包，重要 Bug/更新/安全修复可直接发布 patch；纯文档、测试、CI 和内部重构可以不发布。本次仅同步流程文档，不改应用版本、不创建空 Release。
-- 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
+- 已运行：目标单测 20/20、完整前端单测 150/150、lint、format、构建、浏览器 e2e 32/32、真实 Tauri 桌面 smoke 7/7、Rust 单测 35/35、Rust fmt、clippy、release:check 和 release 测试均通过；GitHub PR #204 的 CI 也已全绿。构建仍可能有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO embedded provider 的 `tauri-driver`/mock store 诊断噪声不影响测试结果，但若它们变成失败必须单独定位。
+- 本切片按重要数据安全修复发布 `v0.8.2` patch；版本号、CHANGELOG、安装包、签名、`latest.json` 和镜像必须在发布后核验。纯文档、测试、CI 和内部重构仍可不发布。
+- 发布影响：PR #204 已合并；当前发布提交将同步 `v0.8.2` 版本号并触发 Release workflow，完成后补充 GitHub Release、Cloudflare 镜像和旧版本自动更新验证。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues、PR 和 `origin/main`，确认本切片已合并后继续 #177 的 WYSIWYG 输入渲染防抖，或补 #88 的 PDF 文件落盘/更新/双链与 `/` 真实桌面回归，并优先选择一个可独立验收的切片；不要重复实现当前的外部修改保护、启动/编辑/保存/无冲突外部刷新/外部新增删除/HTML+Word 导出/关闭确认 smoke，也不要把 #169（工作区规模上限）或 #174（React 错误边界）混入本切片。
+- 下一位 AI 的唯一下一步：先核对 `v0.8.2` Release 的安装包、签名、`latest.json`、镜像和旧版本自动更新结果；发布完成后继续 #177 的 WYSIWYG 输入渲染防抖，或补 #88 的 PDF 文件落盘/更新/双链与 `/` 真实桌面回归，并优先选择一个可独立验收的切片；不要重复实现当前的外部修改保护、启动/编辑/保存/无冲突外部刷新/外部新增删除/HTML+Word 导出/关闭确认 smoke，也不要把 #169（工作区规模上限）或 #174（React 错误边界）混入本切片。
