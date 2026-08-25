@@ -185,7 +185,12 @@ export function TopBar({
             : updateStatus === "up-to-date"
               ? "已是最新"
               : "更新";
-  const updateTitle = updateVersion ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示" : "检查应用更新";
+  const updateTitle =
+    updateStatus === "downloading"
+      ? "打开更新进度"
+      : updateVersion
+        ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
+        : "检查应用更新";
 
   return (
     <header className="topbar">
@@ -333,7 +338,7 @@ export function TopBar({
                   type="button"
                   className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
                   onClick={onCheckUpdates}
-                  disabled={updateStatus === "checking" || updateStatus === "downloading"}
+                  disabled={updateStatus === "checking"}
                   title={updateTitle}
                 >
                   {updateLabel}
