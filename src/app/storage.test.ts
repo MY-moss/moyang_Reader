@@ -8,6 +8,8 @@ import {
   loadOpenTabs,
   loadReadingPosition,
   loadSidebarCollapsed,
+  loadContextPanelOpen,
+  loadContextPanelTab,
   rememberRecentFile,
   rememberMountedWorkspace,
   rememberRecentWorkspace,
@@ -15,6 +17,8 @@ import {
   saveOpenTabs,
   saveReadingPosition,
   saveSidebarCollapsed,
+  saveContextPanelOpen,
+  saveContextPanelTab,
   saveRecentFiles,
   saveMountedWorkspaces,
   saveRecentWorkspaces,
@@ -64,6 +68,17 @@ describe("reader storage", () => {
 
     saveSidebarCollapsed(false);
     expect(loadSidebarCollapsed()).toBe(false);
+  });
+
+  it("persists the right context panel state and tab", () => {
+    expect(loadContextPanelOpen()).toBe(true);
+    expect(loadContextPanelTab()).toBe("outline");
+
+    saveContextPanelOpen(false);
+    saveContextPanelTab("properties");
+
+    expect(loadContextPanelOpen()).toBe(false);
+    expect(loadContextPanelTab()).toBe("properties");
   });
 
   it("persists bounded native tabs and drops temporary browser documents", () => {

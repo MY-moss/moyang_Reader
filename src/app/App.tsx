@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+} from "react";
 import { EmptyState } from "./components/EmptyState";
+import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
+import { ContextPanel } from "./components/ContextPanel";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ImagePreview } from "./components/ImagePreview";
-import { Outline } from "./components/Outline";
 import { PdfPreview } from "./components/PdfPreview";
 import { PrintPreview } from "./components/PrintPreview";
 import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
-import { RelatedPanel } from "./components/RelatedPanel";
 import { RelationGraph } from "./components/RelationGraph";
-import { ReadingRail } from "./components/ReadingRail";
-import { SourceEditor, type SourceEditorPasteContext } from "./components/SourceEditor";
+import { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteContext } from "./components/SourceEditor";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -60,6 +69,7 @@ import {
 } from "./update-recovery";
 import type {
   DocumentKind,
+  ContextPanelTab,
   ExportMargin,
   ExportOrientation,
   ExportPaper,
@@ -75,6 +85,7 @@ import type {
   WorkspaceSearchResult,
 } from "./types";
 import { nextReaderModeAfterOpen } from "./reader-mode";
+import { checkMarkdownEditorSafety } from "./markdown-editor-support";
 import {
   BATCH_EXPORT_CHUNK_SIZE,
   BATCH_EXPORT_MAX_ESTIMATED_BYTES,
@@ -102,6 +113,8 @@ import {
   loadOpenTabs,
   loadReadingPosition,
   loadSidebarCollapsed,
+  loadContextPanelOpen,
+  loadContextPanelTab,
   loadWorkspacePath,
   rememberRecentFile,
   rememberMountedWorkspace,
@@ -110,6 +123,8 @@ import {
   saveOpenTabs,
   saveReadingPosition,
   saveSidebarCollapsed,
+  saveContextPanelOpen,
+  saveContextPanelTab,
   saveMountedWorkspaces,
   saveWorkspaceSession,
   saveWorkspaceSessions,
@@ -165,6 +180,12 @@ import {
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
+
+const LazyMarkdownWysiwygEditor = lazy(() =>
+  import("./components/MarkdownWysiwygEditor").then(({ MarkdownWysiwygEditor }) => ({
+    default: MarkdownWysiwygEditor,
+  })),
+);
 
 function fileTypeLabel(kind: DocumentKind): string {
   return kind === "markdown" ? "MD" : kind === "image" ? "IMG" : kind.toUpperCase();
@@ -379,6 +400,8 @@ export function App() {
   const [locale, setLocale] = useState<Locale>(loadLocale);
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+  const [rightPanelOpen, setRightPanelOpen] = useState(loadContextPanelOpen);
+  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(loadContextPanelTab);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -419,6 +442,7 @@ export function App() {
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
@@ -583,6 +607,14 @@ export function App() {
   useEffect(() => {
     saveSidebarCollapsed(sidebarCollapsed);
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    saveContextPanelOpen(rightPanelOpen);
+  }, [rightPanelOpen]);
+
+  useEffect(() => {
+    saveContextPanelTab(activeContextTab);
+  }, [activeContextTab]);
 
   useEffect(() => {
     setWorkspaceExportFailures([]);
@@ -1186,6 +1218,7 @@ export function App() {
         if (!kind || (kind !== "markdown" && kind !== "text")) {
           throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
         }
+        const editorSafety = kind === "markdown" ? checkMarkdownEditorSafety(source) : { safe: false };
         const rendered = await renderSource(path, source, {
           allowRemoteResources: preferencesRef.current.allowRemoteResources,
         });
@@ -1213,7 +1246,10 @@ export function App() {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
           saveLastDocumentPath(path);
         }
-        setMode((current) => nextReaderModeAfterOpen(current, preserveMode));
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe));
+        if (kind === "markdown" && !editorSafety.safe) {
+          setSettingsNotice(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`);
+        }
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档渲染失败。");
@@ -1277,7 +1313,7 @@ export function App() {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
           saveLastDocumentPath(path);
         }
-        setMode((current) => nextReaderModeAfterOpen(current, preserveMode));
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind));
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档预览失败。");
@@ -1691,6 +1727,43 @@ export function App() {
     };
   }, [workspacePath, workspaceQuery, workspaceRevision]);
 
+  const handleInsertLink = useCallback((context?: SourceEditorLinkContext) => {
+    const url = window.prompt("输入链接地址", "https://");
+    if (!url?.trim()) return;
+
+    if (context) {
+      const selectedText = context.value.slice(context.selectionStart, context.selectionEnd).trim() || "链接文字";
+      context.replace(`[${selectedText}](${url.trim()})`);
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) {
+      document.execCommand("createLink", false, url.trim());
+    } else {
+      setSettingsNotice("请先在所见即所得编辑器中选择链接文字，再按 Ctrl+K。");
+    }
+  }, []);
+
+  // Keep the mode transition in one place so toolbar and keyboard shortcuts cannot drift apart.
+  const toggleDocumentMode = useCallback(() => {
+    const currentDocument = documentStateRef.current;
+    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+
+    if (currentDocument.kind === "markdown" && !checkMarkdownEditorSafety(sourceDraftRef.current).safe) {
+      setSettingsNotice("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。");
+    }
+
+    setMode((current) => {
+      if (currentDocument.kind !== "markdown") return current === "source" ? "rendered" : "source";
+      if (current === "rendered") {
+        return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
+      }
+      if (current === "wysiwyg") return "source";
+      return "rendered";
+    });
+  }, []);
+
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       const eventTarget = event.target instanceof HTMLElement ? event.target : null;
@@ -1716,9 +1789,24 @@ export function App() {
         event.preventDefault();
         void saveDocument();
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        toggleDocumentMode();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {
+        if (mode === "wysiwyg") {
+          event.preventDefault();
+          handleInsertLink();
+        }
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
         setSearchOpen(true);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+        return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
         event.preventDefault();
@@ -1740,7 +1828,7 @@ export function App() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [focusMode, handleChooseWorkspace, openSelectedFile, saveDocument]);
+  }, [focusMode, handleChooseWorkspace, handleInsertLink, mode, openSelectedFile, saveDocument, toggleDocumentMode]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1769,7 +1857,7 @@ export function App() {
 
   useEffect(() => {
     const current = documentStateRef.current;
-    if (mode !== "rendered" || !current || !isEditableDocument(current.kind)) return;
+    if ((mode !== "rendered" && mode !== "wysiwyg") || !current || !isEditableDocument(current.kind)) return;
 
     const requestId = ++sourceRenderRequestRef.current;
     const path = current.path;
@@ -2598,6 +2686,85 @@ export function App() {
     if (query.length < 2 || workspaceSearchLoading) return [];
     return visibleWorkspaceResults.map((result) => result.file);
   }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);
+  const executeCommand = useCallback(
+    (commandId: string) => {
+      switch (commandId) {
+        case "open":
+          void openSelectedFile();
+          break;
+        case "workspace":
+          void handleChooseWorkspace();
+          break;
+        case "quick-open":
+          setQuickOpen(true);
+          break;
+        case "toggle-mode":
+          toggleDocumentMode();
+          break;
+        case "save":
+          void saveDocument();
+          break;
+        case "link":
+          handleInsertLink();
+          break;
+        case "context":
+          setRightPanelOpen((current) => !current);
+          break;
+        case "focus":
+          setFocusMode((current) => !current);
+          break;
+      }
+    },
+    [handleChooseWorkspace, handleInsertLink, openSelectedFile, saveDocument, toggleDocumentMode],
+  );
+  const commandItems = useMemo<ReaderCommand[]>(
+    () => [
+      {
+        id: "open",
+        label: "打开文档",
+        shortcut: "Ctrl O",
+      },
+      {
+        id: "workspace",
+        label: "添加整个文件夹",
+        shortcut: "Ctrl ⇧ O",
+      },
+      {
+        id: "quick-open",
+        label: "快速打开",
+        shortcut: "Ctrl P",
+      },
+      {
+        id: "toggle-mode",
+        label: mode === "rendered" ? "进入编辑模式" : "切换到阅读模式",
+        shortcut: "Ctrl E",
+        disabled: !canEdit,
+      },
+      {
+        id: "save",
+        label: "保存当前文档",
+        shortcut: "Ctrl S",
+        disabled: !documentState?.modified,
+      },
+      {
+        id: "link",
+        label: "插入 Markdown 链接",
+        shortcut: "Ctrl K",
+        disabled: !canEdit,
+      },
+      {
+        id: "context",
+        label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
+      },
+      {
+        id: "focus",
+        label: focusMode ? "退出专注阅读" : "进入专注阅读",
+        shortcut: "Ctrl ⇧ Enter",
+        disabled: !documentState,
+      },
+    ],
+    [canEdit, focusMode, mode, rightPanelOpen, documentState],
+  );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
     const add = (candidate: QuickOpenCandidate) => {
@@ -2904,13 +3071,14 @@ export function App() {
     <div
       className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
-      }${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
+      }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
       <TopBar
         fileName={documentState?.name ?? null}
         mode={mode}
+        documentKind={documentState?.kind ?? null}
         canEdit={canEdit}
         modified={documentState?.modified ?? false}
         searchOpen={searchOpen}
@@ -2944,7 +3112,10 @@ export function App() {
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((current) => !current)}
-        onToggleMode={() => setMode((current) => (current === "rendered" ? "source" : "rendered"))}
+        onToggleMode={toggleDocumentMode}
+        rightPanelOpen={rightPanelOpen}
+        onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onSave={() => void saveDocument()}
         onCopy={() => void handleCopy()}
         copyFeedback={copyFeedback}
@@ -3048,36 +3219,10 @@ export function App() {
           {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}
           {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}
           {documentState ? (
-            <>
-              <div className="sidebar-section">
-                <div className="panel-kicker">CURRENT FILE</div>
-                <div className="file-card">
-                  <span className="file-type">{fileTypeLabel(documentState.kind)}</span>
-                  <div>
-                    <strong>{documentState.name}</strong>
-                    <span>
-                      {documentState.kind === "pdf"
-                        ? "PDF 预览"
-                        : documentState.kind === "image"
-                          ? "图片预览"
-                          : `${documentState.rendered.readingMinutes} 分钟阅读`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <Outline items={documentState.rendered.toc} activeId={currentHeadingId} />
-              <RelatedPanel
-                entry={currentIndexEntry}
-                backlinks={backlinks}
-                outgoing={outgoing}
-                canCreateNote={Boolean(workspacePath && isTauriRuntime())}
-                selectedTag={selectedTag}
-                onOpenFile={(path) => void handleSelectTab(path)}
-                onCreateNote={(target) => void handleCreateNote(target)}
-                onOpenGraph={() => setGraphOpen(true)}
-                onSelectTag={setSelectedTag}
-              />
-            </>
+            <div className="sidebar-note">
+              <div className="panel-kicker">READING DESK</div>
+              <p>文件树负责找到内容，右侧上下文面板负责理解当前文档。</p>
+            </div>
           ) : (
             <div className="sidebar-note">
               <div className="panel-kicker">MOMENT</div>
@@ -3152,24 +3297,53 @@ export function App() {
                   )}
                   <ProgressiveReaderContent html={documentState.rendered.html} />
                 </article>
-                <ReadingRail
-                  progress={readingProgress}
-                  currentHeading={currentHeading}
-                  headingCount={documentState.rendered.toc.length}
-                  onScrollToTop={() => scrollToReaderEdge("top")}
-                  onScrollToBottom={() => scrollToReaderEdge("bottom")}
-                />
               </div>
             )}
+          {!loading && documentState && documentState.kind === "markdown" && mode === "wysiwyg" && (
+            <Suspense fallback={<div className="wysiwyg-loading-state">正在准备所见即所得编辑器…</div>}>
+              <LazyMarkdownWysiwygEditor
+                source={sourceDraft}
+                documentKey={documentState.path}
+                ariaLabel="Markdown 所见即所得编辑器"
+                onChange={(value) => void updateSource(value)}
+                onInsertLink={() => handleInsertLink()}
+              />
+            </Suspense>
+          )}
           {!loading && documentState && canEdit && mode === "source" && (
             <SourceEditor
               value={sourceDraft}
               ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
               onChange={(value) => void updateSource(value)}
               onPaste={handleSourcePaste}
+              onInsertLink={handleInsertLink}
             />
           )}
         </main>
+        {rightPanelOpen && !focusMode && (
+          <ContextPanel
+            documentState={documentState}
+            entry={currentIndexEntry}
+            backlinks={backlinks}
+            outgoing={outgoing}
+            canCreateNote={Boolean(workspacePath && isTauriRuntime())}
+            selectedTag={selectedTag}
+            toc={documentState?.rendered.toc ?? []}
+            activeHeadingId={currentHeadingId}
+            currentHeading={currentHeading}
+            readingProgress={readingProgress}
+            mode={mode}
+            activeTab={activeContextTab}
+            onTabChange={setActiveContextTab}
+            onClose={() => setRightPanelOpen(false)}
+            onOpenFile={(path) => void handleSelectTab(path)}
+            onCreateNote={(target) => void handleCreateNote(target)}
+            onOpenGraph={() => setGraphOpen(true)}
+            onSelectTag={setSelectedTag}
+            onScrollToTop={() => scrollToReaderEdge("top")}
+            onScrollToBottom={() => scrollToReaderEdge("bottom")}
+          />
+        )}
       </div>
 
       <footer className="statusbar">
@@ -3224,6 +3398,13 @@ export function App() {
             setQuickOpen(false);
             void handleSelectTab(path);
           }}
+        />
+      )}
+      {commandPaletteOpen && (
+        <CommandPalette
+          commands={commandItems}
+          onClose={() => setCommandPaletteOpen(false)}
+          onExecute={executeCommand}
         />
       )}
       {draftRecoveryOpen && draftSnapshots.length > 0 && (

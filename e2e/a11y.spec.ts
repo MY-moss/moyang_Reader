@@ -1,6 +1,15 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+async function switchToRenderedMode(page: Page): Promise<void> {
+  const menu = page.locator(".toolbar-overflow");
+  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.getByRole("button", { name: "源文本", exact: true }).click();
+  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.getByRole("button", { name: "阅读", exact: true }).click();
+  if ((await menu.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
+}
+
 async function expectNoSeriousA11yViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   const blocking = results.violations.filter(
@@ -27,6 +36,7 @@ test("keeps the reader shell and key dialogs accessible", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# 可访问性测试\n\n正文内容"),
   });
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "可访问性测试" })).toBeVisible();
   await expectNoSeriousA11yViolations(page);
 

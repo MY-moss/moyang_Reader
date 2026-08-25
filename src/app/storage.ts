@@ -1,4 +1,4 @@
-import type { RecentFile, RecentWorkspace } from "./types";
+import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";
 import { normalizePathKey } from "./path-key";
 
 const workspaceKey = "moyang-reader-workspace";
@@ -10,6 +10,8 @@ const lastDocumentKey = "moyang-reader-last-document";
 const openTabsKey = "moyang-reader-open-tabs";
 const readingPositionsKey = "moyang-reader-reading-positions";
 const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
+const contextPanelOpenKey = "moyang-reader-context-panel-open";
+const contextPanelTabKey = "moyang-reader-context-panel-tab";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 const maxMountedWorkspaces = 5;
@@ -35,6 +37,40 @@ export function saveSidebarCollapsed(collapsed: boolean): void {
     localStorage.setItem(sidebarCollapsedKey, String(collapsed));
   } catch {
     // The layout preference remains available for the current session.
+  }
+}
+
+export function loadContextPanelOpen(): boolean {
+  try {
+    const saved = localStorage.getItem(contextPanelOpenKey);
+    return saved === null ? true : saved === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function saveContextPanelOpen(open: boolean): void {
+  try {
+    localStorage.setItem(contextPanelOpenKey, String(open));
+  } catch {
+    // The context panel remains available for the current session.
+  }
+}
+
+export function loadContextPanelTab(): ContextPanelTab {
+  try {
+    const saved = localStorage.getItem(contextPanelTabKey);
+    return saved === "backlinks" || saved === "properties" || saved === "graph" ? saved : "outline";
+  } catch {
+    return "outline";
+  }
+}
+
+export function saveContextPanelTab(tab: ContextPanelTab): void {
+  try {
+    localStorage.setItem(contextPanelTabKey, tab);
+  } catch {
+    // The context panel tab remains available for the current session.
   }
 }
 

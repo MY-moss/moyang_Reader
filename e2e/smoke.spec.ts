@@ -29,6 +29,13 @@ async function clickToolbarAction(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name, exact: true }).click();
 }
 
+async function switchToRenderedMode(page: Page): Promise<void> {
+  await clickToolbarAction(page, "源文本");
+  await clickToolbarAction(page, "阅读");
+  const menu = page.locator(".toolbar-overflow");
+  if ((await menu.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
+}
+
 test("renders the local reader landing page", async ({ page }) => {
   await page.goto("/");
 
@@ -96,6 +103,8 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# Quick note\n\n快速打开测试"),
   });
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 
   await page.keyboard.press("Control+P");
@@ -107,6 +116,19 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
+});
+
+test("opens the command palette from the keyboard", async ({ page }) => {
+  await page.goto("/");
+
+  await page.keyboard.press("Control+Shift+P");
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByRole("option", { name: /打开文档/ })).toBeVisible();
+  await expect(palette.getByRole("searchbox", { name: "搜索命令" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
 });
 
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {
@@ -125,6 +147,7 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
     },
   ]);
 
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Second note" })).toBeVisible();
   await expect(page.getByRole("button", { name: "first-note.md", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
@@ -146,11 +169,13 @@ test("keeps same-named browser documents in separate tabs", async ({ page }) => 
     },
   ]);
 
+  await switchToRenderedMode(page);
   const tabs = page.getByRole("button", { name: "duplicate-note.md", exact: true });
   await expect(tabs).toHaveCount(2);
   await expect(page.getByRole("heading", { name: "Second duplicate" })).toBeVisible();
 
   await tabs.nth(0).click();
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "First duplicate" })).toBeVisible();
 });
 
@@ -247,6 +272,26 @@ test("opens editor-local find from source mode", async ({ page }) => {
   await expect(searchInput).toBeHidden();
 });
 
+test("inserts a Markdown link from source mode", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "link-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("链接文字"),
+  });
+  await clickToolbarAction(page, "源文本");
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await editor.press("Control+a");
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("链接地址");
+    await dialog.accept("https://example.com");
+  });
+  await editor.press("Control+k");
+
+  await expectEditorText(editor, "[链接文字](https://example.com)");
+});
+
 test("debounces in-document search and navigates highlighted matches", async ({ page }) => {
   await page.goto("/");
 
@@ -255,6 +300,7 @@ test("debounces in-document search and navigates highlighted matches", async ({ 
     mimeType: "text/markdown",
     buffer: Buffer.from("# Search note\n\nneedle one\n\nneedle two\n\nneedle three"),
   });
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Search note" })).toBeVisible();
 
   await page.getByRole("button", { name: "搜索" }).click();
@@ -280,6 +326,7 @@ test("enters and exits focus reading mode", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# Focus note\n\n专注阅读测试"),
   });
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Focus note" })).toBeVisible();
 
   await page.getByRole("button", { name: "专注", exact: true }).click();
@@ -300,6 +347,7 @@ test("collapses and restores the reading sidebar", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# Sidebar note\n\n侧栏切换测试"),
   });
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Sidebar note" })).toBeVisible();
 
   const toggle = page.locator(".sidebar-toggle");
@@ -327,6 +375,7 @@ test("shows a reading rail with progress and edge navigation", async ({ page }) 
     mimeType: "text/markdown",
     buffer: Buffer.from(`# Reading rail\n\n阅读轨道测试。\n\n${sections.join("")}`),
   });
+  await switchToRenderedMode(page);
 
   const rail = page.getByRole("complementary", { name: "阅读进度" });
   await expect(rail).toBeVisible();
@@ -358,6 +407,7 @@ test("previews the print layout before exporting a document", async ({ page }) =
     mimeType: "text/markdown",
     buffer: Buffer.from("# Print preview\n\n## 章节\n\n打印版式预览测试"),
   });
+  await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Print preview" })).toBeVisible();
 
   await openMoreMenu(page);
@@ -423,6 +473,8 @@ test("keeps remote images off until the local privacy setting is enabled", async
     mimeType: "text/markdown",
     buffer: Buffer.from("![tracking](https://example.com/pixel.png)"),
   });
+  await switchToRenderedMode(page);
+  await openSettingsMenu(page);
 
   const image = page.locator(".reader-content img");
   await expect(image).toHaveCount(1);
@@ -444,6 +496,7 @@ test("opens external links outside the reader window", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("[打开外部链接](https://example.com/reference)"),
   });
+  await switchToRenderedMode(page);
 
   const popupPromise = page.waitForEvent("popup");
   await page.getByRole("link", { name: "打开外部链接" }).click();
@@ -463,6 +516,7 @@ test("keeps the reader inside a narrow viewport when long inline content wraps",
     mimeType: "text/markdown",
     buffer: Buffer.from(`# Mobile layout\n\n运行安装程序后会注册 ${extensions}，并继续保持本地阅读。`),
   });
+  await switchToRenderedMode(page);
 
   await expect(page.getByRole("heading", { name: "Mobile layout" })).toBeVisible();
   const metrics = await page.evaluate(() => ({
