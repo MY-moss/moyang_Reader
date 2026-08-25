@@ -149,6 +149,24 @@ a:focus-visible {
   box-shadow: 0 0 0 3px rgba(189, 105, 69, 0.14);
   vertical-align: middle;
 }
+.external-modified-indicator {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin-left: 7px;
+  place-items: center;
+  border: 1px solid var(--accent-warm);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-warm) 14%, transparent);
+  color: var(--accent-warm);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}
+.external-modified-indicator:hover {
+  background: color-mix(in srgb, var(--accent-warm) 24%, transparent);
+}
 .toolbar {
   display: flex;
   align-items: center;
@@ -981,6 +999,20 @@ a:focus-visible {
 }
 .tab-label:hover {
   color: var(--accent-deep);
+}
+.tab-external-indicator {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  place-items: center;
+  border: 1px solid var(--accent-warm);
+  border-radius: 50%;
+  color: var(--accent-warm);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: -1px;
 }
 .tab-close {
   border: 0;
@@ -1949,12 +1981,17 @@ a:focus-visible {
   color: #795d2a;
   font-size: 12px;
 }
+.external-change-notice > span {
+  min-width: 0;
+  line-height: 1.5;
+}
 .external-change-notice strong {
   color: #5a451f;
 }
 .external-change-notice div {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .external-change-notice button {
@@ -1972,6 +2009,28 @@ a:focus-visible {
   border-color: transparent;
   background: transparent;
   color: #8a7654;
+}
+.reader-external-change,
+.statusbar-external-change {
+  border: 0;
+  background: transparent;
+  color: var(--accent-warm);
+  font: inherit;
+  font-weight: 700;
+}
+.reader-external-change {
+  padding: 0;
+  white-space: nowrap;
+}
+.reader-external-change:hover,
+.statusbar-external-change:hover {
+  color: var(--accent-deep);
+  text-decoration: underline;
+}
+.statusbar-external-change {
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
 }
 .reader-content {
   position: relative;
@@ -3322,7 +3381,7 @@ a:focus-visible {
   }
   .context-tab-list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 3px;
     margin: 14px 0;
     padding: 3px;
@@ -3349,12 +3408,10 @@ a:focus-visible {
   .context-panel-body {
     min-width: 0;
   }
-  .context-properties,
-  .context-graph-placeholder {
+  .context-properties {
     padding: 5px 2px 18px;
   }
-  .context-properties h3,
-  .context-graph-placeholder h3 {
+  .context-properties h3 {
     margin: 7px 0 15px;
     color: var(--ink);
     font-family: var(--font-display);
@@ -3397,9 +3454,6 @@ a:focus-visible {
   }
   .context-frontmatter dl {
     margin-top: 10px;
-  }
-  .context-graph-placeholder .quiet-button {
-    margin-top: 13px;
   }
   .command-palette-backdrop {
     position: fixed;

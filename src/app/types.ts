@@ -1,6 +1,6 @@
 export type ReaderMode = "rendered" | "source" | "wysiwyg";
 
-export type ContextPanelTab = "outline" | "backlinks" | "properties" | "graph";
+export type ContextPanelTab = "outline" | "backlinks" | "properties";
 
 export type LayoutState = {
   leftPanelOpen: boolean;
@@ -93,4 +93,5 @@ export type OpenDocument = {
   rendered: RenderedMarkdown;
   previewUrl?: string;
   modified: boolean;
+  externallyModified: boolean;
 };

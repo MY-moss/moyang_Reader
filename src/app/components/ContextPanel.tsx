@@ -30,7 +30,6 @@ const tabs: Array<{ id: ContextPanelTab; label: string }> = [
   { id: "outline", label: "目录" },
   { id: "backlinks", label: "关联" },
   { id: "properties", label: "属性" },
-  { id: "graph", label: "关系" },
 ];
 
 function fileTypeLabel(kind: OpenDocument["kind"]): string {
@@ -90,7 +89,9 @@ export function ContextPanel({
           <span className="file-type">{fileTypeLabel(documentState.kind)}</span>
           <div className="context-document-copy">
             <strong title={documentState.name}>{documentState.name}</strong>
-            <span>{documentState.modified ? "有未保存修改" : "已保存"}</span>
+            <span>
+              {documentState.externallyModified ? "外部已修改" : documentState.modified ? "有未保存修改" : "已保存"}
+            </span>
           </div>
         </div>
       )}
@@ -175,16 +176,6 @@ export function ContextPanel({
               </div>
             )}
             <p className="context-panel-note">YAML 属性编辑将在知识库增强批次中开放，未知字段会保持原样。</p>
-          </section>
-        )}
-        {activeTab === "graph" && (
-          <section className="context-graph-placeholder" aria-labelledby="context-graph-title">
-            <div className="panel-kicker">RELATIONS</div>
-            <h3 id="context-graph-title">关系图</h3>
-            <p className="muted-copy">从当前文档查看出链、反向链接和工作区中的关联路径。</p>
-            <button type="button" className="quiet-button primary" onClick={onOpenGraph} disabled={!entry}>
-              打开关系图
-            </button>
           </section>
         )}
       </div>

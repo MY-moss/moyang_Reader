@@ -240,6 +240,49 @@ describe("Moyang Reader desktop runtime", () => {
     assert.equal(await browser.$("button=重新载入").isDisplayed(), true);
   });
 
+  it("keeps the external-change marker after dismiss and blocks accidental overwrite", async () => {
+    const localText = "本地未保存内容。";
+    const notice = await browser.$(".external-change-notice");
+    await notice.$("button=稍后处理").click();
+    await browser.waitUntil(() => notice.isDisplayed().then((visible) => !visible), {
+      timeout: 5_000,
+      timeoutMsg: "the external-change notice did not hide",
+    });
+
+    assert.equal(await browser.$(".external-modified-indicator").isDisplayed(), true);
+    assert.equal(await browser.$(".statusbar-external-change").getText(), "外部修改待处理");
+
+    assert.equal(await browser.$("button=保存").isEnabled(), true);
+    await clickToolbarAction("保存");
+    await browser.waitUntil(() => browser.$(".external-change-notice").isDisplayed(), {
+      timeout: 5_000,
+      timeoutMsg: "saving a stale document did not reopen the conflict notice",
+    });
+    assert.equal(fs.readFileSync(documentPath, "utf8").includes(localText), false);
+
+    await browser.$(".external-change-notice").$("button=覆盖保存").click();
+    const overwriteDialog = await browser.$('[role="dialog"][aria-labelledby="external-overwrite-title"]');
+    await overwriteDialog.waitForDisplayed();
+    await overwriteDialog.$('[data-testid="external-overwrite-confirm"]').click();
+    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8").includes(localText), {
+      timeout: 15_000,
+      timeoutMsg: "explicit overwrite did not write the local document",
+    });
+
+    const editor = await browser.$('[aria-label="Markdown 源文本"]');
+    await browser.execute((text) => {
+      const target = document.querySelector('[aria-label="Markdown 源文本"]');
+      if (!(target instanceof HTMLElement)) throw new Error("source editor was not found");
+      const view = target.cmTile?.root?.view;
+      if (!view) throw new Error("CodeMirror view is unavailable");
+      view.dispatch({ changes: { from: view.state.doc.length, insert: `\n${text}` } });
+    }, "关闭前未保存内容。");
+    await browser.waitUntil(() => editor.isDisplayed(), {
+      timeout: 5_000,
+      timeoutMsg: "the source editor disappeared after resolving the conflict",
+    });
+  });
+
   it("keeps the window and local edits after cancelling a close request", async () => {
     await requestCloseRequest();
     const firstDialog = await waitForCloseConfirmation();

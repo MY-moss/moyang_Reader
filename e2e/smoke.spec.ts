@@ -72,6 +72,7 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
   await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
   await expect(page.getByRole("button", { name: "文件夹", exact: true })).toHaveAttribute("title", /Ctrl\+Shift\+O/);
+  await expect(page.locator("summary", { hasText: "批量导出" })).toHaveCount(0);
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
 });
 
@@ -144,6 +145,8 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "目录" })).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(3);
 });
 
 test("opens the command palette from the keyboard", async ({ page }) => {

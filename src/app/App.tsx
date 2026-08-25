@@ -16,6 +16,7 @@ import { ContextPanel } from "./components/ContextPanel";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
+import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
 import { PrintPreview } from "./components/PrintPreview";
@@ -425,6 +426,7 @@ export function App() {
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
+  const [externalOverwriteConfirmationOpen, setExternalOverwriteConfirmationOpen] = useState(false);
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
@@ -458,6 +460,7 @@ export function App() {
   const workspaceRefreshRequestRef = useRef(0);
   const workspaceReloadTimerRef = useRef<number | null>(null);
   const pendingWorkspacePathsRef = useRef(new Set<string>());
+  const selfWritingPathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
 
@@ -1243,6 +1246,7 @@ export function App() {
           source,
           rendered,
           modified: false,
+          externallyModified: false,
         });
         setExternalChangePath(null);
         setSourceDraft(source);
@@ -1310,6 +1314,7 @@ export function App() {
           rendered,
           previewUrl,
           modified: false,
+          externallyModified: false,
         });
         setExternalChangePath(null);
         setSourceDraft("");
@@ -1501,33 +1506,79 @@ export function App() {
     inputRef.current?.click();
   }, [handleOpenPaths]);
 
-  const saveDocument = useCallback(async () => {
-    if (!documentState || !documentState.modified || !isEditableDocument(documentState.kind)) return;
+  const saveDocument = useCallback(async (allowExternalOverwrite = false) => {
+    const current = documentStateRef.current;
+    const draft = sourceDraftRef.current;
+    if (!current || !current.modified || !isEditableDocument(current.kind)) return;
 
+    if (current.externallyModified && !allowExternalOverwrite) {
+      setExternalChangePath(current.path);
+      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
+      return;
+    }
+
+    const path = current.path;
+    const pathKey = comparablePath(path);
+    let writeCompleted = false;
     try {
       if (isTauriRuntime()) {
-        selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
-        await writeTextFile(documentState.path, sourceDraft);
+        if (!allowExternalOverwrite) {
+          const diskSource = await readTextFile(path);
+          if (diskSource !== current.source) {
+            setDocumentState((latest) =>
+              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
+            );
+            setExternalChangePath(path);
+            setError("文件在保存前已被其他程序修改，请先选择处理方式。");
+            return;
+          }
+        }
+        selfWritingPathsRef.current.add(pathKey);
+        try {
+          await writeTextFile(path, draft);
+        } finally {
+          selfWritingPathsRef.current.delete(pathKey);
+        }
+        writeCompleted = true;
+        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
       } else {
-        downloadText(documentState.name, sourceDraft);
+        downloadText(current.name, draft);
       }
 
-      const rendered = await renderSource(documentState.path, sourceDraft, {
-        allowRemoteResources: preferences.allowRemoteResources,
+      const rendered = await renderSource(path, draft, {
+        allowRemoteResources: preferencesRef.current.allowRemoteResources,
       });
-      setDocumentState((current) =>
-        current ? { ...current, source: sourceDraft, rendered, modified: false } : current,
+      setDocumentState((latest) =>
+        latest && isSameDocumentPath(latest.path, path)
+          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
+          : latest,
       );
-      clearDraftSnapshot(documentState.path);
+      clearDraftSnapshot(path);
       setDraftSnapshots(loadDraftSnapshots());
       setDraftRecovery(null);
-      selfWrittenPathsRef.current.set(comparablePath(documentState.path), Date.now() + 1_500);
       setExternalChangePath(null);
+      setError(null);
     } catch (cause) {
-      selfWrittenPathsRef.current.delete(comparablePath(documentState.path));
+      selfWritingPathsRef.current.delete(pathKey);
+      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);
       setError(cause instanceof Error ? cause.message : "保存失败。");
     }
-  }, [documentState, preferences.allowRemoteResources, sourceDraft]);
+  }, []);
+
+  const overwriteExternalChange = useCallback(() => {
+    const current = documentStateRef.current;
+    if (!current?.externallyModified) return;
+    setExternalOverwriteConfirmationOpen(true);
+  }, []);
+
+  const cancelExternalOverwrite = useCallback(() => {
+    setExternalOverwriteConfirmationOpen(false);
+  }, []);
+
+  const confirmExternalOverwrite = useCallback(() => {
+    setExternalOverwriteConfirmationOpen(false);
+    void saveDocument(true);
+  }, [saveDocument]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -1695,6 +1746,7 @@ export function App() {
         changedPaths: paths,
         currentPath: current.path,
         modified: current.modified,
+        selfWriting: selfWritingPathsRef.current.has(currentPath),
         selfWrittenUntil: writtenUntil,
         now: Date.now(),
       });
@@ -1705,6 +1757,9 @@ export function App() {
 
       if (action === "notify") {
         setExternalChangePath(current.path);
+        setDocumentState((latest) =>
+          latest && isSameDocumentPath(latest.path, current.path) ? { ...latest, externallyModified: true } : latest,
+        );
       } else {
         void openPath(current.path, true);
       }
@@ -3087,6 +3142,10 @@ export function App() {
         documentKind={documentState?.kind ?? null}
         canEdit={canEdit}
         modified={documentState?.modified ?? false}
+        externallyModified={documentState?.externallyModified ?? false}
+        onShowExternalChange={() => {
+          if (documentState?.path) setExternalChangePath(documentState.path);
+        }}
         searchOpen={searchOpen}
         searchQuery={searchQuery}
         searchResultCount={searchResultCount}
@@ -3180,6 +3239,10 @@ export function App() {
         <Tabs
           tabs={openTabs}
           activePath={documentState?.path ?? null}
+          externallyModified={documentState?.externallyModified ?? false}
+          onShowExternalChange={() => {
+            if (documentState?.path) setExternalChangePath(documentState.path);
+          }}
           onSelect={(path) => void handleSelectTab(path)}
           onClose={(path) => void handleCloseTab(path)}
         />
@@ -3259,6 +3322,8 @@ export function App() {
             <ExternalChangeNotice
               fileName={documentState.name}
               onReload={() => void reloadExternalChange()}
+              onOverwrite={overwriteExternalChange}
+              onSaveAs={() => void handleExportMarkdown()}
               onDismiss={() => setExternalChangePath(null)}
             />
           )}
@@ -3292,6 +3357,15 @@ export function App() {
                       {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")}{" "}
                       字 · {documentState.rendered.readingMinutes} 分钟阅读
                     </span>
+                    {documentState.externallyModified && (
+                      <button
+                        type="button"
+                        className="reader-external-change"
+                        onClick={() => setExternalChangePath(documentState.path)}
+                      >
+                        文件已被外部修改 · 处理
+                      </button>
+                    )}
                   </div>
                   {!startsWithHeading(documentState.rendered.html) && (
                     <header className="print-document-header" aria-hidden="true">
@@ -3363,6 +3437,15 @@ export function App() {
                 : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}
           </span>
         )}
+        {documentState?.externallyModified && (
+          <button
+            type="button"
+            className="statusbar-external-change"
+            onClick={() => setExternalChangePath(documentState.path)}
+          >
+            外部修改待处理
+          </button>
+        )}
         <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>
       </footer>
 
@@ -3423,6 +3506,9 @@ export function App() {
         />
       )}
       {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
+      {externalOverwriteConfirmationOpen && (
+        <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
+      )}
     </div>
   );
 }
