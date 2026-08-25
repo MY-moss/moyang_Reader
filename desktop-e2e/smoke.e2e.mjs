@@ -50,6 +50,21 @@ async function waitForExport(pathname, description) {
   );
 }
 
+async function workspaceEntryExists(selector, text = "") {
+  const entries = await browser.$$(selector);
+  for (const entry of entries) {
+    if (!text || (await entry.getText()).includes(text)) return true;
+  }
+  return false;
+}
+
+async function waitForWorkspaceEntry(selector, text, expected, description) {
+  await browser.waitUntil(() => workspaceEntryExists(selector, text).then((exists) => exists === expected), {
+    timeout: 15_000,
+    timeoutMsg: description,
+  });
+}
+
 describe("Moyang Reader desktop runtime", () => {
   it("opens an initial Markdown path, edits it, and writes it back to disk", async () => {
     await browser.execute(() => window.localStorage.clear());
@@ -137,6 +152,44 @@ describe("Moyang Reader desktop runtime", () => {
     );
 
     assert.match(await browser.$(".document-title").getText(), /desktop-e2e\.md/);
+  });
+
+  it("refreshes the file tree after external files and directories are added and removed", async () => {
+    const directoryName = "watch-added";
+    const fileName = "nested-note.md";
+    const directoryPath = path.join(path.dirname(documentPath), directoryName);
+    const addedFilePath = path.join(directoryPath, fileName);
+
+    fs.mkdirSync(directoryPath);
+    fs.writeFileSync(addedFilePath, "# Watch added\n\n来自外部新增。\n", "utf8");
+
+    await waitForWorkspaceEntry(
+      ".workspace-folder",
+      directoryName,
+      true,
+      "the workspace watcher did not add the external directory to the file tree",
+    );
+    await waitForWorkspaceEntry(
+      ".workspace-file",
+      fileName,
+      true,
+      "the workspace watcher did not add the external file to the file tree",
+    );
+
+    fs.rmSync(directoryPath, { recursive: true, force: true });
+
+    await waitForWorkspaceEntry(
+      ".workspace-folder",
+      directoryName,
+      false,
+      "the workspace watcher did not remove the deleted directory from the file tree",
+    );
+    await waitForWorkspaceEntry(
+      ".workspace-file",
+      fileName,
+      false,
+      "the workspace watcher did not remove the deleted file from the file tree",
+    );
   });
 
   it("shows a conflict notice without replacing unsaved local edits", async () => {
