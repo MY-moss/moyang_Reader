@@ -370,6 +370,38 @@ test("serializes equivalent markdown styles to canonical forms", async ({ page }
   await expect.poll(() => readEditorText(editor), { timeout: 10_000 }).toBe(expected);
 });
 
+test("downgrades a heading one level per Backspace at its start", async ({ page }) => {
+  // Issue #156 investigation: Milkdown's heading keymap binds Backspace/Delete at
+  // offset 0 of a heading to downgradeHeadingCommand. This is intentional and
+  // matches Obsidian/Typora ("delete one `#` level at line start"), not the
+  // intermittent corruption from #156 (which #159's debounce/teardown flush fixes
+  // already cover). Pin the exact downgrade semantics so a Milkdown upgrade that
+  // changes them fails here instead of surprising users.
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "heading-downgrade.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("## 二级标题\n\n正文段落。\n"),
+  });
+
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await expect(editable.locator("h2")).toBeVisible();
+
+  await editable.locator("h2").click({ position: { x: 4, y: 4 } });
+  await page.keyboard.press("Backspace");
+  await expect(editable.locator("h2")).toHaveCount(0);
+  await expect(editable.locator("h1")).toBeVisible();
+  await expect(editable.locator("h1")).toContainText("二级标题");
+
+  // A second Backspace at the H1 start turns it into a paragraph, again
+  // matching the "delete the `# ` prefix" semantics.
+  await page.keyboard.press("Backspace");
+  await expect(editable.locator("h1")).toHaveCount(0);
+  await expect(editable.locator("p").first()).toContainText("二级标题");
+});
+
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await page.goto("/");
 
