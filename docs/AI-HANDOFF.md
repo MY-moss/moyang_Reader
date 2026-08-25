@@ -61,15 +61,16 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 - 基线：`v0.8.1`；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例）、#159（`/` 块级命令菜单）、#160（序列化规范化固化与文档化，关闭 #157）。分支 `codex/heading-downgrade-156` 收尾 #156 调查。
 - 已完成（历史切片）：三栏布局、上下文面板、Milkdown 按需加载与挂载修复、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步、`[[` 双链补全（两模式）、`/` 块级命令菜单（两模式，含 Enter 响应修复）、序列化规范化逐字节断言 + 决策文档 0004。
-- 本切片新增（#156 收尾）：新增 e2e `downgrades a heading one level per Backspace at its start`，固化 Milkdown heading keymap 的降级语义（H2 起始 Backspace→H1，H1→段落，与 Obsidian/Typora 一致）。#156 调查结论：唯一确定性"标题变化"机制就是该 keymap（预期 UX，不改）；原始 `<br />` 损坏在 #159 修复两个竞态（debounce cancel + teardown flush）后无法复现（4 探针变体 × 多次 + 全量 e2e 干净），极可能已随之修复，issue 建议关闭。
+- 本切片新增（#158）：`e2e/smoke.spec.ts` 的 `readEditorText` 保留 CodeMirror 内部 view state 读取以绕过视口虚拟化，但路径失效时不再静默回退到可视区 DOM，而是抛出 `CodeMirror internal view state path changed — update readEditorText`。现有 round-trip e2e 继续验证完整文档读取；后续若升级 CodeMirror，必须先处理该显式失败，再评估通过公开实例引用替代内部路径。
+- #156 已关闭：新增 e2e `downgrades a heading one level per Backspace at its start` 固化 Milkdown heading keymap 的降级语义（H2 起始 Backspace→H1，H1→段落，与 Obsidian/Typora 一致）。调查结论是该 keymap 属于预期 UX；原始 `<br />` 损坏在 #159 的竞态修复后无法复现。
 - 历史关键根因（避免复发，详见 git 历史与本文件旧版）：
   1. CodeMirror 补全对中文标签做模糊匹配——补全源需返回 `filter: false` 由应用侧预过滤。
   2. Milkdown `markdownUpdated` 200ms debounce 销毁时被 cancel——cleanup 里需显式 `serializer(view.state.doc)` flush 差量。
   3. CodeMirror `acceptCompletion` 在菜单更新后 75ms 内拒绝 Enter——`autocompletion({ interactionDelay: 0 })`。
-- 仍需继续：#157 方案 2（序列化器偏好配置，如 `bullet: "-"`）、双链补全与 `/` 触发器的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、e2e 防御性回退（#158）、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
-- 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
+- 仍需继续：双链补全与 `/` 触发器的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
+- 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改，且 `readEditorText` 是 CodeMirror 依赖升级的显式哨兵；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
 - 相关测试：`e2e/smoke.spec.ts` 的 "downgrades a heading one level per Backspace at its start"（本切片新增）；"serializes equivalent markdown styles to canonical forms"（#160 引入）；单测 140 个、e2e 32 个全部通过。
 - 已运行：`npm test` 29 文件 140 测试通过；`npm run lint`、`npx prettier --check`、全量 `npx playwright test`（32 e2e）通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态（#156 是否已随评论关闭），然后推进 #88 桌面 E2E 或 #158 e2e 防御性回退；不要重复调查 #156 或重复实现序列化清单。
+- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态（#158 是否已随本 PR 验证并关闭），然后推进 #88 真实 Tauri 桌面 E2E；不要重复调查 #156、重复实现 #158 的回退保护或重复实现序列化清单。
