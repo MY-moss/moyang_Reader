@@ -8,7 +8,11 @@
           "identifier": "wdio",
           "description": "WebdriverIO-only permissions for real desktop smoke tests",
           "windows": ["main"],
-          "permissions": ["wdio:default", "wdio-webdriver:default"]
+          "permissions": [
+            "wdio:default",
+            "wdio-webdriver:default",
+            "core:event:allow-emit"
+          ]
         }
       ]
     }
