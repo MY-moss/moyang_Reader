@@ -62,9 +62,10 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 基线：`v0.8.1`；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例），分支 `codex/slash-menu-2026-08-25` 推进 v0.9.2 编辑器交互深化的 `/` 块级触发器切片。
 - 已完成（历史切片）：三栏布局、上下文面板、Milkdown 按需加载与挂载修复、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步、`[[` 双链补全（两模式）。
 - 本切片新增：`/` 块级命令菜单在两种编辑模式下落地。源码模式走 CodeMirror autocompletion（`slashCommandSource` 与 wiki 补全并列 override）；WYSIWYG 模式复用 caret 触发浮层，命令通过 `slashCommandAction` 映射到 Milkdown 块级命令（标题 1–3、无序/有序列表、引用、代码块、3×3 表格、分隔线）。纯逻辑收敛在 `src/app/slash-command-menu.ts`（命令表、块首触发匹配、拼音/英文关键字过滤排序、源码插入光标落点）。
-- **本切片两个关键根因（避免复发）**：
+- **本切片三个关键根因（避免复发）**：
   1. CodeMirror 补全对中文标签做模糊匹配——ASCII 查询（如 `ul`）会把“无序列表”等中文标签全部滤掉。修复：两个补全源都返回 `filter: false`，由我们自己的 `filterSlashCommands` 预过滤；斜杠源不设 `validFor` 以保证每个按键都重跑过滤。
   2. Milkdown `markdownUpdated` 是 200ms debounce，销毁时被 cancel——快速切换模式会丢掉最后 200ms 内的编辑。修复：`MarkdownWysiwygEditor` 的 effect cleanup 里直接用 `serializer(view.state.doc)` 序列化并 flush 未同步的差量（`lastSyncedMarkdownRef` 对账）。
+  3. CodeMirror `acceptCompletion` 在菜单更新后 75ms 内（`interactionDelay` 默认值）拒绝 Enter/方向键——打字快的用户输入 `/ul` 后立即 Enter 会偶发失灵，Enter 落到默认换行。修复：`autocompletion({ interactionDelay: 0 })`；我们的补全源只在显式 `[[` / `/` 前缀下出现，菜单弹出时的按键是有意的，无保护必要。e2e 侧把 `toHaveText(/无序列表/)` 收紧为精确匹配（未过滤的全菜单也含该子串，正则会误通过）。另注：Playwright 错误消息把 `\n\n`（空行）渲染为 `·`，排查时不要误以为文档里真有该字符。
 - 仍需继续：双链补全与 `/` 触发器的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、序列化风格偏好（#157）、e2e 防御性回退（#158）、#156 间歇性标题损坏观察、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
 - 关键入口：`src/app/slash-command-menu.ts` 是命令纯逻辑；`src/app/components/SourceEditor.tsx` 接 CodeMirror 补全（wiki + slash 两个 override 源）；`src/app/components/MarkdownWysiwygEditor.tsx` 用原生 capture 监听接管浮层键盘（wiki/slash 共用浮层与键位处理）；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
 - 相关测试：`src/app/slash-command-menu.test.ts`（命令过滤/触发匹配/光标落点单测）；`src/app/wiki-link-completion.test.ts`；`src/app/components/wysiwyg-editor-setup.test.ts`；`e2e/smoke.spec.ts` 的 "inserts a heading from the wysiwyg slash menu" 和 "inserts a list from the source mode slash menu"（含模式切换后源码对账）。

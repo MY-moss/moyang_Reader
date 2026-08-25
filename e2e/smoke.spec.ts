@@ -279,11 +279,15 @@ test("inserts a list from the source mode slash menu", async ({ page }) => {
   // Control+End lands on the empty trailing line where `/` triggers the menu.
   await editor.click();
   await page.keyboard.press("Control+End");
-  await page.keyboard.type("/ul");
+  // Type with delays: the slash source re-runs on every keystroke, so the
+  // menu rebuilds asynchronously and a burst-typed query races the Enter key.
+  await editor.pressSequentially("/ul", { delay: 80 });
 
   const tooltip = page.locator(".cm-tooltip-autocomplete");
   await expect(tooltip).toBeVisible();
-  await expect(tooltip.getByText("无序列表")).toBeVisible();
+  // Exact text: the unfiltered menu also contains "无序列表", so a regex match
+  // could pass before the query has been applied.
+  await expect(tooltip).toHaveText("无序列表- 列表项");
 
   await page.keyboard.press("Enter");
   await expect.poll(async () => readEditorText(editor)).toContain("- ");

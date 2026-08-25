@@ -167,6 +167,12 @@ export function SourceEditor({
                 override: [wikiCompletionSource, slashCommandSource],
                 activateOnTyping: true,
                 icons: false,
+                // CodeMirror refuses to accept Enter/arrow keys within 75ms of
+                // a menu update (guards against accidental picks while typing).
+                // Our sources only surface for explicit `[[` / `/` prefixes, so
+                // a menu press right after typing is intentional — keep it at 0
+                // or fast typists see Enter silently fall through to newline.
+                interactionDelay: 0,
               }),
               view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
               view.EditorView.domEventHandlers({
