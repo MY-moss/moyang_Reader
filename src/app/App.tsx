@@ -28,6 +28,7 @@ import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { UpdateNotice } from "./components/UpdateNotice";
+import { scheduleSourceRender } from "./source-render-scheduler";
 import {
   chooseDocumentPaths,
   chooseSavePath,
@@ -1928,7 +1929,7 @@ export function App() {
     if (mode !== "source" || !path || !kind || !isEditableDocument(kind)) return;
 
     const nextSource = sourceDraft;
-    const timer = window.setTimeout(() => {
+    const cancel = scheduleSourceRender(() => {
       void renderSource(path, nextSource, {
         allowRemoteResources: preferences.allowRemoteResources,
       })
@@ -1941,9 +1942,9 @@ export function App() {
             setError(cause instanceof Error ? cause.message : "文档渲染失败。");
           }
         });
-    }, 180);
+    });
 
-    return () => window.clearTimeout(timer);
+    return cancel;
   }, [documentState?.kind, documentState?.path, mode, preferences.allowRemoteResources, sourceDraft]);
 
   useEffect(() => {
@@ -1952,18 +1953,22 @@ export function App() {
 
     const requestId = ++sourceRenderRequestRef.current;
     const path = current.path;
-    void renderSource(path, sourceDraft, {
-      allowRemoteResources: preferences.allowRemoteResources,
-    })
-      .then((rendered) => {
-        if (requestId !== sourceRenderRequestRef.current) return;
-        setDocumentState((latest) => (latest?.path === path ? { ...latest, rendered } : latest));
+    const cancel = scheduleSourceRender(() => {
+      void renderSource(path, sourceDraft, {
+        allowRemoteResources: preferences.allowRemoteResources,
       })
-      .catch((cause) => {
-        if (requestId === sourceRenderRequestRef.current) {
-          setError(cause instanceof Error ? cause.message : "文档渲染失败。");
-        }
-      });
+        .then((rendered) => {
+          if (requestId !== sourceRenderRequestRef.current) return;
+          setDocumentState((latest) => (latest?.path === path ? { ...latest, rendered } : latest));
+        })
+        .catch((cause) => {
+          if (requestId === sourceRenderRequestRef.current) {
+            setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+          }
+        });
+    });
+
+    return cancel;
   }, [mode, preferences.allowRemoteResources, sourceDraft]);
 
   const updateSource = useCallback((nextSource: string) => {
