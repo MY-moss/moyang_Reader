@@ -78,7 +78,9 @@ jobs:
           npm run build
           npx playwright install chromium
           npm run test:e2e
-          npm audit --audit-level=high
+          # Test/build tooling is not included in the installer; audit shipped
+          # runtime dependencies here and track dev-tool advisories separately.
+          npm audit --omit=dev --audit-level=high
           npm run release:check -- --version=$env:RELEASE_TAG
           npm run test:release
           cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
