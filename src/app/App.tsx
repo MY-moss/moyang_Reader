@@ -77,6 +77,7 @@ import type {
 import { nextReaderModeAfterOpen } from "./reader-mode";
 import {
   BATCH_EXPORT_CHUNK_SIZE,
+  BATCH_EXPORT_MAX_ESTIMATED_BYTES,
   buildBatchDocxExport,
   buildBatchHtmlExport,
   buildDocxExport,
@@ -90,6 +91,7 @@ import {
   pathWithNameSuffix,
   printHtmlDocument,
   summarizeExportFailures,
+  shouldFlushBatchExport,
 } from "./export";
 import {
   loadRecentFiles,
@@ -2766,14 +2768,23 @@ export function App() {
         const exportableFileCount = workspaceActionFiles.filter(
           (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
         ).length;
-        const expectedVolumeCount = Math.max(1, Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE));
+        const estimatedExportBytes = workspaceActionFiles
+          .filter((file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text")
+          .reduce((total, file) => total + file.size, 0);
+        const expectedVolumeCount = Math.max(
+          1,
+          Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE),
+          Math.ceil(estimatedExportBytes / BATCH_EXPORT_MAX_ESTIMATED_BYTES),
+        );
         let documents: { title: string; body: string }[] = [];
+        let estimatedDocumentBytes = 0;
         const flushDocuments = async () => {
           if (documents.length === 0) return;
           if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
 
           const batch = documents;
           documents = [];
+          estimatedDocumentBytes = 0;
           const volumeNumber = writtenVolumes + 1;
           const volumeTitle = expectedVolumeCount > 1 ? `${exportTitle} · 第 ${volumeNumber} 卷` : exportTitle;
           if (format === "html") {
@@ -2831,8 +2842,9 @@ export function App() {
               fileSize,
             );
             documents.push({ title: file.relativePath, body });
+            estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;
             exported += 1;
-            if (documents.length >= BATCH_EXPORT_CHUNK_SIZE) await flushDocuments();
+            if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();
           } catch {
             recordSkippedFile(file.relativePath, "读取失败");
           }
