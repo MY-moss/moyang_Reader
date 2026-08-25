@@ -59,15 +59,17 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-- 基线：`v0.8.1`；已合并基础切片 PR #153 和外部修改同步 PR #154，分支 `codex/wiki-completion-2026-08-25` 推进 v0.9.1 编辑稳定化的双链补全切片。
-- 已完成：三栏布局职责、右侧上下文面板、左右面板记忆、Milkdown 按需加载、Markdown 安全回退、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步。
-- 本切片新增：源码模式（CodeMirror autocompletion）和 WYSIWYG 模式（caret 触发浮层）的 `[[` 双链补全，候选来自工作区 Markdown 文档并排除当前文档；Milkdown 支持语法 round-trip 样例 e2e（标题/行内样式/双链/嵌套与任务列表/引用/代码块/表格/图片/分隔线全部保真）。
-- **关键修复**：WYSIWYG 编辑器自 v0.9.0 起从未真正挂载——`@milkdown/preset-gfm` 7.22.x 的 `gfm` 导出不再内含 commonmark 基础预设，ProseMirror schema 缺 `doc` 顶层节点导致创建失败且 UI 静默空白。修复：`src/app/components/wysiwyg-editor-setup.ts` 显式注册 `[commonmark, gfm]`；新增挂载回归单测 `wysiwyg-editor-setup.test.ts`；smoke round-trip e2e 现在会等待 contenteditable 真正出现并在编辑后校验序列化结果；编辑面挂载失败时显示可见错误提示（`.wysiwyg-error`）。round-trip 探针结论：脚注、autolink、转义、有序列表完全保真；setext 标题规范化为 ATX、嵌套引用加空行、链接引用定义内联化——语义均无损。
-- **e2e 读取缺陷澄清（重要，避免误诊）**：round-trip e2e 曾稳定“复现”末段丢失，经插桩验证序列化链路（markdownUpdated → updateSource → SourceEditor 挂载值）始终包含末段——真凶是 CodeMirror 视口虚拟化：`.cm-line` 只渲染可视区，长文档尾部不在 DOM 中。`e2e/smoke.spec.ts` 的 `readEditorText` 现通过 `.cm-content` → `cmTile` → `root` → `view` → `state.doc` 读取完整文本（CM 6.43 内部路径，升级 CM 需复查，见 #158）。调试中曾一次性观察到标题被替换为 `<br />` 的间歇性损坏（约 1/8 概率，无法稳定复现），已记录为 #156 待观察；序列化本身经单测 + 插桩双重验证无损，已知样式规范化清单见 #157。
-- 仍需继续：双链补全的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、编辑器内 `/` 触发器、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
-- 关键入口：`src/app/wiki-link-completion.ts` 是补全纯逻辑（候选构建、触发匹配、过滤排序、键盘映射）；`src/app/components/SourceEditor.tsx` 接 CodeMirror 补全；`src/app/components/MarkdownWysiwygEditor.tsx` 用原生 capture 监听接管浮层键盘；`src/app/App.tsx` 的 `wikiLinkCandidates` memo 负责喂数据。
-- 相关测试：`src/app/wiki-link-completion.test.ts`（12 个单测）；`src/app/components/wysiwyg-editor-setup.test.ts`（编辑器挂载回归）；`e2e/smoke.spec.ts` 的 "keeps supported markdown syntax through the wysiwyg editor"（含真实编辑后序列化校验）。
-- 已运行：`npm test -- --run` 27 个文件 129 个测试通过；`npm run lint`、`npm run format:check`、`npx tsc -b --pretty false`、`npm run build`、`npx playwright test`（28 个 e2e）全部通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
+- 基线：`v0.8.1`；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例），分支 `codex/slash-menu-2026-08-25` 推进 v0.9.2 编辑器交互深化的 `/` 块级触发器切片。
+- 已完成（历史切片）：三栏布局、上下文面板、Milkdown 按需加载与挂载修复、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步、`[[` 双链补全（两模式）。
+- 本切片新增：`/` 块级命令菜单在两种编辑模式下落地。源码模式走 CodeMirror autocompletion（`slashCommandSource` 与 wiki 补全并列 override）；WYSIWYG 模式复用 caret 触发浮层，命令通过 `slashCommandAction` 映射到 Milkdown 块级命令（标题 1–3、无序/有序列表、引用、代码块、3×3 表格、分隔线）。纯逻辑收敛在 `src/app/slash-command-menu.ts`（命令表、块首触发匹配、拼音/英文关键字过滤排序、源码插入光标落点）。
+- **本切片三个关键根因（避免复发）**：
+  1. CodeMirror 补全对中文标签做模糊匹配——ASCII 查询（如 `ul`）会把“无序列表”等中文标签全部滤掉。修复：两个补全源都返回 `filter: false`，由我们自己的 `filterSlashCommands` 预过滤；斜杠源不设 `validFor` 以保证每个按键都重跑过滤。
+  2. Milkdown `markdownUpdated` 是 200ms debounce，销毁时被 cancel——快速切换模式会丢掉最后 200ms 内的编辑。修复：`MarkdownWysiwygEditor` 的 effect cleanup 里直接用 `serializer(view.state.doc)` 序列化并 flush 未同步的差量（`lastSyncedMarkdownRef` 对账）。
+  3. CodeMirror `acceptCompletion` 在菜单更新后 75ms 内（`interactionDelay` 默认值）拒绝 Enter/方向键——打字快的用户输入 `/ul` 后立即 Enter 会偶发失灵，Enter 落到默认换行。修复：`autocompletion({ interactionDelay: 0 })`；我们的补全源只在显式 `[[` / `/` 前缀下出现，菜单弹出时的按键是有意的，无保护必要。e2e 侧把 `toHaveText(/无序列表/)` 收紧为精确匹配（未过滤的全菜单也含该子串，正则会误通过）。另注：Playwright 错误消息把 `\n\n`（空行）渲染为 `·`，排查时不要误以为文档里真有该字符。
+- 仍需继续：双链补全与 `/` 触发器的桌面端手动验证（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、序列化风格偏好（#157）、e2e 防御性回退（#158）、#156 间歇性标题损坏观察、真实 Tauri 桌面 E2E（#88）、a11y 自动化扩展和 i18n 分批迁移；不能把这些未完成项误报为完成。
+- 关键入口：`src/app/slash-command-menu.ts` 是命令纯逻辑；`src/app/components/SourceEditor.tsx` 接 CodeMirror 补全（wiki + slash 两个 override 源）；`src/app/components/MarkdownWysiwygEditor.tsx` 用原生 capture 监听接管浮层键盘（wiki/slash 共用浮层与键位处理）；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
+- 相关测试：`src/app/slash-command-menu.test.ts`（命令过滤/触发匹配/光标落点单测）；`src/app/wiki-link-completion.test.ts`；`src/app/components/wysiwyg-editor-setup.test.ts`；`e2e/smoke.spec.ts` 的 "inserts a heading from the wysiwyg slash menu" 和 "inserts a list from the source mode slash menu"（含模式切换后源码对账）。
+- 已运行：`npm test` 29 个文件 140 个测试通过；`npm run lint`、`npm run format:check`、`npm run build`（含 `tsc -b`）、`npx playwright test`（30 个 e2e）全部通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
-- 回滚方式：回滚本功能分支即可；`@codemirror/autocomplete` 是既有传递依赖的显式声明，无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，然后在 Tauri 桌面运行 `npm run desktop` 手动验证 `[[` 补全（含同名文档、IME 输入、代码块内不触发），再推进 `/` 触发器或 #88 桌面 E2E；不要重复实现双链补全。
+- 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
+- 下一位 AI 的唯一下一步：先检查 Issues 与当前 PR 状态，然后在 Tauri 桌面运行 `npm run desktop` 手动验证 `[[` 补全和 `/` 触发器（含 IME 输入、代码块内不触发），再推进 #157 序列化风格偏好或 #88 桌面 E2E；不要重复实现 `/` 触发器。

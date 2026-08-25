@@ -223,6 +223,76 @@ test("keeps supported markdown syntax through the wysiwyg editor", async ({ page
   await expectEditorText(editor, corpus);
 });
 
+test("inserts a heading from the wysiwyg slash menu", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "slash-menu-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("第一段。\n\n第二段。\n"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+
+  // Move to the end of the document and start a fresh empty paragraph so the
+  // slash trigger is deterministic regardless of where the click lands.
+  await editable.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+
+  await page.keyboard.type("/");
+  const overlay = page.getByRole("listbox", { name: "块级命令候选" });
+  await expect(overlay).toBeVisible();
+  await expect(overlay.getByRole("option", { name: /标题 1/ })).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(overlay).toHaveCount(0);
+  await page.keyboard.press("Backspace");
+
+  await page.keyboard.type("/h1");
+  await expect(overlay.getByRole("option", { name: /标题 1/ })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(overlay).toHaveCount(0);
+
+  await page.keyboard.type("新标题");
+  await expect(page.locator(".wysiwyg-editor h1", { hasText: "新标题" })).toBeVisible();
+
+  await clickToolbarAction(page, "源文本");
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect
+    .poll(async () => (await readEditorText(editor)).trim())
+    .toContain("# 新标题");
+});
+
+test("inserts a list from the source mode slash menu", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "slash-source-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# 源码模式\n\n正文。\n"),
+  });
+
+  await clickToolbarAction(page, "源文本");
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect(editor).toBeVisible();
+
+  // Control+End lands on the empty trailing line where `/` triggers the menu.
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  // Type with delays: the slash source re-runs on every keystroke, so the
+  // menu rebuilds asynchronously and a burst-typed query races the Enter key.
+  await editor.pressSequentially("/ul", { delay: 80 });
+
+  const tooltip = page.locator(".cm-tooltip-autocomplete");
+  await expect(tooltip).toBeVisible();
+  // Exact text: the unfiltered menu also contains "无序列表", so a regex match
+  // could pass before the query has been applied.
+  await expect(tooltip).toHaveText("无序列表- 列表项");
+
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => readEditorText(editor)).toContain("- ");
+});
+
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await page.goto("/");
 
