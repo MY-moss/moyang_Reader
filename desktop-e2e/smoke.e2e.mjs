@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 
 const documentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
+const exportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
 assert.ok(documentPath, "desktop E2E fixture path should be configured");
+assert.ok(exportRoot, "desktop E2E export path should be configured");
+
+const workspaceName = path.basename(path.dirname(documentPath));
+const htmlExportPath = path.join(exportRoot, `${workspaceName}.html`);
+const docxExportPath = path.join(exportRoot, `${workspaceName}.docx`);
 
 async function clickToolbarAction(name) {
   const menu = await browser.$("details.toolbar-overflow");
@@ -10,6 +17,37 @@ async function clickToolbarAction(name) {
     await menu.$("summary.toolbar-overflow-trigger").click();
   }
   await browser.$(`button=${name}`).click();
+}
+
+async function clickWorkspaceExportAction(name) {
+  const menu = await browser.$("details.workspace-export-menu");
+  if ((await menu.getAttribute("open")) === null) {
+    await menu.$("summary").click();
+  }
+  const action = await menu.$(`button=${name}`);
+  await action.waitForDisplayed();
+  await browser.waitUntil(() => action.isEnabled(), {
+    timeout: 15_000,
+    timeoutMsg: `${name} export action remained disabled`,
+  });
+  await action.click();
+}
+
+async function waitForExport(pathname, description) {
+  await browser.waitUntil(
+    async () => {
+      if (fs.existsSync(pathname)) return true;
+      const alert = await browser.$('[role="alert"]');
+      if (await alert.isDisplayed()) {
+        throw new Error(`${description} failed: ${await alert.getText()}`);
+      }
+      return false;
+    },
+    {
+      timeout: 15_000,
+      timeoutMsg: `${description} did not create an output file`,
+    },
+  );
 }
 
 describe("Moyang Reader desktop runtime", () => {
@@ -65,6 +103,17 @@ describe("Moyang Reader desktop runtime", () => {
     });
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
+  });
+
+  it("exports the workspace to HTML and Word through the real Tauri write path", async () => {
+    await clickWorkspaceExportAction("单文件 HTML");
+    await waitForExport(htmlExportPath, "the real Tauri HTML export");
+    assert.match(fs.readFileSync(htmlExportPath, "utf8"), /Desktop E2E/);
+
+    await clickWorkspaceExportAction("单文件 Word");
+    await waitForExport(docxExportPath, "the real Tauri Word export");
+    const docxBytes = fs.readFileSync(docxExportPath);
+    assert.equal(docxBytes.subarray(0, 2).toString("ascii"), "PK");
   });
 
   it("reloads an unmodified document after an external workspace change", async () => {
