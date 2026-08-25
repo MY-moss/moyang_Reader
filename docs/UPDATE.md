@@ -81,6 +81,14 @@ git push origin v0.9.0
 - 新安装包能正常打开 Markdown、添加整个文件夹和读取图片附件。
 - 从旧版本点击“更新”能检测到新版本并完成重启。
 
+## v0.8.2 在线核验记录
+
+- GitHub Release：[v0.8.2](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.8.2)，Release workflow [32900250651](https://github.com/MY-moss/moyang_Reader/actions/runs/32900250651) 全部通过。
+- GitHub 与 Cloudflare 镜像的 `latest.json` 均 HTTP 200，版本均为 `0.8.2`，包含 Windows x64 NSIS 更新项。
+- GitHub 与镜像安装包均为 4,862,485 字节，SHA-256 均为 `4eed2a25b81c7cb148e80fdf242afc89f4162f4ac24a79787d16fb9f2c592a23`；`.sig` 均为 424 字节且 SHA-256 均为 `19d7d860f395d67e3861b729d252f4ccf4ad6c18f628804718d1ef08fb1fed24`。
+- 镜像工作流 [32902095328](https://github.com/MY-moss/moyang_Reader/actions/runs/32902095328) 通过；未配置 Cloudflare Secret 时会跳过静态资产上传，使用已部署的轻量代理并验证公开资产，不影响更新器回退到 GitHub。
+- 本次已确认本机存在 `v0.8.1` 安装实例，但未自动点击旧版本更新并重启；完整旧版本实机升级仍是下一次 Windows 回归项。
+
 ## 回滚
 
 不要把坏版本直接降回较低版本号。更新器默认只接受更高版本号。
