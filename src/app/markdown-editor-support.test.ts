@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkMarkdownEditorSafety } from "./markdown-editor-support";
+import { checkMarkdownEditorSafety, createEditorSourceSyncTracker } from "./markdown-editor-support";
 
 describe("Markdown WYSIWYG safety", () => {
   it("allows ordinary Markdown and wiki links", () => {
@@ -12,5 +12,20 @@ describe("Markdown WYSIWYG safety", () => {
     expect(checkMarkdownEditorSafety("$x^2$\n\n$$y$$").safe).toBe(false);
     expect(checkMarkdownEditorSafety("<mark>important</mark>").safe).toBe(false);
     expect(checkMarkdownEditorSafety("Paragraph ^block-id").safe).toBe(false);
+  });
+
+  it("does not reapply the source emitted by the local editor", () => {
+    const tracker = createEditorSourceSyncTracker("# Draft");
+
+    tracker.markEditorSource("# Draft\n\nLocal edit");
+
+    expect(tracker.shouldApplyExternalSource("# Draft\n\nLocal edit")).toBe(false);
+  });
+
+  it("applies an external source once and then treats it as the new baseline", () => {
+    const tracker = createEditorSourceSyncTracker("# Draft");
+
+    expect(tracker.shouldApplyExternalSource("# Changed externally")).toBe(true);
+    expect(tracker.shouldApplyExternalSource("# Changed externally")).toBe(false);
   });
 });

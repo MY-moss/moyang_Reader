@@ -3,6 +3,11 @@ export type MarkdownEditorSafety = {
   reason?: string;
 };
 
+export type EditorSourceSyncTracker = {
+  markEditorSource: (source: string) => void;
+  shouldApplyExternalSource: (source: string) => boolean;
+};
+
 const safetyChecks: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /^---\s*\r?\n[\s\S]*?\r?\n---\s*(?:\r?\n|$)/, reason: "包含 frontmatter，先使用源码模式保护属性。" },
   { pattern: /!\[\[/, reason: "包含文档或附件嵌入，暂时保留源码语法。" },
@@ -14,4 +19,19 @@ const safetyChecks: Array<{ pattern: RegExp; reason: string }> = [
 export function checkMarkdownEditorSafety(source: string): MarkdownEditorSafety {
   const match = safetyChecks.find(({ pattern }) => pattern.test(source));
   return match ? { safe: false, reason: match.reason } : { safe: true };
+}
+
+export function createEditorSourceSyncTracker(initialSource: string): EditorSourceSyncTracker {
+  let lastKnownSource = initialSource;
+
+  return {
+    markEditorSource(source) {
+      lastKnownSource = source;
+    },
+    shouldApplyExternalSource(source) {
+      if (source === lastKnownSource) return false;
+      lastKnownSource = source;
+      return true;
+    },
+  };
 }

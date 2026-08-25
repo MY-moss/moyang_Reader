@@ -2,7 +2,9 @@ import { useEffect, useRef } from "react";
 import { defaultValueCtx, Editor, rootCtx } from "@milkdown/kit/core";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import { gfm } from "@milkdown/kit/preset/gfm";
+import { replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
+import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 
 type MarkdownWysiwygEditorProps = {
   source: string;
@@ -15,12 +17,13 @@ type MarkdownWysiwygEditorProps = {
 function MilkdownSurface({ source, documentKey, ariaLabel, onChange, onInsertLink }: MarkdownWysiwygEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
+  const sourceSyncRef = useRef(createEditorSourceSyncTracker(source));
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const { loading } = useEditor(
+  const { loading, get } = useEditor(
     (root) =>
       Editor.make()
         .config((ctx) => {
@@ -30,10 +33,23 @@ function MilkdownSurface({ source, documentKey, ariaLabel, onChange, onInsertLin
         .use(gfm)
         .use(listener)
         .config((ctx) => {
-          ctx.get(listenerCtx).markdownUpdated((_context, markdown) => onChangeRef.current(markdown));
+          ctx.get(listenerCtx).markdownUpdated((_context, markdown) => {
+            sourceSyncRef.current.markEditorSource(markdown);
+            onChangeRef.current(markdown);
+          });
         }),
     [documentKey],
   );
+
+  useEffect(() => {
+    if (loading) return;
+    const editor = get();
+    if (!editor || !sourceSyncRef.current.shouldApplyExternalSource(source)) return;
+
+    // A flush rebuilds the ProseMirror state without emitting a local edit event,
+    // so an external watcher refresh cannot mark the document as dirty again.
+    editor.action(replaceAll(source, true));
+  }, [get, loading, source]);
 
   useEffect(() => {
     if (loading || !containerRef.current) return;

@@ -144,12 +144,8 @@ import {
 } from "../lib/document-adapters";
 import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
 import type { QuickOpenCandidate } from "./quick-open";
-import {
-  applyWorkspaceFileDelta,
-  applyWorkspaceIndexDelta,
-  isCurrentWorkspaceLoad,
-  isSelfWrittenChangePending,
-} from "./workspace-refresh";
+import { applyWorkspaceFileDelta, applyWorkspaceIndexDelta, isCurrentWorkspaceLoad } from "./workspace-refresh";
+import { resolveExternalChangeAction } from "./external-change";
 import { createWorkspaceOpenPlan } from "./workspace-open";
 import { normalizePathKey } from "./path-key";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
@@ -203,12 +199,6 @@ function pathBelongsToWorkspace(path: string, workspacePath: string): boolean {
   const candidate = comparablePath(path);
   const root = comparablePath(workspacePath);
   return candidate === root || candidate.startsWith(`${root}\\`);
-}
-
-function pathWasChanged(changedPath: string, currentPath: string): boolean {
-  const changed = comparablePath(changedPath);
-  const current = comparablePath(currentPath);
-  return changed === current || current.startsWith(`${changed}\\`) || changed.startsWith(`${current}\\`);
 }
 
 function resolveRelativePath(basePath: string, target: string): string | null {
@@ -1357,6 +1347,28 @@ export function App() {
     [openBinary, openSource],
   );
 
+  const reloadExternalChange = useCallback(async () => {
+    const current = documentStateRef.current;
+    if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;
+
+    if (current.modified) {
+      const draftResult = saveDraftSnapshot({
+        path: current.path,
+        draft: sourceDraftRef.current,
+        baseSource: current.source,
+        savedAt: Date.now(),
+      });
+      if (!handleDraftSaveResult(draftResult)) return;
+      if (!window.confirm("重新载入会覆盖当前未保存修改，已先保留一份草稿恢复副本。继续吗？")) return;
+    }
+
+    setExternalChangePath(null);
+    const opened = await openPath(current.path, true);
+    if (!opened && documentStateRef.current?.path === current.path) {
+      setExternalChangePath(current.path);
+    }
+  }, [externalChangePath, handleDraftSaveResult, openPath]);
+
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
     if (!workspaceRestorePendingRef.current) return;
@@ -1657,17 +1669,21 @@ export function App() {
       const current = documentStateRef.current;
       if (!current || current.path.startsWith("browser://")) return;
 
-      const changedCurrentFile = paths.some((path) => pathWasChanged(path, current.path));
-      if (!changedCurrentFile) return;
-
       const currentPath = comparablePath(current.path);
       const writtenUntil = selfWrittenPathsRef.current.get(currentPath);
-      if (writtenUntil) {
-        if (isSelfWrittenChangePending(writtenUntil, Date.now())) return;
+      const action = resolveExternalChangeAction({
+        changedPaths: paths,
+        currentPath: current.path,
+        modified: current.modified,
+        selfWrittenUntil: writtenUntil,
+        now: Date.now(),
+      });
+      if (action === "ignore") return;
+      if (writtenUntil !== undefined) {
         selfWrittenPathsRef.current.delete(currentPath);
       }
 
-      if (current.modified) {
+      if (action === "notify") {
         setExternalChangePath(current.path);
       } else {
         void openPath(current.path, true);
@@ -3251,10 +3267,7 @@ export function App() {
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
               fileName={documentState.name}
-              onReload={() => {
-                setExternalChangePath(null);
-                void openPath(documentState.path, true);
-              }}
+              onReload={() => void reloadExternalChange()}
               onDismiss={() => setExternalChangePath(null)}
             />
           )}
