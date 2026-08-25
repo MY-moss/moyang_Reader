@@ -6,6 +6,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   BATCH_EXPORT_CHUNK_SIZE,
+  BATCH_EXPORT_MAX_ESTIMATED_BYTES,
   calculateDocxImageExtent,
   copyRichText,
   formatExportCancellationNotice,
@@ -18,6 +19,7 @@ import {
   printHtmlDocument,
   readImageDimensions,
   summarizeExportFailures,
+  shouldFlushBatchExport,
 } from "./export";
 
 function pngBytes(width: number, height: number): Uint8Array {
@@ -215,6 +217,12 @@ describe("document export helpers", () => {
     expect(formatExportCancellationNotice(4)).toBe("已取消批量导出，已整理 4 篇文档，未写入文件。");
     expect(formatExportCancellationNotice(40, 1)).toBe("已取消批量导出，已写入 1 个文件，共整理 40 篇文档。");
     expect(BATCH_EXPORT_CHUNK_SIZE).toBe(32);
+  });
+
+  it("flushes large batches by count or estimated in-memory size", () => {
+    expect(shouldFlushBatchExport(BATCH_EXPORT_CHUNK_SIZE, 0)).toBe(true);
+    expect(shouldFlushBatchExport(1, BATCH_EXPORT_MAX_ESTIMATED_BYTES)).toBe(true);
+    expect(shouldFlushBatchExport(BATCH_EXPORT_CHUNK_SIZE - 1, BATCH_EXPORT_MAX_ESTIMATED_BYTES - 1)).toBe(false);
   });
 
   it("builds a single HTML document with a linked table of contents", () => {
