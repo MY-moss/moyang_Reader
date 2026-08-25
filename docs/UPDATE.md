@@ -42,14 +42,18 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-发布 Release 后，`.github/workflows/mirror-release.yml` 会从公开 Release 下载 `latest.json`、NSIS 安装包和 `.sig` 文件，重写 manifest 中的安装包 URL，再部署到 Pages。该流程不读取签名私钥。
+当前生产镜像默认使用 `scripts/mirror-worker.js` 提供轻量代理：它从 GitHub 最新 Release 读取 `latest.json`，把 Windows 安装包 URL 改写为镜像路径，再代理安装包和 `.sig` 下载，不在 Pages 中重复保存 4MB 以上的安装包。这样 GitHub Release 发布后镜像可以自动跟随最新版本，不需要每次重新上传大文件。
 
-要启用自动同步，需要在 GitHub 仓库的 Actions Secrets 中配置：
+`.github/workflows/mirror-release.yml` 发布后会验证镜像版本、签名字段和安装包可访问性。如果配置了 Cloudflare Secrets，工作流仍支持把完整静态资产上传到 Pages；未配置时会快速验证现有代理，不再因缺少凭据而把镜像任务标记为失败。
+
+镜像 Worker 源码位于 `scripts/mirror-worker.js`；如需重新部署代理，应使用 Cloudflare Pages Direct Upload 或 Wrangler 部署该文件。
+
+如果希望使用完整静态资产镜像，而不是轻量代理，需要在 GitHub 仓库的 Actions Secrets 中配置：
 
 - `CLOUDFLARE_API_TOKEN`：仅授予 Pages 项目部署权限的 API Token。
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
 
-这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。若镜像部署失败，GitHub Release 仍然保留，客户端也会继续使用第二个 GitHub 更新端点。
+这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。即使未配置或镜像部署失败，GitHub Release 仍然保留，客户端也会继续使用第二个 GitHub 更新端点。
 
 如果私钥丢失，旧版本将无法验证后续更新。若密钥已经泄露，应立即停止发布，生成新密钥，并在还没有公开用户之前更新配置；一旦已有用户安装旧公钥版本，换钥匙需要专门的密钥轮换机制，不能直接覆盖。
 
@@ -68,7 +72,7 @@ git push origin v0.5.3
 发布前必须检查：
 
 - package.json、src-tauri/Cargo.toml 和 src-tauri/tauri.conf.json 的版本一致。
-- GitHub Secrets 已配置。
+- 若使用完整静态镜像，GitHub Secrets 已配置；使用轻量代理时确认 `latest.json` 在线版本正确。
 - Release 不是 Draft，且 latest.json 已上传。
 - Release 中存在 NSIS 安装包、对应的 `.exe.sig` 签名文件，以及 tauri-action 上传的 `latest.json`。
 - 新安装包能正常打开 Markdown、添加整个文件夹和读取图片附件。

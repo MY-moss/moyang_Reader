@@ -41,7 +41,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Cloudflare credentials
+        shell: pwsh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) {
+            Write-Warning "未配置 Cloudflare Secrets，将验证现有轻量镜像代理，不执行重复资产上传。"
+            "CLOUDFLARE_DEPLOY_ENABLED=false" >> $env:GITHUB_ENV
+          } else {
+            "CLOUDFLARE_DEPLOY_ENABLED=true" >> $env:GITHUB_ENV
+          }
+
       - name: Download public release assets
+        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,25 +84,35 @@ jobs:
           "ASSET_DIR=$assetDir" >> $env:GITHUB_ENV
 
       - name: Prepare mirror files
+        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         shell: pwsh
         run: |
           $outputDir = Join-Path $env:RUNNER_TEMP "moyang-reader-mirror"
           node scripts/prepare-mirror.mjs --manifest="$env:ASSET_DIR/latest.json" --asset-dir="$env:ASSET_DIR" --output="$outputDir" --base-url="$env:MIRROR_BASE_URL" --version="$env:RELEASE_TAG"
           "MIRROR_DIR=$outputDir" >> $env:GITHUB_ENV
 
-      - name: Verify Cloudflare credentials
-        shell: pwsh
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) {
-            throw "请配置 CLOUDFLARE_API_TOKEN 和 CLOUDFLARE_ACCOUNT_ID 后再启用镜像自动同步。"
-          }
-
       - name: Deploy Cloudflare Pages mirror
+        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy "${{ runner.temp }}/moyang-reader-mirror" --project-name=${{ env.MIRROR_PROJECT }}
+
+      - name: Verify published updater mirror
+        shell: pwsh
+        run: |
+          $manifest = Invoke-RestMethod -Uri "$env:MIRROR_BASE_URL/latest.json"
+          $expectedVersion = $env:RELEASE_TAG.TrimStart("v")
+          if ([string]$manifest.version -ne $expectedVersion) {
+            throw "镜像版本 $($manifest.version) 与发布版本 $expectedVersion 不一致。"
+          }
+          $platform = $manifest.platforms.'windows-x86_64'
+          if ($null -eq $platform -or [string]::IsNullOrWhiteSpace($platform.signature)) {
+            throw "镜像 latest.json 缺少 Windows 更新签名。"
+          }
+          $response = Invoke-WebRequest -Method Head -Uri $platform.url
+          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+            throw "镜像安装包不可访问：HTTP $($response.StatusCode)"
+          }
+          Write-Host "Updater mirror verified for v$expectedVersion"
