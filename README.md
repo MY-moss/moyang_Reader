@@ -103,7 +103,7 @@ npm run desktop
 
 更新链路、版本规则、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”；当前已支持应用内分页版式预览，后续继续补充更完整的 PDF 模板和附件处理。
 
-顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
+顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；远程图片设置立即应用，启动更新检查设置从下一次启动生效，手动更新按钮不受影响。更新下载中可以隐藏提示，并从顶部“下载中…”入口恢复进度查看。
 
 贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
 

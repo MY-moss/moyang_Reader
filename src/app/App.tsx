@@ -417,6 +417,7 @@ export function App() {
   const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
   const updateRef = useRef<Update | null>(null);
   const updateCheckInFlightRef = useRef(false);
+  const initialStartupUpdateCheckRef = useRef(preferences.startupUpdateCheck);
   const workspaceExportAbortRef = useRef<AbortController | null>(null);
   const pdfBatchExportRef = useRef<PdfBatchExportState | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
@@ -956,7 +957,7 @@ export function App() {
       })
       .catch(() => undefined);
 
-    const timer = preferences.startupUpdateCheck
+    const timer = initialStartupUpdateCheckRef.current
       ? window.setTimeout(() => {
           if (active) void checkForUpdates(false);
         }, 1_200)
@@ -966,7 +967,7 @@ export function App() {
       active = false;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [checkForUpdates, preferences.startupUpdateCheck]);
+  }, [checkForUpdates]);
 
   const refreshWorkspaceChanges = useCallback(async (root: string, paths: string[]) => {
     if (!isTauriRuntime() || paths.length === 0) return;
@@ -3140,7 +3141,10 @@ export function App() {
         onToggleSearch={() => setSearchOpen((current) => !current)}
         updateStatus={updateStatus}
         updateVersion={availableUpdate?.version ?? null}
-        onCheckUpdates={() => void checkForUpdates(true)}
+        onCheckUpdates={() => {
+          if (updateStatus === "downloading") setUpdateNoticeVisible(true);
+          else void checkForUpdates(true);
+        }}
         onSearchQueryChange={(query) => {
           setSearchQuery(query);
           setSearchResultIndex(0);
@@ -3169,6 +3173,7 @@ export function App() {
             error={updateError}
             onInstall={() => void installUpdate()}
             onRelaunch={() => void relaunchUpdatedApp()}
+            onHide={() => setUpdateNoticeVisible(false)}
             onDismiss={dismissUpdateNotice}
           />
         )}

@@ -69,10 +69,11 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
   3. CodeMirror `acceptCompletion` 在菜单更新后 75ms 内拒绝 Enter——`autocompletion({ interactionDelay: 0 })`。
 - 本切片（#88）新增真实 Tauri Windows desktop smoke：启动参数打开工作区和 Markdown、默认 WYSIWYG、切换源码、CodeMirror 编辑、Rust 保存写回、外部追加修改后的无冲突自动刷新、本地未保存编辑下的冲突提示、HTML/Word 工作区导出真实写盘、外部新增/删除文件和目录后的文件树刷新，以及应用内未保存退出确认的真实取消路径均已通过；退出确认组件单测覆盖 Escape、焦点归还和显式确认回调。确认后会销毁主窗口，WebDriver 会话随之断开，因此烟测不再在销毁窗口后继续发命令。导出保存位置在桌面测试中使用确定的临时目录，正式构建仍使用系统保存对话框；二进制写入优先走原始 IPC，旧 WebView 无法传递原始字节时回退到已有授权写入命令。PDF 目前仍是打印预览链路，未完成真实桌面文件落盘验证。前端路径键补齐 Windows `\\?\\`/UNC 扩展路径归一化，测试夹具主进程/worker 路径已统一，普通构建不加载测试 capability。仍需继续：更新、双链补全与 `/` 触发器的桌面端回归（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、a11y 自动化扩展和 i18n 分批迁移；不能把 #88 误报为完成。
 - 本切片（UX 简化）继续保持低价值“打开列表”入口的移除，并进一步移除文件树任意前 80 项的“显示全部 / 收起列表”门槛：完整筛选树负责浏览，`Ctrl+P` 负责快速定位，系统多选负责一次打开多个文档，批量导出保持不变；#169 继续负责超大工作区虚拟化与规模保护。
+- 本切片（#192）更新提示允许在下载进行中隐藏，下载继续运行，顶部“下载中…”入口可恢复进度；“启动时检查更新”改为只读取初始启动快照，运行期间切换设置不会立即触发检查。由于 Tauri updater 当前没有可靠取消信号，不提供伪造的取消下载按钮。
 - 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改，且 `readEditorText` 是 CodeMirror 依赖升级的显式哨兵；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
 - 相关测试：`e2e/smoke.spec.ts` 的 heading 降级与 round-trip 场景；`src/app/components/CloseConfirmationDialog.test.tsx` 覆盖 Escape、焦点归还和确认回调；`src/app/components/WorkspaceTree.test.tsx` 防止工作区文件树重新引入任意 80 项截断；`desktop-e2e/smoke.e2e.mjs` 的真实桌面启动/编辑/保存/HTML+Word 导出/外部新增删除/外部刷新/冲突提示/关闭确认取消。批量导出仍存在；合并前以实际门禁输出为准，不要沿用旧的 139/32/3/4/5 场景计数。
-- 已运行：新增组件单测 3/3、普通构建通过、Tauri Debug desktop smoke 6/6 通过；完整前端单测、Rust 单测、lint、格式检查、全量浏览器 e2e 和发布检查仍需在本切片合并前重新记录。构建仍可能有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO embedded provider 的 `tauri-driver`/mock store 诊断噪声不影响测试结果，但若它们变成失败必须单独定位。
+- 已运行：更新提示组件单测 5/5、lint 和目标文件格式检查通过；完整前端单测、Rust 单测、格式检查、全量浏览器 e2e、桌面 e2e 和发布检查仍需在本切片合并前重新记录。构建仍可能有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO embedded provider 的 `tauri-driver`/mock store 诊断噪声不影响测试结果，但若它们变成失败必须单独定位。
 - 本切片新增版本与发布政策文档：用户功能 minor 版本必须有公开 Release 和安装包，重要 Bug/更新/安全修复可直接发布 patch；纯文档、测试、CI 和内部重构可以不发布。本次仅同步流程文档，不改应用版本、不创建空 Release。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先检查 Issues、PR 和 `origin/main`，确认本切片已合并后继续 #88 的更新器或 PDF 文件落盘桌面场景，并优先选择一个可独立验收的切片；不要重复实现当前的启动/编辑/保存/无冲突外部刷新/外部新增删除/HTML+Word 导出/关闭确认 smoke，也不要把 #169（工作区规模上限）或 #174（React 错误边界）混入本切片。
+- 下一位 AI 的唯一下一步：先检查 Issues、PR 和 `origin/main`，确认本切片已合并后继续 #88 的 PDF 文件落盘桌面场景，或补齐更新、双链补全与 `/` 触发器的真实桌面回归，并优先选择一个可独立验收的切片；不要重复实现当前的启动/编辑/保存/无冲突外部刷新/外部新增删除/HTML+Word 导出/关闭确认 smoke，也不要把 #169（工作区规模上限）或 #174（React 错误边界）混入本切片。

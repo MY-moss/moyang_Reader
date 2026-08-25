@@ -8,6 +8,7 @@ type UpdateNoticeProps = {
   error: string | null;
   onInstall: () => void;
   onRelaunch: () => void;
+  onHide: () => void;
   onDismiss: () => void;
 };
 
@@ -27,6 +28,7 @@ export function UpdateNotice({
   error,
   onInstall,
   onRelaunch,
+  onHide,
   onDismiss,
 }: UpdateNoticeProps) {
   const isError = status === "error";
@@ -60,6 +62,11 @@ export function UpdateNotice({
         {status === "ready" && (
           <button type="button" className="toolbar-button primary" onClick={onRelaunch}>
             重启应用
+          </button>
+        )}
+        {status === "downloading" && (
+          <button type="button" className="quiet-button" data-testid="update-hide" onClick={onHide}>
+            隐藏
           </button>
         )}
         {status !== "downloading" && (
