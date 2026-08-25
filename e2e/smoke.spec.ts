@@ -5,9 +5,8 @@ async function readEditorText(editor: Locator): Promise<string> {
     // CodeMirror renders only the visible viewport, so reading .cm-line DOM
     // truncates long documents. Pull the authoritative text from the internal
     // view state instead: .cm-content -> cmTile -> root -> view -> state.doc.
-    const content = (
-      node.classList.contains("cm-content") ? node : node.querySelector(".cm-content")
-    ) as (HTMLElement & { cmTile?: { root?: { view?: { state?: { doc?: { toString(): string } } } } } }) | null;
+    const content = (node.classList.contains("cm-content") ? node : node.querySelector(".cm-content")) as
+      (HTMLElement & { cmTile?: { root?: { view?: { state?: { doc?: { toString(): string } } } } } }) | null;
     const docText = content?.cmTile?.root?.view?.state?.doc?.toString();
     if (typeof docText === "string") return docText;
     return node instanceof HTMLTextAreaElement ? node.value : (node.textContent ?? "");
@@ -259,9 +258,7 @@ test("inserts a heading from the wysiwyg slash menu", async ({ page }) => {
 
   await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
-  await expect
-    .poll(async () => (await readEditorText(editor)).trim())
-    .toContain("# 新标题");
+  await expect.poll(async () => (await readEditorText(editor)).trim()).toContain("# 新标题");
 });
 
 test("inserts a list from the source mode slash menu", async ({ page }) => {
@@ -291,6 +288,86 @@ test("inserts a list from the source mode slash menu", async ({ page }) => {
 
   await page.keyboard.press("Enter");
   await expect.poll(async () => readEditorText(editor)).toContain("- ");
+});
+
+test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
+  // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
+  // one canonical form. This test pins the exact output so a Milkdown/remark
+  // upgrade that changes the canonicalization fails loudly here instead of
+  // surfacing as mysterious diff noise in user files. Update
+  // docs/decisions/0004-serialization-normalization.md together with this
+  // expectation.
+  const corpus = [
+    "标题一",
+    "=====",
+    "",
+    "Setext 二级",
+    "-----------",
+    "",
+    "- 一级列表",
+    "  - 嵌套列表",
+    "",
+    "---",
+    "",
+    "|窄|表|",
+    "|---|---|",
+    "|A|B|",
+    "",
+    "普通 [[双链]] 与 [[别名|目标]]。",
+    "",
+    "> 引用一",
+    ">> 嵌套引用",
+    "",
+    "见 [引用文字][ref]。",
+    "",
+    "[ref]: https://example.com",
+  ].join("\n");
+
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "serialization-normalization.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(corpus),
+  });
+
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+
+  // Net-zero edit so the editor serializes the document itself.
+  await editable.click();
+  await page.keyboard.type(" ");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(300);
+
+  await clickToolbarAction(page, "源文本");
+
+  const expected = [
+    "# 标题一",
+    "",
+    "## Setext 二级",
+    "",
+    "* 一级列表",
+    "  * 嵌套列表",
+    "",
+    "***",
+    "",
+    "| 窄 | 表 |",
+    "| - | - |",
+    "| A | B |",
+    "",
+    "普通 \\[\\[双链]] 与 \\[\\[别名|目标]]。",
+    "",
+    "> 引用一",
+    ">",
+    "> > 嵌套引用",
+    "",
+    "见 [引用文字](https://example.com)。",
+    "",
+  ].join("\n");
+
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect.poll(() => readEditorText(editor), { timeout: 10_000 }).toBe(expected);
 });
 
 test("opens multiple browser-selected documents as tabs", async ({ page }) => {
