@@ -1,6 +1,9 @@
 mod commands;
 
-use tauri::{Emitter, Manager, Url, WindowEvent};
+use tauri::{Emitter, Url, WindowEvent};
+
+#[cfg(not(feature = "wdio"))]
+use tauri::Manager;
 
 const DEV_SERVER_PORT: u16 = 1420;
 
@@ -26,23 +29,27 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .manage(commands::AccessRegistry::default())
         .manage(commands::WorkspaceWatcher::default())
-        .manage(commands::WorkspaceSearchCache::default())
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            let paths = commands::collect_open_paths(argv.into_iter().skip(1));
+        .manage(commands::WorkspaceSearchCache::default());
 
-            if !paths.is_empty() {
-                let access = app.state::<commands::AccessRegistry>();
-                for path in &paths {
-                    let _ = commands::register_open_path(access.inner(), path);
-                }
-                let _ = app.emit("open-paths", paths);
-            }
+    #[cfg(not(feature = "wdio"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        let paths = commands::collect_open_paths(argv.into_iter().skip(1));
 
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
+        if !paths.is_empty() {
+            let access = app.state::<commands::AccessRegistry>();
+            for path in &paths {
+                let _ = commands::register_open_path(access.inner(), path);
             }
-        }))
+            let _ = app.emit("open-paths", paths);
+        }
+
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(
@@ -61,6 +68,11 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
+
+    #[cfg(feature = "wdio")]
+    let builder = builder
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
 
     builder
         .on_window_event(|window, event| {

@@ -24,6 +24,11 @@ Tauri/Rust
   ├─ commands.rs：路径、文本解码、目录扫描、索引和安全边界
   ├─ lib.rs：应用生命周期、单实例处理、外部导航兜底
   └─ capabilities/：插件权限和文件监听权限
+
+桌面验证
+  ├─ desktop-e2e/wdio.conf.mjs：真实 Tauri Debug 应用与临时文档夹具
+  ├─ desktop-e2e/smoke.e2e.mjs：启动、编辑、保存写回冒烟路径
+  └─ scripts/test-desktop-e2e.mjs：仅测试构建的跨平台启动入口
 ```
 
 ## 关键决策
@@ -46,6 +51,7 @@ Tauri/Rust
 - 外部链接采用双层防护：前端点击处理将允许的 `http(s)`、`mailto`、`tel` 链接交给系统打开，Rust/Tauri 的 `on_navigation` 钩子只放行应用来源、开发服务器和本地 asset 协议，阻止主窗口意外导航到外部网页。
 - v0.9 编辑边界：Markdown 编辑时 Milkdown 只负责交互和 Markdown 序列化，`renderSource` 仍负责阅读、搜索和导出；`ContextPanel` 只接收当前文档快照和索引结果，不直接拥有文件树或保存状态。
 - 外部修改同步由工作区 watcher 和编辑器源同步跟踪器共同完成：未保存文档只通知不替换，确认重载前先写入本地草稿；无冲突刷新使用 Milkdown 的状态重建，不回传为本地编辑事件，避免误报脏状态。
+- 真实 Tauri 桌面 E2E 使用 WebdriverIO 的内嵌 WebDriver：`wdio` Cargo feature、测试专用配置和 `VITE_MOYANG_DESKTOP_E2E` 只在桌面 smoke 构建启用；普通构建只使用 `default` capability，不携带测试权限或全局 Tauri API。临时文档路径由 WDIO 配置在主进程与 worker 间复用，避免应用夹具和测试夹具漂移。
 
 更详细的发布决策见 [`docs/UPDATE.md`](docs/UPDATE.md)；后续重大架构变化应新增 ADR，而不是覆盖历史说明。
 

@@ -59,6 +59,9 @@ jobs:
       - name: Browser smoke test
         run: npm run test:e2e
 
+      - name: Desktop smoke test
+        run: npm run test:e2e:desktop
+
       - name: Dependency audit
         run: npm audit --audit-level=high
 
