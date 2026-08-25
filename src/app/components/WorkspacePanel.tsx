@@ -22,7 +22,7 @@ type WorkspacePanelProps = {
   workspacePath: string | null;
   files: WorkspaceFile[];
   visibleFiles: WorkspaceFile[];
-  openableFiles: WorkspaceFile[];
+  visibleResultCount: number;
   exportableFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
   recentWorkspaces: RecentWorkspace[];
@@ -37,7 +37,6 @@ type WorkspacePanelProps = {
   onChooseWorkspace: () => void;
   onOpenWorkspace: (path: string) => void;
   onRemoveWorkspace: (path: string) => void;
-  onOpenVisibleFiles: () => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
   onCancelWorkspaceExport: () => void;
   workspaceExporting: boolean;
@@ -46,8 +45,6 @@ type WorkspacePanelProps = {
   onCopyExportFailures: () => void;
   onSaveExportFailures: () => void;
   workspaceExportNotice: string | null;
-  workspaceOpening: boolean;
-  workspaceOpenNotice: string | null;
   workspaceIndexLoading: boolean;
   onOpenFile: (path: string) => void;
   onSearchQueryChange: (query: string) => void;
@@ -64,7 +61,7 @@ export function WorkspacePanel({
   workspacePath,
   files,
   visibleFiles,
-  openableFiles,
+  visibleResultCount,
   exportableFiles,
   recentFiles,
   recentWorkspaces,
@@ -79,7 +76,6 @@ export function WorkspacePanel({
   onChooseWorkspace,
   onOpenWorkspace,
   onRemoveWorkspace,
-  onOpenVisibleFiles,
   onExportWorkspace,
   onCancelWorkspaceExport,
   workspaceExporting,
@@ -88,8 +84,6 @@ export function WorkspacePanel({
   onCopyExportFailures,
   onSaveExportFailures,
   workspaceExportNotice,
-  workspaceOpening,
-  workspaceOpenNotice,
   workspaceIndexLoading,
   onOpenFile,
   onSearchQueryChange,
@@ -109,15 +103,6 @@ export function WorkspacePanel({
           <h2 id="workspace-title">阅读库</h2>
         </div>
         <div className="workspace-actions">
-          <button
-            type="button"
-            className="quiet-button"
-            disabled={!workspacePath || workspaceOpening || openableFiles.length === 0}
-            onClick={onOpenVisibleFiles}
-            title={searchQuery.trim() ? "打开当前搜索结果" : "打开当前筛选的文档"}
-          >
-            {workspaceOpening ? "打开中…" : searchQuery.trim() ? "打开结果" : "打开列表"}
-          </button>
           <details className="export-menu workspace-export-menu">
             <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
             <div className="export-menu-panel">
@@ -261,11 +246,6 @@ export function WorkspacePanel({
           </ul>
         </details>
       )}
-      {workspaceOpenNotice && (
-        <div className="workspace-export-note" role="status">
-          {workspaceOpenNotice}
-        </div>
-      )}
       {workspaceIndexLoading && (
         <div className="workspace-index-note" role="status">
           目录已打开，正在整理链接与标签…
@@ -279,7 +259,7 @@ export function WorkspacePanel({
               {searchQuery.trim()
                 ? searchLoading
                   ? "正在整理搜索结果…"
-                  : `当前结果 ${openableFiles.length} 项`
+                  : `当前结果 ${visibleResultCount} 项`
                 : `显示 ${visibleFiles.length} / ${files.length} 项`}
             </span>
             {hasFilters && (

@@ -68,9 +68,10 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
   2. Milkdown `markdownUpdated` 200ms debounce 销毁时被 cancel——cleanup 里需显式 `serializer(view.state.doc)` flush 差量。
   3. CodeMirror `acceptCompletion` 在菜单更新后 75ms 内拒绝 Enter——`autocompletion({ interactionDelay: 0 })`。
 - 本切片（#88）新增真实 Tauri Windows desktop smoke：启动参数打开工作区和 Markdown、默认 WYSIWYG、切换源码、CodeMirror 编辑、Rust 保存写回、外部追加修改后的无冲突自动刷新，以及本地未保存编辑下的冲突提示均已通过；前端路径键补齐 Windows `\\?\\`/UNC 扩展路径归一化，测试夹具主进程/worker 路径已统一，普通构建不加载测试 capability。仍需继续：新增/删除目录、导出写盘、更新、关闭确认，以及双链补全与 `/` 触发器的桌面端回归（浏览器 e2e 无法挂载工作区，见 `src/app/bridge.ts` 的 `chooseWorkspacePath`）、a11y 自动化扩展和 i18n 分批迁移；不能把 #88 误报为完成。
+- 本切片（UX 简化）移除低价值的“打开列表”入口及其批量开标签页状态/计划模块：它没有逐项选择，会把最多 40 个筛选结果直接塞进标签页；单击文件、`Ctrl+P` 快速打开和系统多选打开已覆盖真实需求，批量导出保持不变。
 - 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改，且 `readEditorText` 是 CodeMirror 依赖升级的显式哨兵；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
-- 相关测试：`e2e/smoke.spec.ts` 的 "downgrades a heading one level per Backspace at its start"；"serializes equivalent markdown styles to canonical forms"（#160 引入）；`desktop-e2e/smoke.e2e.mjs` 的真实桌面启动/编辑/保存/外部刷新/冲突提示；单测 141 个、浏览器 e2e 32 个、桌面 smoke 3 个全部通过。
-- 已运行：`npm test` 29 文件 141 测试通过；`npm run lint`、`npm run format:check`、普通 `npm run build`、普通 Tauri Debug 构建、`npm run test:e2e:desktop`（桌面 3 场景）、全量 `npx playwright test`（32 e2e）通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO 1.3 的 embedded provider 仍会输出外部 `tauri-driver` 诊断噪声，但不影响测试结果。
+- 相关测试：`e2e/smoke.spec.ts` 的 "downgrades a heading one level per Backspace at its start"；"serializes equivalent markdown styles to canonical forms"（#160 引入）；`desktop-e2e/smoke.e2e.mjs` 的真实桌面启动/编辑/保存/外部刷新/冲突提示，以及“打开列表”已移除、批量导出仍存在的回归断言；单测 139 个、浏览器 e2e 32 个、桌面 smoke 3 个全部通过。
+- 已运行：`npm test` 28 文件 139 测试通过；`npm run lint`、`npm run format:check`、普通 `npm run build`、普通 Tauri Debug 构建、`npm run test:e2e:desktop`（桌面 3 场景）、全量 `npx playwright test`（32 e2e）通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO 1.3 的 embedded provider 仍会输出外部 `tauri-driver` 诊断噪声，但不影响测试结果。
 - 本切片新增版本与发布政策文档：用户功能 minor 版本必须有公开 Release 和安装包，重要 Bug/更新/安全修复可直接发布 patch；纯文档、测试、CI 和内部重构可以不发布。本次仅同步流程文档，不改应用版本、不创建空 Release。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
