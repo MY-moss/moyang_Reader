@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent } from "react";
 import type { Completion, CompletionSource } from "@codemirror/autocomplete";
+import { filterSlashCommands, matchSlashTrigger, slashCaretOffset, slashCommands } from "../slash-command-menu";
 import {
   filterWikiLinkCandidates,
   formatWikiLinkInsert,
@@ -121,7 +122,37 @@ export function SourceEditor({
                 });
               },
             })),
-            validFor: /^[^\][|\n]*$/,
+            // Candidates are pre-filtered above; CodeMirror's own fuzzy label
+            // matching would drop Chinese labels for ASCII queries.
+            filter: false,
+          };
+        };
+
+        const slashCommandSource: CompletionSource = (context) => {
+          const line = context.state.doc.lineAt(context.pos);
+          const trigger = matchSlashTrigger(line.text.slice(0, context.pos - line.from));
+          if (!trigger) return null;
+
+          const items = filterSlashCommands(slashCommands, trigger.query);
+          if (!items.length) return null;
+
+          return {
+            // `from` points at the query start; the leading `/` sits one char before it.
+            from: context.pos - trigger.query.length,
+            options: items.map((item) => ({
+              label: item.label,
+              detail: item.detail,
+              type: "text",
+              apply: (editorView: EditorViewInstance, _completion: Completion, from: number, to: number) => {
+                editorView.dispatch({
+                  changes: { from: from - 1, to, insert: item.sourceInsert },
+                  selection: { anchor: from - 1 + slashCaretOffset(item) },
+                });
+              },
+            })),
+            // Re-run the source on every keystroke (no `validFor`) so our own
+            // query filtering applies, and never fuzzy-match Chinese labels.
+            filter: false,
           };
         };
 
@@ -133,7 +164,7 @@ export function SourceEditor({
               markdownLanguage.markdown(),
               view.keymap.of(search.searchKeymap),
               autocomplete.autocompletion({
-                override: [wikiCompletionSource],
+                override: [wikiCompletionSource, slashCommandSource],
                 activateOnTyping: true,
                 icons: false,
               }),

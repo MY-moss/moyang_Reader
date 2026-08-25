@@ -3522,7 +3522,7 @@ a:focus-visible {
   .wysiwyg-editor .milkdown {
     min-height: 480px;
   }
-  .wiki-completion {
+  .completion-overlay {
     position: absolute;
     z-index: 30;
     display: grid;
@@ -3535,7 +3535,7 @@ a:focus-visible {
     background: var(--surface-strong);
     box-shadow: var(--shadow-soft);
   }
-  .wiki-completion button {
+  .completion-overlay button {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -3547,19 +3547,19 @@ a:focus-visible {
     padding: 7px 9px;
     text-align: left;
   }
-  .wiki-completion button:hover,
-  .wiki-completion button.is-active {
+  .completion-overlay button:hover,
+  .completion-overlay button.is-active {
     border-color: color-mix(in srgb, var(--accent) 54%, var(--line));
     background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
   }
-  .wiki-completion-label {
+  .completion-overlay-label {
     overflow: hidden;
     font-size: 13px;
     font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .wiki-completion-detail {
+  .completion-overlay-detail {
     overflow: hidden;
     color: var(--muted);
     flex-shrink: 0;
