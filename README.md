@@ -101,7 +101,7 @@ npm run desktop
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
 
-更新链路、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”；当前已支持应用内分页版式预览，后续继续补充更完整的 PDF 模板和附件处理。
+更新链路、版本规则、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”；当前已支持应用内分页版式预览，后续继续补充更完整的 PDF 模板和附件处理。
 
 顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；开启后会立即应用到当前文档和批量导出，手动更新按钮不受影响。
 

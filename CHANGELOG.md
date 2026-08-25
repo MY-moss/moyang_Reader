@@ -13,6 +13,7 @@
 - 新增真实 Tauri 桌面 smoke：启动参数打开 Markdown、默认所见即所得编辑、源码模式编辑和 Rust 保存写回均在 Debug 桌面进程中验证；测试权限与 WebdriverIO 桥接隔离在测试配置，不进入普通构建或安装包。
 - 真实桌面 smoke 扩展到工作区外部修改自动刷新；路径比较补齐 Windows `\\?\\`/UNC 扩展路径，避免 watcher 事件因路径格式不同而漏掉当前文档。
 - 真实桌面 smoke 增加未保存冲突场景：外部修改只显示提示并保留本地编辑内容，不静默覆盖草稿。
+- 固化版本发布规则：用户功能 minor 版本和重要 Bug patch 版本必须同步 Release、安装包、签名、`latest.json` 与镜像；纯文档/测试改动可不发布。
 - CI/Release 依赖审计明确只阻断会随应用发布的生产依赖；WDIO、Playwright 等仅用于测试的工具链继续由 Dependabot 和本地/CI 测试单独跟踪，避免测试工具的间接漏洞阻断非发布功能 PR。
 
 ### Fixed

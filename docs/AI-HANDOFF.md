@@ -47,7 +47,7 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## Release 规则
 
-合并 PR 不等于发布安装包。稳定批次才更新版本号、CHANGELOG、Release、`.sig`、`latest.json` 和 Cloudflare 镜像；发布后必须做在线 HTTP、哈希、签名、manifest 和旧版本自动更新验证。
+合并 PR 不等于发布安装包，但用户功能 minor 版本达到验收后必须及时发布；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch。每个 PR 必须标记无 Release、minor 或 patch，并写出目标版本和理由。稳定发布时必须同步 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、CHANGELOG、Git tag、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和 Cloudflare 镜像；发布后必须做在线 HTTP、哈希、签名、manifest 和旧版本自动更新验证。纯文档、测试、CI 和内部重构可以不发布，但交接中必须明确写出原因。完整规则见 `docs/RELEASE-POLICY.md`。
 
 ## Token 预算规则
 
@@ -71,6 +71,7 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 关键入口：`docs/decisions/0004-serialization-normalization.md` 是规范化清单唯一事实源；`e2e/smoke.spec.ts` 的序列化测试与它必须同步修改，且 `readEditorText` 是 CodeMirror 依赖升级的显式哨兵；`src/app/slash-command-menu.ts` 是 slash 命令纯逻辑；`src/app/wiki-link-completion.ts` 是双链补全纯逻辑。
 - 相关测试：`e2e/smoke.spec.ts` 的 "downgrades a heading one level per Backspace at its start"；"serializes equivalent markdown styles to canonical forms"（#160 引入）；`desktop-e2e/smoke.e2e.mjs` 的真实桌面启动/编辑/保存/外部刷新/冲突提示；单测 141 个、浏览器 e2e 32 个、桌面 smoke 3 个全部通过。
 - 已运行：`npm test` 29 文件 141 测试通过；`npm run lint`、`npm run format:check`、普通 `npm run build`、普通 Tauri Debug 构建、`npm run test:e2e:desktop`（桌面 3 场景）、全量 `npx playwright test`（32 e2e）通过。构建仍有既有的大入口包体积提示，Milkdown 保持独立懒加载分包；WebdriverIO 1.3 的 embedded provider 仍会输出外部 `tauri-driver` 诊断噪声，但不影响测试结果。
+- 本切片新增版本与发布政策文档：用户功能 minor 版本必须有公开 Release 和安装包，重要 Bug/更新/安全修复可直接发布 patch；纯文档、测试、CI 和内部重构可以不发布。本次仅同步流程文档，不改应用版本、不创建空 Release。
 - 发布影响：本切片不改版本号、不创建 Release、不生成安装包；合并前只推送功能分支和交接文档。稳定批次按 `docs/ROADMAP.md` 执行发布检查。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
 - 下一位 AI 的唯一下一步：先检查 Issues、PR 和 `origin/main`，确认本切片已合并后继续 #88 的桌面导出写盘场景；不要重复实现当前的启动/编辑/保存/无冲突外部刷新 smoke，也不要把 #169（工作区规模上限）或 #174（React 错误边界）混入本切片。
