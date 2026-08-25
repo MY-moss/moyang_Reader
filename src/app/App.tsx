@@ -636,13 +636,27 @@ export function App() {
     const path = documentState?.path;
     if (!path || path.startsWith("browser://") || mode !== "rendered") return;
 
-    const timer = window.setTimeout(() => {
+    let frame: number | null = null;
+    let attempts = 0;
+    const restorePosition = () => {
       const contentArea = contentAreaRef.current;
       if (!contentArea) return;
-      contentArea.scrollTop = loadReadingPosition(path);
+      const storedTop = loadReadingPosition(path);
+      contentArea.scrollTop = storedTop;
       readingPositionRef.current = { path, top: contentArea.scrollTop };
-    }, 0);
-    return () => window.clearTimeout(timer);
+      if (storedTop > 0 && contentArea.scrollTop === 0 && attempts < 6) {
+        attempts += 1;
+        frame = window.requestAnimationFrame(() => {
+          frame = null;
+          restorePosition();
+        });
+      }
+    };
+    const timer = window.setTimeout(restorePosition, 0);
+    return () => {
+      window.clearTimeout(timer);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [documentState?.path, documentState?.rendered.html, mode]);
 
   useEffect(() => {
