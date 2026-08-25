@@ -22,6 +22,7 @@ import {
   saveWorkspaceSessions,
   forgetWorkspaceSession,
 } from "./storage";
+import { normalizePathKey } from "./path-key";
 
 afterEach(() => localStorage.clear());
 
@@ -67,8 +68,8 @@ describe("reader storage", () => {
 
   it("persists bounded native tabs and drops temporary browser documents", () => {
     saveOpenTabs([
-      { path: "C:/Notes/first.md", name: "first.md" },
-      { path: "c:\\notes\\FIRST.md", name: "duplicate.md" },
+      { path: "C:/I-NOTES/INDEX.md", name: "first.md" },
+      { path: "c:\\i-notes\\index.md", name: "duplicate.md" },
       { path: "browser://temporary.md", name: "temporary.md" },
       ...Array.from({ length: 17 }, (_, index) => ({
         path: `C:/Notes/${index + 2}.md`,
@@ -78,11 +79,9 @@ describe("reader storage", () => {
 
     const tabs = loadOpenTabs();
     expect(tabs).toHaveLength(16);
-    expect(tabs[0]).toEqual({ path: "C:/Notes/first.md", name: "first.md" });
+    expect(tabs[0]).toEqual({ path: "C:/I-NOTES/INDEX.md", name: "first.md" });
     expect(tabs.some((tab) => tab.path.startsWith("browser://"))).toBe(false);
-    expect(
-      tabs.filter((tab) => tab.path.replace(/[\\/]+/g, "\\").toLocaleLowerCase() === "c:\\notes\\first.md"),
-    ).toHaveLength(1);
+    expect(tabs.filter((tab) => normalizePathKey(tab.path) === "c:\\i-notes\\index.md")).toHaveLength(1);
   });
 
   it("stores reading positions case-insensitively and keeps a bounded history", () => {

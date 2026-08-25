@@ -1,10 +1,8 @@
 import type { WorkspaceFile, WorkspaceIndexEntry, WorkspaceRefreshResult } from "./types";
+import { normalizePathKey } from "./path-key";
 
 function normalizeWorkspacePath(value: string | null): string {
-  return (value ?? "")
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(value ?? "");
 }
 
 function isWithinScope(path: string, scope: string): boolean {

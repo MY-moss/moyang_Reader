@@ -134,6 +134,7 @@ import {
   isSelfWrittenChangePending,
 } from "./workspace-refresh";
 import { createWorkspaceOpenPlan } from "./workspace-open";
+import { normalizePathKey } from "./path-key";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 import {
   isSameDocumentPath,
@@ -171,10 +172,7 @@ function startsWithHeading(html: string): boolean {
 }
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 function pathBelongsToWorkspace(path: string, workspacePath: string): boolean {
@@ -1365,7 +1363,7 @@ export function App() {
 
       const seen = new Set<string>();
       for (const entry of pathsToProcess) {
-        const key = `${entry.kind}:${entry.path.toLocaleLowerCase()}`;
+        const key = `${entry.kind}:${normalizePathKey(entry.path)}`;
         if (seen.has(key)) continue;
         seen.add(key);
 

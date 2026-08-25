@@ -1,12 +1,10 @@
 import type { OpenDocument } from "./types";
+import { normalizePathKey } from "./path-key";
 
 type ActiveDocument = Pick<OpenDocument, "path" | "modified">;
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 export function isSameDocumentPath(left: string, right: string): boolean {

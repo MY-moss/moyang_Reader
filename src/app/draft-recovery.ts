@@ -1,3 +1,5 @@
+import { normalizePathKey } from "./path-key";
+
 const draftStorageKey = "moyang-reader-drafts";
 const maxDrafts = 8;
 const maxDraftCharacters = 2_000_000;
@@ -10,10 +12,7 @@ export type DraftSnapshot = {
 };
 
 function comparablePath(path: string): string {
-  return path
-    .replace(/[\\/]+/g, "\\")
-    .replace(/\\$/, "")
-    .toLocaleLowerCase();
+  return normalizePathKey(path);
 }
 
 function isDraftSnapshot(value: unknown): value is DraftSnapshot {
