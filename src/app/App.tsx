@@ -147,7 +147,6 @@ import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } f
 import type { QuickOpenCandidate } from "./quick-open";
 import { applyWorkspaceFileDelta, applyWorkspaceIndexDelta, isCurrentWorkspaceLoad } from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
-import { createWorkspaceOpenPlan } from "./workspace-open";
 import { normalizePathKey } from "./path-key";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 import {
@@ -407,8 +406,6 @@ export function App() {
   const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
-  const [workspaceOpening, setWorkspaceOpening] = useState(false);
-  const [workspaceOpenNotice, setWorkspaceOpenNotice] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
@@ -2697,7 +2694,7 @@ export function App() {
       ),
     [selectedFileKind, selectedTag, taggedFilePaths, workspaceResults],
   );
-  const workspaceActionFiles = useMemo(() => {
+  const workspaceExportFiles = useMemo(() => {
     const query = workspaceQuery.trim();
     if (!query) return visibleWorkspaceFiles;
     if (query.length < 2 || workspaceSearchLoading) return [];
@@ -2801,54 +2798,6 @@ export function App() {
     return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
   }, [openTabs, recentFiles, workspaceFiles]);
 
-  const handleOpenWorkspaceFiles = useCallback(async () => {
-    if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
-
-    const plan = createWorkspaceOpenPlan(workspaceActionFiles);
-    if (plan.files.length === 0) return;
-    const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
-    const filesToOpen = currentModifiedPath
-      ? plan.files.filter((file) => !isSameDocumentPath(currentModifiedPath, file.path))
-      : plan.files;
-    if (filesToOpen.length === 0) {
-      setWorkspaceOpenNotice("当前文档有未保存修改，已保留，不重复打开。");
-      return;
-    }
-    if (
-      !confirmDocumentReplacement(
-        filesToOpen.map((file) => file.path),
-        "当前文档有未保存修改，批量打开后将丢失这些修改。继续吗？",
-      )
-    ) {
-      return;
-    }
-
-    setWorkspaceOpening(true);
-    setWorkspaceOpenNotice(null);
-    setError(null);
-
-    let opened = 0;
-    try {
-      for (const file of filesToOpen) {
-        if (await openPath(file.path)) opened += 1;
-      }
-
-      const failed = filesToOpen.length - opened;
-      const details = [
-        `已打开 ${opened} 个文档`,
-        failed > 0 ? `失败 ${failed} 个` : "",
-        filesToOpen.length < plan.files.length
-          ? `已保留当前未保存文档 ${plan.files.length - filesToOpen.length} 个`
-          : "",
-        plan.skippedCount > 0 ? `为保持轻量跳过 ${plan.skippedCount} 个` : "",
-      ].filter(Boolean);
-      setWorkspaceOpenNotice(`${details.join("，")}。`);
-      if (failed > 0) setError(`有 ${failed} 个文档无法打开，请查看当前文件是否仍然存在。`);
-    } finally {
-      setWorkspaceOpening(false);
-    }
-  }, [confirmDocumentReplacement, openPath, workspaceActionFiles, workspacePath]);
-
   const handleCancelWorkspaceExport = useCallback(() => {
     workspaceExportAbortRef.current?.abort();
     if (pdfBatchExportRef.current) finishPdfBatch(true);
@@ -2888,7 +2837,7 @@ export function App() {
 
   const handleExportWorkspace = useCallback(
     async (format: "html" | "docx" | "pdf") => {
-      if (!workspacePath || workspaceActionFiles.length === 0 || !isTauriRuntime()) return;
+      if (!workspacePath || workspaceExportFiles.length === 0 || !isTauriRuntime()) return;
 
       const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
       const savePath =
@@ -2900,13 +2849,13 @@ export function App() {
       const controller = new AbortController();
       workspaceExportAbortRef.current = controller;
       setWorkspaceExporting(true);
-      setWorkspaceExportProgress({ current: 0, total: workspaceActionFiles.length, fileName: "准备导出…" });
+      setWorkspaceExportProgress({ current: 0, total: workspaceExportFiles.length, fileName: "准备导出…" });
       setWorkspaceExportFailures([]);
       setWorkspaceExportNotice(null);
       setError(null);
 
       if (format === "pdf") {
-        const files = workspaceActionFiles.filter(
+        const files = workspaceExportFiles.filter(
           (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
         );
         if (files.length === 0) {
@@ -2953,10 +2902,10 @@ export function App() {
           orientation: preferences.exportOrientation,
           margin: preferences.exportMargin,
         };
-        const exportableFileCount = workspaceActionFiles.filter(
+        const exportableFileCount = workspaceExportFiles.filter(
           (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
         ).length;
-        const estimatedExportBytes = workspaceActionFiles
+        const estimatedExportBytes = workspaceExportFiles
           .filter((file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text")
           .reduce((total, file) => total + file.size, 0);
         const expectedVolumeCount = Math.max(
@@ -2993,14 +2942,14 @@ export function App() {
           if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
         };
 
-        for (const [index, file] of workspaceActionFiles.entries()) {
+        for (const [index, file] of workspaceExportFiles.entries()) {
           if (controller.signal.aborted) {
             setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
             return;
           }
           setWorkspaceExportProgress({
             current: index + 1,
-            total: workspaceActionFiles.length,
+            total: workspaceExportFiles.length,
             fileName: file.relativePath,
           });
           try {
@@ -3083,7 +3032,7 @@ export function App() {
       preferences.exportPaper,
       finishPdfBatch,
       prepareNextPdfBatch,
-      workspaceActionFiles,
+      workspaceExportFiles,
       workspacePath,
     ],
   );
@@ -3198,7 +3147,6 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar">
           <WorkspacePanel
-            onOpenVisibleFiles={() => void handleOpenWorkspaceFiles()}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             onCancelWorkspaceExport={handleCancelWorkspaceExport}
             workspaceExporting={workspaceExporting}
@@ -3207,14 +3155,12 @@ export function App() {
             onCopyExportFailures={() => void copyWorkspaceExportFailures()}
             onSaveExportFailures={() => void saveWorkspaceExportFailures()}
             workspaceExportNotice={workspaceExportNotice}
-            workspaceOpening={workspaceOpening}
-            workspaceOpenNotice={workspaceOpenNotice}
             workspaceIndexLoading={workspaceIndexLoading}
             workspacePath={workspacePath}
             files={workspaceFiles}
             visibleFiles={visibleWorkspaceFiles}
-            openableFiles={workspaceActionFiles}
-            exportableFiles={workspaceActionFiles}
+            visibleResultCount={visibleWorkspaceResults.length}
+            exportableFiles={workspaceExportFiles}
             recentFiles={recentFiles}
             recentWorkspaces={recentWorkspaces}
             mountedWorkspaces={mountedWorkspaces}
