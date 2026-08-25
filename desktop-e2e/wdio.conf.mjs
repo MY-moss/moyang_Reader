@@ -9,6 +9,7 @@ const fixtureRoot = configuredDocumentPath
   ? path.dirname(configuredDocumentPath)
   : fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-"));
 const documentPath = configuredDocumentPath ?? path.join(fixtureRoot, "desktop-e2e.md");
+const workspacePath = fixtureRoot;
 const applicationPath = path.join(
   projectRoot,
   "src-tauri",
@@ -38,11 +39,11 @@ export const config = {
       browserName: "tauri",
       "tauri:options": {
         application: applicationPath,
-        args: [documentPath],
+        args: [workspacePath, documentPath],
       },
       "wdio:tauriServiceOptions": {
         appBinaryPath: applicationPath,
-        appArgs: [documentPath],
+        appArgs: [workspacePath, documentPath],
         driverProvider: "embedded",
         embeddedPort: 4445,
       },
@@ -53,7 +54,7 @@ export const config = {
       "@wdio/tauri-service",
       {
         appBinaryPath: applicationPath,
-        appArgs: [documentPath],
+        appArgs: [workspacePath, documentPath],
         driverProvider: "embedded",
         embeddedPort: 4445,
       },
