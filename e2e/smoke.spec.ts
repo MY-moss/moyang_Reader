@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function readEditorText(editor: Locator): Promise<string> {
   return editor.evaluate((node) => {
+    if (node instanceof HTMLTextAreaElement) return node.value;
+
     // CodeMirror renders only the visible viewport, so reading .cm-line DOM
     // truncates long documents. Pull the authoritative text from the internal
     // view state instead: .cm-content -> cmTile -> root -> view -> state.doc.
@@ -9,7 +11,7 @@ async function readEditorText(editor: Locator): Promise<string> {
       (HTMLElement & { cmTile?: { root?: { view?: { state?: { doc?: { toString(): string } } } } } }) | null;
     const docText = content?.cmTile?.root?.view?.state?.doc?.toString();
     if (typeof docText === "string") return docText;
-    return node instanceof HTMLTextAreaElement ? node.value : (node.textContent ?? "");
+    throw new Error("CodeMirror internal view state path changed — update readEditorText");
   });
 }
 
