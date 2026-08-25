@@ -16,6 +16,10 @@
 - 固化版本发布规则：用户功能 minor 版本和重要 Bug patch 版本必须同步 Release、安装包、签名、`latest.json` 与镜像；纯文档/测试改动可不发布。
 - CI/Release 依赖审计明确只阻断会随应用发布的生产依赖；WDIO、Playwright 等仅用于测试的工具链继续由 Dependabot 和本地/CI 测试单独跟踪，避免测试工具的间接漏洞阻断非发布功能 PR。
 
+### Removed
+
+- 移除“打开列表”入口：它会在没有逐项选择的情况下把最多 40 个筛选结果批量塞进标签页，和文件树、Ctrl+P 快速打开及系统多选打开重复；保留更可控的单击打开、快速打开和批量导出。
+
 ### Fixed
 
 - E2E 的 CodeMirror 文本读取在内部 view state 路径失效时不再静默回退到可视区 DOM；现在会明确提示 `CodeMirror internal view state path changed — update readEditorText`，避免编辑器依赖升级后产生“末段丢失”的误报（#158）。

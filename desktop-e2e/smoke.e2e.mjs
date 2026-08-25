@@ -24,6 +24,8 @@ describe("Moyang Reader desktop runtime", () => {
       timeoutMsg: "the startup document path was not opened by the Tauri runtime",
     });
     await browser.$("h1=Desktop E2E").waitForDisplayed();
+    assert.equal(await browser.$("button=打开列表").isExisting(), false);
+    assert.equal(await browser.$("summary=批量导出").isDisplayed(), true);
 
     await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
 
