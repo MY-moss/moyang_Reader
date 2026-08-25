@@ -60,9 +60,9 @@ describe("draft recovery", () => {
   });
 
   it("does not store unchanged or oversized drafts", () => {
-    expect(
-      saveDraftSnapshot({ path: "C:/Notes/same.md", draft: "same", baseSource: "same", savedAt: 1 }).ok,
-    ).toBe(true);
+    expect(saveDraftSnapshot({ path: "C:/Notes/same.md", draft: "same", baseSource: "same", savedAt: 1 }).ok).toBe(
+      true,
+    );
     expect(
       saveDraftSnapshot({
         path: "C:/Notes/large.md",

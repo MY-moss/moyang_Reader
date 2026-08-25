@@ -6,5 +6,8 @@
  * `toLocaleLowerCase()`.
  */
 export function normalizePathKey(path: string): string {
-  return path.replace(/[\\/]+/g, "\\").replace(/\\$/, "").toLowerCase();
+  return path
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\$/, "")
+    .toLowerCase();
 }
