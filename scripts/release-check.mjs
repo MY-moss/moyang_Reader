@@ -110,6 +110,12 @@ export function validateReleaseWorkflow(projectRoot = defaultRoot) {
   if (!mirror.includes("scripts/prepare-mirror.mjs")) {
     errors.push("mirror-release.yml 必须运行镜像清单自检脚本。");
   }
+  if (!mirror.includes("CLOUDFLARE_DEPLOY_ENABLED=false")) {
+    errors.push("mirror-release.yml 缺少无 Cloudflare 凭据时的代理验证回退。");
+  }
+  if (!fs.existsSync(path.join(projectRoot, "scripts", "mirror-worker.js"))) {
+    errors.push("缺少 scripts/mirror-worker.js 镜像代理源文件。");
+  }
   return errors;
 }
 
