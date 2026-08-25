@@ -27,7 +27,7 @@ const MAX_SEARCH_INDEX_ROOTS: usize = 8;
 const MAX_SEARCH_INDEX_POSTINGS: usize = 500_000;
 const MAX_SEARCH_INDEX_TOKENS_PER_FILE: usize = 100_000;
 const MAX_SEARCH_INDEX_TOKEN_CHARS: usize = 256;
-const SEARCH_INDEX_CACHE_VERSION: u32 = 2;
+const SEARCH_INDEX_CACHE_VERSION: u32 = 3;
 const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
@@ -81,6 +81,7 @@ struct CachedWorkspaceFileList {
 #[derive(Default)]
 struct CachedSearchIndex {
     files: HashMap<String, IndexedSearchFile>,
+    unindexed_files: HashSet<String>,
     postings: HashMap<String, HashSet<String>>,
     posting_count: usize,
     last_used: u64,
@@ -99,6 +100,7 @@ struct PersistedSearchIndex {
     root: String,
     disabled: bool,
     files: Vec<PersistedIndexedSearchFile>,
+    unindexed_files: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -115,6 +117,7 @@ struct SearchIndexSnapshot<'a> {
     root: String,
     disabled: bool,
     files: Vec<PersistedIndexedSearchFileSnapshot<'a>>,
+    unindexed_files: Vec<&'a String>,
 }
 
 #[derive(Serialize)]
@@ -310,6 +313,7 @@ fn add_indexed_file_with_tokens(
         return false;
     }
 
+    let path_key = path.clone();
     for token in &tokens {
         let paths = index.postings.entry(token.clone()).or_default();
         if paths.insert(path.clone()) {
@@ -327,6 +331,7 @@ fn add_indexed_file_with_tokens(
             tokens,
         },
     );
+    index.unindexed_files.remove(&path_key);
     true
 }
 
@@ -341,6 +346,7 @@ fn load_persisted_search_index(cache_directory: &Path, root: &Path) -> Option<Ca
     if snapshot.version != SEARCH_INDEX_CACHE_VERSION
         || snapshot.root != access_path_key(root)
         || snapshot.files.len() > MAX_PERSISTED_SEARCH_INDEX_FILES
+        || snapshot.unindexed_files.len() > MAX_PERSISTED_SEARCH_INDEX_FILES
     {
         return None;
     }
@@ -365,6 +371,14 @@ fn load_persisted_search_index(cache_directory: &Path, root: &Path) -> Option<Ca
             return None;
         }
     }
+    index.unindexed_files = snapshot.unindexed_files.into_iter().collect();
+    if !index
+        .unindexed_files
+        .iter()
+        .all(|path| index.files.contains_key(path))
+    {
+        return None;
+    }
     Some(index)
 }
 
@@ -388,6 +402,7 @@ fn persist_search_index(cache_directory: &Path, root: &Path, index: &CachedSearc
                 tokens: file.tokens.iter().collect(),
             })
             .collect(),
+        unindexed_files: index.unindexed_files.iter().collect(),
     };
     let Ok(bytes) = serde_json::to_vec(&snapshot) else {
         return;
@@ -407,6 +422,7 @@ fn persist_search_index(cache_directory: &Path, root: &Path, index: &CachedSearc
 }
 
 fn remove_indexed_file(index: &mut CachedSearchIndex, path: &str) {
+    index.unindexed_files.remove(path);
     let Some(file) = index.files.remove(path) else {
         return;
     };
@@ -431,7 +447,16 @@ fn add_indexed_file(
     source: &str,
 ) -> bool {
     let Some(tokens) = source_search_tokens(source) else {
-        return false;
+        index.unindexed_files.insert(path.clone());
+        index.files.insert(
+            path,
+            IndexedSearchFile {
+                size,
+                modified,
+                tokens: HashSet::new(),
+            },
+        );
+        return true;
     };
     add_indexed_file_with_tokens(index, path, size, modified, tokens)
 }
@@ -591,6 +616,7 @@ impl WorkspaceSearchCache {
                     if !add_indexed_file(&mut index, path, metadata.len(), modified, &source) {
                         index.disabled = true;
                         index.files.clear();
+                        index.unindexed_files.clear();
                         index.postings.clear();
                         index.posting_count = 0;
                         break;
@@ -647,10 +673,13 @@ impl WorkspaceSearchCache {
         if missing_ascii_token {
             return None;
         }
+        let fallback_paths = index.unindexed_files.clone();
         if missing_cjk_token {
-            return Some(HashSet::new());
+            return Some(fallback_paths);
         }
-        candidates
+        let mut candidates = candidates.unwrap_or_default();
+        candidates.extend(fallback_paths);
+        Some(candidates)
     }
 
     fn invalidate_scopes(&self, scopes: &[String]) {
@@ -2748,6 +2777,75 @@ mod tests {
         assert_eq!(candidates.len(), 1);
 
         fs::remove_dir_all(root).expect("remove CJK search workspace");
+    }
+
+    #[test]
+    fn falls_back_only_for_files_that_exceed_index_token_limits() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-fallback-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create search fallback workspace");
+        fs::write(root.join("indexed.md"), "needle in an indexed note")
+            .expect("write indexed fallback note");
+        fs::write(
+            root.join("unindexed.md"),
+            format!("{} needle", "x".repeat(MAX_SEARCH_INDEX_TOKEN_CHARS + 1)),
+        )
+        .expect("write unindexed fallback note");
+        let cache_directory = std::env::temp_dir().join(format!(
+            "moyang-reader-search-fallback-cache-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+
+        let cache = WorkspaceSearchCache::default();
+        let results = search_workspace_inner_with_cache_and_persistence(
+            root.clone(),
+            "needle".to_string(),
+            &cache,
+            Some(&cache_directory),
+        )
+        .expect("search fallback query");
+        let names = results
+            .into_iter()
+            .map(|result| result.file.name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, vec!["indexed.md", "unindexed.md"]);
+        let root_key = access_path_key(&root);
+        let indexes = cache
+            .search_indexes
+            .lock()
+            .expect("lock fallback search index");
+        let index = indexes.get(&root_key).expect("search index should exist");
+        assert_eq!(index.unindexed_files.len(), 1);
+        assert!(index
+            .unindexed_files
+            .contains(&access_path_key(&root.join("unindexed.md"))));
+
+        let persisted_cache = WorkspaceSearchCache::default();
+        let persisted_results = search_workspace_inner_with_cache_and_persistence(
+            root.clone(),
+            "needle".to_string(),
+            &persisted_cache,
+            Some(&cache_directory),
+        )
+        .expect("search persisted fallback query");
+        assert_eq!(persisted_results.len(), 2);
+        assert_eq!(
+            persisted_cache
+                .search_indexes
+                .lock()
+                .expect("lock persisted fallback index")
+                .get(&root_key)
+                .map(|index| index.unindexed_files.len()),
+            Some(1)
+        );
+
+        fs::remove_dir_all(root).expect("remove search fallback workspace");
+        fs::remove_dir_all(cache_directory).expect("remove search fallback cache");
     }
 
     #[test]
