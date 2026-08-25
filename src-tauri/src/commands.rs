@@ -25,7 +25,9 @@ const MAX_SEARCH_CACHE_ENTRIES: usize = 256;
 const MAX_SEARCH_CACHE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_SEARCH_INDEX_ROOTS: usize = 8;
 const MAX_SEARCH_INDEX_POSTINGS: usize = 500_000;
-const SEARCH_INDEX_CACHE_VERSION: u32 = 1;
+const MAX_SEARCH_INDEX_TOKENS_PER_FILE: usize = 100_000;
+const MAX_SEARCH_INDEX_TOKEN_CHARS: usize = 256;
+const SEARCH_INDEX_CACHE_VERSION: u32 = 2;
 const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
@@ -88,7 +90,7 @@ struct CachedSearchIndex {
 struct IndexedSearchFile {
     size: u64,
     modified: Option<SystemTime>,
-    shingles: HashSet<String>,
+    tokens: HashSet<String>,
 }
 
 #[derive(Deserialize)]
@@ -104,7 +106,7 @@ struct PersistedIndexedSearchFile {
     path: String,
     size: u64,
     modified_nanos: Option<u64>,
-    shingles: Vec<String>,
+    tokens: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -120,7 +122,7 @@ struct PersistedIndexedSearchFileSnapshot<'a> {
     path: &'a str,
     size: u64,
     modified_nanos: Option<u64>,
-    shingles: Vec<&'a String>,
+    tokens: Vec<&'a String>,
 }
 
 fn collect_workspace_directory_stamps(
@@ -203,12 +205,69 @@ fn prune_search_indexes(search_indexes: &mut HashMap<String, CachedSearchIndex>)
     }
 }
 
-fn source_shingles(source: &str) -> HashSet<String> {
-    let chars: Vec<char> = source.to_lowercase().chars().collect();
-    chars
-        .windows(2)
-        .map(|pair| pair.iter().collect::<String>())
-        .collect()
+fn is_cjk_search_char(character: char) -> bool {
+    matches!(
+        character,
+        '\u{3400}'..='\u{4DBF}'
+            | '\u{4E00}'..='\u{9FFF}'
+            | '\u{F900}'..='\u{FAFF}'
+            | '\u{20000}'..='\u{2FA1F}'
+    )
+}
+
+fn is_ascii_search_char(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '_'
+}
+
+fn insert_search_token(tokens: &mut HashSet<String>, token: String) -> bool {
+    if token.is_empty() {
+        return true;
+    }
+    if token.chars().count() > MAX_SEARCH_INDEX_TOKEN_CHARS {
+        return false;
+    }
+    tokens.insert(token);
+    tokens.len() <= MAX_SEARCH_INDEX_TOKENS_PER_FILE
+}
+
+fn source_search_tokens(source: &str) -> Option<HashSet<String>> {
+    let mut tokens = HashSet::new();
+    let mut ascii_word = String::new();
+    let mut previous_cjk = None;
+
+    for character in source.to_lowercase().chars() {
+        if is_ascii_search_char(character) {
+            previous_cjk = None;
+            ascii_word.push(character);
+            if ascii_word.chars().count() > MAX_SEARCH_INDEX_TOKEN_CHARS {
+                return None;
+            }
+            continue;
+        }
+
+        if !ascii_word.is_empty()
+            && !insert_search_token(&mut tokens, std::mem::take(&mut ascii_word))
+        {
+            return None;
+        }
+
+        if is_cjk_search_char(character) {
+            if let Some(previous) = previous_cjk {
+                if !insert_search_token(&mut tokens, format!("{previous}{character}")) {
+                    return None;
+                }
+            }
+            previous_cjk = Some(character);
+        } else {
+            previous_cjk = None;
+        }
+    }
+
+    if !ascii_word.is_empty() && !insert_search_token(&mut tokens, ascii_word) {
+        return None;
+    }
+
+    Some(tokens)
 }
 
 fn system_time_marker(modified: Option<SystemTime>) -> Option<u64> {
@@ -236,15 +295,23 @@ fn persistent_search_index_path(cache_directory: &Path, root: &Path) -> PathBuf 
         .join(format!("{}.json", persistent_search_index_key(root)))
 }
 
-fn add_indexed_file_with_shingles(
+fn add_indexed_file_with_tokens(
     index: &mut CachedSearchIndex,
     path: String,
     size: u64,
     modified: Option<SystemTime>,
-    shingles: HashSet<String>,
+    tokens: HashSet<String>,
 ) -> bool {
-    for shingle in &shingles {
-        let paths = index.postings.entry(shingle.clone()).or_default();
+    if tokens.len() > MAX_SEARCH_INDEX_TOKENS_PER_FILE
+        || tokens
+            .iter()
+            .any(|token| token.chars().count() > MAX_SEARCH_INDEX_TOKEN_CHARS)
+    {
+        return false;
+    }
+
+    for token in &tokens {
+        let paths = index.postings.entry(token.clone()).or_default();
         if paths.insert(path.clone()) {
             index.posting_count += 1;
             if index.posting_count > MAX_SEARCH_INDEX_POSTINGS {
@@ -257,7 +324,7 @@ fn add_indexed_file_with_shingles(
         IndexedSearchFile {
             size,
             modified,
-            shingles,
+            tokens,
         },
     );
     true
@@ -287,13 +354,13 @@ fn load_persisted_search_index(cache_directory: &Path, root: &Path) -> Option<Ca
     }
 
     for file in snapshot.files {
-        let shingles = file.shingles.into_iter().collect::<HashSet<_>>();
-        if !add_indexed_file_with_shingles(
+        let tokens = file.tokens.into_iter().collect::<HashSet<_>>();
+        if !add_indexed_file_with_tokens(
             &mut index,
             file.path,
             file.size,
             marker_system_time(file.modified_nanos),
-            shingles,
+            tokens,
         ) {
             return None;
         }
@@ -318,7 +385,7 @@ fn persist_search_index(cache_directory: &Path, root: &Path, index: &CachedSearc
                 path,
                 size: file.size,
                 modified_nanos: system_time_marker(file.modified),
-                shingles: file.shingles.iter().collect(),
+                tokens: file.tokens.iter().collect(),
             })
             .collect(),
     };
@@ -344,13 +411,13 @@ fn remove_indexed_file(index: &mut CachedSearchIndex, path: &str) {
         return;
     };
 
-    for shingle in file.shingles {
-        if let Some(paths) = index.postings.get_mut(&shingle) {
+    for token in file.tokens {
+        if let Some(paths) = index.postings.get_mut(&token) {
             if paths.remove(path) {
                 index.posting_count = index.posting_count.saturating_sub(1);
             }
             if paths.is_empty() {
-                index.postings.remove(&shingle);
+                index.postings.remove(&token);
             }
         }
     }
@@ -363,7 +430,10 @@ fn add_indexed_file(
     modified: Option<SystemTime>,
     source: &str,
 ) -> bool {
-    add_indexed_file_with_shingles(index, path, size, modified, source_shingles(source))
+    let Some(tokens) = source_search_tokens(source) else {
+        return false;
+    };
+    add_indexed_file_with_tokens(index, path, size, modified, tokens)
 }
 
 impl WorkspaceSearchCache {
@@ -551,16 +621,34 @@ impl WorkspaceSearchCache {
             return None;
         }
 
-        let shingles = source_shingles(query);
+        let tokens = source_search_tokens(query)?;
+        if tokens.is_empty() {
+            return None;
+        }
+
         let mut candidates: Option<HashSet<String>> = None;
-        for shingle in shingles {
-            let Some(paths) = index.postings.get(&shingle) else {
-                return Some(HashSet::new());
+        let mut missing_ascii_token = false;
+        let mut missing_cjk_token = false;
+        for token in tokens {
+            let Some(paths) = index.postings.get(&token) else {
+                if token.is_ascii() {
+                    missing_ascii_token = true;
+                } else {
+                    missing_cjk_token = true;
+                }
+                continue;
             };
             candidates = Some(match candidates {
                 Some(current) => current.intersection(paths).cloned().collect(),
                 None => paths.clone(),
             });
+        }
+
+        if missing_ascii_token {
+            return None;
+        }
+        if missing_cjk_token {
+            return Some(HashSet::new());
         }
         candidates
     }
@@ -2086,9 +2174,10 @@ mod tests {
         prune_search_entries, read_text_file_inner, refresh_workspace_inner,
         search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchText, OpenPath,
-        OpenPathKind, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
-        MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, TEMP_FILE_COUNTER,
+        source_search_tokens, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
+        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
+        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
+        MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -2105,6 +2194,27 @@ mod tests {
         assert!(is_supported_document_path(Path::new("notes/Guide.PDF")));
         assert!(is_supported_document_path(Path::new("notes/Cover.PNG")));
         assert!(!is_supported_document_path(Path::new("notes/Guide.doc")));
+    }
+
+    #[test]
+    fn tokenizes_ascii_words_and_cjk_bigrams() {
+        let tokens =
+            source_search_tokens("Alpha alpha 42 中文搜索 文档").expect("tokenize search source");
+
+        assert!(tokens.contains("alpha"));
+        assert!(tokens.contains("42"));
+        assert!(tokens.contains("中文"));
+        assert!(tokens.contains("文搜"));
+        assert!(tokens.contains("搜索"));
+        assert!(tokens.contains("文档"));
+        assert!(!tokens.contains("al"));
+    }
+
+    #[test]
+    fn bounds_search_token_length_before_indexing() {
+        let source = "x".repeat(MAX_SEARCH_INDEX_TOKEN_CHARS + 1);
+
+        assert!(source_search_tokens(&source).is_none());
     }
 
     #[test]
@@ -2599,6 +2709,13 @@ mod tests {
         assert_eq!(indexed.len(), 1);
         assert_eq!(indexed[0].file.name, "first.md");
 
+        let exact_candidates = cache
+            .content_candidates(&root, "needle")
+            .expect("exact ASCII word should use the index");
+        assert_eq!(exact_candidates.len(), 1);
+        assert!(exact_candidates.contains(&access_path_key(&root.join("first.md"))));
+        assert!(cache.content_candidates(&root, "eedl").is_none());
+
         let short_query = search_workspace_inner_with_cache(root.clone(), "a".to_string(), &cache)
             .expect("search short query");
         assert!(short_query
@@ -2606,6 +2723,96 @@ mod tests {
             .any(|result| result.file.name == "first.md"));
 
         fs::remove_dir_all(root).expect("remove search index workspace");
+    }
+
+    #[test]
+    fn searches_cjk_queries_with_bigram_candidates() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-cjk-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create CJK search workspace");
+        fs::write(root.join("reader.md"), "本地文档阅读器").expect("write CJK match");
+        fs::write(root.join("other.md"), "本地工具").expect("write CJK non-match");
+
+        let cache = WorkspaceSearchCache::default();
+        let results = search_workspace_inner_with_cache(root.clone(), "文档".to_string(), &cache)
+            .expect("search CJK query");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].file.name, "reader.md");
+        let candidates = cache
+            .content_candidates(&root, "文档")
+            .expect("CJK query should use the index");
+        assert_eq!(candidates.len(), 1);
+
+        fs::remove_dir_all(root).expect("remove CJK search workspace");
+    }
+
+    #[test]
+    fn keeps_indexed_results_consistent_with_a_linear_scan() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-consistency-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create consistency search workspace");
+
+        let words = [
+            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "theta",
+        ];
+        let mut seed = 0x9e37_79b9_u64;
+        for index in 0..96 {
+            let word_count = 3 + (seed as usize % 6);
+            let mut source = String::new();
+            for _ in 0..word_count {
+                seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                source.push_str(words[(seed as usize) % words.len()]);
+                source.push(' ');
+            }
+            if index % 7 == 0 {
+                source.push_str("中文文档 ");
+            }
+            if index % 11 == 0 {
+                source.push_str("阅读器 ");
+            }
+            fs::write(root.join(format!("note-{index:03}.md")), source)
+                .expect("write consistency search note");
+        }
+
+        let queries = [
+            "alpha", "beta", "gamma", "delta", "epsilon", "中文", "文档", "阅读", "eedl",
+            "note-001",
+        ];
+        let cache = WorkspaceSearchCache::default();
+        for query in queries {
+            let actual = search_workspace_inner_with_cache(root.clone(), query.to_string(), &cache)
+                .expect("search consistency query")
+                .into_iter()
+                .map(|result| result.file.relative_path)
+                .collect::<Vec<_>>();
+            let normalized_query = query.to_lowercase();
+            let expected = list_workspace_files_inner(root.clone())
+                .expect("list consistency search files")
+                .into_iter()
+                .filter(|file| {
+                    file.name.to_lowercase().contains(&normalized_query)
+                        || fs::read_to_string(&file.path)
+                            .map(|source| {
+                                source
+                                    .lines()
+                                    .any(|line| line.to_lowercase().contains(&normalized_query))
+                            })
+                            .unwrap_or(false)
+                })
+                .map(|file| file.relative_path)
+                .collect::<Vec<_>>();
+
+            assert_eq!(actual, expected, "search result mismatch for {query}");
+        }
+
+        fs::remove_dir_all(root).expect("remove consistency search workspace");
     }
 
     #[test]
