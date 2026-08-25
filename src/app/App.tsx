@@ -2158,9 +2158,13 @@ export function App() {
             ? await renderDocx(await readBinaryFile(file.path), {
                 allowRemoteResources: preferencesRef.current.allowRemoteResources,
               })
-            : await renderSource(file.path, await readTextFile(file.path), {
-                allowRemoteResources: preferencesRef.current.allowRemoteResources,
-              });
+            : await renderSource(
+                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",
+                await readTextFile(file.path),
+                {
+                  allowRemoteResources: preferencesRef.current.allowRemoteResources,
+                },
+              );
         const body = await inlineLocalImages(
           rendered.html,
           (source) => {
@@ -2840,10 +2844,15 @@ export function App() {
       if (!workspacePath || workspaceExportFiles.length === 0 || !isTauriRuntime()) return;
 
       const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
-      const savePath =
-        format === "pdf"
-          ? null
-          : await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+      let savePath: string | null = null;
+      try {
+        if (format !== "pdf") {
+          savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "打开导出保存位置失败。");
+        return;
+      }
       if (format !== "pdf" && !savePath) return;
 
       const controller = new AbortController();
@@ -2959,9 +2968,13 @@ export function App() {
                 allowRemoteResources: preferences.allowRemoteResources,
               });
             } else if (file.kind === "markdown" || file.kind === "text") {
-              rendered = await renderSource(file.path, await readTextFile(file.path), {
-                allowRemoteResources: preferences.allowRemoteResources,
-              });
+              rendered = await renderSource(
+                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",
+                await readTextFile(file.path),
+                {
+                  allowRemoteResources: preferences.allowRemoteResources,
+                },
+              );
             } else {
               recordSkippedFile(file.relativePath, "类型不支持");
               continue;
@@ -2982,8 +2995,8 @@ export function App() {
             estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;
             exported += 1;
             if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();
-          } catch {
-            recordSkippedFile(file.relativePath, "读取失败");
+          } catch (cause) {
+            recordSkippedFile(file.relativePath, cause instanceof Error ? cause.message : "读取失败");
           }
         }
 
@@ -3008,8 +3021,9 @@ export function App() {
           skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
         );
         const volumeNotice = writtenVolumes > 1 ? `，已分卷为 ${writtenVolumes} 个文件` : "";
+        const destinationNotice = savePath ? `（${fileNameFromPath(savePath)}）` : "";
         setWorkspaceExportNotice(
-          `已导出 ${exported} 篇文档为 ${formatLabel}${volumeNotice}${
+          `已导出 ${exported} 篇文档为 ${formatLabel}${destinationNotice}${volumeNotice}${
             failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""
           }。`,
         );
@@ -3017,7 +3031,7 @@ export function App() {
         if (controller.signal.aborted) {
           setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
         } else {
-          setError(cause instanceof Error ? cause.message : "批量导出失败。");
+          setError(cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "批量导出失败。");
         }
       } finally {
         if (workspaceExportAbortRef.current === controller) workspaceExportAbortRef.current = null;

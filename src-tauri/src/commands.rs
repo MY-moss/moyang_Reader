@@ -1097,6 +1097,17 @@ pub async fn choose_save_path(
             _ => return Err("不支持的导出格式。".to_string()),
         };
 
+    #[cfg(feature = "wdio")]
+    if let Some(export_root) = std::env::var_os("MOYANG_DESKTOP_E2E_EXPORT_ROOT") {
+        let default = PathBuf::from(&default_path);
+        let file_name = default
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "桌面测试无法解析导出文件名。".to_string())?;
+        let path = PathBuf::from(export_root).join(file_name);
+        return register_selected_path(access, Some(FilePath::Path(path)), false);
+    }
+
     let selected = tauri::async_runtime::spawn_blocking(move || {
         let default = PathBuf::from(default_path);
         let mut dialog = app
@@ -2092,8 +2103,11 @@ pub fn write_binary_file_raw(
 fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
     let mut candidate = path;
     loop {
+        if access.is_write_allowed(candidate) {
+            return true;
+        }
         if candidate.exists() {
-            return access.is_write_allowed(candidate);
+            return false;
         }
         let Some(parent) = candidate.parent() else {
             return false;
@@ -2352,6 +2366,30 @@ mod tests {
         ));
 
         fs::remove_dir_all(root).expect("remove new file access workspace");
+    }
+
+    #[test]
+    fn allows_writes_to_an_explicitly_authorized_new_file() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-explicit-new-file-access-{}",
+            std::process::id()
+        ));
+        let export_dir = root.join("exports");
+        let target = export_dir.join("reading-library.html");
+        fs::create_dir_all(&export_dir).expect("create explicit new file access directory");
+
+        let access = AccessRegistry::default();
+        access
+            .register_path(&target)
+            .expect("register explicitly selected save path");
+
+        assert!(is_write_allowed_for_new_path(&access, &target));
+        assert!(!is_write_allowed_for_new_path(
+            &access,
+            &export_dir.join("unselected.html")
+        ));
+
+        fs::remove_dir_all(root).expect("remove explicit new file access directory");
     }
 
     #[test]

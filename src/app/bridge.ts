@@ -143,9 +143,25 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
     throw new Error("浏览器预览模式不能写回本地文件。");
   }
 
-  await invoke("write_binary_file_raw", contents, {
-    headers: { path: encodeURIComponent(path) },
-  });
+  try {
+    await invoke("write_binary_file_raw", contents.slice().buffer, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        path: encodeURIComponent(path),
+      },
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    if (!message.includes("原始字节请求体")) throw cause;
+
+    // Older WebView/Tauri bridges may serialize ArrayBuffer payloads as JSON.
+    // Keep the raw path fast, but preserve DOCX export compatibility with the
+    // existing authorized Vec<u8> command when raw IPC is unavailable.
+    await invoke("write_binary_file", {
+      path,
+      contents: Array.from(contents),
+    });
+  }
 }
 
 export async function initialPaths(): Promise<OpenPath[]> {

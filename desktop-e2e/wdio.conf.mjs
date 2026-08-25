@@ -10,6 +10,9 @@ const fixtureRoot = configuredDocumentPath
   : fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-"));
 const documentPath = configuredDocumentPath ?? path.join(fixtureRoot, "desktop-e2e.md");
 const workspacePath = fixtureRoot;
+const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
+const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
+const ownsExportRoot = !configuredExportRoot;
 const applicationPath = path.join(
   projectRoot,
   "src-tauri",
@@ -22,8 +25,10 @@ if (!configuredDocumentPath) {
   fs.writeFileSync(documentPath, "# Desktop E2E\n\n初始内容。\n", "utf8");
 }
 process.env.MOYANG_DESKTOP_E2E_DOCUMENT = documentPath;
+process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT = exportRoot;
 
 function cleanupFixture() {
+  if (ownsExportRoot) fs.rmSync(exportRoot, { recursive: true, force: true });
   if (configuredDocumentPath) return;
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
