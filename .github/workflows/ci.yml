@@ -63,7 +63,9 @@ jobs:
         run: npm run test:e2e:desktop
 
       - name: Dependency audit
-        run: npm audit --audit-level=high
+        # Only production dependencies ship in the application; desktop/browser
+        # runners remain covered by Dependabot and local test execution.
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Release metadata check
         run: npm run release:check
