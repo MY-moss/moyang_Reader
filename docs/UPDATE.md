@@ -21,9 +21,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 ## 开发期与稳定批次
 
-功能快速迭代阶段只在本地开发、测试和提交，不为每个小改动推送 main、创建 Tag 或生成 Release。可以在同一个本地候选版本上连续累积多个功能，版本号和更新说明在准备稳定批次时统一整理。
+功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
-准备发布时再集中完成一次完整门禁：复查 Issues、运行前端/Rust 测试、构建安装包、检查更新清单和在线 Release，然后一次性同步 main、推送版本标签并验证旧版本在线更新。只有稳定批次才会进入公开更新通道。
+不能长期只更新 `main` 而不提供安装包。稳定版本发布时，版本号、CHANGELOG、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和 Cloudflare 镜像必须同步到同一个版本，并验证旧版本自动更新。完整规则见 [`docs/RELEASE-POLICY.md`](RELEASE-POLICY.md)。
 
 ## 首次配置 GitHub Secrets
 
@@ -59,15 +59,14 @@ https://moyang-reader-mirror.pages.dev
 
 ## 发布新版本
 
-确认代码已经合并到 main 后：
+确认代码已经合并到 main、版本号已经同步且 CI 全绿后：
 
 ```powershell
-git tag -a v0.5.3 -m "Release v0.5.3"
-git push origin main
-git push origin v0.5.3
+git tag -a v0.9.0 -m "Release v0.9.0"
+git push origin v0.9.0
 ```
 
-只推送版本标签会触发 Release workflow。建议先推送 main，确认 CI 通过，再推送标签。
+推送版本标签会触发 Release workflow。不要在版本号未同步或 CI 未通过时推送 tag；手动发布也必须把 `version` 输入设为与项目版本完全一致的值。
 
 发布前必须检查：
 
