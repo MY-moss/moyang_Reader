@@ -9,6 +9,17 @@ on:
         description: "要同步的 Release 标签，必须包含 v，例如 v0.9.1"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "要同步的 Release 标签，必须包含 v，例如 v0.9.1"
+        required: true
+        type: string
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
 
 permissions:
   contents: read

@@ -1,6 +1,6 @@
 # Moyang Reader 版本与发布政策
 
-当前稳定基线：`v0.9.1`（本次发布后核验 GitHub Release、安装包、签名、manifest 和 Cloudflare 镜像；旧版本实机点击更新并重启仍待补测）。
+当前稳定基线：`v0.9.1`（GitHub Release、安装包、签名、manifest 和 Cloudflare 镜像资产已在线核验；旧版本实机点击更新并重启仍待补测）。Cloudflare Pages 项目当前资产正确，但仓库尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`，后续正式发布会在镜像工作流中明确失败，不能把它误判为同步成功。
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
@@ -41,6 +41,17 @@ Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶�
 
 私钥只允许存在于 GitHub Actions Secret 或本机安全位置，不进入仓库、Issue、PR、Release、镜像或 AI 上下文。
 
+## Cloudflare Secret 配置边界
+
+Cloudflare 镜像只由 `.github/workflows/mirror-release.yml` 负责，并由 Release 工作流在安装包发布成功后调用。不要新增一个把仓库根目录 `.` 在每次 `main` 推送时直接部署到 Pages 的 `deploy.yml`；这会绕过 Release 资产准备，可能覆盖或破坏更新镜像目录。
+
+维护者只需在仓库的 Settings → Secrets and variables → Actions 中配置以下两个 Secret：
+
+- `CLOUDFLARE_API_TOKEN`：仅授予目标 Pages 项目部署权限的 API Token；
+- `CLOUDFLARE_ACCOUNT_ID`：目标 Cloudflare 账户 ID。
+
+工作流中只能使用 `${{ secrets.CLOUDFLARE_API_TOKEN }}` 和 `${{ secrets.CLOUDFLARE_ACCOUNT_ID }}` 读取它们，真实值不得出现在 YAML、提交、Issue、PR、Release、日志或聊天中。任何已经粘贴到公开位置的 Token 都必须先撤销并重新生成，再配置到 GitHub Secret。配置完成后，可对同一版本手动重跑镜像工作流；GitHub Release 资产会保留，镜像失败不应被误报为成功。
+
 ## 标准流程
 
 ### 1. 功能 PR 阶段
@@ -64,7 +75,7 @@ Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶�
 4. 运行前端、Rust、浏览器桌面 E2E、发布检查和 Release 测试。
 5. 合并到 `main`，确认 CI 全绿后创建并推送 `vX.Y.Z` tag。
 6. 由 `.github/workflows/release.yml` 构建签名安装包、`.sig` 和 `latest.json` 并创建 GitHub Release。
-7. 由镜像工作流将 Release 资产静态上传到 Cloudflare Pages；缺少 Cloudflare Secret 时直接失败，不得静默改为只验证旧镜像。
+7. 由 Release 工作流直接调用镜像工作流，将 Release 资产静态上传到 Cloudflare Pages；缺少 Cloudflare Secret 时直接失败，不得静默改为只验证旧镜像。Release 由 `GITHUB_TOKEN` 创建时不依赖 `release` 事件，避免事件不触发造成漏同步。
 8. 在线检查 GitHub 和镜像的 `latest.json`、版本目录、安装包 HTTP 状态、文件大小、SHA-256、签名和版本号；临时 522 等错误必须重试后再判定。
 9. 由 `mirror-health.yml` 定时巡检最新 Release 与 Cloudflare 镜像；巡检失败时先修复镜像，再继续发布流程。
 10. 使用旧版本验证自动更新；完成后更新 Release、Issue 状态和 AI 交接记录。
