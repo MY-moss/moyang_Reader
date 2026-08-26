@@ -136,6 +136,15 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   await expect(page.getByRole("button", { name: "打开 recovery-note.md 草稿" })).toBeVisible();
 
   await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
+  const discardDialog = page.getByRole("dialog", { name: "丢弃草稿？" });
+  await expect(discardDialog).toBeVisible();
+  await expect(page.getByTestId("draft-discard-cancel")).toBeFocused();
+  await page.getByTestId("draft-discard-cancel").click();
+  await expect(discardDialog).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
+
+  await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
+  await page.getByTestId("draft-discard-confirm").click();
   await expect(page.getByRole("button", { name: "草稿 1" })).toHaveCount(0);
 });
 
