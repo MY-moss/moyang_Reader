@@ -69,9 +69,9 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，当前分支：`codex/pdf-export-closeout-2026-08-27`）**
+> **最新检查点（2026-08-27，主线提交：`ed731b2608d353074410956a82c0bbfb4ef32f93`）**
 >
-> - 稳定基线仍为 `v0.9.2`；PDF 子切片已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并到远程 `main`，合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`，主线树为 `c650c6cf87b73aacba0543f0c99a6e0ae878b735`。
+> - 稳定基线仍为 `v0.9.2`；PDF 子切片已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并到远程 `main`，合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`，交接事实又由 [PR #245](https://github.com/MY-moss/moyang_Reader/pull/245) 同步到主线，文档合并提交为 `ed731b2608d353074410956a82c0bbfb4ef32f93`。
 > - 本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，只完成其中的 PDF 子项：Windows 桌面当前文档可选择保存位置，由隐藏的 Microsoft Edge headless 生成真实 PDF；输出先校验 `%PDF-` 文件头，再原子替换到目标路径，失败不会留下半成品。
 > - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径，并稳定阅读位置恢复；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性、大小、`%PDF-` 和 `%%EOF` 校验，同时稳定阅读位置场景。
 > - 已验证：本地 `npm run build`、`npm test -- --run`（171/171）、`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings`、浏览器打印预览 E2E（1/1）和真实 Tauri Windows desktop smoke（10/10）通过；远程 CI run [33019830925](https://github.com/MY-moss/moyang_Reader/actions/runs/33019830925) 全绿。
