@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
+import { useModalBehavior } from "./useModalBehavior";
 
 type DraftRecoveryCenterProps = {
   snapshots: DraftSnapshot[];
@@ -18,6 +20,10 @@ function draftPreview(draft: string): string {
 }
 
 export function DraftRecoveryCenter({ snapshots, onOpen, onDiscard, onClearAll, onClose }: DraftRecoveryCenterProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
+
   return (
     <div
       className="quick-open-backdrop draft-recovery-backdrop"
@@ -27,17 +33,25 @@ export function DraftRecoveryCenter({ snapshots, onOpen, onDiscard, onClearAll, 
       }}
     >
       <section
+        ref={dialogRef}
         className="quick-open-dialog draft-recovery-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="draft-recovery-title"
+        tabIndex={-1}
       >
         <header className="quick-open-header">
           <div>
             <div className="quick-open-kicker">LOCAL RECOVERY</div>
             <h2 id="draft-recovery-title">未保存草稿</h2>
           </div>
-          <button type="button" className="quiet-button" onClick={onClose} aria-label="关闭草稿恢复中心">
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="quiet-button"
+            onClick={onClose}
+            aria-label="关闭草稿恢复中心"
+          >
             关闭
           </button>
         </header>

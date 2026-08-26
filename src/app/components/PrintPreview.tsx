@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExportMargin, ExportOrientation, ExportPaper } from "../types";
 import { estimatePrintPageCount } from "../print-preview";
+import { useModalBehavior } from "./useModalBehavior";
 
 type PrintPreviewProps = {
   title: string;
@@ -33,6 +34,9 @@ export function PrintPreview({ title, html, paper, orientation, margin, onPrint,
   const [printing, setPrinting] = useState(false);
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [paginationStatus, setPaginationStatus] = useState<PaginationStatus>("loading");
+
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   const measurePagination = useCallback(() => {
     const previewDocument = frameRef.current?.contentDocument;
@@ -79,18 +83,6 @@ export function PrintPreview({ title, html, paper, orientation, margin, onPrint,
     };
   }, [html, margin, orientation, paper]);
 
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onClose();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
   const handlePrint = async () => {
     setPrinting(true);
     try {
@@ -108,7 +100,14 @@ export function PrintPreview({ title, html, paper, orientation, margin, onPrint,
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="print-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="print-preview-title">
+      <section
+        ref={dialogRef}
+        className="print-preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="print-preview-title"
+        tabIndex={-1}
+      >
         <header className="print-preview-header">
           <div>
             <div className="panel-kicker">PRINT PREVIEW</div>

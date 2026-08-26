@@ -117,7 +117,14 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   await page.goto("/");
 
   await page.getByRole("button", { name: "草稿 1" }).click();
+  const draftTrigger = page.getByRole("button", { name: "草稿 1" });
   await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭草稿恢复中心" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "未保存草稿" })).toHaveCount(0);
+  await expect(draftTrigger).toBeFocused();
+
+  await draftTrigger.click();
   await expect(page.getByRole("button", { name: "打开 recovery-note.md 草稿" })).toBeVisible();
 
   await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
@@ -136,11 +143,25 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 
-  await page.keyboard.press("Control+P");
+  const quickOpenTrigger = page.locator('button[title="快速打开文档 (Ctrl+P)"]');
+  await quickOpenTrigger.click();
   await expect(page.getByRole("dialog", { name: "快速打开" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "快速打开文档" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
+  await expect(quickOpenTrigger).toBeFocused();
 
-  await page.getByRole("searchbox", { name: "快速打开文档" }).fill("quick-note");
+  await page.keyboard.press("Control+P");
+  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开" });
+  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文档" });
+  await expect(quickOpenDialog).toBeVisible();
+  await expect(quickOpenSearch).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(quickOpenDialog.getByRole("option").last()).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(quickOpenSearch).toBeFocused();
+
+  await quickOpenSearch.fill("quick-note");
   await expect(page.getByRole("option", { name: /quick-note\.md/ })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
@@ -149,9 +170,12 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab")).toHaveCount(3);
 });
 
-test("opens the command palette from the keyboard", async ({ page }) => {
+test("opens the command palette and restores trigger focus", async ({ page }) => {
   await page.goto("/");
 
+  await openMoreMenu(page);
+  const commandTrigger = page.getByRole("button", { name: "命令面板", exact: true });
+  await commandTrigger.focus();
   await page.keyboard.press("Control+Shift+P");
   const palette = page.getByRole("dialog", { name: "命令面板" });
   await expect(palette).toBeVisible();
@@ -160,6 +184,7 @@ test("opens the command palette from the keyboard", async ({ page }) => {
 
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
+  await expect(commandTrigger).toBeFocused();
 });
 
 test("keeps supported markdown syntax through the wysiwyg editor", async ({ page }) => {

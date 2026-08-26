@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { WorkspaceIndexEntry } from "../types";
 import { createLinkIndex, findLinkedEntry, type WorkspaceLinkIndex } from "../workspace-index";
+import { useModalBehavior } from "./useModalBehavior";
 
 type RelationGraphProps = {
   current?: WorkspaceIndexEntry;
@@ -59,7 +60,10 @@ function graphNodes(
 }
 
 export function RelationGraph({ current, entries, onClose, onOpenFile }: RelationGraphProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const linkIndex = useMemo(() => createLinkIndex(entries), [entries]);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
   if (!current) return null;
 
   const nodes = graphNodes(current, entries, linkIndex);
@@ -87,13 +91,20 @@ export function RelationGraph({ current, entries, onClose, onOpenFile }: Relatio
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="relation-graph" role="dialog" aria-modal="true" aria-labelledby="graph-title">
+      <section
+        ref={dialogRef}
+        className="relation-graph"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="graph-title"
+        tabIndex={-1}
+      >
         <header className="graph-header">
           <div>
             <div className="panel-kicker">RELATIONS</div>
             <h2 id="graph-title">文档关系图</h2>
           </div>
-          <button type="button" className="find-button" onClick={onClose} aria-label="关闭关系图">
+          <button ref={closeButtonRef} type="button" className="find-button" onClick={onClose} aria-label="关闭关系图">
             ×
           </button>
         </header>
