@@ -47,6 +47,17 @@ type EditorViewInstance = {
   };
 };
 
+type DesktopE2eEditorView = {
+  state: {
+    doc: { content: { size: number }; resolve: (position: number) => unknown };
+    selection: { constructor: { near: (resolvedPosition: unknown) => unknown } };
+    tr: {
+      setSelection: (selection: unknown) => { insertText: (text: string) => unknown };
+    };
+  };
+  dispatch: (transaction: unknown) => void;
+};
+
 type SerializerInstance = (doc: unknown) => string;
 
 type ParentNodeLike = {
@@ -320,6 +331,23 @@ function MilkdownSurface({
       setCompletion(next);
     };
 
+    let desktopE2eInsertText: ((value: string) => void) | null = null;
+    if (__MOYANG_DESKTOP_E2E__) {
+      desktopE2eInsertText = (value) => {
+        const view = viewRef.current as unknown as DesktopE2eEditorView | null;
+        if (!view) return;
+
+        const end = view.state.doc.content.size;
+        const selection = view.state.selection.constructor.near(view.state.doc.resolve(end));
+        view.dispatch(view.state.tr.setSelection(selection).insertText(value));
+        updateCompletion();
+      };
+      window.__moyangDesktopE2e = {
+        ...window.__moyangDesktopE2e,
+        insertWysiwygText: desktopE2eInsertText,
+      };
+    }
+
     const handleInput = () => updateCompletion();
 
     const handleKeyDownCapture = (event: KeyboardEvent) => {
@@ -377,6 +405,9 @@ function MilkdownSurface({
           lastSyncedMarkdownRef.current = markdown;
           onChangeRef.current(markdown);
         }
+      }
+      if (desktopE2eInsertText && window.__moyangDesktopE2e?.insertWysiwygText === desktopE2eInsertText) {
+        delete window.__moyangDesktopE2e.insertWysiwygText;
       }
       viewRef.current = null;
     };

@@ -19,6 +19,22 @@ async function clickToolbarAction(name) {
   await browser.$(`button=${name}`).click();
 }
 
+async function ensureWysiwygMode() {
+  const editable = await browser.$('.wysiwyg-editor [contenteditable="true"]');
+  if (await editable.isExisting()) {
+    await editable.waitForDisplayed();
+    return editable;
+  }
+
+  const sourceEditor = await browser.$('[aria-label="Markdown 源文本"]');
+  if (await sourceEditor.isExisting()) {
+    await clickToolbarAction("阅读");
+  }
+  await clickToolbarAction("编辑");
+  await editable.waitForDisplayed();
+  return editable;
+}
+
 async function clickWorkspaceExportAction(name) {
   const menu = await browser.$("details.workspace-export-menu");
   if ((await menu.getAttribute("open")) === null) {
@@ -146,6 +162,92 @@ describe("Moyang Reader desktop runtime", () => {
     });
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
+  });
+
+  it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
+    await waitForWorkspaceEntry(
+      ".workspace-file",
+      "wiki-target.md",
+      true,
+      "the desktop wiki-link fixture was not indexed in the workspace",
+    );
+    const editable = await ensureWysiwygMode();
+    await editable.click();
+    await browser.execute((text) => {
+      const insert = window.__moyangDesktopE2e?.insertWysiwygText;
+      if (!insert) throw new Error("desktop WYSIWYG E2E bridge is unavailable");
+      insert(text);
+    }, "[[wiki");
+
+    const wikiOverlay = await browser.$('[role="listbox"][aria-label="双链补全候选"]');
+    try {
+      await wikiOverlay.waitForDisplayed();
+    } catch (cause) {
+      const debug = await browser.execute(() => ({
+        editorText: document.querySelector('.wysiwyg-editor [contenteditable="true"]')?.textContent ?? null,
+        editorHtml: document.querySelector('.wysiwyg-editor [contenteditable="true"]')?.innerHTML ?? null,
+        workspaceFiles: Array.from(document.querySelectorAll(".workspace-file")).map((element) => element.textContent),
+      }));
+      throw new Error(`${cause.message}; desktop completion debug: ${JSON.stringify(debug)}`, { cause });
+    }
+    await browser.waitUntil(
+      () =>
+        wikiOverlay
+          .$('[role="option"]')
+          .getText()
+          .then((text) => text.includes("wiki-target")),
+      { timeout: 5_000, timeoutMsg: "the desktop wiki-link completion did not show the fixture note" },
+    );
+    await wikiOverlay.$('[role="option"]').click();
+    await browser.waitUntil(() => wikiOverlay.isDisplayed().then((visible) => !visible), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop wiki-link completion did not close after acceptance",
+    });
+
+    await clickToolbarAction("源文本");
+    const editor = await browser.$('[aria-label="Markdown 源文本"]');
+    await editor.waitForDisplayed();
+    await browser.waitUntil(
+      () => editor.getText().then((text) => text.includes("[[wiki-target]]") || text.includes("\\[\\[wiki-target]]")),
+      {
+        timeout: 5_000,
+        timeoutMsg: "the desktop wiki-link completion did not serialize the accepted link",
+      },
+    );
+
+    await editor.click();
+    await browser.execute((text) => {
+      const insert = window.__moyangDesktopE2e?.insertSourceText;
+      if (!insert) throw new Error("desktop source E2E bridge is unavailable");
+      insert(text);
+    }, "\n/ul");
+    const slashMenu = await browser.$(".cm-tooltip-autocomplete");
+    await slashMenu.waitForDisplayed();
+    await browser.waitUntil(() => slashMenu.getText().then((text) => text === "无序列表- 列表项"), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop slash completion did not filter the list command",
+    });
+    await browser.execute(() => {
+      const accept = window.__moyangDesktopE2e?.acceptSourceCompletion;
+      if (!accept) throw new Error("desktop source completion accept bridge is unavailable");
+      accept();
+    });
+    try {
+      await browser.waitUntil(() => editor.getText().then((text) => text.includes("- ")), {
+        timeout: 5_000,
+        timeoutMsg: "the desktop slash completion did not insert a list marker",
+      });
+    } catch (cause) {
+      throw new Error(`${cause.message}; source after slash completion: ${JSON.stringify(await editor.getText())}`, {
+        cause,
+      });
+    }
+
+    await clickToolbarAction("保存");
+    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8").includes("wiki-target"), {
+      timeout: 15_000,
+      timeoutMsg: "the desktop completion scenario did not save its fixture edits",
+    });
   });
 
   it("exports the workspace to HTML and Word through the real Tauri write path", async () => {

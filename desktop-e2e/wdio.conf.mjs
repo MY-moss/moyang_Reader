@@ -9,6 +9,8 @@ const fixtureRoot = configuredDocumentPath
   ? path.dirname(configuredDocumentPath)
   : fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-"));
 const documentPath = configuredDocumentPath ?? path.join(fixtureRoot, "desktop-e2e.md");
+const wikiTargetPath = path.join(fixtureRoot, "wiki-target.md");
+const ownsWikiTarget = !fs.existsSync(wikiTargetPath);
 const workspacePath = fixtureRoot;
 const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
 const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
@@ -24,11 +26,15 @@ const applicationPath = path.join(
 if (!configuredDocumentPath) {
   fs.writeFileSync(documentPath, "# Desktop E2E\n\n初始内容。\n", "utf8");
 }
+if (ownsWikiTarget) {
+  fs.writeFileSync(wikiTargetPath, "# Wiki target\n\n桌面双链候选文档。\n", "utf8");
+}
 process.env.MOYANG_DESKTOP_E2E_DOCUMENT = documentPath;
 process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT = exportRoot;
 
 function cleanupFixture() {
   if (ownsExportRoot) fs.rmSync(exportRoot, { recursive: true, force: true });
+  if (ownsWikiTarget) fs.rmSync(wikiTargetPath, { force: true });
   if (configuredDocumentPath) return;
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
