@@ -997,4 +997,3 @@ test("dismisses topbar menus with an outside click or Escape", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(overflowMenu).not.toHaveAttribute("open");
 });
-
