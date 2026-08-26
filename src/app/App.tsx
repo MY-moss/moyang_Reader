@@ -3233,6 +3233,7 @@ export function App() {
         onImportSettings={importPortableSettings}
         onOpen={() => void openSelectedFile()}
         onChooseWorkspace={() => void handleChooseWorkspace()}
+        workspaceOpen={Boolean(workspacePath)}
         onQuickOpen={() => setQuickOpen(true)}
         draftCount={draftSnapshots.length}
         onOpenRecovery={() => setDraftRecoveryOpen(true)}
@@ -3399,7 +3400,12 @@ export function App() {
             </div>
           )}
           {!loading && !documentState && (
-            <EmptyState onOpen={() => void openSelectedFile()} onChooseWorkspace={() => void handleChooseWorkspace()} />
+            <EmptyState
+              onOpen={() => void openSelectedFile()}
+              onChooseWorkspace={() => void handleChooseWorkspace()}
+              hasWorkspace={Boolean(workspacePath)}
+              showWorkspaceAction={!workspacePath && !sidebarCollapsed}
+            />
           )}
           {!loading && documentState && documentState.kind === "pdf" && mode === "rendered" && (
             <PdfPreview name={documentState.name} src={documentState.previewUrl} />

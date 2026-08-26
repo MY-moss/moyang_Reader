@@ -31,7 +31,7 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile }: WorkspaceF
       onClick={() => onOpenFile(file.path)}
     >
       <span>{file.name}</span>
-      {depth === 0 && <small>{file.relativePath === file.name ? "" : file.relativePath}</small>}
+      {depth === 0 && file.relativePath !== file.name && <small>{file.relativePath}</small>}
     </button>
   );
 }

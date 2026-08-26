@@ -141,9 +141,11 @@ export function WorkspacePanel({
               取消导出
             </button>
           )}
-          <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
-            {workspacePath ? "更换文件夹" : "添加文件夹"}
-          </button>
+          {workspacePath && (
+            <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
+              更换文件夹
+            </button>
+          )}
         </div>
       </div>
 
