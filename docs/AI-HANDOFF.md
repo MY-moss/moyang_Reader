@@ -36,10 +36,10 @@
 - 修改文件和行为变化；
 - 已运行命令及结果；
 - 已知限制、风险和回滚方式；
-- 当前切片（#104 搜索索引预算回退，PR #235）：已合并到 `main`（合并提交 `7ff67dbf`）；本地和 GitHub 正式 Quality checks 均已通过，Issue #104 保持 open，已纳入 `v0.9.1` patch。
-- 在线下一步：发布分支 `codex/release-v0.9.1-2026-08-27` 已从 `7ff67dbf` 创建，正在同步版本元数据和 CHANGELOG；合并后由 Release workflow 生成 Windows x64 安装包、`.sig`、`latest.json`，再同步 Cloudflare 镜像并验证旧版本更新链路。
-- 已知限制：之前的应用 API 提交没有产生 Actions run；本次不绕过分支保护、不强制覆盖远程，只使用快进更新现有功能分支。
-- 关联 Issue、PR 和是否需要 Release。
+- 当前切片：填写本次功能切片的 Issue、PR、合并提交和验证结果；未完成的 Issue 保持 open，并注明计划版本。
+- 在线下一步：稳定批次合并后，按 `docs/RELEASE-POLICY.md` 判断是否生成 Windows x64 安装包、`.sig`、`latest.json` 和镜像资产。
+- 已知限制：记录真实失败根因、重试次数和未验证边界；不绕过分支保护、不强制覆盖远程。
+- 关联 Issue、PR、是否需要 Release，以及下一位 AI 的唯一下一步。
 
 ## PR 规则
 
@@ -71,17 +71,19 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 > **最新检查点（2026-08-27，优先于下方历史条目）**
 >
-> - 稳定基线：`v0.9.1`；`main` 当前合并提交为 `6682aa06bd0b38c6c6300b2b693696b955833607`（已包含 PR #238 的 #231 修复）。
+> - 发布目标：`v0.9.2`；发布分支 `codex/release-v0.9.2-2026-08-27` 基于最新 `main` `aa756b8518de37352efc1458ce05f9a654c754b6` 创建，包含已完成的 #174、#188、#231 稳定化切片；当前仍处于发布候选阶段。
 > - GitHub Release 已发布：[`v0.9.1`](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.1)，Release workflow [`32996354493`](https://github.com/MY-moss/moyang_Reader/actions/runs/32996354493) 成功；安装包 4,861,912 字节，SHA-256 `bf511b08459d78023055fecd9605579dae23cf883826203309460f4f1d36a35f`；`.sig` 424 字节，SHA-256 `47d9185a297e4839f7d33ac5db68572a9fae323e1c6a82a724187ccf4df04bef`。
 > - Cloudflare 根 manifest、`/v0.9.1/` 安装包和 `.sig` 均 HTTP 200，镜像安装包与 GitHub Release SHA-256 一致；镜像 workflow [`32998515986`](https://github.com/MY-moss/moyang_Reader/actions/runs/32998515986) 在凭据预检失败，仓库当前没有 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` Secret。不要把该失败记录为部署成功，也不要在聊天中传递 token。
 > - PR #237 已将两项流程修复合并到 `main`：CI 并发组按事件隔离；Release 工作流直接调用镜像工作流，避免 `GITHUB_TOKEN` 创建 Release 后不触发 `release` 事件。该流程切片只改 CI/发布/文档，不生成新安装包。
 > - 镜像自动部署的唯一外部前置是维护者在 GitHub Actions Secrets 中配置 Cloudflare API Token（仅 Pages 编辑权限）和账户 ID；流程修复合并后应先补齐 Secrets，再在下一次稳定 Release 验证端到端镜像部署。
 
+> - #88 已关闭的范围是 Windows 真实桌面 E2E 基线；PDF 文件真实落盘和旧版本更新器实机回归仍未完成，已单独登记为 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，计划放入 v0.9.3。不要把 #88 的关闭状态当作这两项工作的完成证明。
+
 - 已完成切片（#231，PR #238）：顶栏“更多 / 设置 / 导出”菜单新增捕获阶段的外点 `pointerdown` 与 `Escape` 关闭；菜单内部控件不受影响，关闭时会一并收起嵌套菜单。`e2e/smoke.spec.ts` 新增外点和 Esc 回归，本地单测 168/168、lint、构建及顶栏 E2E 2/2 已通过；PR #238 已合并到 `main`，Issue #231 已标记 completed；本切片不单独生成安装包，纳入 v0.9.2 稳定批次。
 
 - 已完成切片（#174，PR #239）：在 `src/main.tsx` 根节点接入独立 `ErrorBoundary`，捕获渲染期异常并显示可重新加载的恢复页；错误详情仅在本地折叠显示并写入开发者控制台，不上传或覆盖用户文件。新增 `ErrorBoundary.test.tsx` 覆盖恢复页和重载回调；PR #239 已合并为 `99cb59701a71b05cd8da81047b1ec9fe90eb04da`，Issue #174 已标记 completed；本切片不单独生成安装包，纳入 v0.9.2 稳定批次。
 
-- 当前切片（#188，`codex/typography-hierarchy-2026-08-27`）：统一阅读模式、Milkdown WYSIWYG 和 HTML 导出的 h4/h5/h6 层级与列表排版节奏；h4 使用 19px，列表提供缩进、嵌套间距、列表标记色和多段列表项收束规则。新增 HTML 导出回归与真实浏览器样式 E2E；本切片不单独生成安装包，纳入 v0.9.2 稳定批次。
+- 已完成切片（#188，PR #240）：统一阅读模式、Milkdown WYSIWYG 和 HTML 导出的 h4/h5/h6 层级与列表排版节奏；h4 使用 19px，列表提供缩进、嵌套间距、列表标记色和多段列表项收束规则。新增 HTML 导出回归与真实浏览器样式 E2E；PR #240 已合并到 `main`，Issue #188 已标记 completed；纳入 v0.9.2 稳定批次。
 
 - 历史基线：`v0.9.0`（详细历史合并记录保留在本文件中）；当前状态以“最新检查点”为准。
 - 历史切片（Cloudflare 静态镜像发布链路）：该阶段已确认静态资产映射、重试校验和缺少凭据时失败的行为；v0.9.1 的真实资产与自动同步状态以最新检查点为准。
@@ -116,5 +118,5 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - v0.9.0 发布结果：PR #222 已合并；Release workflow [32933116043](https://github.com/MY-moss/moyang_Reader/actions/runs/32933116043) 和镜像 workflow [32934449872](https://github.com/MY-moss/moyang_Reader/actions/runs/32934449872) 均通过，公开 Release 为 [v0.9.0](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.0)。GitHub 与 Cloudflare 的 `latest.json` 均为 `0.9.0`、HTTP 200；两边 Windows 安装包均为 4,862,669 字节，SHA-256 为 `063a075e50a39d013725eb25a5eb5f38dbf70f4dd39b201b17f99daf6bec497d`；GitHub 与镜像安装包均 HTTP 200，签名文件均 HTTP 200、424 字节，manifest 均带签名字段。
 - 更新验证边界：本机检测到已安装 `v0.8.1`，v0.9.0 的 GitHub/镜像 manifest、安装包、签名和 HTTPS 下载链路均已验证；本次仍未自动点击旧版本的“下载并安装”并重启，不能将其记录为完整旧版本实机升级回归。下一次 Windows 实机回归需验证旧版本点击更新、签名校验、替换安装和重启后的版本号。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；确认 #188 的质量检查、合并和 Issue 状态，合并后从最新 `main` 选择下一个 Ready 切片；v0.9.2 稳定验收时统一生成安装包。维护者仍需在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，再手动重跑 v0.9.1 镜像工作流；不要把 token 放入聊天、仓库或文档。镜像资产目前已在线且与 GitHub Release 哈希一致；不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
+- 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；完成 v0.9.2 发布分支的质量检查、PR 合并、Windows x64 安装包/签名/manifest 生成及 Cloudflare 镜像核验；发布完成后再从最新 `main` 选择下一个 Ready 切片。若 #241 尚未具备 Ready 条件，不要提前实现 PDF/更新器功能。维护者仍需在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，不要把 token 放入聊天、仓库或文档。镜像资产目前已在线且与 GitHub Release 哈希一致；不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
 - CI 触发记录：PR #236 的 head `e364648fe703c4689a148f894525a68d25452a1b` 的 push `Quality checks` 曾被并发重跑取消，恢复后的 job `98264563669` 已成功；PR #236 已合并为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。Release workflow `32996354493` 已成功，镜像 workflow `32998515986` 仅因 Cloudflare Secrets 缺失失败。
