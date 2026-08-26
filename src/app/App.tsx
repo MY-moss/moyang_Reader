@@ -179,9 +179,26 @@ import {
   type DraftSnapshot,
   type DraftSaveResult,
 } from "./draft-recovery";
+import {
+  canRedoEditorChange,
+  canUndoEditorChange,
+  createEditorHistory,
+  redoEditorChange,
+  recordEditorChange,
+  undoEditorChange,
+  type EditorHistoryState,
+} from "./editor-history";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
+}
+
+function focusEditorSurface(surface: Element | null): void {
+  if (!surface) return;
+  const target = surface.matches('textarea, [contenteditable="true"], .cm-content')
+    ? surface
+    : surface.querySelector<HTMLElement>('.cm-content, [contenteditable="true"], textarea');
+  if (target instanceof HTMLElement) target.focus();
 }
 
 const LazyMarkdownWysiwygEditor = lazy(() =>
@@ -388,6 +405,7 @@ export function App() {
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
   const [sourceDraft, setSourceDraft] = useState("");
+  const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -460,6 +478,7 @@ export function App() {
   const documentStateRef = useRef<OpenDocument | null>(null);
   const closeConfirmationOpenRef = useRef(false);
   const sourceDraftRef = useRef(sourceDraft);
+  const editorHistoryRef = useRef(editorHistory);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const openTabsRef = useRef<RecentFile[]>(openTabs);
@@ -511,6 +530,61 @@ export function App() {
     }
     return true;
   }, []);
+
+  const resetEditorHistory = useCallback((documentKey: string, source: string) => {
+    const nextHistory = createEditorHistory(documentKey, source);
+    editorHistoryRef.current = nextHistory;
+    setEditorHistory(nextHistory);
+  }, []);
+
+  const applyEditorHistoryState = useCallback((nextHistory: EditorHistoryState, focusTarget?: Element | null) => {
+    const activeEditor =
+      focusTarget?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??
+      (typeof document !== "undefined"
+        ? (document.activeElement?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??
+          document.querySelector<HTMLElement>(".source-editor, .wysiwyg-editor"))
+        : null);
+    editorHistoryRef.current = nextHistory;
+    setEditorHistory(nextHistory);
+    sourceDraftRef.current = nextHistory.present;
+    setSourceDraft(nextHistory.present);
+    setDocumentState((current) =>
+      current && isSameDocumentPath(current.path, nextHistory.documentKey)
+        ? { ...current, modified: nextHistory.present !== current.source }
+        : current,
+    );
+    if (activeEditor) {
+      window.requestAnimationFrame(() => {
+        focusEditorSurface(activeEditor);
+      });
+    }
+  }, []);
+
+  const undoEditor = useCallback(
+    (focusTarget?: Element | null) => {
+      const current = documentStateRef.current;
+      const history = editorHistoryRef.current;
+      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))
+        return;
+
+      const nextHistory = undoEditorChange(history);
+      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);
+    },
+    [applyEditorHistoryState],
+  );
+
+  const redoEditor = useCallback(
+    (focusTarget?: Element | null) => {
+      const current = documentStateRef.current;
+      const history = editorHistoryRef.current;
+      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))
+        return;
+
+      const nextHistory = redoEditorChange(history);
+      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);
+    },
+    [applyEditorHistoryState],
+  );
 
   const flushCurrentDraft = useCallback((): DraftFlushOutcome => {
     const current = documentStateRef.current;
@@ -1334,6 +1408,7 @@ export function App() {
         setExternalChangePath(null);
         setSourceDraft(source);
         sourceDraftRef.current = source;
+        resetEditorHistory(path, source);
         setDraftRecovery(findDraftSnapshot(path, source));
         setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
@@ -1355,7 +1430,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources],
+    [releaseDocumentResources, resetEditorHistory],
   );
 
   const openBinary = useCallback(
@@ -1402,6 +1477,7 @@ export function App() {
         setExternalChangePath(null);
         setSourceDraft("");
         sourceDraftRef.current = "";
+        resetEditorHistory(path, "");
         setDraftRecovery(null);
         setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
@@ -1420,7 +1496,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources],
+    [releaseDocumentResources, resetEditorHistory],
   );
 
   const openPath = useCallback(
@@ -2019,6 +2095,32 @@ export function App() {
   }, [focusMode, handleChooseWorkspace, handleInsertLink, mode, openSelectedFile, saveDocument, toggleReadingEditing]);
 
   useEffect(() => {
+    const handleEditorHistoryShortcut = (event: KeyboardEvent) => {
+      if (event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (mode !== "source" && mode !== "wysiwyg") return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const editorSurface = target?.closest(".source-editor, .wysiwyg-editor");
+      const activeElement = document.activeElement;
+      const focusIsDocument = activeElement === document.body || activeElement === document.documentElement;
+      if (!editorSurface && !focusIsDocument) return;
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = key === "y" || (key === "z" && event.shiftKey);
+      if (!isUndo && !isRedo) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      if (isUndo) undoEditor(editorSurface);
+      else redoEditor(editorSurface);
+    };
+
+    window.addEventListener("keydown", handleEditorHistoryShortcut, true);
+    return () => window.removeEventListener("keydown", handleEditorHistoryShortcut, true);
+  }, [mode, redoEditor, undoEditor]);
+
+  useEffect(() => {
     const path = documentState?.path;
     const kind = documentState?.kind;
     const requestId = ++sourceRenderRequestRef.current;
@@ -2070,6 +2172,15 @@ export function App() {
   const updateSource = useCallback((nextSource: string) => {
     const current = documentStateRef.current;
     if (!current || !isEditableDocument(current.kind)) return;
+
+    const history = editorHistoryRef.current;
+    const nextHistory = isSameDocumentPath(history.documentKey, current.path)
+      ? recordEditorChange(history, nextSource)
+      : createEditorHistory(current.path, nextSource);
+    if (nextHistory !== history) {
+      editorHistoryRef.current = nextHistory;
+      setEditorHistory(nextHistory);
+    }
     sourceDraftRef.current = nextSource;
     setSourceDraft(nextSource);
     setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
@@ -2918,6 +3029,12 @@ export function App() {
         case "save":
           void saveDocument();
           break;
+        case "undo":
+          undoEditor();
+          break;
+        case "redo":
+          redoEditor();
+          break;
         case "link":
           handleInsertLink();
           break;
@@ -2929,8 +3046,19 @@ export function App() {
           break;
       }
     },
-    [handleChooseWorkspace, handleInsertLink, openSelectedFile, saveDocument, toggleReadingEditing],
+    [
+      handleChooseWorkspace,
+      handleInsertLink,
+      openSelectedFile,
+      redoEditor,
+      saveDocument,
+      toggleReadingEditing,
+      undoEditor,
+    ],
   );
+  const canEditHistory = canEdit && mode !== "rendered";
+  const canUndo = canEditHistory && canUndoEditorChange(editorHistory);
+  const canRedo = canEditHistory && canRedoEditorChange(editorHistory);
   const commandItems = useMemo<ReaderCommand[]>(
     () => [
       {
@@ -2961,6 +3089,18 @@ export function App() {
         disabled: !documentState?.modified,
       },
       {
+        id: "undo",
+        label: "撤销上一次编辑",
+        shortcut: "Ctrl Z",
+        disabled: !canUndo,
+      },
+      {
+        id: "redo",
+        label: "重做上一次编辑",
+        shortcut: "Ctrl Y",
+        disabled: !canRedo,
+      },
+      {
         id: "link",
         label: "插入 Markdown 链接",
         shortcut: "Ctrl K",
@@ -2977,7 +3117,7 @@ export function App() {
         disabled: !documentState,
       },
     ],
-    [canEdit, focusMode, mode, rightPanelOpen, documentState],
+    [canEdit, canRedo, canUndo, focusMode, mode, rightPanelOpen, documentState],
   );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
@@ -3296,6 +3436,10 @@ export function App() {
         onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={toggleReadingEditing}
         onCycleMode={toggleDocumentMode}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undoEditor}
+        onRedo={redoEditor}
         rightPanelOpen={rightPanelOpen}
         onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}

@@ -49,6 +49,10 @@ type TopBarProps = {
   onToggleFocusMode: () => void;
   onToggleMode: () => void;
   onCycleMode: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   onOpenCommandPalette: () => void;
@@ -121,6 +125,10 @@ export function TopBar({
   onToggleFocusMode,
   onToggleMode,
   onCycleMode,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   rightPanelOpen,
   onToggleRightPanel,
   onOpenCommandPalette,
@@ -286,6 +294,32 @@ export function TopBar({
           >
             {mode === "rendered" ? t("action.edit") : t("action.read")}
           </button>
+        )}
+        {fileName && canEdit && mode !== "rendered" && (
+          <div className="toolbar-history" role="group" aria-label="编辑历史">
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              aria-label="撤销"
+              aria-keyshortcuts="Control+Z"
+              title="撤销 (Ctrl+Z)"
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              aria-label="重做"
+              aria-keyshortcuts="Control+Y"
+              title="重做 (Ctrl+Y)"
+            >
+              ↷
+            </button>
+          </div>
         )}
         {draftCount > 0 && (
           <button

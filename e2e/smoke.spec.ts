@@ -207,6 +207,48 @@ test("keeps a direct read/edit action for immediate WYSIWYG editing", async ({ p
   await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
 });
 
+test("shares undo and redo history between WYSIWYG and source editing", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "editor-history.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Editor history\n\n原始内容。\n"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await editable.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("可撤销内容。");
+  await expect(editable).toContainText("可撤销内容。");
+
+  // Milkdown emits the serialized Markdown on a short debounce. Wait for the
+  // application-level history to receive that snapshot before undoing it.
+  await page.waitForTimeout(350);
+  const undoButton = page.getByRole("button", { name: "撤销", exact: true });
+  const redoButton = page.getByRole("button", { name: "重做", exact: true });
+  await expect(undoButton).toBeEnabled();
+
+  await page.keyboard.press("Control+Z");
+  await expect(editable).not.toContainText("可撤销内容。");
+  await expect(redoButton).toBeEnabled();
+
+  await page.keyboard.press("Control+Shift+Z");
+  await expect(redoButton).toBeDisabled();
+  await expect(editable).toContainText("可撤销内容。");
+
+  await clickToolbarAction(page, "源文本");
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expectEditorText(editor, "# Editor history\n\n原始内容。\n\n可撤销内容。\n");
+
+  await editor.click();
+  await page.keyboard.press("Control+Z");
+  await expectEditorText(editor, "# Editor history\n\n原始内容。\n");
+  await page.keyboard.press("Control+Y");
+  await expectEditorText(editor, "# Editor history\n\n原始内容。\n\n可撤销内容。\n");
+});
+
 test("opens the command palette and restores trigger focus", async ({ page }) => {
   await page.goto("/");
 
