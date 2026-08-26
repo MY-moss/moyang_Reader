@@ -26,7 +26,8 @@
 ## v0.9.3 当前进度
 
 - 已完成：当前文档的 Windows PDF 保存路径、Edge headless 渲染、有效 PDF 文件头校验、原子替换，以及真实 Tauri 桌面 smoke；已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并，远程 `main` 合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`。
-- 未完成：从已安装旧版本启动的更新下载、签名校验、替换、重启和版本号回归；完成前不关闭 #241，也不创建 v0.9.3 Release。
+- 已完成：从已登记的 Windows x64 v0.8.0 安装实例启动，检查到 v0.9.2，并完成下载、签名校验、替换、自动重启和版本号确认；未登记的旧副本不计入回归。
+- 未完成：将 PDF 与更新器回归纳入 v0.9.3 的版本同步、Release、manifest、签名和 Cloudflare 镜像稳定发布；完成前不关闭 #241。
 
 ## UI 与交互深化方向（v0.10.2 候选切片）
 

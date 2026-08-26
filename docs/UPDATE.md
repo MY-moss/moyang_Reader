@@ -83,6 +83,14 @@ git push origin v0.9.0
 - 新安装包能正常打开 Markdown、添加整个文件夹和读取图片附件。
 - 从旧版本点击“更新”能检测到新版本并完成重启。
 
+## Windows 旧版本升级实机回归（2026-08-27）
+
+- 使用 GitHub Release 提供的 Windows x64 v0.8.0 NSIS 安装包，将实例安装到 Windows 注册表登记的安装位置。
+- 从 v0.8.0 启动应用，手动检查到 v0.9.2；确认更新提示后完成下载、签名校验、替换安装和自动重启。
+- 重启后注册表 `DisplayVersion`、应用文件 `ProductVersion` 和界面版本均为 v0.9.2，进程路径仍为同一登记安装位置，且重启前后进程 PID 不同。
+- 不把未写入 Windows 卸载注册表的旧副本当作安装更新回归结果；更新器遵循登记安装位置，这是 Windows NSIS 安装实例的有效验证边界。
+- v0.9.3 仍需单独完成版本同步、Release、manifest、签名、Cloudflare 镜像和旧版本升级复核后再对外发布。
+
 ## v0.8.2 在线核验记录
 
 - GitHub Release：[v0.8.2](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.8.2)，Release workflow [32900250651](https://github.com/MY-moss/moyang_Reader/actions/runs/32900250651) 全部通过。
