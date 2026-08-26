@@ -38,6 +38,7 @@ import {
   authorizeStoredPath,
   closeWindow,
   createMarkdownFile,
+  exportPdfFile,
   fileExists,
   fileSize,
   indexWorkspace,
@@ -333,6 +334,9 @@ type BrowserDocument = {
 type PrintPreviewState = {
   title: string;
   html: string;
+  defaultPath?: string;
+  actionLabel?: string;
+  actionHint?: string;
   paper: ExportPaper;
   orientation: ExportOrientation;
   margin: ExportMargin;
@@ -743,19 +747,27 @@ export function App() {
 
     let frame: number | null = null;
     let attempts = 0;
+    const maxRestoreAttempts = 60;
+    const retryRestore = () => {
+      if (attempts >= maxRestoreAttempts) return;
+      attempts += 1;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        restorePosition();
+      });
+    };
     const restorePosition = () => {
       const contentArea = contentAreaRef.current;
       if (!contentArea) return;
       const storedTop = loadReadingPosition(path);
-      contentArea.scrollTop = storedTop;
-      readingPositionRef.current = { path, top: contentArea.scrollTop };
-      if (storedTop > 0 && contentArea.scrollTop === 0 && attempts < 6) {
-        attempts += 1;
-        frame = window.requestAnimationFrame(() => {
-          frame = null;
-          restorePosition();
-        });
+      const maxScrollTop = Math.max(0, contentArea.scrollHeight - contentArea.clientHeight);
+      if (storedTop > 0 && maxScrollTop === 0) {
+        retryRestore();
+        return;
       }
+      contentArea.scrollTop = Math.min(storedTop, maxScrollTop);
+      readingPositionRef.current = { path, top: contentArea.scrollTop };
+      if (storedTop > 0 && contentArea.scrollTop === 0) retryRestore();
     };
     const timer = window.setTimeout(restorePosition, 0);
     return () => {
@@ -2372,6 +2384,19 @@ export function App() {
     );
   }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
+  const savePdfDocument = useCallback(async (html: string, defaultPath: string): Promise<boolean> => {
+    if (!isTauriRuntime()) {
+      await printHtmlDocument(html);
+      return true;
+    }
+
+    const path = await chooseSavePath(defaultPath, "pdf");
+    if (!path) return false;
+    await exportPdfFile(path, html);
+    setSettingsNotice(`已保存 PDF：${fileNameFromPath(path)}。`);
+    return true;
+  }, []);
+
   const handleExport = useCallback(async () => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
       const anchor = document.createElement("a");
@@ -2381,16 +2406,18 @@ export function App() {
       anchor.click();
       return;
     }
+    if (!documentState) return;
 
     try {
       const html = await buildCurrentExportHtml();
       if (!html) return;
-      await printHtmlDocument(html);
+      const saved = await savePdfDocument(html, pathWithExtension(documentState.path, "pdf"));
+      if (!saved) return;
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");
     }
-  }, [buildCurrentExportHtml, documentState]);
+  }, [buildCurrentExportHtml, documentState, savePdfDocument]);
 
   const handlePreviewPrint = useCallback(async () => {
     if (!documentState) return;
@@ -2401,6 +2428,11 @@ export function App() {
       setPrintPreview({
         title: documentState.name,
         html,
+        defaultPath: pathWithExtension(documentState.path, "pdf"),
+        actionLabel: isTauriRuntime() ? "保存 PDF" : "打印 / 保存 PDF",
+        actionHint: isTauriRuntime()
+          ? "Windows 桌面版会将 PDF 保存到所选位置 · 预览内容不会修改原文"
+          : "预计页数以系统打印对话框为准 · 预览内容不会修改原文",
         paper: preferences.exportPaper,
         orientation: preferences.exportOrientation,
         margin: preferences.exportMargin,
@@ -2511,20 +2543,28 @@ export function App() {
     if (!printPreview) return;
 
     try {
-      await printHtmlDocument(printPreview.html);
       const batch = pdfBatchExportRef.current;
-      if (batch && batch.nextIndex < batch.files.length) {
-        await prepareNextPdfBatch();
-      } else if (batch) {
-        finishPdfBatch(false);
+      if (batch) {
+        await printHtmlDocument(printPreview.html);
+        if (batch.nextIndex < batch.files.length) {
+          await prepareNextPdfBatch();
+        } else {
+          finishPdfBatch(false);
+        }
       } else {
+        if (!documentState) return;
+        const saved = await savePdfDocument(
+          printPreview.html,
+          printPreview.defaultPath ?? pathWithExtension(documentState.path, "pdf"),
+        );
+        if (!saved) return;
         setPrintPreview(null);
       }
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "打开打印预览失败。");
+      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");
     }
-  }, [finishPdfBatch, prepareNextPdfBatch, printPreview]);
+  }, [documentState, finishPdfBatch, prepareNextPdfBatch, printPreview, savePdfDocument]);
 
   const handleClosePrintPreview = useCallback(() => {
     if (pdfBatchExportRef.current) finishPdfBatch(true);
@@ -3448,7 +3488,13 @@ export function App() {
         copyFeedback={copyFeedback}
         onExport={() => void handleExport()}
         exportLabel={
-          documentState?.kind === "pdf" ? "打开 PDF" : documentState?.kind === "image" ? "打开图片" : "打印 / PDF"
+          documentState?.kind === "pdf"
+            ? "打开 PDF"
+            : documentState?.kind === "image"
+              ? "打开图片"
+              : isTauriRuntime()
+                ? "保存 PDF"
+                : "打印 / PDF"
         }
         canPreviewPrint={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
         onPreviewPrint={() => void handlePreviewPrint()}
@@ -3745,6 +3791,8 @@ export function App() {
         <PrintPreview
           title={printPreview.title}
           html={printPreview.html}
+          actionLabel={printPreview.actionLabel}
+          actionHint={printPreview.actionHint}
           paper={printPreview.paper}
           orientation={printPreview.orientation}
           margin={printPreview.margin}

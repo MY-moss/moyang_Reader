@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,6 +11,8 @@ assert.ok(exportRoot, "desktop E2E export path should be configured");
 const workspaceName = path.basename(path.dirname(documentPath));
 const htmlExportPath = path.join(exportRoot, `${workspaceName}.html`);
 const docxExportPath = path.join(exportRoot, `${workspaceName}.docx`);
+const documentName = path.basename(documentPath, path.extname(documentPath));
+const pdfExportPath = path.join(exportRoot, `${documentName}.pdf`);
 
 async function clickToolbarAction(name) {
   const menu = await browser.$("details.toolbar-overflow");
@@ -33,6 +36,14 @@ async function ensureWysiwygMode() {
   await clickToolbarAction("编辑");
   await editable.waitForDisplayed();
   return editable;
+}
+
+async function ensureRenderedMode() {
+  const returnToReading = await browser.$('button[aria-label="直接返回阅读模式"]');
+  if (await returnToReading.isExisting()) {
+    await returnToReading.click();
+  }
+  await browser.$(".reader-content").waitForDisplayed();
 }
 
 async function clickWorkspaceExportAction(name) {
@@ -79,6 +90,35 @@ async function waitForWorkspaceEntry(selector, text, expected, description) {
     timeout: 15_000,
     timeoutMsg: description,
   });
+}
+
+async function waitForSavedReadingPosition(fileName) {
+  await browser.waitUntil(
+    () =>
+      browser.execute((expectedName) => {
+        try {
+          const raw = window.localStorage.getItem("moyang-reader-reading-positions");
+          const positions = raw ? JSON.parse(raw) : [];
+          return (
+            Array.isArray(positions) &&
+            positions.some(
+              (item) =>
+                item &&
+                typeof item.path === "string" &&
+                item.path.split(/[\\/]/).pop() === expectedName &&
+                typeof item.top === "number" &&
+                item.top > 0,
+            )
+          );
+        } catch {
+          return false;
+        }
+      }, fileName),
+    {
+      timeout: 5_000,
+      timeoutMsg: `${fileName} reading position was not persisted`,
+    },
+  );
 }
 
 async function clickWorkspaceFile(name) {
@@ -267,7 +307,17 @@ describe("Moyang Reader desktop runtime", () => {
     });
   });
 
-  it("exports the workspace to HTML and Word through the real Tauri write path", async () => {
+  it("exports a real PDF and the workspace to HTML and Word", async () => {
+    fs.rmSync(pdfExportPath, { force: true });
+    const pdfAction = await browser.$("button=保存 PDF");
+    await pdfAction.waitForDisplayed();
+    await pdfAction.click();
+    await waitForExport(pdfExportPath, "the real Tauri PDF export");
+    const pdfBytes = fs.readFileSync(pdfExportPath);
+    assert.ok(pdfBytes.length > 100, "the real Tauri PDF export should not be empty");
+    assert.equal(pdfBytes.subarray(0, 5).toString("ascii"), "%PDF-");
+    assert.ok(pdfBytes.includes(Buffer.from("%%EOF")), "the real Tauri PDF export should have an EOF marker");
+
     await clickWorkspaceExportAction("单文件 HTML");
     await waitForExport(htmlExportPath, "the real Tauri HTML export");
     assert.match(fs.readFileSync(htmlExportPath, "utf8"), /Desktop E2E/);
@@ -368,8 +418,7 @@ describe("Moyang Reader desktop runtime", () => {
       );
 
       await clickWorkspaceFile(longName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Long position note").waitForDisplayed();
 
       await browser.waitUntil(
@@ -398,9 +447,9 @@ describe("Moyang Reader desktop runtime", () => {
           ),
         { timeout: 5_000, timeoutMsg: "the long document did not record a non-zero reading position" },
       );
+      await waitForSavedReadingPosition(longName);
       await clickWorkspaceFile(shortName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Short position note").waitForDisplayed();
       await browser.waitUntil(
         () =>
@@ -413,8 +462,7 @@ describe("Moyang Reader desktop runtime", () => {
         { timeout: 5_000, timeoutMsg: "the short document did not reset the reading position" },
       );
       await clickWorkspaceFile(longName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Long position note").waitForDisplayed();
       await browser.waitUntil(
         () =>

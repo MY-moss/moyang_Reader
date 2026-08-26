@@ -69,6 +69,15 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
+> **最新检查点（2026-08-27，当前分支：`codex/pdf-file-export-2026-08-27`）**
+>
+> - 稳定基线仍为 `v0.9.2`；远程 `main` 最新提交为 `3ad27a6c6d3bc3670d8b9eb1db937201b0a07f9f`，当前切片尚未创建 PR 或合并。
+> - 本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，只完成其中的 PDF 子项：Windows 桌面当前文档可选择保存位置，由隐藏的 Microsoft Edge headless 生成真实 PDF；输出先校验 `%PDF-` 文件头，再原子替换到目标路径，失败不会留下半成品。
+> - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性和 `%PDF-` 校验。
+> - 已验证：`npm run build` 通过；`npm test -- --run` 为 171/171；`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings` 通过；浏览器打印预览 E2E 1/1 通过；真实 Tauri 桌面 smoke 10/10 通过，其中 PDF 已实际写盘并检查文件头。
+> - 当前未完成：旧版本安装环境的更新下载、签名校验、替换、重启和版本号回归；因此 #241 保持 open，本切片不创建 Release 或安装包，待更新器子切片完成后再按 v0.9.3 稳定批次发布。
+> - 下一位 AI 的唯一下一步：先检查本分支改动和 #241，完成一次 PR 前审查；若门禁通过，合并 PDF 子项并把更新器回归作为新的独立分支/PR，不要在同一 PR 中重写发布流程。
+
 > **最新检查点（2026-08-27，优先于下方历史条目）**
 >
 > - 稳定基线：`v0.9.2`；PR #242 已合并到 `main`，合并提交为 `62af5b7cbadb76aa7071c59e0ccd17d79cdf7608`，包含已完成的 #174、#188、#231 稳定化切片。

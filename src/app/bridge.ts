@@ -41,10 +41,18 @@ export async function authorizeStoredPath(path: string, workspace: boolean): Pro
 
 export async function chooseSavePath(
   defaultPath: string,
-  format: "markdown" | "html" | "docx" | "json",
+  format: "markdown" | "html" | "docx" | "pdf" | "json",
 ): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invoke<string | null>("choose_save_path", { defaultPath, format });
+}
+
+export async function exportPdfFile(path: string, html: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能直接保存 PDF 文件。");
+  }
+
+  await invoke("export_pdf_file", { path, html });
 }
 
 export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]> {
