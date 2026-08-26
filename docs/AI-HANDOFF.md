@@ -36,7 +36,9 @@
 - 修改文件和行为变化；
 - 已运行命令及结果；
 - 已知限制、风险和回滚方式；
-- 下一位 AI 的唯一下一步；
+- 当前切片（#104 搜索索引预算回退，待 PR）：已从最新 `main` 移植单文件 posting 预算回退和回归测试；本地完整门禁已通过，Issue #104 保持 open，当前候选为 `v0.9.1` patch。
+- 在线下一步：检查分支 `codex/search-index-fallback-2026-08-26` 的 Quality checks；通过且无真实冲突后合并。合并后只执行一次稳定发布：更新版本号为 `v0.9.1`，生成 Windows x64 安装包、`.sig`、`latest.json`，同步 Cloudflare 镜像并验证旧版本更新链路。
+- 已知限制：本次本地 Git HTTPS 推送曾被连接重置，因此使用 GitHub 原子提交保留最新 main 基线；不要用旧本地分支强制覆盖远程。
 - 关联 Issue、PR 和是否需要 Release。
 
 ## PR 规则
