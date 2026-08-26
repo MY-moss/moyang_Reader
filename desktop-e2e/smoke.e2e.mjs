@@ -38,6 +38,14 @@ async function ensureWysiwygMode() {
   return editable;
 }
 
+async function ensureRenderedMode() {
+  const returnToReading = await browser.$('button[aria-label="直接返回阅读模式"]');
+  if (await returnToReading.isExisting()) {
+    await returnToReading.click();
+  }
+  await browser.$(".reader-content").waitForDisplayed();
+}
+
 async function clickWorkspaceExportAction(name) {
   const menu = await browser.$("details.workspace-export-menu");
   if ((await menu.getAttribute("open")) === null) {
@@ -82,6 +90,35 @@ async function waitForWorkspaceEntry(selector, text, expected, description) {
     timeout: 15_000,
     timeoutMsg: description,
   });
+}
+
+async function waitForSavedReadingPosition(fileName) {
+  await browser.waitUntil(
+    () =>
+      browser.execute((expectedName) => {
+        try {
+          const raw = window.localStorage.getItem("moyang-reader-reading-positions");
+          const positions = raw ? JSON.parse(raw) : [];
+          return (
+            Array.isArray(positions) &&
+            positions.some(
+              (item) =>
+                item &&
+                typeof item.path === "string" &&
+                item.path.split(/[\\/]/).pop() === expectedName &&
+                typeof item.top === "number" &&
+                item.top > 0,
+            )
+          );
+        } catch {
+          return false;
+        }
+      }, fileName),
+    {
+      timeout: 5_000,
+      timeoutMsg: `${fileName} reading position was not persisted`,
+    },
+  );
 }
 
 async function clickWorkspaceFile(name) {
@@ -381,8 +418,7 @@ describe("Moyang Reader desktop runtime", () => {
       );
 
       await clickWorkspaceFile(longName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Long position note").waitForDisplayed();
 
       await browser.waitUntil(
@@ -411,9 +447,9 @@ describe("Moyang Reader desktop runtime", () => {
           ),
         { timeout: 5_000, timeoutMsg: "the long document did not record a non-zero reading position" },
       );
+      await waitForSavedReadingPosition(longName);
       await clickWorkspaceFile(shortName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Short position note").waitForDisplayed();
       await browser.waitUntil(
         () =>
@@ -426,8 +462,7 @@ describe("Moyang Reader desktop runtime", () => {
         { timeout: 5_000, timeoutMsg: "the short document did not reset the reading position" },
       );
       await clickWorkspaceFile(longName);
-      await clickToolbarAction("源文本");
-      await clickToolbarAction("阅读");
+      await ensureRenderedMode();
       await browser.$("h1=Long position note").waitForDisplayed();
       await browser.waitUntil(
         () =>

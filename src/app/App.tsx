@@ -747,19 +747,27 @@ export function App() {
 
     let frame: number | null = null;
     let attempts = 0;
+    const maxRestoreAttempts = 60;
+    const retryRestore = () => {
+      if (attempts >= maxRestoreAttempts) return;
+      attempts += 1;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        restorePosition();
+      });
+    };
     const restorePosition = () => {
       const contentArea = contentAreaRef.current;
       if (!contentArea) return;
       const storedTop = loadReadingPosition(path);
-      contentArea.scrollTop = storedTop;
-      readingPositionRef.current = { path, top: contentArea.scrollTop };
-      if (storedTop > 0 && contentArea.scrollTop === 0 && attempts < 6) {
-        attempts += 1;
-        frame = window.requestAnimationFrame(() => {
-          frame = null;
-          restorePosition();
-        });
+      const maxScrollTop = Math.max(0, contentArea.scrollHeight - contentArea.clientHeight);
+      if (storedTop > 0 && maxScrollTop === 0) {
+        retryRestore();
+        return;
       }
+      contentArea.scrollTop = Math.min(storedTop, maxScrollTop);
+      readingPositionRef.current = { path, top: contentArea.scrollTop };
+      if (storedTop > 0 && contentArea.scrollTop === 0) retryRestore();
     };
     const timer = window.setTimeout(restorePosition, 0);
     return () => {
