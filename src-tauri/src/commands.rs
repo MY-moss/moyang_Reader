@@ -305,6 +305,24 @@ fn add_indexed_file_with_tokens(
     modified: Option<SystemTime>,
     tokens: HashSet<String>,
 ) -> bool {
+    add_indexed_file_with_limit(
+        index,
+        path,
+        size,
+        modified,
+        tokens,
+        MAX_SEARCH_INDEX_POSTINGS,
+    )
+}
+
+fn add_indexed_file_with_limit(
+    index: &mut CachedSearchIndex,
+    path: String,
+    size: u64,
+    modified: Option<SystemTime>,
+    tokens: HashSet<String>,
+    posting_limit: usize,
+) -> bool {
     if tokens.len() > MAX_SEARCH_INDEX_TOKENS_PER_FILE
         || tokens
             .iter()
@@ -313,14 +331,34 @@ fn add_indexed_file_with_tokens(
         return false;
     }
 
+    let additional_postings = tokens
+        .iter()
+        .filter(|token| {
+            !index
+                .postings
+                .get(*token)
+                .map(|paths| paths.contains(&path))
+                .unwrap_or(false)
+        })
+        .count();
+    if index.posting_count.saturating_add(additional_postings) > posting_limit {
+        index.unindexed_files.insert(path.clone());
+        index.files.insert(
+            path,
+            IndexedSearchFile {
+                size,
+                modified,
+                tokens: HashSet::new(),
+            },
+        );
+        return true;
+    }
+
     let path_key = path.clone();
     for token in &tokens {
         let paths = index.postings.entry(token.clone()).or_default();
         if paths.insert(path.clone()) {
             index.posting_count += 1;
-            if index.posting_count > MAX_SEARCH_INDEX_POSTINGS {
-                return false;
-            }
         }
     }
     index.files.insert(
@@ -2209,18 +2247,18 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        access_path_key, authorize_stored_path_inner, clean_tag, collect_open_paths,
-        create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
-        extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
-        is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
-        list_workspace_files_inner, path_exists_inner, persistent_search_index_path,
-        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
+        access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
+        collect_open_paths, create_markdown_file_inner, decode_ipc_path, decode_text,
+        extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
+        index_workspace_inner, is_supported_document_path, is_supported_text_path,
+        is_write_allowed_for_new_path, list_workspace_files_inner, path_exists_inner,
+        persistent_search_index_path, prune_search_entries, read_text_file_inner,
+        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         source_search_tokens, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
-        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
-        MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
+        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -2884,6 +2922,41 @@ mod tests {
 
         fs::remove_dir_all(root).expect("remove search fallback workspace");
         fs::remove_dir_all(cache_directory).expect("remove search fallback cache");
+    }
+
+    #[test]
+    fn falls_back_only_the_file_that_exceeds_the_posting_budget() {
+        let mut index = CachedSearchIndex::default();
+        let first_tokens = ["alpha", "beta"].into_iter().map(str::to_string).collect();
+
+        assert!(add_indexed_file_with_limit(
+            &mut index,
+            "first.md".to_string(),
+            1,
+            None,
+            first_tokens,
+            2,
+        ));
+        assert_eq!(index.posting_count, 2);
+
+        let second_tokens = ["gamma"].into_iter().map(str::to_string).collect();
+        assert!(add_indexed_file_with_limit(
+            &mut index,
+            "second.md".to_string(),
+            1,
+            None,
+            second_tokens,
+            2,
+        ));
+
+        assert_eq!(index.posting_count, 2);
+        assert_eq!(
+            index.files.get("second.md").map(|file| file.tokens.len()),
+            Some(0)
+        );
+        assert!(index.unindexed_files.contains("second.md"));
+        assert!(!index.postings.contains_key("gamma"));
+        assert!(index.postings.contains_key("alpha"));
     }
 
     #[test]
