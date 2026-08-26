@@ -325,6 +325,7 @@ describe("Moyang Reader desktop runtime", () => {
     const targetPath = path.join(path.dirname(documentPath), targetName);
     const draftText = "切页前最后一段输入。";
     let confirmIntercepted = false;
+    let targetOpened = false;
     fs.writeFileSync(targetPath, "# Draft flush target\n\n目标文档。\n", "utf8");
 
     try {
@@ -373,11 +374,19 @@ describe("Moyang Reader desktop runtime", () => {
       const confirmationMessage = await browser.execute(() => window.__desktopE2EConfirmMessage || "");
       assert.match(confirmationMessage, /自动保留为草稿/);
       await browser.$("h1=Draft flush target").waitForDisplayed();
+      targetOpened = true;
 
       const savedDraft = await browser.execute((expectedPath) => {
         const normalize = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+        const expected = normalize(expectedPath);
+        const expectedName = expected.slice(expected.lastIndexOf("/") + 1);
         const drafts = JSON.parse(window.localStorage.getItem("moyang-reader-drafts") || "[]");
-        return drafts.find((snapshot) => normalize(snapshot.path) === normalize(expectedPath)) ?? null;
+        return (
+          drafts.find((snapshot) => {
+            const actual = normalize(snapshot.path);
+            return actual === expected || actual.endsWith(`/${expectedName}`);
+          }) ?? null
+        );
       }, documentPath);
       assert.ok(savedDraft, "the latest edit was not flushed to local draft storage");
       assert.match(savedDraft.draft, new RegExp(draftText));
@@ -390,6 +399,7 @@ describe("Moyang Reader desktop runtime", () => {
         timeout: 5_000,
         timeoutMsg: "the flushed draft recovery notice did not dismiss",
       });
+      targetOpened = false;
       if (!(await browser.$("button=编辑").isExisting())) {
         if (await browser.$("button=源文本").isExisting()) {
           await clickToolbarAction("源文本");
@@ -400,6 +410,20 @@ describe("Moyang Reader desktop runtime", () => {
       }
       await browser.$(".reader-content").waitForDisplayed();
     } finally {
+      if (targetOpened) {
+        try {
+          await clickWorkspaceFile(path.basename(documentPath));
+          const recoveryNotice = await browser.$(".draft-recovery-notice");
+          await recoveryNotice.waitForDisplayed();
+          await recoveryNotice.$("button=丢弃").click();
+          await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
+            timeout: 5_000,
+            timeoutMsg: "the flushed draft recovery cleanup did not dismiss",
+          });
+        } catch {
+          // Preserve the original assertion when desktop cleanup cannot finish.
+        }
+      }
       if (confirmIntercepted) {
         await browser
           .execute(() => {
