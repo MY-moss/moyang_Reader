@@ -2229,7 +2229,9 @@ a:focus-visible {
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
-.markdown-body h4 {
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   color: var(--ink);
   font-family: var(--font-display);
   font-weight: 500;
@@ -2249,8 +2251,46 @@ a:focus-visible {
   margin: 35px 0 12px;
   font-size: 23px;
 }
+.markdown-body h4 {
+  margin: 28px 0 10px;
+  font-size: 19px;
+}
+.markdown-body h5 {
+  margin: 24px 0 8px;
+  font-size: 17px;
+}
+.markdown-body h6 {
+  margin: 20px 0 8px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .markdown-body p {
   margin: 0 0 20px;
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 20px;
+  padding-left: 1.75em;
+}
+.markdown-body li {
+  margin: 0.35em 0;
+  padding-left: 0.15em;
+}
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+.markdown-body li > p:not(:last-child) {
+  margin-bottom: 0.45em;
+}
+.markdown-body li > p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body li::marker {
+  color: var(--accent-deep);
 }
 .markdown-body a {
   color: var(--accent-deep);
@@ -2818,6 +2858,8 @@ a:focus-visible {
   :root:not([data-theme]) .markdown-body h2,
   :root:not([data-theme]) .markdown-body h3,
   :root:not([data-theme]) .markdown-body h4,
+  :root:not([data-theme]) .markdown-body h5,
+  :root:not([data-theme]) .markdown-body h6,
   :root:not([data-theme]) .source-editor {
     color: #e8e8e1;
   }
@@ -2908,6 +2950,8 @@ a:focus-visible {
 :root[data-theme="dark"] .markdown-body h2,
 :root[data-theme="dark"] .markdown-body h3,
 :root[data-theme="dark"] .markdown-body h4,
+:root[data-theme="dark"] .markdown-body h5,
+:root[data-theme="dark"] .markdown-body h6,
 :root[data-theme="dark"] .source-editor {
   color: #e8e8e1;
 }
@@ -3334,7 +3378,9 @@ a:focus-visible {
   .markdown-body h1,
   .markdown-body h2,
   .markdown-body h3,
-  .markdown-body h4 {
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
     break-after: avoid;
   }
   .markdown-body p,
@@ -3746,7 +3792,9 @@ a:focus-visible {
   .wysiwyg-editor .editor h1,
   .wysiwyg-editor .editor h2,
   .wysiwyg-editor .editor h3,
-  .wysiwyg-editor .editor h4 {
+  .wysiwyg-editor .editor h4,
+  .wysiwyg-editor .editor h5,
+  .wysiwyg-editor .editor h6 {
     color: var(--ink);
     font-family: var(--font-display);
     font-weight: 600;
@@ -3764,6 +3812,21 @@ a:focus-visible {
     margin-top: 1.65em;
     font-size: 23px;
   }
+  .wysiwyg-editor .editor h4 {
+    margin-top: 1.45em;
+    font-size: 19px;
+  }
+  .wysiwyg-editor .editor h5 {
+    margin-top: 1.3em;
+    font-size: 17px;
+  }
+  .wysiwyg-editor .editor h6 {
+    margin-top: 1.2em;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
   .wysiwyg-editor .editor p,
   .wysiwyg-editor .editor ul,
   .wysiwyg-editor .editor ol,
@@ -3771,6 +3834,28 @@ a:focus-visible {
   .wysiwyg-editor .editor pre,
   .wysiwyg-editor .editor table {
     margin: 1em 0;
+  }
+  .wysiwyg-editor .editor ul,
+  .wysiwyg-editor .editor ol {
+    padding-left: 1.75em;
+  }
+  .wysiwyg-editor .editor li {
+    margin: 0.35em 0;
+    padding-left: 0.15em;
+  }
+  .wysiwyg-editor .editor li > ul,
+  .wysiwyg-editor .editor li > ol {
+    margin-top: 0.35em;
+    margin-bottom: 0.35em;
+  }
+  .wysiwyg-editor .editor li > p:not(:last-child) {
+    margin-bottom: 0.45em;
+  }
+  .wysiwyg-editor .editor li > p:last-child {
+    margin-bottom: 0;
+  }
+  .wysiwyg-editor .editor li::marker {
+    color: var(--accent-deep);
   }
   .wysiwyg-editor .editor a {
     color: var(--accent-deep);

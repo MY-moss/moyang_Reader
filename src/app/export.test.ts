@@ -109,6 +109,16 @@ describe("document export helpers", () => {
     expect(html).toContain("@page { size: Letter landscape; margin: 14mm 14mm; }");
   });
 
+  it("keeps heading hierarchy and list rhythm in HTML exports", () => {
+    const html = buildHtmlExport("层级", "<h4>小节</h4><h5>细节</h5><ul><li>项目</li></ul>");
+
+    expect(html).toContain("h4 { margin: 28px 0 10px; font-size: 19px; }");
+    expect(html).toContain("h5 { margin: 24px 0 8px; font-size: 17px; }");
+    expect(html).toContain("h6 { margin: 20px 0 8px;");
+    expect(html).toContain("ul, ol { padding-left: 1.75em; }");
+    expect(html).toContain("li { margin: .35em 0; padding-left: .15em; }");
+  });
+
   it("adds a linked outline to a single-document HTML export", () => {
     const html = buildHtmlExport("报告", '<h1 id="intro">介绍</h1><h2 id="details">细节</h2>', undefined, [
       { id: "intro", depth: 1, text: "介绍" },
