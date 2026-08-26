@@ -69,14 +69,15 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，主线提交：`ed731b2608d353074410956a82c0bbfb4ef32f93`）**
+> **最新检查点（2026-08-27，验证基线：`main@7fa0576376d3cf6274c7dab19000e3399ed9dd6a`）**
 >
 > - 稳定基线仍为 `v0.9.2`；PDF 子切片已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并到远程 `main`，合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`，交接事实又由 [PR #245](https://github.com/MY-moss/moyang_Reader/pull/245) 同步到主线，文档合并提交为 `ed731b2608d353074410956a82c0bbfb4ef32f93`。
 > - 本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，只完成其中的 PDF 子项：Windows 桌面当前文档可选择保存位置，由隐藏的 Microsoft Edge headless 生成真实 PDF；输出先校验 `%PDF-` 文件头，再原子替换到目标路径，失败不会留下半成品。
 > - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径，并稳定阅读位置恢复；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性、大小、`%PDF-` 和 `%%EOF` 校验，同时稳定阅读位置场景。
 > - 已验证：本地 `npm run build`、`npm test -- --run`（171/171）、`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings`、浏览器打印预览 E2E（1/1）和真实 Tauri Windows desktop smoke（10/10）通过；远程 CI run [33019830925](https://github.com/MY-moss/moyang_Reader/actions/runs/33019830925) 全绿。
-> - 当前未完成：旧版本安装环境的更新下载、签名校验、替换、重启和版本号回归；因此 #241 保持 open，本切片不创建 Release 或安装包，待更新器子切片完成后再按 v0.9.3 稳定批次发布。
-> - 下一位 AI 的唯一下一步：从最新 `main` 创建新的独立分支，先检查 #241 更新器实现与已有 Release/manifest 流程，完成旧版本安装环境的下载、签名校验、替换、重启和版本号回归；不要在同一分支继续追加 PDF 或重写发布流程。
+> - 更新器子项已完成实机回归：使用已登记的 Windows x64 v0.8.0 NSIS 安装实例检查到 v0.9.2，下载并完成签名校验、替换安装、自动重启；更新前后注册表安装位置一致，文件版本为 v0.9.2，重启后的进程 PID 已变化。一个未登记的旧副本不能作为安装更新回归依据。
+> - #241 仍保持 open：PDF 与更新器行为均已验证，但 v0.9.3 还需要把 PDF 变更纳入版本号、Release、manifest、签名和 Cloudflare 镜像的稳定发布批次；本次只记录回归结果，不创建新 Release 或安装包。
+> - 下一位 AI 的唯一下一步：从最新 `main` 创建新的独立发布分支，按 `docs/RELEASE-POLICY.md` 准备 v0.9.3 版本同步、Release 预检、Windows 安装包、manifest/签名和镜像验证；不要重新修改 PDF 或更新器实现。
 
 > **最新检查点（2026-08-27，优先于下方历史条目）**
 >
