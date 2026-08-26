@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatTransitionConfirmation,
   isSameDocumentPath,
   shouldConfirmDocumentReplacement,
   shouldConfirmWorkspaceSwitch,
@@ -32,5 +33,14 @@ describe("document transition guards", () => {
     expect(shouldConfirmWorkspaceSwitch(true, "C:/Notes", "c:\\notes\\")).toBe(false);
     expect(shouldConfirmWorkspaceSwitch(true, "C:/Notes", "D:/Archive")).toBe(true);
     expect(shouldConfirmWorkspaceSwitch(false, "C:/Notes", "D:/Archive")).toBe(false);
+  });
+
+  it("describes whether the latest edit was preserved as a draft", () => {
+    expect(formatTransitionConfirmation("切换文档", true)).toBe(
+      "当前文档的最新修改已自动保留为草稿，可在“草稿”中心恢复。仍要切换文档吗？",
+    );
+    expect(formatTransitionConfirmation("切换文档", false)).toBe(
+      "当前文档有未保存修改，切换文档后将丢失这些修改。继续吗？",
+    );
   });
 });

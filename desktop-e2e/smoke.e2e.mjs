@@ -320,6 +320,123 @@ describe("Moyang Reader desktop runtime", () => {
     }
   });
 
+  it("flushes the latest draft before switching documents", async () => {
+    const targetName = "draft-flush-target.md";
+    const targetPath = path.join(path.dirname(documentPath), targetName);
+    const draftText = "切页前最后一段输入。";
+    let confirmIntercepted = false;
+    let targetOpened = false;
+    fs.writeFileSync(targetPath, "# Draft flush target\n\n目标文档。\n", "utf8");
+
+    try {
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        targetName,
+        true,
+        "the draft-flush target did not appear in the workspace",
+      );
+      if (await browser.$("button=阅读").isExisting()) {
+        await clickToolbarAction("阅读");
+      }
+      if (await browser.$("button=编辑").isExisting()) {
+        await clickToolbarAction("编辑");
+      }
+      await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
+      await clickToolbarAction("源文本");
+      const editor = await browser.$('[aria-label="Markdown 源文本"]');
+      await editor.waitForDisplayed();
+      await browser.execute((text) => {
+        const target = document.querySelector('[aria-label="Markdown 源文本"]');
+        if (!(target instanceof HTMLElement)) throw new Error("source editor was not found");
+        const view = target.cmTile?.root?.view;
+        if (!view) throw new Error("CodeMirror view is unavailable");
+        view.dispatch({ changes: { from: view.state.doc.length, insert: `\n${text}` } });
+      }, draftText);
+      await browser.waitUntil(() => editor.getText().then((value) => value.includes(draftText)), {
+        timeout: 5_000,
+        timeoutMsg: "the latest draft edit was not applied before switching",
+      });
+
+      await browser.execute(() => {
+        window.__desktopE2EOriginalConfirm = window.confirm;
+        window.__desktopE2EConfirmMessage = null;
+        window.confirm = (message) => {
+          window.__desktopE2EConfirmMessage = String(message);
+          return true;
+        };
+      });
+      confirmIntercepted = true;
+      await clickWorkspaceFile(targetName);
+      await browser.waitUntil(() => browser.execute(() => typeof window.__desktopE2EConfirmMessage === "string"), {
+        timeout: 5_000,
+        timeoutMsg: "switching documents did not show the draft-preservation confirmation",
+      });
+      const confirmationMessage = await browser.execute(() => window.__desktopE2EConfirmMessage || "");
+      assert.match(confirmationMessage, /自动保留为草稿/);
+      await browser.$("h1=Draft flush target").waitForDisplayed();
+      targetOpened = true;
+
+      const savedDraft = await browser.execute((expectedPath) => {
+        const normalize = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+        const expected = normalize(expectedPath);
+        const expectedName = expected.slice(expected.lastIndexOf("/") + 1);
+        const drafts = JSON.parse(window.localStorage.getItem("moyang-reader-drafts") || "[]");
+        return (
+          drafts.find((snapshot) => {
+            const actual = normalize(snapshot.path);
+            return actual === expected || actual.endsWith(`/${expectedName}`);
+          }) ?? null
+        );
+      }, documentPath);
+      assert.ok(savedDraft, "the latest edit was not flushed to local draft storage");
+      assert.match(savedDraft.draft, new RegExp(draftText));
+
+      await clickWorkspaceFile(path.basename(documentPath));
+      const recoveryNotice = await browser.$(".draft-recovery-notice");
+      await recoveryNotice.waitForDisplayed();
+      await recoveryNotice.$("button=丢弃").click();
+      await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
+        timeout: 5_000,
+        timeoutMsg: "the flushed draft recovery notice did not dismiss",
+      });
+      targetOpened = false;
+      if (!(await browser.$("button=编辑").isExisting())) {
+        if (await browser.$("button=源文本").isExisting()) {
+          await clickToolbarAction("源文本");
+        }
+        if (await browser.$("button=阅读").isExisting()) {
+          await clickToolbarAction("阅读");
+        }
+      }
+      await browser.$(".reader-content").waitForDisplayed();
+    } finally {
+      if (targetOpened) {
+        try {
+          await clickWorkspaceFile(path.basename(documentPath));
+          const recoveryNotice = await browser.$(".draft-recovery-notice");
+          await recoveryNotice.waitForDisplayed();
+          await recoveryNotice.$("button=丢弃").click();
+          await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
+            timeout: 5_000,
+            timeoutMsg: "the flushed draft recovery cleanup did not dismiss",
+          });
+        } catch {
+          // Preserve the original assertion when desktop cleanup cannot finish.
+        }
+      }
+      if (confirmIntercepted) {
+        await browser
+          .execute(() => {
+            window.confirm = window.__desktopE2EOriginalConfirm;
+            delete window.__desktopE2EOriginalConfirm;
+            delete window.__desktopE2EConfirmMessage;
+          })
+          .catch(() => undefined);
+      }
+      fs.rmSync(targetPath, { force: true });
+    }
+  });
+
   it("shows a conflict notice without replacing unsaved local edits", async () => {
     const localText = "本地未保存内容。";
     const externalText = "外部冲突内容。";
