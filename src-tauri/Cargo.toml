@@ -1,6 +1,6 @@
 [package]
 name = "moyang-reader"
-version = "0.9.0"
+version = "0.9.1"
 description = "A fast local document reader"
 authors = ["Moyang"]
 edition = "2021"
