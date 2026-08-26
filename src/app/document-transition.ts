@@ -34,4 +34,3 @@ export function formatTransitionConfirmation(action: string, draftSaved: boolean
     ? `当前文档的最新修改已自动保留为草稿，可在“草稿”中心恢复。仍要${action}吗？`
     : `当前文档有未保存修改，${action}后将丢失这些修改。继续吗？`;
 }
-
