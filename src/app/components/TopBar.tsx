@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type {
   DocumentKind,
   ExportMargin,
@@ -166,6 +166,32 @@ export function TopBar({
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const settingsMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const menuRefs = [moreMenuRef, settingsMenuRef, exportMenuRef];
+    const closeMenus = () => {
+      for (const menuRef of menuRefs) {
+        menuRef.current?.removeAttribute("open");
+      }
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || menuRefs.some((menuRef) => menuRef.current?.contains(target))) return;
+      closeMenus();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !menuRefs.some((menuRef) => menuRef.current?.open)) return;
+      closeMenus();
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, []);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
   const closeDropdownMenus = () => {
