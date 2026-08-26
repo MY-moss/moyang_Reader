@@ -92,6 +92,19 @@ async function clickWorkspaceFile(name) {
   throw new Error(`workspace file ${name} was not found`);
 }
 
+async function discardDraftNotice() {
+  const recoveryNotice = await browser.$(".draft-recovery-notice");
+  await recoveryNotice.waitForDisplayed();
+  await recoveryNotice.$("button=丢弃").click();
+  const confirmButton = await browser.$('[data-testid="draft-discard-confirm"]');
+  await confirmButton.waitForDisplayed();
+  await confirmButton.click();
+  await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
+    timeout: 5_000,
+    timeoutMsg: "the draft recovery notice did not dismiss after confirmation",
+  });
+}
+
 async function requestCloseRequest() {
   await browser.execute(async () => {
     const tauriEvent = window.__TAURI__?.event;
@@ -494,13 +507,7 @@ describe("Moyang Reader desktop runtime", () => {
       assert.match(savedDraft.draft, new RegExp(draftText));
 
       await clickWorkspaceFile(path.basename(documentPath));
-      const recoveryNotice = await browser.$(".draft-recovery-notice");
-      await recoveryNotice.waitForDisplayed();
-      await recoveryNotice.$("button=丢弃").click();
-      await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
-        timeout: 5_000,
-        timeoutMsg: "the flushed draft recovery notice did not dismiss",
-      });
+      await discardDraftNotice();
       targetOpened = false;
       if (!(await browser.$("button=编辑").isExisting())) {
         if (await browser.$("button=源文本").isExisting()) {
@@ -515,13 +522,7 @@ describe("Moyang Reader desktop runtime", () => {
       if (targetOpened) {
         try {
           await clickWorkspaceFile(path.basename(documentPath));
-          const recoveryNotice = await browser.$(".draft-recovery-notice");
-          await recoveryNotice.waitForDisplayed();
-          await recoveryNotice.$("button=丢弃").click();
-          await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
-            timeout: 5_000,
-            timeoutMsg: "the flushed draft recovery cleanup did not dismiss",
-          });
+          await discardDraftNotice();
         } catch {
           // Preserve the original assertion when desktop cleanup cannot finish.
         }

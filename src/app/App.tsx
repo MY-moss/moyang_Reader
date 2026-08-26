@@ -15,6 +15,7 @@ import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
+import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { ImagePreview } from "./components/ImagePreview";
@@ -436,6 +437,7 @@ export function App() {
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
@@ -2107,10 +2109,12 @@ export function App() {
   }, [draftRecovery, updateSource]);
 
   const discardDraft = useCallback(() => {
-    if (draftRecovery) clearDraftSnapshot(draftRecovery.path);
-    setDraftRecovery(null);
-    setDraftSnapshots(loadDraftSnapshots());
+    if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });
   }, [draftRecovery]);
+
+  const deferDraftRecovery = useCallback(() => {
+    setDraftRecovery(null);
+  }, []);
 
   const openDraftSnapshot = useCallback(
     async (path: string) => {
@@ -2128,14 +2132,28 @@ export function App() {
     [confirmDocumentReplacement, openPath],
   );
 
-  const discardDraftByPath = useCallback(
-    (path: string) => {
-      clearDraftSnapshot(path);
-      setDraftSnapshots(loadDraftSnapshots());
-      if (isSameDocumentPath(draftRecovery?.path ?? "", path)) setDraftRecovery(null);
-    },
-    [draftRecovery?.path],
-  );
+  const requestDraftDiscardByPath = useCallback((path: string) => {
+    setDraftRecoveryOpen(false);
+    setDraftDiscardRequest({ path, fromCenter: true });
+  }, []);
+
+  const cancelDraftDiscard = useCallback(() => {
+    const request = draftDiscardRequest;
+    setDraftDiscardRequest(null);
+    if (request?.fromCenter) setDraftRecoveryOpen(true);
+  }, [draftDiscardRequest]);
+
+  const confirmDraftDiscard = useCallback(() => {
+    const request = draftDiscardRequest;
+    if (!request) return;
+
+    clearDraftSnapshot(request.path);
+    const remaining = loadDraftSnapshots();
+    setDraftSnapshots(remaining);
+    if (isSameDocumentPath(draftRecovery?.path ?? "", request.path)) setDraftRecovery(null);
+    setDraftDiscardRequest(null);
+    if (request.fromCenter) setDraftRecoveryOpen(remaining.length > 0);
+  }, [draftDiscardRequest, draftRecovery?.path]);
 
   const clearAllDrafts = useCallback(() => {
     if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
@@ -3429,7 +3447,12 @@ export function App() {
             />
           )}
           {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
-            <DraftRecoveryNotice snapshot={draftRecovery} onRecover={recoverDraft} onDiscard={discardDraft} />
+            <DraftRecoveryNotice
+              snapshot={draftRecovery}
+              onRecover={recoverDraft}
+              onLater={deferDraftRecovery}
+              onDiscard={discardDraft}
+            />
           )}
           {error && (
             <div className="error-state" role="alert">
@@ -3606,9 +3629,16 @@ export function App() {
         <DraftRecoveryCenter
           snapshots={draftSnapshots}
           onOpen={(path) => void openDraftSnapshot(path)}
-          onDiscard={discardDraftByPath}
+          onDiscard={requestDraftDiscardByPath}
           onClearAll={clearAllDrafts}
           onClose={() => setDraftRecoveryOpen(false)}
+        />
+      )}
+      {draftDiscardRequest && (
+        <DraftDiscardConfirmationDialog
+          path={draftDiscardRequest.path}
+          onCancel={cancelDraftDiscard}
+          onConfirm={confirmDraftDiscard}
         />
       )}
       {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
