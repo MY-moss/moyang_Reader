@@ -111,6 +111,7 @@ import {
 } from "./export";
 import {
   loadRecentFiles,
+  MAX_MOUNTED_WORKSPACES,
   loadMountedWorkspaces,
   loadRecentWorkspaces,
   loadWorkspaceSessions,
@@ -462,6 +463,7 @@ export function App() {
   const openTabsRef = useRef<RecentFile[]>(openTabs);
   const workspaceRestorePendingRef = useRef(false);
   const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
+  const pendingWorkspaceMountsRef = useRef(new Set<string>());
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
   const workspaceReloadTimerRef = useRef<number | null>(null);
@@ -1070,6 +1072,21 @@ export function App() {
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
     if (!isTauriRuntime()) return;
 
+    const mounted = loadMountedWorkspaces();
+    const rootKey = comparablePath(root);
+    const alreadyMounted = mounted.some((workspace) => comparablePath(workspace.path) === rootKey);
+    const alreadyPending = pendingWorkspaceMountsRef.current.has(rootKey);
+    if (
+      !alreadyMounted &&
+      !alreadyPending &&
+      mounted.length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES
+    ) {
+      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
+      return;
+    }
+    const ownsPendingMount = !alreadyMounted && !alreadyPending;
+    if (ownsPendingMount) pendingWorkspaceMountsRef.current.add(rootKey);
+
     const previousWorkspacePath = workspacePathRef.current;
     const storedSession = loadWorkspaceSessions().find(
       (session) => comparablePath(session.path) === comparablePath(root),
@@ -1243,10 +1260,16 @@ export function App() {
       } else {
         setError(cause instanceof Error ? cause.message : "工作区读取失败。");
       }
+    } finally {
+      if (ownsPendingMount) pendingWorkspaceMountsRef.current.delete(rootKey);
     }
   }, []);
 
   const handleChooseWorkspace = useCallback(async () => {
+    if (loadMountedWorkspaces().length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES) {
+      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
+      return;
+    }
     const selected = await chooseWorkspacePath();
     if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {
       await loadWorkspace(selected);
@@ -1916,6 +1939,17 @@ export function App() {
     });
   }, []);
 
+  const toggleReadingEditing = useCallback(() => {
+    const currentDocument = documentStateRef.current;
+    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+
+    setMode((current) => {
+      if (current !== "rendered") return "rendered";
+      if (currentDocument.kind !== "markdown") return "source";
+      return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
+    });
+  }, []);
+
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       const eventTarget = event.target instanceof HTMLElement ? event.target : null;
@@ -1943,7 +1977,7 @@ export function App() {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
         event.preventDefault();
-        toggleDocumentMode();
+        toggleReadingEditing();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {
         if (mode === "wysiwyg") {
@@ -1980,7 +2014,7 @@ export function App() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [focusMode, handleChooseWorkspace, handleInsertLink, mode, openSelectedFile, saveDocument, toggleDocumentMode]);
+  }, [focusMode, handleChooseWorkspace, handleInsertLink, mode, openSelectedFile, saveDocument, toggleReadingEditing]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -2861,7 +2895,7 @@ export function App() {
           setQuickOpen(true);
           break;
         case "toggle-mode":
-          toggleDocumentMode();
+          toggleReadingEditing();
           break;
         case "save":
           void saveDocument();
@@ -2877,7 +2911,7 @@ export function App() {
           break;
       }
     },
-    [handleChooseWorkspace, handleInsertLink, openSelectedFile, saveDocument, toggleDocumentMode],
+    [handleChooseWorkspace, handleInsertLink, openSelectedFile, saveDocument, toggleReadingEditing],
   );
   const commandItems = useMemo<ReaderCommand[]>(
     () => [
@@ -3232,8 +3266,9 @@ export function App() {
         onExportSettings={() => void exportPortableSettings()}
         onImportSettings={importPortableSettings}
         onOpen={() => void openSelectedFile()}
-        onChooseWorkspace={() => void handleChooseWorkspace()}
+        onAddWorkspace={() => void handleChooseWorkspace()}
         workspaceOpen={Boolean(workspacePath)}
+        workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}
         onQuickOpen={() => setQuickOpen(true)}
         draftCount={draftSnapshots.length}
         onOpenRecovery={() => setDraftRecoveryOpen(true)}
@@ -3241,7 +3276,8 @@ export function App() {
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((current) => !current)}
-        onToggleMode={toggleDocumentMode}
+        onToggleMode={toggleReadingEditing}
+        onCycleMode={toggleDocumentMode}
         rightPanelOpen={rightPanelOpen}
         onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
@@ -3338,7 +3374,8 @@ export function App() {
             tagOptions={availableTags}
             selectedTag={selectedTag}
             selectedKind={selectedFileKind}
-            onChooseWorkspace={() => void handleChooseWorkspace()}
+            onAddWorkspace={() => void handleChooseWorkspace()}
+            workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onRemoveWorkspace={handleRemoveMountedWorkspace}
             onOpenFile={(path) => void handleSelectTab(path)}

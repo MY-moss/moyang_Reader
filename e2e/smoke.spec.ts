@@ -178,6 +178,26 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab")).toHaveCount(3);
 });
 
+test("keeps a direct read/edit action for immediate WYSIWYG editing", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "direct-edit.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Direct edit\n\n可以直接编辑。"),
+  });
+
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+  const modeButton = page.locator(".editor-mode-button");
+  await expect(modeButton).toHaveText("阅读");
+
+  await modeButton.click();
+  await expect(page.getByRole("heading", { name: "Direct edit" })).toBeVisible();
+  await expect(modeButton).toHaveText("编辑");
+
+  await page.keyboard.press("Control+E");
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+});
+
 test("opens the command palette and restores trigger focus", async ({ page }) => {
   await page.goto("/");
 
