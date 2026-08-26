@@ -71,9 +71,17 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
   await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "文件夹", exact: true })).toHaveAttribute("title", /Ctrl\+Shift\+O/);
+  await expect(page.locator('button[title="添加整个文件夹 (Ctrl+Shift+O)"]')).toHaveCount(0);
   await expect(page.locator("summary", { hasText: "批量导出" })).toHaveCount(0);
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
+});
+
+test("keeps the folder action available after collapsing the sidebar", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('button[title="隐藏侧栏 (Ctrl+Shift+B)"]').click();
+  await expect(page.locator('button[title="添加整个文件夹 (Ctrl+Shift+O)"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "添加整个文件夹" })).toHaveCount(0);
 });
 
 test("keeps the folder shortcut available from the landing page", async ({ page }) => {
@@ -773,6 +781,8 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   await page.getByLabel("界面语言").selectOption("en-US");
 
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("button", { name: "Folder", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Sidebar", exact: true }).click();
   await expect(page.getByRole("button", { name: "Folder", exact: true })).toBeVisible();
   await expect(page.getByText("LOCAL FIRST")).toBeVisible();
 

@@ -39,6 +39,7 @@ type TopBarProps = {
   onOpen: () => void;
   onChooseWorkspace: () => void;
   onQuickOpen: () => void;
+  workspaceOpen: boolean;
   draftCount: number;
   onOpenRecovery: () => void;
   sidebarCollapsed: boolean;
@@ -108,6 +109,7 @@ export function TopBar({
   onOpen,
   onChooseWorkspace,
   onQuickOpen,
+  workspaceOpen,
   draftCount,
   onOpenRecovery,
   sidebarCollapsed,
@@ -236,17 +238,19 @@ export function TopBar({
         >
           {t("action.open")}
         </button>
-        <button
-          type="button"
-          className="toolbar-button"
-          onClick={() => {
-            dismissTopbarOverlays();
-            onChooseWorkspace();
-          }}
-          title="添加整个文件夹 (Ctrl+Shift+O)"
-        >
-          {t("action.folder")}
-        </button>
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => {
+              dismissTopbarOverlays();
+              onChooseWorkspace();
+            }}
+            title={`${workspaceOpen ? "更换阅读库" : "添加整个文件夹"} (Ctrl+Shift+O)`}
+          >
+            {t("action.folder")}
+          </button>
+        )}
         <button
           type="button"
           className="toolbar-button"

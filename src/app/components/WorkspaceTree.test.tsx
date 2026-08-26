@@ -38,4 +38,25 @@ describe("WorkspaceTreeView", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("does not render an empty path row for files at the workspace root", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={[{ ...file(0), name: "README.md", relativePath: "README.md" }]}
+          activePath={null}
+          onOpenFile={() => {}}
+        />,
+      );
+    });
+
+    expect(container.querySelectorAll(".workspace-file small")).toHaveLength(0);
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });
