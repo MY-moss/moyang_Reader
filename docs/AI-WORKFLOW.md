@@ -257,4 +257,3 @@ Token 统计使用每次 `token_count` 的 `last_token_usage` 累加。缓存输
 ## 当前停止规则
 
 本次流程整改只修改流程文档、PR 模板和 `scripts/ai-workflow-metrics.mjs`。不开发业务功能、不创建 Release、不上传密钥、不执行无关 GitHub 写操作。完成文档校验和本地审查后，等待下一项明确的 Ready 任务。
-
