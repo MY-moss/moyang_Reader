@@ -594,6 +594,25 @@ test("debounces in-document search and navigates highlighted matches", async ({ 
   await expect(page.locator("mark.moyang-search-hit").nth(0)).toHaveClass(/active/);
 });
 
+test("keeps search highlights readable when following the system dark theme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "system-dark-search-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# System dark search\n\nneedle one\n\nneedle two"),
+  });
+  await switchToRenderedMode(page);
+
+  await page.getByRole("button", { name: "搜索" }).click();
+  await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
+
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+  await expect(page.locator("mark.moyang-search-hit").nth(0)).toHaveCSS("background-color", "rgb(187, 112, 64)");
+  await expect(page.locator("mark.moyang-search-hit").nth(1)).toHaveCSS("background-color", "rgb(146, 114, 43)");
+});
+
 test("enters and exits focus reading mode", async ({ page }) => {
   await page.goto("/");
 
