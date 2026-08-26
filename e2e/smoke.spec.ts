@@ -855,7 +855,8 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Folder", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Sidebar", exact: true }).click();
   await expect(page.getByRole("button", { name: "Folder", exact: true })).toBeVisible();
-  await expect(page.getByText("LOCAL FIRST")).toBeVisible();
+  await expect(page.locator(".settings-menu")).not.toHaveAttribute("open");
+  await expect(page.getByText("LOCAL FIRST")).not.toBeVisible();
 
   await page.reload();
   await openSettingsMenu(page, "Settings");
@@ -996,3 +997,4 @@ test("dismisses topbar menus with an outside click or Escape", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(overflowMenu).not.toHaveAttribute("open");
 });
+

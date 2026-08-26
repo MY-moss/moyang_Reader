@@ -180,9 +180,13 @@ export function TopBar({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || !menuRefs.some((menuRef) => menuRef.current?.open)) return;
+      const target = event.target;
+      const isInsideMenu = target instanceof Node && menuRefs.some((menuRef) => menuRef.current?.contains(target));
       closeMenus();
-      event.preventDefault();
-      event.stopPropagation();
+      if (isInsideMenu) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     };
 
     document.addEventListener("pointerdown", handlePointerDown, true);
@@ -398,7 +402,15 @@ export function TopBar({
                 <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
                   {t("action.commands")}
                 </button>
-                <button type="button" className="toolbar-button" onClick={onCycleMode} disabled={!fileName || !canEdit}>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => {
+                    dismissTopbarOverlays();
+                    onCycleMode();
+                  }}
+                  disabled={!fileName || !canEdit}
+                >
                   {mode === "rendered"
                     ? documentKind === "markdown"
                       ? t("action.edit")
@@ -656,3 +668,4 @@ export function TopBar({
     </header>
   );
 }
+
