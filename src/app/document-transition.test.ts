@@ -44,4 +44,3 @@ describe("document transition guards", () => {
     );
   });
 });
-
