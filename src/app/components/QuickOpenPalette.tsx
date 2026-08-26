@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { rankQuickOpenItems, type QuickOpenCandidate } from "../quick-open";
+import { useModalBehavior } from "./useModalBehavior";
 
 type QuickOpenPaletteProps = {
   items: QuickOpenCandidate[];
@@ -17,14 +18,13 @@ function kindLabel(kind: string | undefined): string {
 }
 
 export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPaletteProps) {
+  const dialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const results = useMemo(() => rankQuickOpenItems(items, query), [items, query]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, onClose });
 
   useEffect(() => {
     setActiveIndex(0);
@@ -32,11 +32,6 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
       if (event.key === "ArrowDown") {
         event.preventDefault();
         setActiveIndex((current) => (results.length ? (current + 1) % results.length : 0));
@@ -65,7 +60,14 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="quick-open-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-open-title">
+      <section
+        ref={dialogRef}
+        className="quick-open-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-open-title"
+        tabIndex={-1}
+      >
         <div className="quick-open-header">
           <div>
             <div className="quick-open-kicker">QUICK OPEN</div>

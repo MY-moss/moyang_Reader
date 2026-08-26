@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useModalBehavior } from "./useModalBehavior";
 
 export type ReaderCommand = {
   id: string;
@@ -14,6 +15,7 @@ type CommandPaletteProps = {
 };
 
 export function CommandPalette({ commands, onClose, onExecute }: CommandPaletteProps) {
+  const dialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -22,9 +24,7 @@ export function CommandPalette({ commands, onClose, onExecute }: CommandPaletteP
     return commands.filter((command) => !normalized || command.label.toLocaleLowerCase().includes(normalized));
   }, [commands, query]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, onClose });
 
   useEffect(() => {
     setActiveIndex(0);
@@ -32,11 +32,6 @@ export function CommandPalette({ commands, onClose, onExecute }: CommandPaletteP
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
       if (event.key === "ArrowDown") {
         event.preventDefault();
         setActiveIndex((current) => (visibleCommands.length ? (current + 1) % visibleCommands.length : 0));
@@ -71,10 +66,12 @@ export function CommandPalette({ commands, onClose, onExecute }: CommandPaletteP
       }}
     >
       <section
+        ref={dialogRef}
         className="command-palette-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="command-palette-title"
+        tabIndex={-1}
       >
         <div className="command-palette-header">
           <div>

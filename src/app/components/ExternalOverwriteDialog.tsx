@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useModalBehavior } from "./useModalBehavior";
 
 type ExternalOverwriteDialogProps = {
   onCancel: () => void;
@@ -6,33 +7,20 @@ type ExternalOverwriteDialogProps = {
 };
 
 export function ExternalOverwriteDialog({ onCancel, onConfirm }: ExternalOverwriteDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const previousFocus = document.activeElement;
-    cancelButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onCancel();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      if (previousFocus instanceof HTMLElement) previousFocus.focus();
-    };
-  }, [onCancel]);
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: cancelButtonRef, onClose: onCancel });
 
   return (
     <div className="quick-open-backdrop close-confirm-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="quick-open-dialog close-confirm-dialog external-overwrite-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="external-overwrite-title"
         aria-describedby="external-overwrite-description"
+        tabIndex={-1}
       >
         <header className="quick-open-header">
           <div>
