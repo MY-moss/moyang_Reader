@@ -165,4 +165,3 @@ jobs:
             Assert-MirrorAsset "$($platform.url).sig"
           }
           Write-Host "Updater mirror verified for v$expectedVersion"
-

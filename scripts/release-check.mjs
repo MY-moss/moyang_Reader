@@ -230,4 +230,3 @@ const invokedFile = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1]
 if (invokedFile === import.meta.url) {
   process.exitCode = runReleaseCheck(process.argv.slice(2));
 }
-

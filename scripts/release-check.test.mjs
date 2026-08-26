@@ -172,4 +172,3 @@ test("rejects a mirror workflow that can silently skip deployment or duplicate t
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
-

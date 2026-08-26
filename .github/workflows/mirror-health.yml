@@ -63,4 +63,3 @@ jobs:
             }
           }
           Write-Host "Updater mirror is healthy for v$expectedVersion"
-
