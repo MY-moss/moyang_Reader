@@ -86,6 +86,8 @@ export function SourceEditor({
     setReady(false);
     let disposed = false;
     let createdView: EditorViewInstance | null = null;
+    let desktopE2eInsertText: ((value: string) => void) | null = null;
+    let desktopE2eAcceptCompletion: (() => void) | null = null;
 
     void Promise.all([
       import("codemirror"),
@@ -219,6 +221,28 @@ export function SourceEditor({
           parent,
         });
         viewRef.current = createdView;
+        if (__MOYANG_DESKTOP_E2E__) {
+          desktopE2eInsertText = (text) => {
+            const current = viewRef.current;
+            if (!current) return;
+
+            const end = current.state.doc.length;
+            current.dispatch({
+              changes: { from: end, insert: text },
+              selection: { anchor: end + text.length },
+            });
+            autocomplete.startCompletion(current);
+          };
+          desktopE2eAcceptCompletion = () => {
+            const current = viewRef.current;
+            if (current) autocomplete.acceptCompletion(current);
+          };
+          window.__moyangDesktopE2e = {
+            ...window.__moyangDesktopE2e,
+            acceptSourceCompletion: desktopE2eAcceptCompletion,
+            insertSourceText: desktopE2eInsertText,
+          };
+        }
         setReady(true);
       })
       .catch(() => {
@@ -227,6 +251,15 @@ export function SourceEditor({
 
     return () => {
       disposed = true;
+      if (desktopE2eInsertText && window.__moyangDesktopE2e?.insertSourceText === desktopE2eInsertText) {
+        delete window.__moyangDesktopE2e.insertSourceText;
+      }
+      if (
+        desktopE2eAcceptCompletion &&
+        window.__moyangDesktopE2e?.acceptSourceCompletion === desktopE2eAcceptCompletion
+      ) {
+        delete window.__moyangDesktopE2e.acceptSourceCompletion;
+      }
       createdView?.destroy();
       viewRef.current = null;
     };
