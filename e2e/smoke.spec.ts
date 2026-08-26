@@ -855,7 +855,8 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Folder", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Sidebar", exact: true }).click();
   await expect(page.getByRole("button", { name: "Folder", exact: true })).toBeVisible();
-  await expect(page.getByText("LOCAL FIRST")).toBeVisible();
+  await expect(page.locator(".settings-menu")).not.toHaveAttribute("open");
+  await expect(page.getByText("LOCAL FIRST")).not.toBeVisible();
 
   await page.reload();
   await openSettingsMenu(page, "Settings");
@@ -959,4 +960,40 @@ test("keeps topbar overlays mutually exclusive", async ({ page }) => {
   await openSettingsMenu(page);
   await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveCount(0);
   await expect(page.locator(".settings-menu")).toHaveAttribute("open", "");
+});
+
+test("dismisses topbar menus with an outside click or Escape", async ({ page }) => {
+  await page.goto("/");
+
+  await openSettingsMenu(page);
+  const overflowMenu = page.locator(".toolbar-overflow");
+  const settingsMenu = page.locator(".settings-menu");
+  const exportMenu = page.locator(".export-menu");
+  await expect(settingsMenu).toHaveAttribute("open", "");
+  await page.locator(".empty-state").click();
+  await expect(settingsMenu).not.toHaveAttribute("open");
+  await expect(overflowMenu).not.toHaveAttribute("open");
+
+  await openSettingsMenu(page);
+  await page.keyboard.press("Escape");
+  await expect(settingsMenu).not.toHaveAttribute("open");
+  await expect(overflowMenu).not.toHaveAttribute("open");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "menu-dismiss.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Menu dismiss"),
+  });
+  await expect(page.getByRole("heading", { name: "Menu dismiss" })).toBeVisible();
+  await switchToRenderedMode(page);
+  await openMoreMenu(page);
+  await page.locator(".topbar .export-menu summary").click();
+  await expect(exportMenu).toHaveAttribute("open", "");
+  await page.locator(".reader-content").click({ position: { x: 20, y: 120 } });
+  await expect(exportMenu).not.toHaveAttribute("open");
+  await expect(overflowMenu).not.toHaveAttribute("open");
+
+  await openMoreMenu(page);
+  await page.keyboard.press("Escape");
+  await expect(overflowMenu).not.toHaveAttribute("open");
 });
