@@ -331,6 +331,42 @@ test("keeps supported markdown syntax through the wysiwyg editor", async ({ page
   await expectEditorText(editor, corpus);
 });
 
+test("keeps heading hierarchy and list rhythm readable", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "typography-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# 主标题\n\n#### 四级标题\n\n- 一级项目\n  - 嵌套项目\n"),
+  });
+
+  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+  const wysiwygHeading = page.locator(".wysiwyg-editor h4");
+  await expect(wysiwygHeading).toHaveText("四级标题");
+  const wysiwygFontSize = await wysiwygHeading.evaluate((element) => getComputedStyle(element).fontSize);
+  expect(Number.parseFloat(wysiwygFontSize)).toBe(19);
+
+  await switchToRenderedMode(page);
+
+  const heading = page.locator(".markdown-body h4");
+  const list = page.locator(".markdown-body ul").first();
+  await expect(heading).toHaveText("四级标题");
+  await expect(list).toBeVisible();
+
+  const styles = await heading.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return { fontSize: computed.fontSize, marginBottom: computed.marginBottom };
+  });
+  const listStyles = await list.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return { marginBottom: computed.marginBottom, paddingLeft: computed.paddingLeft };
+  });
+
+  expect(Number.parseFloat(styles.fontSize)).toBe(19);
+  expect(styles.marginBottom).toBe("10px");
+  expect(listStyles.marginBottom).toBe("20px");
+  expect(Number.parseFloat(listStyles.paddingLeft)).toBeGreaterThan(0);
+});
+
 test("inserts a heading from the wysiwyg slash menu", async ({ page }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles({

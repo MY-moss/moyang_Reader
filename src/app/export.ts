@@ -491,10 +491,13 @@ export function buildHtmlExport(
     `    @page { size: ${exportPageSize(options)} ${options.orientation}; margin: ${exportMargin(options)}; }\n` +
     "    :root { color-scheme: light; }\n" +
     '    body { max-width: 860px; margin: 0 auto; color: #35332f; background: #fff; font-family: Georgia, "Songti SC", "STSong", serif; font-size: 17px; line-height: 1.85; }\n' +
-    '    h1, h2, h3, h4 { color: #292825; font-family: Georgia, "Songti SC", "STSong", serif; font-weight: 500; line-height: 1.25; }\n' +
+    '    h1, h2, h3, h4, h5, h6 { color: #292825; font-family: Georgia, "Songti SC", "STSong", serif; font-weight: 500; line-height: 1.25; }\n' +
     "    h1 { margin: 0 0 30px; font-size: 42px; }\n" +
     "    h2 { margin: 50px 0 16px; font-size: 29px; }\n" +
     "    h3 { margin: 35px 0 12px; font-size: 23px; }\n" +
+    "    h4 { margin: 28px 0 10px; font-size: 19px; }\n" +
+    "    h5 { margin: 24px 0 8px; font-size: 17px; }\n" +
+    "    h6 { margin: 20px 0 8px; color: #6d716b; font-size: 15px; font-weight: 600; letter-spacing: .02em; }\n" +
     "    .export-header { margin: 0 0 42px; padding: 0 0 18px; border-bottom: 1px solid #d9d5cc; break-after: avoid; }\n" +
     "    .export-kicker { margin-bottom: 8px; color: #6d716b; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: .12em; }\n" +
     "    .export-header h1 { margin: 0; font-size: 38px; }\n" +
@@ -510,6 +513,12 @@ export function buildHtmlExport(
     "    .batch-index strong { display: block; margin-bottom: 8px; color: #292825; }\n" +
     "    .batch-index ol { margin: 0; padding-left: 22px; }\n" +
     "    p, ul, ol, blockquote, pre, table { margin: 0 0 20px; }\n" +
+    "    ul, ol { padding-left: 1.75em; }\n" +
+    "    li { margin: .35em 0; padding-left: .15em; }\n" +
+    "    li > ul, li > ol { margin-top: .35em; margin-bottom: .35em; }\n" +
+    "    li > p:not(:last-child) { margin-bottom: .45em; }\n" +
+    "    li > p:last-child { margin-bottom: 0; }\n" +
+    "    li::marker { color: #28655f; }\n" +
     "    .batch-document + .batch-document { break-before: page; }\n" +
     "    a { color: #28655f; }\n" +
     "    img { max-width: 100%; height: auto; }\n" +
