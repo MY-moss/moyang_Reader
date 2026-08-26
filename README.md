@@ -1,10 +1,12 @@
 # Moyang Reader
 
-一个 Windows 优先、阅读器优先的本地文档阅读工具。
+一个 Windows x64、阅读器优先的本地文档阅读工具。
 
 ## 当前状态
 
-v0.9.0 是当前稳定基线；后续 v0.9.1 将继续完善编辑器保真、桌面回归和无障碍体验，继续保持 Windows 优先、本地优先和轻量启动：
+v0.9.0 是当前稳定基线；后续 v0.9.1 将继续完善编辑器保真、Windows 桌面回归和无障碍体验，集中保持 Windows x64、本地优先和轻量启动：
+
+当前产品边界：只发布和维护 Windows x64 桌面版。浏览器版只用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端及跨平台自动更新暂不支持，以减少安装包、CI、测试和维护成本。
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
 - 双击传入文件路径、单实例接收后续打开请求；桌面“打开”对话框支持一次选择多个文档并依次打开
@@ -113,7 +115,7 @@ npm run desktop
 2. v0.9.1：编辑器保真、桌面回归、外部修改安全、a11y 和基础 i18n 稳定化。
 3. v0.10：嵌入、块引用、属性和关系图筛选，并完成大库搜索性能升级。
 4. v0.11：Worker/分批导出、PDF/Word 模板和分享体验。
-5. v0.12：跨平台前置、镜像巡检和发布稳定性。
-6. v1.0：核心能力冻结，进入长期维护。
+5. v0.12：Windows 镜像巡检、更新器回归和发布稳定性。
+6. v1.0：Windows x64 核心能力冻结，进入长期维护。
 
 详细需求、交互契约、版本映射和 AI 接手流程见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。
