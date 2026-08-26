@@ -69,10 +69,18 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-- 基线：`v0.9.0`（GitHub Release 与 Cloudflare 镜像已完成在线核验）；已合并 PR #153（阅读工作台）、#154（外部修改同步）、#155（双链补全与 round-trip 样例）、#159（`/` 块级命令菜单）、#160（序列化规范化固化与文档化，关闭 #157）、#204（外部修改保护与低价值入口收敛，关闭 #178）、#208（#177 WYSIWYG 渲染防抖，关闭 #177）、#209（交接文档同步）、#210（#180 阅读位置竞态修复，关闭 #180，合并提交 `50c4f56`）、#212（#170 系统暗色搜索高亮，关闭 #170）、#213（v0.8.3 发布事实交接）、#214（#186 模态键盘契约，关闭 #186）、#216（#185 草稿切换安全，关闭 #185，合并提交 `7a35036d75ce7bda4908f3b41c978e2d9e74fbfb`）、#218（#88 桌面编辑回归，合并提交 `bfc480d33d462e9a462501f822feb059db91bf44`）、#219（#195 工作区入口审查，合并提交 `6816a7477952725b1e929ea4ce4d59285cccc47f`）、#221（多阅读库、直接编辑入口与 Windows 无控制台启动，合并提交 `961097687acd665982442cf64ff2beee932cfd13`）和 #222（v0.9.0 发布准备，合并提交 `d7a91b4d2d4167bb49afe66ba5556d7ac7ed4310`）。v0.9.0 已发布；Issue #88 和 #195 均保持 open；分支 `codex/heading-downgrade-156` 收尾 #156 调查。
-- 当前切片（Cloudflare 静态镜像发布链路）：`.github/workflows/mirror-release.yml` 只保留 Release `published` 和手动版本同步，删除 `workflow_run` 重复触发；正式发布必须配置 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`，否则工作流失败而不是验证旧代理后报成功。Release 资产直接下载并通过 `prepare-mirror.mjs` 生成 `/vX.Y.Z/` 静态目录，部署后重试根 manifest、版本 manifest、安装包和 `.sig`，同时校验版本、HTTP 和安装包大小。`scripts/mirror-worker.js` 仅保留为应急回滚方案。该切片只改 CI/发布/文档，不生成新安装包；当前尚未配置 Cloudflare Secrets，必须在合并后手动重同步 `v0.9.0` 验证真实上传。
+> **最新检查点（2026-08-27，优先于下方历史条目）**
+>
+> - 稳定基线：`v0.9.1`；`main` 当前合并提交为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。
+> - GitHub Release 已发布：[`v0.9.1`](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.1)，Release workflow [`32996354493`](https://github.com/MY-moss/moyang_Reader/actions/runs/32996354493) 成功；安装包 4,861,912 字节，SHA-256 `bf511b08459d78023055fecd9605579dae23cf883826203309460f4f1d36a35f`；`.sig` 424 字节，SHA-256 `47d9185a297e4839f7d33ac5db68572a9fae323e1c6a82a724187ccf4df04bef`。
+> - Cloudflare 根 manifest、`/v0.9.1/` 安装包和 `.sig` 均 HTTP 200，镜像安装包与 GitHub Release SHA-256 一致；镜像 workflow [`32998515986`](https://github.com/MY-moss/moyang_Reader/actions/runs/32998515986) 在凭据预检失败，仓库当前没有 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` Secret。不要把该失败记录为部署成功，也不要在聊天中传递 token。
+> - 当前分支 `codex/release-pipeline-reliability-2026-08-27` 用于修复两项流程缺口：CI 并发组按事件隔离；Release 工作流直接调用镜像工作流，避免 `GITHUB_TOKEN` 创建 Release 后不触发 `release` 事件。该分支只改 CI/发布/文档，不生成新安装包。
+> - 镜像自动部署的唯一外部前置是维护者在 GitHub Actions Secrets 中配置 Cloudflare API Token（仅 Pages 编辑权限）和账户 ID；流程修复合并后应先补齐 Secrets，再在下一次稳定 Release 验证端到端镜像部署。
+
+- 历史基线：`v0.9.0`（详细历史合并记录保留在本文件中）；当前状态以“最新检查点”为准。
+- 历史切片（Cloudflare 静态镜像发布链路）：该阶段已确认静态资产映射、重试校验和缺少凭据时失败的行为；v0.9.1 的真实资产与自动同步状态以最新检查点为准。
 - 镜像健康巡检：`.github/workflows/mirror-health.yml` 每 6 小时和手动触发，读取 GitHub 最新 Release，对比 Cloudflare 根 manifest 的版本、版本目录、下载地址、安装包和 `.sig`；它不上传资产，不增加提交或 Release 的耗时，失败时作为发布链路告警。
-- 本切片（v0.9.1 编辑历史与恢复）：新增 `src/app/editor-history.ts` 的 100 项有界快照历史，App 统一连接源码编辑器与 Milkdown WYSIWYG；`Ctrl+Z`、`Ctrl+Y` / `Ctrl+Shift+Z`、顶部撤销/重做按钮和命令面板共用同一状态。打开/切换/重新载入文档会重置历史，保存不会清空历史；阅读模式禁用编辑历史。App 在编辑器 DOM 捕获阶段拦截快捷键，避免 CodeMirror/ProseMirror 原生历史重复执行；受控源码同步和外部 `replaceAll` 通过去重不重复入栈。单测覆盖撤销、重做、分支编辑、重复状态和 100 项上限；本切片不生成安装包或 Release，目标纳入下一稳定 `v0.9.1`。
+- 历史切片（v0.9.1 编辑历史与恢复）：编辑历史、编辑器保真与相关稳定化内容已包含在 v0.9.1；具体 Release 和验证结果以最新检查点为准。
 - 已完成（历史切片）：三栏布局、上下文面板、Milkdown 按需加载与挂载修复、命令面板、外部变更决策边界、WYSIWYG 同路径源码同步、`[[` 双链补全（两模式）、`/` 块级命令菜单（两模式，含 Enter 响应修复）、序列化规范化逐字节断言 + 决策文档 0004。
 - 本切片新增（#158）：`e2e/smoke.spec.ts` 的 `readEditorText` 保留 CodeMirror 内部 view state 读取以绕过视口虚拟化，但路径失效时不再静默回退到可视区 DOM，而是抛出 `CodeMirror internal view state path changed — update readEditorText`。现有 round-trip e2e 继续验证完整文档读取；后续若升级 CodeMirror，必须先处理该显式失败，再评估通过公开实例引用替代内部路径。
 - #156 已关闭：新增 e2e `downgrades a heading one level per Backspace at its start` 固化 Milkdown heading keymap 的降级语义（H2 起始 Backspace→H1，H1→段落，与 Obsidian/Typora 一致）。调查结论是该 keymap 属于预期 UX；原始 `<br />` 损坏在 #159 的竞态修复后无法复现。
@@ -102,5 +110,5 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - v0.9.0 发布结果：PR #222 已合并；Release workflow [32933116043](https://github.com/MY-moss/moyang_Reader/actions/runs/32933116043) 和镜像 workflow [32934449872](https://github.com/MY-moss/moyang_Reader/actions/runs/32934449872) 均通过，公开 Release 为 [v0.9.0](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.0)。GitHub 与 Cloudflare 的 `latest.json` 均为 `0.9.0`、HTTP 200；两边 Windows 安装包均为 4,862,669 字节，SHA-256 为 `063a075e50a39d013725eb25a5eb5f38dbf70f4dd39b201b17f99daf6bec497d`；GitHub 与镜像安装包均 HTTP 200，签名文件均 HTTP 200、424 字节，manifest 均带签名字段。
 - 更新验证边界：本机检测到已安装 `v0.8.1`，v0.9.0 的 GitHub/镜像 manifest、安装包、签名和 HTTPS 下载链路均已验证；本次仍未自动点击旧版本的“下载并安装”并重启，不能将其记录为完整旧版本实机升级回归。下一次 Windows 实机回归需验证旧版本点击更新、签名校验、替换安装和重启后的版本号。
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
-- 下一位 AI 的唯一下一步：先查看 Issues、PR 和本文件，确认本切片检查结果；若 PR 已合并，补做一次真实源码/WYSIWYG 撤销重做桌面路径验证，再继续 #165/#164 的编辑器行为与 round-trip 回归。Cloudflare 当前仍需配置 GitHub Actions 的 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` 后手动同步 `v0.9.0`，不能把 2026-08-25 的旧 `ad_hoc` 部署当成新同步。#88、#195、#226、#227 仍按实际验收状态管理，不提前关闭；不要重复实现当前的搜索高亮、阅读位置、外部修改保护、WYSIWYG 渲染防抖、工作区入口收敛、启动/编辑/保存/无冲突外部刷新/外部新增删除/HTML+Word 导出/关闭确认 smoke。
-- CI 触发记录：PR #235 的当前 head `60ff4804` 已由正式 push run `32992317607` 完成 `Quality checks` 全绿；手动验证 `32991838347` 因同一 SHA 的正式运行出现而自动取消，不作为合并依据。
+- 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；本分支的发布链路修复通过检查后合并，不生成新安装包。维护者需要在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，再手动重跑 v0.9.1 镜像工作流；不要把 token 放入聊天、仓库或文档。镜像资产目前已在线且与 GitHub Release 哈希一致；不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
+- CI 触发记录：PR #236 的 head `e364648fe703c4689a148f894525a68d25452a1b` 的 push `Quality checks` 曾被并发重跑取消，恢复后的 job `98264563669` 已成功；PR #236 已合并为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。Release workflow `32996354493` 已成功，镜像 workflow `32998515986` 仅因 Cloudflare Secrets 缺失失败。

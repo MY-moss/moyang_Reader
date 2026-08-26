@@ -18,6 +18,8 @@ permissions:
 jobs:
   publish:
     name: Build and publish Windows update
+    outputs:
+      release_tag: ${{ steps.release.outputs.tag }}
     runs-on: windows-latest
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org
@@ -105,3 +107,12 @@ jobs:
           uploadUpdaterSignatures: true
           updaterJsonPreferNsis: true
           args: --config src-tauri/tauri.release.conf.json
+
+  mirror:
+    name: Publish updater mirror
+    needs: publish
+    if: needs.publish.result == 'success'
+    uses: ./.github/workflows/mirror-release.yml
+    with:
+      version: ${{ needs.publish.outputs.release_tag }}
+    secrets: inherit

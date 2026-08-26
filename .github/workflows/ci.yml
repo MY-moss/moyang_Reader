@@ -10,7 +10,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Keep manual validation independent from the required push check for the
+  # same commit. Push runs still cancel older push runs on the same branch.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
