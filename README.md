@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-v0.8.3 是当前稳定基线；v0.9.0 正在以可审查的功能切片推进，继续保持 Windows 优先、本地优先和轻量启动：
+v0.9.0 是当前稳定基线；后续 v0.9.1 将继续完善编辑器保真、桌面回归和无障碍体验，继续保持 Windows 优先、本地优先和轻量启动：
 
 - Tauri 2 + Rust + React/TypeScript 工程骨架
 - 双击传入文件路径、单实例接收后续打开请求；桌面“打开”对话框支持一次选择多个文档并依次打开
@@ -97,7 +97,7 @@ npm run desktop
 
 稳定批次生成的 NSIS 安装包预期路径：
 
-`src-tauri/target/release/bundle/nsis/Moyang Reader_0.8.3_x64-setup.exe`
+`src-tauri/target/release/bundle/nsis/Moyang Reader_0.9.0_x64-setup.exe`
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
 
@@ -109,8 +109,8 @@ npm run desktop
 
 ## 后续版本路线
 
-1. v0.8.3：当前稳定基线，在 v0.8.2 基础上修复系统暗色模式下搜索高亮可读性问题。
-2. v0.9：三栏 UI 状态重构、Markdown 所见即所得编辑、源码安全回退、桌面 E2E、a11y 和基础 i18n。
+1. v0.9.0：当前稳定基线，完成三栏工作区、多阅读库并存、Markdown 所见即所得编辑和 Windows 无控制台启动。
+2. v0.9.1：编辑器保真、桌面回归、外部修改安全、a11y 和基础 i18n 稳定化。
 3. v0.10：嵌入、块引用、属性和关系图筛选，并完成大库搜索性能升级。
 4. v0.11：Worker/分批导出、PDF/Word 模板和分享体验。
 5. v0.12：跨平台前置、镜像巡检和发布稳定性。
