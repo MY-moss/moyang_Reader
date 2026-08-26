@@ -49,6 +49,14 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 合并 PR 不等于发布安装包，但用户功能 minor 版本达到验收后必须及时发布；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch。每个 PR 必须标记无 Release、minor 或 patch，并写出目标版本和理由。稳定发布时必须同步 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、CHANGELOG、Git tag、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和 Cloudflare 镜像；发布后必须做在线 HTTP、哈希、签名、manifest 和旧版本自动更新验证。纯文档、测试、CI 和内部重构可以不发布，但交接中必须明确写出原因。完整规则见 `docs/RELEASE-POLICY.md`。
 
+## 当前平台边界（Windows x64）
+
+- 产品、发布、文件关联、自动更新和真实桌面 E2E 只覆盖 Windows x64。
+- 浏览器版只用于本地开发预览和 Playwright UI 测试，不作为独立桌面平台发布。
+- macOS、Linux、Windows ARM、移动端和跨平台自动更新在 v1.0 前不进入主线；不要为它们新增构建矩阵、安装包或桌面回归。
+- `.github/workflows/ci.yml` 只保留 Windows 质量门禁；独立 RustSec 审计可以使用 Ubuntu runner，但不代表支持 Linux 产品。
+- 现有跨平台抽象不主动删除，除非它们增加 Windows 构建/启动/维护成本；未来重新开放平台必须先写新的 ADR。
+
 ## Token 预算规则
 
 - 先给出短上下文包，再按需读取文件。

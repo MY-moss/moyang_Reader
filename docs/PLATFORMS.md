@@ -1,34 +1,36 @@
-# 跨平台前置验证
+# 平台支持边界
 
-Moyang Reader 以 Windows 桌面版为稳定发布目标；macOS 和 Linux 在 v0.8 先建立构建、测试和路径行为的前置门禁，不把未完成的签名、公证或自动更新发布称为正式支持。
+## 当前决策
 
-## CI 覆盖
+Moyang Reader 当前只支持 Windows x64 桌面版。Windows 是唯一的产品、发布、安装包、文件关联、自动更新和真实桌面 E2E 平台。
 
-`.github/workflows/ci.yml` 会在 Windows 之外对 `ubuntu-latest` 和 `macos-latest` 执行：
+浏览器版只用于本地开发预览和 Playwright UI 测试，不作为独立桌面产品发布；macOS、Linux、移动端和 Windows ARM 暂不承诺支持。
 
-- 前端单元测试和 Vite 构建；
-- Rust 格式检查、clippy 和命令层测试；
-- Linux 安装 Tauri 2 所需的 WebKit、GTK、AppIndicator、图像和打包依赖。
+## Windows 交付范围
 
-## Windows 桌面窗口模型
+- Tauri Windows 桌面应用；
+- x64 NSIS 安装包和更新签名；
+- Markdown、TXT/LOG、DOCX、PDF、图片和整个文件夹打开；
+- Windows 文件关联、单实例启动、原生文件对话框和目录监听；
+- Windows Debug/Release 桌面 smoke、更新器和安装包验证；
+- GitHub Release 与 Cloudflare Pages 镜像中的 Windows x64 资产。
 
-Windows 的 Tauri 入口使用 GUI 子系统，Debug 和 Release 进程都不会额外创建控制台窗口。开发模式的 `beforeDevCommand` 通过 `scripts/tauri-dev-server.mjs` 启动带 `windowsHide` 的 Vite 子进程；`npm run desktop` 仍会把日志留在启动它的开发终端中，但不会再弹出一个独立 CMD 窗口。发布安装版不依赖 Vite，也不应出现命令行窗口；若安装版仍出现窗口，应优先核对实际启动的 exe 是否来自最新安装包，而不是旧的 `target/debug` 产物。
+## CI 与成本控制
 
-## 手动验收清单
+`.github/workflows/ci.yml` 默认只运行 `windows-latest` 的完整质量门禁，包括前端、浏览器、真实 Tauri 桌面、Rust、依赖审计和发布元数据检查。这样可以避免每个 PR 重复运行 macOS/Linux 构建，降低时间和缓存消耗。
 
-在真实 macOS/Linux 桌面环境准备发布前，至少验证：
+`.github/workflows/rust-audit.yml` 保留 Ubuntu runner 的 RustSec 依赖审计。它只检查供应链漏洞，不构建或发布 Linux 应用，也不代表 Linux 产品支持。
 
-1. 打开 Markdown、纯文本、DOCX、PDF 和常见图片；
-2. 添加整个文件夹、递归扫描、目录折叠、搜索和文件变更刷新；
-3. 打印 / 保存 PDF、HTML 和 DOCX 导出；
-4. 文件关联、单实例传入路径和关闭未保存修改提示；
-5. 系统主题、字体、文件名包含非 ASCII 字符时的显示和读写；
-6. 更新器的签名包格式与当前平台产物格式是否匹配。
+## 明确不做
 
-## 明确延期
+- macOS `.app`、公证、签名和自动更新；
+- Linux AppImage、包管理器发布和自动更新；
+- macOS/Linux 文件关联、原生文件对话框和桌面 E2E；
+- Windows ARM、移动端和跨平台同步；
+- 为保持“跨平台”而新增抽象、适配器或构建矩阵。
 
-- macOS 公证、签名证书和正式 `.app` 更新通道；
-- Linux AppImage/包管理器发布和自动更新；
-- 各平台的 Release 安装包上传与镜像清单扩展。
+现有代码中的跨平台抽象暂不主动删除：只要它们不增加 Windows 构建体积、启动时间或维护负担，就保留以降低破坏性清理的回归风险。未来只有在出现明确用户需求和维护预算时，才通过新的 ADR 重新开放平台范围。
 
-这些事项需要真实平台凭据和人工验收，统一放到 v0.8 稳定发布前的发布批次处理。
+## Windows 窗口模型
+
+Windows Tauri 入口使用 GUI 子系统，Debug 和 Release 进程不会额外创建控制台窗口。开发模式通过隐藏的 Vite 辅助进程提供前端服务；发布安装版不依赖 Vite，也不应出现命令行窗口。

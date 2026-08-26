@@ -4,6 +4,10 @@
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
+## 平台范围
+
+当前只发布 Windows x64 桌面版。公开 Release、NSIS 安装包、更新签名、`latest.json`、Cloudflare 镜像和旧版本自动更新验证都只针对 Windows x64；不生成 macOS/Linux/Windows ARM 安装包，也不为这些平台增加默认 CI 或桌面 E2E。浏览器版只用于开发预览和 UI 测试。
+
 ## 版本规则
 
 Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶段，但对用户可见的版本含义保持稳定：
@@ -31,7 +35,7 @@ Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶�
 - Windows NSIS 安装包：`Moyang.Reader_X.Y.Z_x64-setup.exe`；
 - 对应的 `.exe.sig` 签名文件；
 - `latest.json`，版本、下载地址和签名与 Release 一致；
-- Cloudflare Pages 镜像或镜像代理可访问；
+- Cloudflare Pages 镜像或镜像代理中的 Windows x64 资产可访问；
 - CHANGELOG 中的用户可见说明；
 - 旧版本检查更新、签名校验、下载、安装和重启验证记录。
 

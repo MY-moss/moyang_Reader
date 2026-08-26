@@ -86,6 +86,10 @@ async function clickWorkspaceFile(name) {
   for (const file of files) {
     if ((await file.getText()).includes(name)) {
       await file.click();
+      await browser.waitUntil(async () => (await browser.$(".document-title").getText()).includes(name), {
+        timeout: 15_000,
+        timeoutMsg: `workspace file ${name} did not finish opening`,
+      });
       return;
     }
   }
