@@ -127,3 +127,48 @@ test("guards release and mirror workflows against stale or incomplete publishing
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   assert.deepEqual(validateReleaseWorkflow(root), []);
 });
+
+test("rejects a mirror workflow that can silently skip deployment or duplicate triggers", () => {
+  const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-workflow-"));
+  try {
+    fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
+    fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
+    fs.copyFileSync(
+      path.join(sourceRoot, ".github", "workflows", "release.yml"),
+      path.join(root, ".github", "workflows", "release.yml"),
+    );
+    fs.copyFileSync(
+      path.join(sourceRoot, ".github", "workflows", "mirror-health.yml"),
+      path.join(root, ".github", "workflows", "mirror-health.yml"),
+    );
+    const mirrorPath = path.join(root, ".github", "workflows", "mirror-release.yml");
+    const mirror = fs
+      .readFileSync(path.join(sourceRoot, ".github", "workflows", "mirror-release.yml"), "utf8")
+      .replace(
+        "  workflow_dispatch:",
+        '  workflow_run:\n    workflows: ["Release"]\n    types: [completed]\n  workflow_dispatch:',
+      )
+      .replace(
+        'throw "缺少 CLOUDFLARE_API_TOKEN 或 CLOUDFLARE_ACCOUNT_ID；正式 Release 不允许跳过镜像上传。"',
+        '"CLOUDFLARE_DEPLOY_ENABLED=false" >> $env:GITHUB_ENV',
+      );
+    fs.writeFileSync(mirrorPath, mirror);
+    fs.copyFileSync(
+      path.join(sourceRoot, "scripts", "mirror-worker.js"),
+      path.join(root, "scripts", "mirror-worker.js"),
+    );
+
+    const errors = validateReleaseWorkflow(root);
+    assert.equal(
+      errors.some((error) => error.includes("workflow_run")),
+      true,
+    );
+    assert.equal(
+      errors.some((error) => error.includes("静默跳过")),
+      true,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

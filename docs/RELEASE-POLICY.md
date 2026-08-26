@@ -60,9 +60,10 @@ Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶�
 4. 运行前端、Rust、浏览器桌面 E2E、发布检查和 Release 测试。
 5. 合并到 `main`，确认 CI 全绿后创建并推送 `vX.Y.Z` tag。
 6. 由 `.github/workflows/release.yml` 构建签名安装包、`.sig` 和 `latest.json` 并创建 GitHub Release。
-7. 由镜像工作流同步或验证 Cloudflare Pages 更新端点。
-8. 在线检查 GitHub 和镜像的 `latest.json`、安装包 HTTP 状态、文件大小、SHA-256、签名和版本号。
-9. 使用旧版本验证自动更新；完成后更新 Release、Issue 状态和 AI 交接记录。
+7. 由镜像工作流将 Release 资产静态上传到 Cloudflare Pages；缺少 Cloudflare Secret 时直接失败，不得静默改为只验证旧镜像。
+8. 在线检查 GitHub 和镜像的 `latest.json`、版本目录、安装包 HTTP 状态、文件大小、SHA-256、签名和版本号；临时 522 等错误必须重试后再判定。
+9. 由 `mirror-health.yml` 定时巡检最新 Release 与 Cloudflare 镜像；巡检失败时先修复镜像，再继续发布流程。
+10. 使用旧版本验证自动更新；完成后更新 Release、Issue 状态和 AI 交接记录。
 
 推荐的本地发布前检查：
 

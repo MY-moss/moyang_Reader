@@ -1,0 +1,65 @@
+name: Check updater mirror
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Check latest Release mirror
+    runs-on: ubuntu-latest
+    env:
+      MIRROR_BASE_URL: https://moyang-reader-mirror.pages.dev
+    steps:
+      - name: Compare GitHub Release and Cloudflare mirror
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = gh release view --repo $env:GITHUB_REPOSITORY --json tagName | ConvertFrom-Json
+          $expectedVersion = ([string]$release.tagName).TrimStart("v")
+          $baseUrl = $env:MIRROR_BASE_URL.TrimEnd("/")
+          $manifest = $null
+          $lastError = $null
+          for ($attempt = 1; $attempt -le 6; $attempt++) {
+            try {
+              $manifest = Invoke-RestMethod -Headers @{ "Cache-Control" = "no-cache" } -Uri "$baseUrl/latest.json?health=$expectedVersion&attempt=$attempt" -TimeoutSec 20
+              if ([string]$manifest.version -ne $expectedVersion) {
+                throw "Cloudflare 镜像版本 $($manifest.version) 落后于 GitHub Release $expectedVersion。"
+              }
+              break
+            } catch {
+              $lastError = $_
+              if ($attempt -lt 6) {
+                Start-Sleep -Seconds 5
+              }
+            }
+          }
+          if ($null -eq $manifest) {
+            throw "Cloudflare 镜像健康检查失败：$lastError"
+          }
+
+          $checkedUrls = [System.Collections.Generic.HashSet[string]]::new()
+          foreach ($entry in $manifest.platforms.PSObject.Properties) {
+            $platform = $entry.Value
+            if ($null -eq $platform -or [string]::IsNullOrWhiteSpace($platform.url) -or [string]::IsNullOrWhiteSpace($platform.signature)) {
+              throw "$($entry.Name) 缺少下载地址或签名。"
+            }
+            if ($platform.url -notmatch "/v$expectedVersion/") {
+              throw "$($entry.Name) 未指向当前版本目录：$($platform.url)"
+            }
+            if (-not $checkedUrls.Add($platform.url)) {
+              continue
+            }
+            foreach ($url in @($platform.url, "$($platform.url).sig")) {
+              $response = Invoke-WebRequest -Method Head -Headers @{ "Cache-Control" = "no-cache" } -Uri $url -TimeoutSec 20
+              if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+                throw "镜像资产不可访问：$url（HTTP $($response.StatusCode)）"
+              }
+            }
+          }
+          Write-Host "Updater mirror is healthy for v$expectedVersion"
