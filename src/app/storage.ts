@@ -14,7 +14,7 @@ const contextPanelOpenKey = "moyang-reader-context-panel-open";
 const contextPanelTabKey = "moyang-reader-context-panel-tab";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
-const maxMountedWorkspaces = 5;
+export const MAX_MOUNTED_WORKSPACES = 5;
 const maxOpenTabs = 16;
 const maxReadingPositions = 32;
 
@@ -180,7 +180,7 @@ function parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {
       seen.add(key);
       return true;
     })
-    .slice(0, maxMountedWorkspaces);
+    .slice(0, MAX_MOUNTED_WORKSPACES);
 }
 
 export function loadWorkspaceSessions(): WorkspaceSession[] {
@@ -204,7 +204,7 @@ export function saveWorkspaceSession(session: WorkspaceSession): void {
   const key = comparablePath(session.path);
   const next = [session, ...loadWorkspaceSessions().filter((item) => comparablePath(item.path) !== key)].slice(
     0,
-    maxMountedWorkspaces,
+    MAX_MOUNTED_WORKSPACES,
   );
   saveWorkspaceSessions(next);
 }
@@ -348,18 +348,18 @@ export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorks
 }
 
 export function loadMountedWorkspaces(): RecentWorkspace[] {
-  return loadWorkspaceList(mountedWorkspacesKey, maxMountedWorkspaces);
+  return loadWorkspaceList(mountedWorkspacesKey, MAX_MOUNTED_WORKSPACES);
 }
 
 export function saveMountedWorkspaces(workspaces: RecentWorkspace[]): void {
-  saveWorkspaceList(mountedWorkspacesKey, workspaces, maxMountedWorkspaces);
+  saveWorkspaceList(mountedWorkspacesKey, workspaces, MAX_MOUNTED_WORKSPACES);
 }
 
 export function rememberMountedWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
   const key = comparablePath(workspace.path);
   const next = [workspace, ...loadMountedWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(
     0,
-    maxMountedWorkspaces,
+    MAX_MOUNTED_WORKSPACES,
   );
   saveMountedWorkspaces(next);
   return next;

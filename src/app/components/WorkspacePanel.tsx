@@ -8,6 +8,7 @@ import type {
 import { WorkspaceTreeView } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
+import { MAX_MOUNTED_WORKSPACES } from "../storage";
 
 const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
   { value: "all", label: "全部类型" },
@@ -34,7 +35,8 @@ type WorkspacePanelProps = {
   tagOptions: string[];
   selectedTag: string | null;
   selectedKind: WorkspaceKindFilter;
-  onChooseWorkspace: () => void;
+  onAddWorkspace: () => void;
+  workspaceLimitReached: boolean;
   onOpenWorkspace: (path: string) => void;
   onRemoveWorkspace: (path: string) => void;
   onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
@@ -77,7 +79,8 @@ export function WorkspacePanel({
   tagOptions,
   selectedTag,
   selectedKind,
-  onChooseWorkspace,
+  onAddWorkspace,
+  workspaceLimitReached,
   onOpenWorkspace,
   onRemoveWorkspace,
   onExportWorkspace,
@@ -142,8 +145,18 @@ export function WorkspacePanel({
             </button>
           )}
           {workspacePath && (
-            <button type="button" className="quiet-button" onClick={onChooseWorkspace}>
-              更换文件夹
+            <button
+              type="button"
+              className="quiet-button workspace-add-button"
+              onClick={onAddWorkspace}
+              disabled={workspaceLimitReached}
+              title={
+                workspaceLimitReached
+                  ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`
+                  : "添加另一个阅读库"
+              }
+            >
+              添加阅读库
             </button>
           )}
         </div>
@@ -153,14 +166,18 @@ export function WorkspacePanel({
         <div className="workspace-location" title={workspacePath}>
           <span className="workspace-dot" aria-hidden="true" />
           <span>{pathName(workspacePath)}</span>
-          <small>{files.length} 项</small>
+          <small>
+            {files.length} 项 · {mountedWorkspaces.length} 个阅读库
+          </small>
           {switchableWorkspaces.length > 0 && (
             <details className="workspace-switcher">
               <summary className="workspace-switcher-trigger" aria-label="切换阅读库">
                 切换
               </summary>
               <div className="workspace-switcher-menu" role="menu">
-                <div className="workspace-switcher-label">已挂载阅读库 · {mountedWorkspaces.length} / 5</div>
+                <div className="workspace-switcher-label">
+                  已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
+                </div>
                 {switchableWorkspaces.map((workspace) => (
                   <div className="workspace-switcher-item" role="none" key={workspace.path}>
                     <button

@@ -10,6 +10,10 @@ Moyang Reader 以 Windows 桌面版为稳定发布目标；macOS 和 Linux 在 v
 - Rust 格式检查、clippy 和命令层测试；
 - Linux 安装 Tauri 2 所需的 WebKit、GTK、AppIndicator、图像和打包依赖。
 
+## Windows 桌面窗口模型
+
+Windows 的 Tauri 入口使用 GUI 子系统，Debug 和 Release 进程都不会额外创建控制台窗口。开发模式的 `beforeDevCommand` 通过 `scripts/tauri-dev-server.mjs` 启动带 `windowsHide` 的 Vite 子进程；`npm run desktop` 仍会把日志留在启动它的开发终端中，但不会再弹出一个独立 CMD 窗口。发布安装版不依赖 Vite，也不应出现命令行窗口；若安装版仍出现窗口，应优先核对实际启动的 exe 是否来自最新安装包，而不是旧的 `target/debug` 产物。
+
 ## 手动验收清单
 
 在真实 macOS/Linux 桌面环境准备发布前，至少验证：

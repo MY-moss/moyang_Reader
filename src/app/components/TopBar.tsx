@@ -37,9 +37,10 @@ type TopBarProps = {
   onExportOrientationChange: (orientation: ExportOrientation) => void;
   onExportMarginChange: (margin: ExportMargin) => void;
   onOpen: () => void;
-  onChooseWorkspace: () => void;
+  onAddWorkspace: () => void;
   onQuickOpen: () => void;
   workspaceOpen: boolean;
+  workspaceLimitReached: boolean;
   draftCount: number;
   onOpenRecovery: () => void;
   sidebarCollapsed: boolean;
@@ -47,6 +48,7 @@ type TopBarProps = {
   focusMode: boolean;
   onToggleFocusMode: () => void;
   onToggleMode: () => void;
+  onCycleMode: () => void;
   rightPanelOpen: boolean;
   onToggleRightPanel: () => void;
   onOpenCommandPalette: () => void;
@@ -107,9 +109,10 @@ export function TopBar({
   onExportOrientationChange,
   onExportMarginChange,
   onOpen,
-  onChooseWorkspace,
+  onAddWorkspace,
   onQuickOpen,
   workspaceOpen,
+  workspaceLimitReached,
   draftCount,
   onOpenRecovery,
   sidebarCollapsed,
@@ -117,6 +120,7 @@ export function TopBar({
   focusMode,
   onToggleFocusMode,
   onToggleMode,
+  onCycleMode,
   rightPanelOpen,
   onToggleRightPanel,
   onOpenCommandPalette,
@@ -244,11 +248,16 @@ export function TopBar({
             className="toolbar-button"
             onClick={() => {
               dismissTopbarOverlays();
-              onChooseWorkspace();
+              onAddWorkspace();
             }}
-            title={`${workspaceOpen ? "更换阅读库" : "添加整个文件夹"} (Ctrl+Shift+O)`}
+            disabled={workspaceLimitReached}
+            title={
+              workspaceLimitReached
+                ? "已达到阅读库上限，请先移除一个已挂载阅读库"
+                : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (Ctrl+Shift+O)`
+            }
           >
-            {t("action.folder")}
+            {workspaceOpen ? "添加阅读库" : t("action.folder")}
           </button>
         )}
         <button
@@ -262,6 +271,22 @@ export function TopBar({
         >
           {t("action.quickOpen")}
         </button>
+        {fileName && canEdit && (
+          <button
+            type="button"
+            className="toolbar-button editor-mode-button"
+            onClick={() => {
+              dismissTopbarOverlays();
+              onToggleMode();
+            }}
+            aria-pressed={mode !== "rendered"}
+            aria-label={mode === "rendered" ? "直接进入编辑模式" : "直接返回阅读模式"}
+            aria-keyshortcuts="Control+E"
+            title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (Ctrl+E)`}
+          >
+            {mode === "rendered" ? t("action.edit") : t("action.read")}
+          </button>
+        )}
         {draftCount > 0 && (
           <button
             type="button"
@@ -313,12 +338,7 @@ export function TopBar({
                 <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
                   {t("action.commands")}
                 </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={onToggleMode}
-                  disabled={!fileName || !canEdit}
-                >
+                <button type="button" className="toolbar-button" onClick={onCycleMode} disabled={!fileName || !canEdit}>
                   {mode === "rendered"
                     ? documentKind === "markdown"
                       ? t("action.edit")
