@@ -9,6 +9,8 @@ type PrintPreviewProps = {
   paper: ExportPaper;
   orientation: ExportOrientation;
   margin: ExportMargin;
+  actionLabel?: string;
+  actionHint?: string;
   onPrint: () => void | Promise<void>;
   onClose: () => void;
 };
@@ -27,7 +29,17 @@ function marginLabel(margin: ExportMargin): string {
 
 type PaginationStatus = "loading" | "ready" | "unavailable";
 
-export function PrintPreview({ title, html, paper, orientation, margin, onPrint, onClose }: PrintPreviewProps) {
+export function PrintPreview({
+  title,
+  html,
+  paper,
+  orientation,
+  margin,
+  actionLabel = "打印 / 保存 PDF",
+  actionHint = "预计页数以系统打印对话框为准 · 预览内容不会修改原文",
+  onPrint,
+  onClose,
+}: PrintPreviewProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -124,7 +136,7 @@ export function PrintPreview({ title, html, paper, orientation, margin, onPrint,
               onClick={() => void handlePrint()}
               disabled={printing}
             >
-              {printing ? "准备打印…" : "打印 / 保存 PDF"}
+              {printing ? "正在准备…" : actionLabel}
             </button>
           </div>
         </header>
@@ -151,7 +163,7 @@ export function PrintPreview({ title, html, paper, orientation, margin, onPrint,
                   : "暂无法估算页数"}
             </span>
           </div>
-          <span>预计页数以系统打印对话框为准 · 预览内容不会修改原文</span>
+          <span>{actionHint}</span>
         </footer>
       </section>
     </div>

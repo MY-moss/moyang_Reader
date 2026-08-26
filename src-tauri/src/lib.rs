@@ -100,6 +100,7 @@ pub fn run() {
             commands::write_text_file,
             commands::write_binary_file,
             commands::write_binary_file_raw,
+            commands::export_pdf_file,
             commands::create_markdown_file,
             commands::list_workspace_files,
             commands::search_workspace,

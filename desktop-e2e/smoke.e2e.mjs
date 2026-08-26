@@ -10,6 +10,8 @@ assert.ok(exportRoot, "desktop E2E export path should be configured");
 const workspaceName = path.basename(path.dirname(documentPath));
 const htmlExportPath = path.join(exportRoot, `${workspaceName}.html`);
 const docxExportPath = path.join(exportRoot, `${workspaceName}.docx`);
+const documentName = path.basename(documentPath, path.extname(documentPath));
+const pdfExportPath = path.join(exportRoot, `${documentName}.pdf`);
 
 async function clickToolbarAction(name) {
   const menu = await browser.$("details.toolbar-overflow");
@@ -267,7 +269,17 @@ describe("Moyang Reader desktop runtime", () => {
     });
   });
 
-  it("exports the workspace to HTML and Word through the real Tauri write path", async () => {
+  it("exports a real PDF and the workspace to HTML and Word", async () => {
+    fs.rmSync(pdfExportPath, { force: true });
+    const pdfAction = await browser.$("button=保存 PDF");
+    await pdfAction.waitForDisplayed();
+    await pdfAction.click();
+    await waitForExport(pdfExportPath, "the real Tauri PDF export");
+    const pdfBytes = fs.readFileSync(pdfExportPath);
+    assert.ok(pdfBytes.length > 100, "the real Tauri PDF export should not be empty");
+    assert.equal(pdfBytes.subarray(0, 5).toString("ascii"), "%PDF-");
+    assert.ok(pdfBytes.includes(Buffer.from("%%EOF")), "the real Tauri PDF export should have an EOF marker");
+
     await clickWorkspaceExportAction("单文件 HTML");
     await waitForExport(htmlExportPath, "the real Tauri HTML export");
     assert.match(fs.readFileSync(htmlExportPath, "utf8"), /Desktop E2E/);
