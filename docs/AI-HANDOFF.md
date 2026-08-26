@@ -69,14 +69,14 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，当前分支：`codex/pdf-file-export-2026-08-27`）**
+> **最新检查点（2026-08-27，当前分支：`codex/pdf-export-closeout-2026-08-27`）**
 >
-> - 稳定基线仍为 `v0.9.2`；远程 `main` 最新提交为 `3ad27a6c6d3bc3670d8b9eb1db937201b0a07f9f`，当前切片尚未创建 PR 或合并。
+> - 稳定基线仍为 `v0.9.2`；PDF 子切片已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并到远程 `main`，合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`，主线树为 `c650c6cf87b73aacba0543f0c99a6e0ae878b735`。
 > - 本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，只完成其中的 PDF 子项：Windows 桌面当前文档可选择保存位置，由隐藏的 Microsoft Edge headless 生成真实 PDF；输出先校验 `%PDF-` 文件头，再原子替换到目标路径，失败不会留下半成品。
-> - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性和 `%PDF-` 校验。
-> - 已验证：`npm run build` 通过；`npm test -- --run` 为 171/171；`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings` 通过；浏览器打印预览 E2E 1/1 通过；真实 Tauri 桌面 smoke 10/10 通过，其中 PDF 已实际写盘并检查文件头。
+> - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径，并稳定阅读位置恢复；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性、大小、`%PDF-` 和 `%%EOF` 校验，同时稳定阅读位置场景。
+> - 已验证：本地 `npm run build`、`npm test -- --run`（171/171）、`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings`、浏览器打印预览 E2E（1/1）和真实 Tauri Windows desktop smoke（10/10）通过；远程 CI run [33019830925](https://github.com/MY-moss/moyang_Reader/actions/runs/33019830925) 全绿。
 > - 当前未完成：旧版本安装环境的更新下载、签名校验、替换、重启和版本号回归；因此 #241 保持 open，本切片不创建 Release 或安装包，待更新器子切片完成后再按 v0.9.3 稳定批次发布。
-> - 下一位 AI 的唯一下一步：先检查本分支改动和 #241，完成一次 PR 前审查；若门禁通过，合并 PDF 子项并把更新器回归作为新的独立分支/PR，不要在同一 PR 中重写发布流程。
+> - 下一位 AI 的唯一下一步：从最新 `main` 创建新的独立分支，先检查 #241 更新器实现与已有 Release/manifest 流程，完成旧版本安装环境的下载、签名校验、替换、重启和版本号回归；不要在同一分支继续追加 PDF 或重写发布流程。
 
 > **最新检查点（2026-08-27，优先于下方历史条目）**
 >
