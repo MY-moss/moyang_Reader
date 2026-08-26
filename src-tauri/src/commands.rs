@@ -2247,18 +2247,18 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag, collect_open_paths,
-        create_markdown_file_inner, decode_ipc_path, decode_text, extract_markdown_links,
-        extract_tags, extract_title, extract_wiki_links, index_workspace_inner,
-        is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
-        list_workspace_files_inner, path_exists_inner, persistent_search_index_path,
-        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
+        access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
+        collect_open_paths, create_markdown_file_inner, decode_ipc_path, decode_text,
+        extract_markdown_links, extract_tags, extract_title, extract_wiki_links,
+        index_workspace_inner, is_supported_document_path, is_supported_text_path,
+        is_write_allowed_for_new_path, list_workspace_files_inner, path_exists_inner,
+        persistent_search_index_path, prune_search_entries, read_text_file_inner,
+        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         source_search_tokens, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
-        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
-        MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
+        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
