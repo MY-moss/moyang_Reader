@@ -3,116 +3,166 @@ name: Mirror release to Cloudflare Pages
 on:
   release:
     types: [published]
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       version:
-        description: "要同步的 Release 标签，例如 v0.6.0"
+        description: "要同步的 Release 标签，必须包含 v，例如 v0.9.1"
         required: true
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: mirror-release-${{ github.event.release.tag_name || inputs.version }}
+  cancel-in-progress: true
+
 jobs:
   mirror:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     name: Publish updater mirror
     runs-on: windows-latest
     env:
-      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.version }}
       MIRROR_BASE_URL: https://moyang-reader-mirror.pages.dev
       MIRROR_PROJECT: moyang-reader-mirror
     steps:
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.version || github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.release.tag_name || inputs.version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG.Trim()
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') {
+            throw "镜像同步版本必须是带 v 前缀的 SemVer：$tag"
+          }
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
-      - name: Verify Cloudflare credentials
+      - name: Require Cloudflare credentials
         shell: pwsh
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ACCOUNT_ID)) {
-            Write-Warning "未配置 Cloudflare Secrets，将验证现有轻量镜像代理，不执行重复资产上传。"
-            "CLOUDFLARE_DEPLOY_ENABLED=false" >> $env:GITHUB_ENV
-          } else {
-            "CLOUDFLARE_DEPLOY_ENABLED=true" >> $env:GITHUB_ENV
+            throw "缺少 CLOUDFLARE_API_TOKEN 或 CLOUDFLARE_ACCOUNT_ID；正式 Release 不允许跳过镜像上传。"
           }
 
       - name: Download public release assets
-        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $assetDir = Join-Path $env:RUNNER_TEMP "moyang-reader-release-assets"
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
-          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern "latest.json" --dir $assetDir
-          $assetNames = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --dir $assetDir
           if ($LASTEXITCODE -ne 0) {
-            throw "无法读取 Release 资产列表。"
-          }
-          foreach ($assetName in ($assetNames | Where-Object { $_ -ne "latest.json" -and $_ -notlike "*.sig" })) {
-            gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sig" --dir $assetDir
+            throw "无法下载 Release 资产：$env:RELEASE_TAG"
           }
           $manifestPath = Join-Path $assetDir "latest.json"
-          $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
-          $releaseAssets = (gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json).assets
-          foreach ($entry in $manifest.platforms.PSObject.Properties) {
-            $asset = $releaseAssets | Where-Object { $_.apiUrl -eq $entry.Value.url } | Select-Object -First 1
-            if ($null -eq $asset) {
-              throw "无法将更新清单映射到 Release 资产：$($entry.Name)"
-            }
-            $entry.Value.url = $asset.url
+          if (-not (Test-Path -LiteralPath $manifestPath)) {
+            throw "Release 缺少 latest.json。"
           }
-          $manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath $manifestPath
+          node scripts/release-check.mjs --version=$env:RELEASE_TAG --manifest="$manifestPath"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release 资产未通过 manifest 校验。"
+          }
           "ASSET_DIR=$assetDir" >> $env:GITHUB_ENV
 
       - name: Prepare mirror files
-        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         shell: pwsh
         run: |
           $outputDir = Join-Path $env:RUNNER_TEMP "moyang-reader-mirror"
           node scripts/prepare-mirror.mjs --manifest="$env:ASSET_DIR/latest.json" --asset-dir="$env:ASSET_DIR" --output="$outputDir" --base-url="$env:MIRROR_BASE_URL" --version="$env:RELEASE_TAG"
-          "MIRROR_DIR=$outputDir" >> $env:GITHUB_ENV
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法生成 Cloudflare 静态镜像目录。"
+          }
 
       - name: Deploy Cloudflare Pages mirror
-        if: ${{ env.CLOUDFLARE_DEPLOY_ENABLED == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy "${{ runner.temp }}/moyang-reader-mirror" --project-name=${{ env.MIRROR_PROJECT }}
+          command: pages deploy "${{ runner.temp }}/moyang-reader-mirror" --project-name=${{ env.MIRROR_PROJECT }} --branch=main
 
       - name: Verify published updater mirror
         shell: pwsh
         run: |
-          $manifest = Invoke-RestMethod -Uri "$env:MIRROR_BASE_URL/latest.json"
           $expectedVersion = $env:RELEASE_TAG.TrimStart("v")
-          if ([string]$manifest.version -ne $expectedVersion) {
-            throw "镜像版本 $($manifest.version) 与发布版本 $expectedVersion 不一致。"
+          $baseUrl = $env:MIRROR_BASE_URL.TrimEnd("/")
+
+          function Get-MirrorManifest([string]$url) {
+            $lastError = $null
+            for ($attempt = 1; $attempt -le 12; $attempt++) {
+              try {
+                $result = Invoke-RestMethod -Headers @{ "Cache-Control" = "no-cache" } -Uri "$url&attempt=$attempt" -TimeoutSec 20
+                if ([string]$result.version -ne $expectedVersion) {
+                  throw "镜像仍返回旧版本 $($result.version)。"
+                }
+                return $result
+              } catch {
+                $lastError = $_
+                if ($attempt -lt 12) {
+                  Start-Sleep -Seconds 5
+                }
+              }
+            }
+            throw "镜像 manifest 在重试后仍不可用：$url；$lastError"
           }
-          $platform = $manifest.platforms.'windows-x86_64'
-          if ($null -eq $platform -or [string]::IsNullOrWhiteSpace($platform.signature)) {
-            throw "镜像 latest.json 缺少 Windows 更新签名。"
+
+          function Assert-MirrorAsset([string]$url, [int64]$expectedLength = 0) {
+            $lastError = $null
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                $response = Invoke-WebRequest -Method Head -Headers @{ "Cache-Control" = "no-cache" } -Uri $url -TimeoutSec 20
+                if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+                  throw "HTTP $($response.StatusCode)"
+                }
+                $contentLength = $response.Headers["Content-Length"]
+                if ($expectedLength -gt 0 -and $contentLength -and [int64]$contentLength -ne $expectedLength) {
+                  throw "文件大小 $contentLength 与 Release 大小 $expectedLength 不一致"
+                }
+                return
+              } catch {
+                $lastError = $_
+                if ($attempt -lt 3) {
+                  Start-Sleep -Seconds 3
+                }
+              }
+            }
+            throw "镜像资产不可访问：$url；$lastError"
           }
-          $response = Invoke-WebRequest -Method Head -Uri $platform.url
-          if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
-            throw "镜像安装包不可访问：HTTP $($response.StatusCode)"
+
+          $manifest = Get-MirrorManifest "$baseUrl/latest.json?version=$expectedVersion"
+          $null = Get-MirrorManifest "$baseUrl/v$expectedVersion/latest.json?version=$expectedVersion"
+          $checkedUrls = [System.Collections.Generic.HashSet[string]]::new()
+          foreach ($entry in $manifest.platforms.PSObject.Properties) {
+            $platform = $entry.Value
+            if ($null -eq $platform -or [string]::IsNullOrWhiteSpace($platform.url)) {
+              throw "$($entry.Name) 缺少镜像下载地址。"
+            }
+            if ($platform.url -notmatch "/v$expectedVersion/") {
+              throw "$($entry.Name) 未指向当前镜像版本：$($platform.url)"
+            }
+            if (-not $checkedUrls.Add($platform.url)) {
+              continue
+            }
+            $uri = [System.Uri]$platform.url
+            $assetName = [System.IO.Path]::GetFileName([System.Uri]::UnescapeDataString($uri.AbsolutePath))
+            $assetPath = Join-Path $env:ASSET_DIR $assetName
+            if (-not (Test-Path -LiteralPath $assetPath)) {
+              throw "本地 Release 缓存缺少镜像资产：$assetName"
+            }
+            $assetLength = (Get-Item -LiteralPath $assetPath).Length
+            Assert-MirrorAsset $platform.url $assetLength
+            Assert-MirrorAsset "$($platform.url).sig"
           }
           Write-Host "Updater mirror verified for v$expectedVersion"
+

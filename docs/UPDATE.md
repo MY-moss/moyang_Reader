@@ -46,18 +46,20 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-当前生产镜像默认使用 `scripts/mirror-worker.js` 提供轻量代理：它从 GitHub 最新 Release 读取 `latest.json`，把 Windows 安装包 URL 改写为镜像路径，再代理安装包和 `.sig` 下载，不在 Pages 中重复保存 4MB 以上的安装包。这样 GitHub Release 发布后镜像可以自动跟随最新版本，不需要每次重新上传大文件。
+当前生产镜像以 Cloudflare Pages 静态资产为主：每次 GitHub Release 发布后，`.github/workflows/mirror-release.yml` 下载该 Release 的安装包、`.sig` 和 `latest.json`，使用 `scripts/prepare-mirror.mjs` 生成版本目录，再通过 Wrangler 上传到 Pages。镜像会保留 `/vX.Y.Z/` 版本目录，根路径 `latest.json` 指向最新稳定版本。
 
-`.github/workflows/mirror-release.yml` 发布后会验证镜像版本、签名字段和安装包可访问性。如果配置了 Cloudflare Secrets，工作流仍支持把完整静态资产上传到 Pages；未配置时会快速验证现有代理，不再因缺少凭据而把镜像任务标记为失败。
+镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。正式同步缺少 Cloudflare 凭据时会直接失败，不能以“只验证旧镜像”的绿色状态结束；GitHub Release 仍保留，客户端会回退到第二个 GitHub 更新端点。
 
-镜像 Worker 源码位于 `scripts/mirror-worker.js`；如需重新部署代理，应使用 Cloudflare Pages Direct Upload 或 Wrangler 部署该文件。
+`scripts/mirror-worker.js` 保留为手动应急回滚方案，不是当前默认发布路径。静态镜像部署完成后，工作流会重试检查根 manifest、版本目录 manifest、安装包和 `.sig`，并校验版本、HTTP 状态和安装包大小。
 
-如果希望使用完整静态资产镜像，而不是轻量代理，需要在 GitHub 仓库的 Actions Secrets 中配置：
+`.github/workflows/mirror-health.yml` 每 6 小时以及手动触发一次，比较 GitHub 最新 Release 与 Cloudflare 镜像；发现版本落后、manifest 不完整、安装包不可访问或签名文件缺失时会让巡检失败。
+
+要启用自动静态镜像，需要在 GitHub 仓库的 Actions Secrets 中配置：
 
 - `CLOUDFLARE_API_TOKEN`：仅授予 Pages 项目部署权限的 API Token。
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
 
-这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。即使未配置或镜像部署失败，GitHub Release 仍然保留，客户端也会继续使用第二个 GitHub 更新端点。
+这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。Cloudflare 部署失败时 GitHub Release 仍然保留，客户端会继续使用第二个 GitHub 更新端点，但发布流程必须修复镜像后才能视为完成。
 
 如果私钥丢失，旧版本将无法验证后续更新。若密钥已经泄露，应立即停止发布，生成新密钥，并在还没有公开用户之前更新配置；一旦已有用户安装旧公钥版本，换钥匙需要专门的密钥轮换机制，不能直接覆盖。
 
@@ -75,7 +77,7 @@ git push origin v0.9.0
 发布前必须检查：
 
 - package.json、src-tauri/Cargo.toml 和 src-tauri/tauri.conf.json 的版本一致。
-- 若使用完整静态镜像，GitHub Secrets 已配置；使用轻量代理时确认 `latest.json` 在线版本正确。
+- GitHub Secrets 已配置，且镜像工作流实际执行了静态资产上传。
 - Release 不是 Draft，且 latest.json 已上传。
 - Release 中存在 NSIS 安装包、对应的 `.exe.sig` 签名文件，以及 tauri-action 上传的 `latest.json`。
 - 新安装包能正常打开 Markdown、添加整个文件夹和读取图片附件。
@@ -124,3 +126,4 @@ npm run tauri -- build --config src-tauri/tauri.release.conf.json
 ```
 
 签名更新产物位于 src-tauri/target/release/bundle/ 下。key、pem 和 sig 文件已经加入 .gitignore，但仍应在提交前检查 staged diff。
+

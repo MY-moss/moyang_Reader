@@ -92,8 +92,10 @@ export function validateReleaseWorkflow(projectRoot = defaultRoot) {
   const errors = [];
   const releasePath = path.join(projectRoot, ".github", "workflows", "release.yml");
   const mirrorPath = path.join(projectRoot, ".github", "workflows", "mirror-release.yml");
+  const healthPath = path.join(projectRoot, ".github", "workflows", "mirror-health.yml");
   const release = fs.readFileSync(releasePath, "utf8");
   const mirror = fs.readFileSync(mirrorPath, "utf8");
+  const health = fs.existsSync(healthPath) ? fs.readFileSync(healthPath, "utf8") : "";
 
   if (!/workflow_dispatch:\s*\n\s+inputs:\s*\n\s+version:/m.test(release)) {
     errors.push("release.yml 必须为手动发布提供 version 输入。");
@@ -107,11 +109,26 @@ export function validateReleaseWorkflow(projectRoot = defaultRoot) {
   if (!mirror.includes("release:") || !mirror.includes("types: [published]")) {
     errors.push("mirror-release.yml 必须在 Release 发布后触发。");
   }
+  if (mirror.includes("workflow_run:")) {
+    errors.push("mirror-release.yml 不应同时使用 workflow_run 自动触发，避免同一 Release 重复部署。");
+  }
   if (!mirror.includes("scripts/prepare-mirror.mjs")) {
     errors.push("mirror-release.yml 必须运行镜像清单自检脚本。");
   }
-  if (!mirror.includes("CLOUDFLARE_DEPLOY_ENABLED=false")) {
-    errors.push("mirror-release.yml 缺少无 Cloudflare 凭据时的代理验证回退。");
+  if (!mirror.includes("Require Cloudflare credentials") || !mirror.includes("正式 Release 不允许跳过镜像上传")) {
+    errors.push("mirror-release.yml 必须要求 Cloudflare 凭据，不能把未上传的镜像标记为成功。");
+  }
+  if (mirror.includes("CLOUDFLARE_DEPLOY_ENABLED=false")) {
+    errors.push("mirror-release.yml 不得在正式发布中静默跳过 Cloudflare 资产上传。");
+  }
+  if (!mirror.includes("cloudflare/wrangler-action@") || !mirror.includes("pages deploy")) {
+    errors.push("mirror-release.yml 必须通过 Wrangler 部署静态 Cloudflare Pages 镜像。");
+  }
+  if (!mirror.includes("Start-Sleep") || !mirror.includes("Cache-Control")) {
+    errors.push("mirror-release.yml 必须对镜像传播和临时 HTTP 错误进行重试验证。");
+  }
+  if (!health.includes("schedule:") || !health.includes("workflow_dispatch:") || !health.includes("latest.json")) {
+    errors.push("mirror-health.yml 必须提供定时和手动镜像健康检查。");
   }
   if (!fs.existsSync(path.join(projectRoot, "scripts", "mirror-worker.js"))) {
     errors.push("缺少 scripts/mirror-worker.js 镜像代理源文件。");
@@ -213,3 +230,4 @@ const invokedFile = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1]
 if (invokedFile === import.meta.url) {
   process.exitCode = runReleaseCheck(process.argv.slice(2));
 }
+
