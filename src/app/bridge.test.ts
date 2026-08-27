@@ -8,7 +8,7 @@ const { invoke, listen } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
-import { writeBinaryFile } from "./bridge";
+import { fileMetadata, writeBinaryFile } from "./bridge";
 
 describe("binary bridge", () => {
   beforeEach(() => {
@@ -43,5 +43,15 @@ describe("binary bridge", () => {
       path: "C:\\Notes\\fallback.docx",
       contents: [9, 8, 7],
     });
+  });
+
+  it("reads the lightweight file stamp used by the document cache", async () => {
+    invoke.mockResolvedValue({ size: 42, modifiedMs: 1_725_000_000_000 });
+
+    await expect(fileMetadata("C:\\Notes\\Today.md")).resolves.toEqual({
+      size: 42,
+      modifiedMs: 1_725_000_000_000,
+    });
+    expect(invoke).toHaveBeenCalledWith("file_metadata", { path: "C:\\Notes\\Today.md" });
   });
 });

@@ -95,6 +95,7 @@ pub fn run() {
             commands::read_binary_file,
             commands::path_exists,
             commands::file_size,
+            commands::file_metadata,
             commands::watch_workspace,
             commands::unwatch_workspace,
             commands::write_text_file,
