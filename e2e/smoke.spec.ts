@@ -1062,6 +1062,30 @@ test("keeps the reader inside a narrow viewport when long inline content wraps",
   expect(metrics.articleScrollWidth).toBe(metrics.articleClientWidth);
 });
 
+test("shows a cue when compact toolbar actions overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 820 });
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "compact-toolbar.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Compact toolbar\n\nKeep the reader usable in a compact window."),
+  });
+  await expect(page.getByRole("heading", { name: "Compact toolbar" })).toBeVisible();
+  await page.locator('button[title="隐藏侧栏 (Ctrl+Shift+B)"]').click();
+
+  const toolbar = page.locator(".toolbar");
+  await expect(toolbar).toHaveClass(/has-overflow/);
+  await expect(toolbar).toHaveAttribute("title", "还有更多操作，可横向滚动");
+  const toolbarMetrics = await toolbar.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(toolbarMetrics.scrollWidth).toBeGreaterThan(toolbarMetrics.clientWidth);
+  const overflowCue = await toolbar.evaluate((element) => getComputedStyle(element, "::before").content);
+  expect(overflowCue).toBe('"›"');
+});
+
 test("keeps topbar overlays mutually exclusive", async ({ page }) => {
   await page.goto("/");
 
