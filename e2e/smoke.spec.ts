@@ -207,6 +207,75 @@ test("keeps a direct read/edit action for immediate WYSIWYG editing", async ({ p
   await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
 });
 
+test("keeps outline navigation inside the reader and supports resizable sidebars", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "layout-navigation.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(
+      [
+        "# Layout navigation",
+        "",
+        ...Array.from({ length: 14 }, (_, index) => `首段占位内容 ${index + 1}，用于验证中央滚动容器。`),
+        "",
+        "## 第二章",
+        "",
+        ...Array.from({ length: 14 }, (_, index) => `第二章内容 ${index + 1}。`),
+        "",
+        "## 第三章",
+        "",
+        ...Array.from({ length: 14 }, (_, index) => `第三章内容 ${index + 1}。`),
+      ].join("\n"),
+    ),
+  });
+
+  await switchToRenderedMode(page);
+  await expect(page.getByRole("heading", { name: "第三章" })).toBeVisible();
+
+  const contentArea = page.locator(".content-area");
+  await page.getByRole("link", { name: "第三章" }).click();
+  await expect
+    .poll(() => contentArea.evaluate((element) => element.scrollTop), { timeout: 5_000 })
+    .toBeGreaterThan(100);
+  await expect
+    .poll(() =>
+      contentArea.evaluate((element) => {
+        const heading = element.querySelector<HTMLElement>("#第三章");
+        return heading ? heading.getBoundingClientRect().top - element.getBoundingClientRect().top : -1;
+      }),
+    )
+    .toBeGreaterThan(0);
+
+  await page.keyboard.press("Control+Shift+R");
+  await expect(page.locator(".context-sidebar")).toHaveCount(0);
+  await page.keyboard.press("Control+Shift+R");
+  await expect(page.locator(".context-sidebar")).toBeVisible();
+
+  const appShell = page.locator(".app-shell");
+  const leftHandle = page.locator(".pane-resize-handle-sidebar");
+  const leftBox = await leftHandle.boundingBox();
+  if (!leftBox) throw new Error("左侧栏分隔线没有可用几何位置");
+  await page.mouse.move(leftBox.x + leftBox.width / 2, leftBox.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(leftBox.x + leftBox.width / 2 + 72, leftBox.y + 220);
+  await page.mouse.up();
+  await expect
+    .poll(() => appShell.evaluate((element) => getComputedStyle(element).getPropertyValue("--sidebar-width")))
+    .toBe("332px");
+
+  const rightHandle = page.locator(".pane-resize-handle-context");
+  const rightBox = await rightHandle.boundingBox();
+  if (!rightBox) throw new Error("右侧栏分隔线没有可用几何位置");
+  await page.mouse.move(rightBox.x + rightBox.width / 2, rightBox.y + 220);
+  await page.mouse.down();
+  await page.mouse.move(rightBox.x + rightBox.width / 2 - 56, rightBox.y + 220);
+  await page.mouse.up();
+  await expect
+    .poll(() => appShell.evaluate((element) => getComputedStyle(element).getPropertyValue("--context-width")))
+    .toBe("376px");
+});
+
 test("shares undo and redo history between WYSIWYG and source editing", async ({ page }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles({

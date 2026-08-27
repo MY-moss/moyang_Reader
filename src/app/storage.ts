@@ -1,5 +1,6 @@
 import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";
 import { normalizePathKey } from "./path-key";
+import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
 
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
@@ -12,6 +13,7 @@ const readingPositionsKey = "moyang-reader-reading-positions";
 const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
 const contextPanelOpenKey = "moyang-reader-context-panel-open";
 const contextPanelTabKey = "moyang-reader-context-panel-tab";
+const paneWidthsKey = "moyang-reader-pane-widths";
 const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 export const MAX_MOUNTED_WORKSPACES = 5;
@@ -71,6 +73,23 @@ export function saveContextPanelTab(tab: ContextPanelTab): void {
     localStorage.setItem(contextPanelTabKey, tab);
   } catch {
     // The context panel tab remains available for the current session.
+  }
+}
+
+export function loadPaneWidths(): PaneWidths {
+  try {
+    const raw = localStorage.getItem(paneWidthsKey);
+    return raw ? normalizePaneWidths(JSON.parse(raw) as unknown) : { ...DEFAULT_PANE_WIDTHS };
+  } catch {
+    return { ...DEFAULT_PANE_WIDTHS };
+  }
+}
+
+export function savePaneWidths(widths: PaneWidths): void {
+  try {
+    localStorage.setItem(paneWidthsKey, JSON.stringify(normalizePaneWidths(widths)));
+  } catch {
+    // Pane widths remain available for the current session.
   }
 }
 

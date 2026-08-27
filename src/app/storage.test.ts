@@ -10,6 +10,7 @@ import {
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
+  loadPaneWidths,
   rememberRecentFile,
   rememberMountedWorkspace,
   rememberRecentWorkspace,
@@ -19,6 +20,7 @@ import {
   saveSidebarCollapsed,
   saveContextPanelOpen,
   saveContextPanelTab,
+  savePaneWidths,
   saveRecentFiles,
   saveMountedWorkspaces,
   saveRecentWorkspaces,
@@ -79,6 +81,16 @@ describe("reader storage", () => {
 
     expect(loadContextPanelOpen()).toBe(false);
     expect(loadContextPanelTab()).toBe("properties");
+  });
+
+  it("persists bounded pane widths and recovers from malformed values", () => {
+    expect(loadPaneWidths()).toEqual({ sidebar: 260, context: 320 });
+
+    savePaneWidths({ sidebar: 311.4, context: 900 });
+    expect(loadPaneWidths()).toEqual({ sidebar: 311, context: 440 });
+
+    localStorage.setItem("moyang-reader-pane-widths", "not-json");
+    expect(loadPaneWidths()).toEqual({ sidebar: 260, context: 320 });
   });
 
   it("falls back from the removed graph placeholder tab", () => {

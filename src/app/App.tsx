@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type MouseEvent,
 } from "react";
@@ -20,6 +21,7 @@ import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
+import { PaneResizeHandle } from "./components/PaneResizeHandle";
 import { PrintPreview } from "./components/PrintPreview";
 import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
@@ -87,6 +89,7 @@ import type {
   RecentFile,
   RecentWorkspace,
   ThemeMode,
+  TocItem,
   WorkspaceExportFailure,
   WorkspaceFile,
   WorkspaceIndexEntry,
@@ -126,6 +129,7 @@ import {
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
+  loadPaneWidths,
   loadWorkspacePath,
   rememberRecentFile,
   rememberMountedWorkspace,
@@ -136,6 +140,7 @@ import {
   saveSidebarCollapsed,
   saveContextPanelOpen,
   saveContextPanelTab,
+  savePaneWidths,
   saveMountedWorkspaces,
   saveWorkspaceSession,
   saveWorkspaceSessions,
@@ -158,6 +163,8 @@ import type { QuickOpenCandidate } from "./quick-open";
 import { applyWorkspaceFileDelta, applyWorkspaceIndexDelta, isCurrentWorkspaceLoad } from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
+import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
+import { scrollHeadingInContainer } from "./heading-navigation";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 import {
   formatTransitionConfirmation,
@@ -248,12 +255,17 @@ function resolveWikiPath(basePath: string, target: string): string | null {
   return /\.[A-Za-z0-9]+$/.test(resolved) ? resolved : `${resolved}.md`;
 }
 
-function scrollToHeading(anchor: string): void {
-  const id = safeDecode(anchor);
+function scrollToHeading(anchor: string, contentArea: HTMLElement | null, article: HTMLElement | null): void {
+  let attempts = 0;
+  const attempt = () => {
+    if (scrollHeadingInContainer(anchor, contentArea, article)) return;
+    if (attempts >= 4) return;
+    attempts += 1;
+    window.requestAnimationFrame(attempt);
+  };
+
   window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    window.requestAnimationFrame(attempt);
   });
 }
 
@@ -426,6 +438,7 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
   const [rightPanelOpen, setRightPanelOpen] = useState(loadContextPanelOpen);
   const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(loadContextPanelTab);
+  const [paneWidths, setPaneWidths] = useState(loadPaneWidths);
   const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -500,6 +513,7 @@ export function App() {
   const selfWritingPathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
+  const pendingHeadingRef = useRef<string | null>(null);
 
   const updateReadingRail = useCallback(() => {
     const contentArea = contentAreaRef.current;
@@ -516,6 +530,34 @@ export function App() {
     if (!contentArea) return;
     contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });
   }, []);
+
+  const resizePane = useCallback((side: PaneSide, delta: number) => {
+    setPaneWidths((current) => {
+      const nextWidth = clampPaneWidth(side, current[side] + delta);
+      if (nextWidth === current[side]) return current;
+      return { ...current, [side]: nextWidth };
+    });
+  }, []);
+
+  const resetPane = useCallback((side: PaneSide) => {
+    setPaneWidths((current) => ({
+      ...current,
+      [side]: DEFAULT_PANE_WIDTHS[side],
+    }));
+  }, []);
+
+  const navigateToHeading = useCallback(
+    (item: TocItem) => {
+      pendingHeadingRef.current = item.id;
+      if (mode !== "rendered") {
+        setMode("rendered");
+        return;
+      }
+      pendingHeadingRef.current = null;
+      scrollToHeading(item.id, contentAreaRef.current, articleRef.current);
+    },
+    [mode],
+  );
 
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
     setPreferences((current) => {
@@ -745,6 +787,10 @@ export function App() {
   }, [activeContextTab]);
 
   useEffect(() => {
+    savePaneWidths(paneWidths);
+  }, [paneWidths]);
+
+  useEffect(() => {
     setWorkspaceExportFailures([]);
     setWorkspaceExportNotice(null);
   }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
@@ -838,6 +884,15 @@ export function App() {
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);
+
+  useEffect(() => {
+    if (mode !== "rendered") return;
+    const pendingHeading = pendingHeadingRef.current;
+    if (!pendingHeading) return;
+
+    pendingHeadingRef.current = null;
+    scrollToHeading(pendingHeading, contentAreaRef.current, articleRef.current);
+  }, [documentState?.path, documentState?.rendered.html, mode]);
 
   useEffect(() => {
     if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
@@ -2149,6 +2204,10 @@ export function App() {
         event.preventDefault();
         setSidebarCollapsed((current) => !current);
       }
+      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        setRightPanelOpen((current) => !current);
+      }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
         setFocusMode(false);
@@ -2868,7 +2927,7 @@ export function App() {
           return;
         }
         void handleSelectTab(path).then(() => {
-          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
+          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
         });
         return;
       }
@@ -2876,7 +2935,7 @@ export function App() {
       const target = safeDecode(href);
       if (target.startsWith("#")) {
         event.preventDefault();
-        scrollToHeading(target.slice(1));
+        scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current);
         return;
       }
 
@@ -2911,7 +2970,7 @@ export function App() {
         return;
       }
       void handleSelectTab(path).then(() => {
-        if (rawAnchor) scrollToHeading(safeDecode(rawAnchor));
+        if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
       });
     },
     [documentState, handleSelectTab, workspaceIndex],
@@ -3206,6 +3265,7 @@ export function App() {
       {
         id: "context",
         label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
+        shortcut: "Ctrl ⇧ R",
       },
       {
         id: "focus",
@@ -3485,6 +3545,12 @@ export function App() {
       className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
       }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
+      style={
+        {
+          "--sidebar-width": `${paneWidths.sidebar}px`,
+          "--context-width": `${paneWidths.context}px`,
+        } as CSSProperties
+      }
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -3666,6 +3732,16 @@ export function App() {
             </div>
           )}
         </aside>
+        {!sidebarCollapsed && !focusMode && (
+          <PaneResizeHandle
+            side="sidebar"
+            value={paneWidths.sidebar}
+            min={PANE_WIDTH_LIMITS.sidebar.min}
+            max={PANE_WIDTH_LIMITS.sidebar.max}
+            onResizeBy={(delta) => resizePane("sidebar", delta)}
+            onReset={() => resetPane("sidebar")}
+          />
+        )}
 
         <main ref={contentAreaRef} className="content-area" aria-live="polite">
           {sidebarCollapsed && !focusMode && (
@@ -3777,6 +3853,16 @@ export function App() {
           )}
         </main>
         {rightPanelOpen && !focusMode && (
+          <PaneResizeHandle
+            side="context"
+            value={paneWidths.context}
+            min={PANE_WIDTH_LIMITS.context.min}
+            max={PANE_WIDTH_LIMITS.context.max}
+            onResizeBy={(delta) => resizePane("context", delta)}
+            onReset={() => resetPane("context")}
+          />
+        )}
+        {rightPanelOpen && !focusMode && (
           <ContextPanel
             documentState={documentState}
             entry={currentIndexEntry}
@@ -3798,6 +3884,7 @@ export function App() {
             onSelectTag={setSelectedTag}
             onScrollToTop={() => scrollToReaderEdge("top")}
             onScrollToBottom={() => scrollToReaderEdge("bottom")}
+            onNavigateHeading={navigateToHeading}
           />
         )}
       </div>
