@@ -14,4 +14,3 @@ export function reorderTabs<T extends { path: string }>(
   next.splice(targetIndex, 0, source);
   return next;
 }
-

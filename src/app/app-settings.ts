@@ -168,4 +168,3 @@ export function saveAppSettingsSnapshot(input: AppSettingsInput, savedAt = Date.
     return { ok: false, reason: "本机设置存储不可用。" };
   }
 }
-

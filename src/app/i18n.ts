@@ -215,4 +215,3 @@ export function saveLocale(locale: Locale): void {
     // The current locale remains active when local storage is unavailable.
   }
 }
-

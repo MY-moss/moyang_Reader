@@ -33,4 +33,3 @@ describe("reading zoom", () => {
     expect(readingScaleFromZoom(150)).toBe("large");
   });
 });
-

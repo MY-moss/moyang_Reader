@@ -192,4 +192,3 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
     openTabs: parseTabs(parsed.openTabs),
   };
 }
-

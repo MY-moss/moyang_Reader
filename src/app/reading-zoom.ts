@@ -34,4 +34,3 @@ export function stepReadingZoom(current: number, direction: "in" | "out"): numbe
   const delta = direction === "in" ? READING_ZOOM_KEY_STEP : -READING_ZOOM_KEY_STEP;
   return normalizeReadingZoom(current + delta);
 }
-

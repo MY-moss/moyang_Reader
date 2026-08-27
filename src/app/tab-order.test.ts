@@ -22,4 +22,3 @@ describe("reorderTabs", () => {
     expect(tabs.map((tab) => tab.name)).toEqual(["one.md", "two.md", "three.md"]);
   });
 });
-

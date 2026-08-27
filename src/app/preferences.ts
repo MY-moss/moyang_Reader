@@ -82,4 +82,3 @@ export function saveReaderPreferences(preferences: ReaderPreferences): void {
     // Local storage may be unavailable in a restricted browser preview.
   }
 }
-

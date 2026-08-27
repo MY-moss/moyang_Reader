@@ -74,4 +74,3 @@ describe("Tabs", () => {
     cleanup(container, root);
   });
 });
-

@@ -757,4 +757,3 @@ export function TopBar({
     </header>
   );
 }
-
