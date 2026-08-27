@@ -41,6 +41,7 @@ import {
   exportPdfFile,
   fileExists,
   fileSize,
+  fileMetadata,
   indexWorkspace,
   initialPaths,
   isTauriRuntime,
@@ -79,6 +80,7 @@ import type {
   ExportMargin,
   ExportOrientation,
   ExportPaper,
+  FileStamp,
   OpenPath,
   OpenDocument,
   ReaderMode,
@@ -90,6 +92,7 @@ import type {
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
 } from "./types";
+import { DocumentCache } from "./document-cache";
 import { nextReaderModeAfterOpen } from "./reader-mode";
 import { checkMarkdownEditorSafety } from "./markdown-editor-support";
 import { buildWikiLinkCandidates } from "./wiki-link-completion";
@@ -488,6 +491,7 @@ export function App() {
   const openTabsRef = useRef<RecentFile[]>(openTabs);
   const workspaceRestorePendingRef = useRef(false);
   const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
+  const documentCacheRef = useRef(new DocumentCache());
   const pendingWorkspaceMountsRef = useRef(new Set<string>());
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshRequestRef = useRef(0);
@@ -713,6 +717,10 @@ export function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    documentCacheRef.current.clear();
+  }, [preferences.allowRemoteResources]);
 
   useEffect(() => {
     if (!settingsNotice) return;
@@ -942,11 +950,13 @@ export function App() {
       previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       previewUrlsRef.current.clear();
       browserDocumentsRef.current.clear();
+      documentCacheRef.current.clear();
     },
     [],
   );
 
   const releaseDocumentResources = useCallback((path: string) => {
+    documentCacheRef.current.remove(path);
     const cached = browserDocumentsRef.current.get(path);
     const previewUrl = previewUrlsRef.current.get(path) ?? cached?.previewUrl;
     if (previewUrl) {
@@ -1382,6 +1392,7 @@ export function App() {
   const handleRemoveMountedWorkspace = useCallback((path: string) => {
     if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;
     mountedWorkspaceCacheRef.current.delete(comparablePath(path));
+    documentCacheRef.current.invalidate([path]);
     forgetWorkspaceSession(path);
     setMountedWorkspaces((current) => {
       const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));
@@ -1391,7 +1402,13 @@ export function App() {
   }, []);
 
   const openSource = useCallback(
-    async (path: string, source: string, preserveMode = false): Promise<boolean> => {
+    async (
+      path: string,
+      source: string,
+      preserveMode = false,
+      stamp?: FileStamp,
+      renderedOverride?: OpenDocument["rendered"],
+    ): Promise<boolean> => {
       setLoading(true);
       setError(null);
 
@@ -1401,9 +1418,11 @@ export function App() {
           throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
         }
         const editorSafety = kind === "markdown" ? checkMarkdownEditorSafety(source) : { safe: false };
-        const rendered = await renderSource(path, source, {
-          allowRemoteResources: preferencesRef.current.allowRemoteResources,
-        });
+        const rendered =
+          renderedOverride ??
+          (await renderSource(path, source, {
+            allowRemoteResources: preferencesRef.current.allowRemoteResources,
+          }));
         releaseDocumentResources(path);
         if (path.startsWith("browser://")) {
           browserDocumentsRef.current.set(path, { kind, source });
@@ -1434,6 +1453,16 @@ export function App() {
         if (kind === "markdown" && !editorSafety.safe) {
           setSettingsNotice(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`);
         }
+        if (stamp && !path.startsWith("browser://")) {
+          documentCacheRef.current.set({
+            path,
+            name: fileNameFromPath(path),
+            kind,
+            source,
+            rendered,
+            stamp,
+          });
+        }
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档渲染失败。");
@@ -1446,7 +1475,13 @@ export function App() {
   );
 
   const openBinary = useCallback(
-    async (path: string, bytes: Uint8Array, preserveMode = false): Promise<boolean> => {
+    async (
+      path: string,
+      bytes: Uint8Array,
+      preserveMode = false,
+      stamp?: FileStamp,
+      renderedOverride?: OpenDocument["rendered"],
+    ): Promise<boolean> => {
       const kind = documentKindFromPath(path);
       if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
         throw new Error("当前文件不是可预览的文档。");
@@ -1457,9 +1492,10 @@ export function App() {
 
       try {
         const rendered =
-          kind === "docx"
+          renderedOverride ??
+          (kind === "docx"
             ? await renderDocx(bytes, { allowRemoteResources: preferencesRef.current.allowRemoteResources })
-            : emptyRenderedDocument();
+            : emptyRenderedDocument());
         let previewUrl: string | undefined;
         if (kind === "pdf" || kind === "image") {
           const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -1500,6 +1536,17 @@ export function App() {
           saveLastDocumentPath(path);
         }
         setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind));
+        if (stamp && !path.startsWith("browser://")) {
+          documentCacheRef.current.set({
+            path,
+            name: fileNameFromPath(path),
+            kind,
+            source: "",
+            rendered,
+            stamp,
+            bytes,
+          });
+        }
         return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文档预览失败。");
@@ -1529,12 +1576,20 @@ export function App() {
         if (!kind) {
           throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
         }
+        const stamp = await fileMetadata(path);
+        const cached = documentCacheRef.current.get(path, stamp);
         if (kind === "docx" || kind === "pdf" || kind === "image") {
-          return await openBinary(path, await readBinaryFile(path), preserveMode);
+          if (cached?.kind === kind && cached.bytes) {
+            return await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
+          }
+          return await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
         }
 
+        if (cached?.kind === kind) {
+          return await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
+        }
         const source = await readTextFile(path);
-        return await openSource(path, source, preserveMode);
+        return await openSource(path, source, preserveMode, stamp);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文件打开失败。");
         return false;
@@ -1715,6 +1770,7 @@ export function App() {
         }
         writeCompleted = true;
         selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
+        documentCacheRef.current.remove(path);
       } else {
         downloadText(current.name, draft);
       }
@@ -1900,6 +1956,7 @@ export function App() {
     void subscribeToWorkspaceChanges(workspacePath, (paths) => {
       if (!active) return;
 
+      documentCacheRef.current.invalidate(paths);
       for (const path of paths) pendingWorkspacePaths.add(path);
       if (workspaceReloadTimerRef.current !== null) {
         window.clearTimeout(workspaceReloadTimerRef.current);

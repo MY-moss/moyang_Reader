@@ -69,16 +69,18 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@d650fb08a45ce4c3cb9226c2f932792f2a692d4d`）**
+> **最新检查点（2026-08-27，验证基线：`main@95b7d5290b83dc31ce6e142a9b8d2cff9e71ae31`）**
 >
-> - 稳定基线已升为 `v0.9.3`；发布准备由 [PR #248](https://github.com/MY-moss/moyang_Reader/pull/248) 完成并合并到 `main`，合并提交为 `d650fb08a45ce4c3cb9226c2f932792f2a692d4d`。本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，不再重复修改 PDF 或更新器实现。
+> - 稳定基线为 `v0.9.3`；发布文档收尾由 [PR #249](https://github.com/MY-moss/moyang_Reader/pull/249) 完成并合并到 `main`，当前远程 `main` 为 `95b7d5290b83dc31ce6e142a9b8d2cff9e71ae31`。#241 的 Cloudflare Secrets 外部前置仍未混入本切片实现。
 > - v0.9.3 已包含 Windows PDF 当前文档保存、Edge headless 渲染、有效 PDF 文件头校验、原子替换和真实桌面 smoke；Markdown、TXT、Word、PDF、图片既有打开行为保持不变。
 > - 发布 workflow [33025181022](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 的 Windows 构建/发布 job 成功；GitHub Release [v0.9.3](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.3) 已上传 `latest.json`（1,401 字节）、Windows x64 NSIS 安装包（4,856,795 字节）和 `.sig`（424 字节）。安装包 SHA-256 为 `255ccfb5236b1516ea0c31c9ca66c34bfe896571984be77a5ebb1bb575af0b3c`，`.sig` SHA-256 为 `45f8aa9ebb017dd83a7b6a4bb29db3bf33691cb97bfd1e448065fac22c4c0d5d`，manifest SHA-256 为 `7fd5a1250a8fa192a3e66bf7d59c4dd92d02e3724e5bf9c8cb4a90f7650f10c2`。
-> - 本地和远程发布门禁均通过：前端 lint、格式、171 个测试、构建、浏览器 E2E 38 项、Windows 桌面 E2E 10 项、release 检查/测试、Rust fmt/clippy/37 个 Rust tests，以及远程 CI `33024776253` 和 Rust 审计 `33024776310`。
+> - v0.9.3 发布门禁曾通过：前端 lint、格式、176 个测试、构建、浏览器 E2E 38 项、Windows 桌面 E2E 10 项、release 检查/测试、Rust fmt/clippy/37 个 Rust tests，以及远程 CI `33024776253` 和 Rust 审计 `33024776310`；当前 #183 分支的新增验证以本检查点后续记录为准。
 > - 已登记的 Windows x64 v0.9.2 安装实例已实际点击更新到 v0.9.3；下载、签名校验、替换、自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion` 和运行进程版本均为 v0.9.3，更新前后进程 PID 不同。未登记的旧副本不计入回归。
 > - Cloudflare 根 manifest、`/v0.9.3/` 安装包和 `.sig` 均 HTTP 200，大小和 SHA-256 与 GitHub Release 一致；但 Release 镜像子任务 [98365959782](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 在 `Require Cloudflare credentials` 阶段因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败。公开镜像在线不等于自动部署 workflow 全绿，不能把该子任务记录为成功，也不能把令牌写入文档。
 > - #241 保持 open，仅等待维护者在 GitHub Actions Secrets 中安全配置 Cloudflare 凭据后，重跑同一版本镜像 workflow 并确认自动同步全绿；GitHub Release、签名资产和当前 v0.9.3 公开镜像已经可用。
-> - 下一位 AI 的唯一下一步：先检查 #241 和 Cloudflare Secrets/镜像 workflow 状态；若 Secrets 已配置则只重跑 v0.9.3 镜像验证，若仍未配置则报告外部前置，不创建新的 v0.9.3 Release/tag，也不重复实现已完成的 PDF 或更新器功能。
+> - 当前功能切片：#183；分支为 `codex/tab-cache-2026-08-27`。已加入会话级有界文档缓存、轻量文件标记命令、变更/保存/关闭失效边界及针对性测试；缓存不写盘、不改变 Markdown 真源。
+> - 本地验证已通过：缓存/桥接测试 7 项、前端完整测试 176 项、lint、format、前端构建、浏览器 E2E 38 项、Rust fmt 和 Rust 37 项测试。真实 Windows 桌面 E2E、PR、合并和 v0.9.4 发布仍未完成，不能提前记录为完成。
+> - 下一位 AI 的唯一下一步：先审查本分支 `#183` 的 diff 和测试，再运行真实 Windows 桌面回归；确认无问题后推送分支、创建一个 PR，Quality checks 全绿且无真实冲突时按流程合并，再单独准备 v0.9.4 Release。#241 仍保持 open，不把镜像凭据写入仓库或上下文。
 
 > **历史检查点（2026-08-27，v0.9.2；优先级低于上方当前检查点）**
 >

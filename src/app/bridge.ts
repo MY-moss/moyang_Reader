@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  FileStamp,
   OpenPath,
   WorkspaceFile,
   WorkspaceIndexEntry,
@@ -119,6 +120,11 @@ export async function fileExists(path: string): Promise<boolean> {
 export async function fileSize(path: string): Promise<number> {
   if (!isTauriRuntime()) return 0;
   return invoke<number>("file_size", { path });
+}
+
+export async function fileMetadata(path: string): Promise<FileStamp> {
+  if (!isTauriRuntime()) return { size: 0, modifiedMs: null };
+  return invoke<FileStamp>("file_metadata", { path });
 }
 
 export async function readTextFile(path: string): Promise<string> {

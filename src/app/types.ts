@@ -14,6 +14,11 @@ export type EditorResult =
 
 export type DocumentKind = "markdown" | "text" | "docx" | "pdf" | "image";
 
+export type FileStamp = {
+  size: number;
+  modifiedMs: number | null;
+};
+
 export type ThemeMode = "system" | "light" | "dark";
 
 export type ReadingScale = "small" | "medium" | "large";

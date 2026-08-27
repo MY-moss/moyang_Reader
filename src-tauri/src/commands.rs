@@ -1288,6 +1288,35 @@ pub fn file_size(path: String, access: State<'_, AccessRegistry>) -> Result<u64,
         .map_err(|error| format!("无法读取文件信息：{error}"))
 }
 
+#[derive(Debug, Serialize)]
+pub struct FileMetadata {
+    pub size: u64,
+    pub modified_ms: Option<u64>,
+}
+
+#[tauri::command]
+pub fn file_metadata(
+    path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<FileMetadata, String> {
+    let path = PathBuf::from(path);
+    if !access.is_read_allowed(&path) {
+        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
+
+    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+    let modified_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| duration.as_millis().try_into().ok());
+
+    Ok(FileMetadata {
+        size: metadata.len(),
+        modified_ms,
+    })
+}
+
 #[tauri::command]
 pub fn watch_workspace(
     root: String,
