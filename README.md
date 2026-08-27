@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-v0.10.2 已发布：包含紧凑 Windows 窗口可用性和工具栏溢出提示。[GitHub Release](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.2) 与 [Cloudflare 镜像](https://moyang-reader-mirror.pages.dev/latest.json) 均提供 Windows x64 更新资产，保持本地优先和轻量启动：
+v0.10.3 正在发布准备：包含首次使用教程、设置保存状态和 Windows 应用配置文件持久化兜底；安装包将在主线 CI 通过后由 Windows x64 发布工作流同步公开，保持本地优先和轻量启动：
 
 当前产品边界：只发布和维护 Windows x64 桌面版。浏览器版只用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端及跨平台自动更新暂不支持，以减少安装包、CI、测试和维护成本。
 
@@ -123,9 +123,10 @@ npm run desktop
 2. v0.9.5：已发布三栏目录跳转、侧栏滚动和窄屏布局，并支持左右侧栏调宽与快捷键。
 3. v0.10.1：已发布大库搜索性能验收和撤回阅读位置修复。
 4. v0.10.2：已发布紧凑窗口可用性；#187 的完整响应式断点验收继续保持 open。
-5. v0.10：嵌入、块引用、属性和关系图筛选。
-6. v0.11：Worker/分批导出、PDF/Word 模板和分享体验。
-7. v0.12：Windows 镜像巡检、更新器回归和发布稳定性。
-8. v1.0：Windows x64 核心能力冻结，进入长期维护。
+5. v0.10.3：发布准备中，包含首次使用教程和设置持久化修复。
+6. v0.10：嵌入、块引用、属性和关系图筛选。
+7. v0.11：Worker/分批导出、PDF/Word 模板和分享体验。
+8. v0.12：Windows 镜像巡检、更新器回归和发布稳定性。
+9. v1.0：Windows x64 核心能力冻结，进入长期维护。
 
 详细需求、交互契约、版本映射和 AI 接手流程见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。

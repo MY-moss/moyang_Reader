@@ -27,6 +27,12 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
+## v0.10.3 发布准备（2026-08-27）
+
+- 发布范围：首次使用“快速上手”教程、设置保存状态、统一设置快照、Windows 应用配置文件原子兜底和关闭前等待配置写入。
+- 当前状态：功能 PR #272 已合并，版本准备分支将 package.json、Cargo.toml、tauri.conf.json、锁文件和 CHANGELOG 统一为 `0.10.3`；主线质量门禁通过后创建 `v0.10.3` 标签。
+- 发布边界：只生成 Windows x64 NSIS 安装包、`.sig` 和 `latest.json`；Cloudflare 静态镜像仍需 #241 所跟踪的仓库 Secrets，缺少凭据时不能把旧镜像当作新版本。
+
 ## v0.10.2 发布记录（2026-08-27）
 
 - 发布范围：#187 的已验收子切片——Windows 最小窗口宽度 720px，以及工具栏真实横向溢出提示；完整响应式断点体系继续保持 open。
