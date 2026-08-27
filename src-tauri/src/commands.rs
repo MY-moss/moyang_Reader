@@ -3032,6 +3032,8 @@ fn export_pdf_file_windows(path: PathBuf, html: &str) -> Result<(), String> {
             .arg("--no-first-run")
             .arg("--no-default-browser-check")
             .arg("--no-pdf-header-footer")
+            .arg("--run-all-compositor-stages-before-draw")
+            .arg("--virtual-time-budget=1000")
             .arg(format!("--user-data-dir={}", temp_profile.display()))
             .arg(format!("--print-to-pdf={}", temp_pdf.display()))
             .arg(edge_file_url(&temp_html))
@@ -3046,7 +3048,15 @@ fn export_pdf_file_windows(path: PathBuf, html: &str) -> Result<(), String> {
                     .map_or_else(|| "未知".to_string(), |code| code.to_string())
             ));
         }
-        if !is_valid_pdf_file(&temp_pdf) {
+        let mut valid_pdf = false;
+        for _ in 0..50 {
+            if is_valid_pdf_file(&temp_pdf) {
+                valid_pdf = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if !valid_pdf {
             return Err("PDF 渲染器未生成有效文件，请稍后重试。".to_string());
         }
 
@@ -3200,6 +3210,8 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    use super::export_pdf_file_windows;
     use super::{
         access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
@@ -3240,6 +3252,31 @@ mod tests {
         assert!(has_pdf_header(b"%PDF-1.7\n"));
         assert!(!has_pdf_header(b"PDF-1.7\n"));
         assert!(!has_pdf_header(b"%PDF"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn exports_pdf_file_with_the_windows_edge_renderer() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-pdf-test-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let output = root.join("export.pdf");
+        fs::create_dir_all(&root).expect("create PDF export test directory");
+
+        export_pdf_file_windows(
+            output.clone(),
+            "<!doctype html><html><head><meta charset=\"utf-8\"><style>body{font-family:Arial}</style></head><body><h1>PDF smoke</h1><p>Windows export.</p></body></html>",
+        )
+        .expect("Windows Edge should create a PDF file");
+
+        let bytes = fs::read(&output).expect("read generated PDF");
+        assert!(bytes.len() > 100);
+        assert!(has_pdf_header(&bytes));
+        assert!(bytes.windows(5).any(|window| window == b"%%EOF"));
+
+        fs::remove_dir_all(root).expect("remove PDF export test directory");
     }
 
     #[test]

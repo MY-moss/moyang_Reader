@@ -1,5 +1,15 @@
 # AI 开发与交接流程
 
+## 进行中功能切片（2026-08-28，#241 PDF 文件落盘）
+
+- 目标：修复 Windows 桌面“保存 PDF”偶发退出码为 0 但没有生成文件的问题，并保留有效 PDF 文件头、原子替换和路径授权边界。
+- 分支：`codex/pdf-export-file-2026-08-28`，基于 `origin/main@9052016bebebb2f6f1516ab3a26d1ec438dfaf42`。
+- 非目标：本切片不处理 #241 中旧版本自动更新器的实机回归，不修改更新协议、签名密钥、Cloudflare 凭据或其他导出格式。
+- 实现：Windows Edge headless 导出增加 `--run-all-compositor-stages-before-draw` 与 `--virtual-time-budget=1000`，避免 Edge 在页面完成绘制前退出；桌面 PDF smoke 改为通过实际“更多操作”菜单触发保存动作，适配窄窗口布局。
+- 根因：Edge headless 的父进程退出时，子进程仍可能异步写入 `--print-to-pdf` 目标；旧实现立即检查并清理临时文件，导致有效 PDF 被清理前尚未出现。现在退出后最多轮询 5 秒，直到文件以 `%PDF-` 开头，再执行原子替换。
+- 当前验证：Rust 格式检查、`cargo build --features wdio`、Windows PDF 回归单测和直接 Edge 参数校验通过；Rust 回归单测复现了旧失败并验证新轮询。完整本机桌面 smoke 未通过，首个根因是 Tauri WebDriver 未进入应用页面（`Tauri core.invoke not available`、`tauri-driver` 缺失警告），该环境问题与本切片分开记录。
+- 交接：提交前补跑针对性 Rust/前端门禁；推送本分支并创建唯一 PR 关联 #241。合并与主线门禁通过后，再单独执行 v0.10.7 patch 发布和安装包/manifest/镜像核验；旧更新器仍由 #241 的后续切片负责。
+
 ## 已完成发布切片（2026-08-28，v0.10.6）
 
 - 目标：将 PR #281 的文件/文件夹右键管理与正文编辑动作作为稳定 Windows x64 patch 发布。

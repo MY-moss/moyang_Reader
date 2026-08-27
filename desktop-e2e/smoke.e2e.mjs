@@ -439,9 +439,7 @@ describe("Moyang Reader desktop runtime", () => {
 
   it("exports a real PDF and the workspace to HTML and Word", async () => {
     fs.rmSync(pdfExportPath, { force: true });
-    const pdfAction = await browser.$("button=保存 PDF");
-    await pdfAction.waitForDisplayed();
-    await pdfAction.click();
+    await clickToolbarAction("保存 PDF");
     await waitForExport(pdfExportPath, "the real Tauri PDF export");
     const pdfBytes = fs.readFileSync(pdfExportPath);
     assert.ok(pdfBytes.length > 100, "the real Tauri PDF export should not be empty");
