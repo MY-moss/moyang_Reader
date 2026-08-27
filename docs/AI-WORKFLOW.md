@@ -132,12 +132,12 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 
 ### R1：5000 文档有界增量索引（#104，当前切片已完成，T1，后续目标 v0.10.1）
 
-- 状态：单文件回退与未变化索引快速路径均已完成并合并；#104 总 Issue 仍保持开放，后续只在有明确验收目标时继续拆切片。
+- 状态：单文件回退、未变化索引快速路径和 ASCII 子串候选均已完成并合并；#104 总 Issue 仍保持开放，后续只在有明确验收目标时继续拆切片。
 - 目标：在全局 posting 预算达到上限时只让超限文件回退线性扫描，保留其他文件的倒排索引和搜索响应。
 - 非目标：不引入新搜索依赖、不重做查询语法、不实现持久化索引第二阶段。
 - 验收：超限文件进入 `unindexed_files`；已有索引不被整库清空；线性结果与索引结果一致；CJK、持久化、修改/删除失效测试继续通过。
 - 预计文件：`src-tauri/src/commands.rs`、相关 Rust 测试、`docs/AI-HANDOFF.md`。
-- 测试：T1；本次快速路径已通过完整 Rust 门禁和 PR Quality checks，公开 Release 仍待 v0.10.1 稳定批次验收。
+- 测试：T1；两个搜索性能切片已通过完整 Rust 门禁和 PR Quality checks，公开 Release 仍待 v0.10.1 稳定批次验收。
 
 ### R2：可取消的分批导出与失败清单（#87，T2，目标 v0.11.0）
 
