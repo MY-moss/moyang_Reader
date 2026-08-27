@@ -5,6 +5,7 @@ export type ContextMenuItem = {
   label: string;
   shortcut?: string;
   disabled?: boolean;
+  tone?: "default" | "danger";
   onSelect: () => void;
 };
 
@@ -108,6 +109,7 @@ export function ContextMenu({ x, y, title, ariaLabel, groups, onClose }: Context
               type="button"
               role="menuitem"
               disabled={item.disabled}
+              className={item.tone === "danger" ? "context-menu-danger" : undefined}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 if (item.disabled) return;

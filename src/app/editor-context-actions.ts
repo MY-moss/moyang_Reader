@@ -103,6 +103,13 @@ export function applySourceEditorAction(
   insertionText?: string,
 ): SourceEditorActionResult | null {
   switch (action) {
+    case "undo":
+    case "redo":
+    case "cut":
+    case "copy":
+    case "paste":
+    case "select-all":
+      return null;
     case "bold":
       return wrapSelection(value, selectionStart, selectionEnd, "**");
     case "italic":

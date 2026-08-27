@@ -1,4 +1,10 @@
 export type EditorContextAction =
+  | "undo"
+  | "redo"
+  | "cut"
+  | "copy"
+  | "paste"
+  | "select-all"
   | "bold"
   | "italic"
   | "strike"
@@ -21,6 +27,7 @@ export type EditorContextMenuItem = {
   action: EditorContextAction;
   label: string;
   shortcut?: string;
+  disabled?: boolean;
 };
 
 export type EditorContextMenuGroup = {
@@ -29,6 +36,17 @@ export type EditorContextMenuGroup = {
 };
 
 export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
+  {
+    label: "编辑",
+    items: [
+      { action: "undo", label: "撤销", shortcut: "Ctrl Z" },
+      { action: "redo", label: "重做", shortcut: "Ctrl Y" },
+      { action: "cut", label: "剪切", shortcut: "Ctrl X" },
+      { action: "copy", label: "复制", shortcut: "Ctrl C" },
+      { action: "paste", label: "粘贴", shortcut: "Ctrl V" },
+      { action: "select-all", label: "全选", shortcut: "Ctrl A" },
+    ],
+  },
   {
     label: "格式",
     items: [

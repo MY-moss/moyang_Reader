@@ -1,5 +1,17 @@
 # AI 开发与交接流程
 
+## 当前功能切片（2026-08-28，v0.10.5 文件/文件夹管理与文本右键）
+
+- 目标：在已有工作区树和编辑器菜单上补齐高频右键管理，不引入新运行时依赖或云同步。
+- 分支：`codex/context-menu-crud-2026-08-28`，基于 `origin/main@804e56e9fc936b156c3b8f024ff65f975684fc03`；已推送提交 `75749655c61cc44a794dfcb05a58988433e7ebe4`，对应 [PR #278](https://github.com/MY-moss/moyang_Reader/pull/278)。当前切片只使用这一条功能分支和一个 PR。
+- 已实现：文件/文件夹右键打开、重命名、删除、资源管理器定位、复制完整路径；根目录保留新建/定位/路径复制；文件树支持空工作区根目录菜单；Markdown/TXT 源码与 WYSIWYG 菜单补齐撤销、重做、剪切、复制、粘贴、全选。
+- 安全边界：Tauri 端再次校验授权工作区、相对路径、路径穿越、目标重名和最终符号链接；文件重命名默认保留原扩展名；资源管理器调用使用无控制台窗口的 Windows 原生进程参数。
+- 当前验证：前端 lint、树/路径定向测试 8/8、一次前端生产构建、Rust 全部 42 项测试通过；`cargo fmt` 已执行，前端格式检查通过。构建仅保留既有入口 chunk size warning。
+- 桌面验证：新增 Windows Tauri CRUD smoke 定向用例 1/1 通过；完整桌面 smoke 的其余 9 项通过，既有 PDF 文件导出用例仍因“保存 PDF 失败”失败。Tauri 内嵌 WebDriver 报告 `tauri-driver` 缺失警告，但本机 embedded driver 仍完成测试。
+- 文档同步：`docs/REQUIREMENTS.md`、`docs/UI-INTERACTION.md`、`docs/ROADMAP.md`、`docs/USER-GUIDE.md`、本文件和 `CHANGELOG.md` 已补充 v0.10.5 边界、验收与交接信息。
+- 发布边界：`v0.10.4` tag 已推送且其 Release workflow `33102819737` 当时仍在进行；本切片不覆盖或重复该发布。当前功能合并并通过 Windows x64 门禁后，作为 `v0.10.5` 稳定 patch 生成安装包、`.sig`、`latest.json` 并核验镜像。
+- 未完成：PR #278 尚未合并，需等待 Quality checks；PDF 文件落盘失败继续留在 #241，不扩大本切片范围。合并并通过 Windows x64 门禁后才发布 v0.10.5 安装包；不在本切片自动开始跨目录移动、批量操作或其他新功能。
+
 ## 当前开发切片（2026-08-28，v0.10.4 #232 第二批）
 
 - 目标：补齐标签页中键关闭、原生拖拽排序和阅读区连续缩放，延续 #232 的桌面惯例交互。

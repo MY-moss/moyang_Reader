@@ -38,6 +38,11 @@ type MarkdownWysiwygEditorProps = {
   ariaLabel: string;
   onChange: (markdown: string) => void;
   onInsertLink: () => void;
+  onUndo?: (focusTarget?: Element | null) => void;
+  onRedo?: (focusTarget?: Element | null) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onStatusMessage?: (message: string) => void;
   wikiCandidates?: readonly WikiLinkCandidate[];
 };
 
@@ -166,6 +171,11 @@ function MilkdownSurface({
   ariaLabel,
   onChange,
   onInsertLink,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
+  onStatusMessage,
   wikiCandidates,
 }: MarkdownWysiwygEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -179,12 +189,27 @@ function MilkdownSurface({
   const lastSyncedMarkdownRef = useRef<string | null>(null);
   const wikiCandidatesRef = useRef<readonly WikiLinkCandidate[]>(wikiCandidates ?? []);
   const completionRef = useRef<CompletionOverlayState | null>(null);
+  const onUndoRef = useRef(onUndo);
+  const onRedoRef = useRef(onRedo);
+  const onStatusMessageRef = useRef(onStatusMessage);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    onUndoRef.current = onUndo;
+  }, [onUndo]);
+
+  useEffect(() => {
+    onRedoRef.current = onRedo;
+  }, [onRedo]);
+
+  useEffect(() => {
+    onStatusMessageRef.current = onStatusMessage;
+  }, [onStatusMessage]);
 
   useEffect(() => {
     wikiCandidatesRef.current = wikiCandidates ?? [];
@@ -288,6 +313,52 @@ function MilkdownSurface({
       const view = viewRef.current;
       if (!editor || !view) return;
 
+      if (action === "undo" || action === "redo") {
+        (action === "undo" ? onUndoRef.current : onRedoRef.current)?.(containerRef.current);
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "copy" || action === "cut") {
+        if (!contextMenu?.hasSelection) {
+          onStatusMessageRef.current?.("请先选择要复制的文本。");
+          setContextMenu(null);
+          return;
+        }
+        view.focus();
+        if (!document.execCommand(action)) {
+          onStatusMessageRef.current?.("无法访问剪贴板，请使用 Ctrl+C 或检查应用权限。");
+        }
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "paste") {
+        const clipboard = navigator.clipboard;
+        if (!clipboard?.readText) {
+          onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
+          setContextMenu(null);
+          return;
+        }
+        void clipboard
+          .readText()
+          .then((pastedText) => {
+            if (!pastedText) return;
+            view.focus();
+            view.dispatch(view.state.tr.insertText(pastedText, view.state.selection.from, view.state.selection.to));
+          })
+          .catch(() => onStatusMessageRef.current?.("无法读取剪贴板，请使用 Ctrl+V 或检查应用权限。"));
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "select-all") {
+        view.focus();
+        document.execCommand("selectAll");
+        setContextMenu(null);
+        return;
+      }
+
       if (action === "link") {
         onInsertLink();
         setContextMenu(null);
@@ -363,7 +434,7 @@ function MilkdownSurface({
       view.focus();
       setContextMenu(null);
     },
-    [onInsertLink],
+    [contextMenu, onInsertLink],
   );
 
   const editorContextGroups = editorContextMenuGroups.map((group) => ({
@@ -372,6 +443,11 @@ function MilkdownSurface({
       id: `wysiwyg-${item.action}`,
       label: item.label,
       shortcut: item.shortcut,
+      disabled:
+        item.disabled ||
+        (item.action === "undo" && !canUndo) ||
+        (item.action === "redo" && !canRedo) ||
+        ((item.action === "cut" || item.action === "copy") && !contextMenu?.hasSelection),
       onSelect: () => applyContextAction(item.action),
     })),
   }));
@@ -536,7 +612,11 @@ function MilkdownSurface({
         event.preventDefault();
         completionRef.current = null;
         setCompletion(null);
-        setContextMenu({ x: event.clientX, y: event.clientY });
+        setContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          hasSelection: Boolean(window.getSelection()?.toString().trim()),
+        });
       }}
       onKeyDown={(event) => {
         if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;

@@ -113,6 +113,27 @@ export async function createWorkspaceFolder(root: string, parentPath: string, na
   return invoke<string>("create_workspace_folder", { root, parentPath, name });
 }
 
+export async function renameWorkspaceEntry(root: string, entryPath: string, name: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能重命名工作区内容。");
+  }
+  return invoke<string>("rename_workspace_entry", { root, entryPath, name });
+}
+
+export async function deleteWorkspaceEntry(root: string, entryPath: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能删除工作区内容。");
+  }
+  await invoke("delete_workspace_entry", { root, entryPath });
+}
+
+export async function revealWorkspaceEntry(root: string, entryPath: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能打开资源管理器定位本地路径。");
+  }
+  await invoke("reveal_workspace_entry", { root, entryPath });
+}
+
 export async function subscribeToWorkspaceChanges(
   root: string,
   onPaths: (paths: string[]) => void,

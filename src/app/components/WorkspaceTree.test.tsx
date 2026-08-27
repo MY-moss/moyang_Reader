@@ -96,4 +96,74 @@ describe("WorkspaceTreeView", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("offers file management and path actions from the file context menu", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onOpenFile = vi.fn();
+    const onRenameEntry = vi.fn();
+    const onDeleteEntry = vi.fn();
+    const onRevealEntry = vi.fn();
+    const onCopyPath = vi.fn();
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={[file(0)]}
+          activePath={null}
+          onOpenFile={onOpenFile}
+          onRenameEntry={onRenameEntry}
+          onDeleteEntry={onDeleteEntry}
+          onRevealEntry={onRevealEntry}
+          onCopyPath={onCopyPath}
+        />,
+      );
+    });
+
+    const fileButton = container.querySelector<HTMLButtonElement>(".workspace-file");
+    expect(fileButton).toBeTruthy();
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+
+    const menuItems = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
+    expect(menuItems().some((button) => button.textContent?.includes("打开文件"))).toBe(true);
+    expect(menuItems().some((button) => button.textContent?.includes("重命名文件"))).toBe(true);
+    expect(menuItems().some((button) => button.textContent?.includes("删除文件"))).toBe(true);
+    expect(menuItems().some((button) => button.textContent?.includes("复制完整路径"))).toBe(true);
+
+    const rename = menuItems().find((button) => button.textContent?.includes("重命名文件"));
+    act(() => rename?.click());
+    expect(onRenameEntry).toHaveBeenCalledWith("notes/0.md", "file");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the root context menu available for an empty workspace", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onCreateNote = vi.fn();
+
+    act(() => {
+      root.render(<WorkspaceTreeView files={[]} activePath={null} onOpenFile={() => {}} onCreateNote={onCreateNote} />);
+    });
+
+    act(() => {
+      container
+        .querySelector<HTMLDivElement>(".workspace-tree")
+        ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const createNote = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
+      (button) => button.textContent?.trim() === "新建笔记",
+    );
+    expect(createNote).toBeTruthy();
+    act(() => createNote?.click());
+    expect(onCreateNote).toHaveBeenCalledWith("");
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });

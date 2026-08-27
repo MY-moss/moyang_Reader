@@ -2451,6 +2451,135 @@ fn create_workspace_folder_inner(
     Ok(display_path(&candidate))
 }
 
+fn canonical_workspace_root(raw_root: &str) -> Result<PathBuf, String> {
+    let root = fs::canonicalize(PathBuf::from(raw_root))
+        .map_err(|error| format!("无法读取工作区目录：{error}"))?;
+    if !root.is_dir() {
+        return Err("工作区路径不是文件夹。".to_string());
+    }
+    Ok(root)
+}
+
+fn resolve_workspace_entry(root: &Path, raw_entry_path: &str) -> Result<PathBuf, String> {
+    let entry_path = raw_entry_path.trim().replace('\\', "/");
+    if entry_path.is_empty() || entry_path.starts_with('/') || entry_path.contains(':') {
+        return Err("工作区条目必须是非空的相对路径。".to_string());
+    }
+
+    let mut candidate = root.to_path_buf();
+    let mut has_part = false;
+    for part in entry_path.split('/') {
+        if part.is_empty() {
+            continue;
+        }
+        validate_workspace_entry_name(part)
+            .map_err(|_| "工作区条目路径不是有效的相对路径。".to_string())?;
+        candidate.push(part);
+        has_part = true;
+    }
+    if !has_part {
+        return Err("工作区条目必须是非空的相对路径。".to_string());
+    }
+
+    let metadata =
+        fs::symlink_metadata(&candidate).map_err(|error| format!("无法读取工作区条目：{error}"))?;
+    if metadata.file_type().is_symlink() {
+        return Err("出于安全原因，暂不支持重命名或删除符号链接。".to_string());
+    }
+
+    let canonical =
+        fs::canonicalize(&candidate).map_err(|error| format!("无法确认工作区条目：{error}"))?;
+    if !canonical.starts_with(root) {
+        return Err("工作区条目不在当前工作区内。".to_string());
+    }
+    Ok(canonical)
+}
+
+fn rename_workspace_entry_inner(
+    root: String,
+    entry_path: String,
+    raw_name: String,
+) -> Result<String, String> {
+    let root = canonical_workspace_root(&root)?;
+    let source = resolve_workspace_entry(&root, &entry_path)?;
+    let mut name = validate_workspace_entry_name(&raw_name)?;
+    let source_is_directory = fs::symlink_metadata(&source)
+        .map_err(|error| format!("无法读取工作区条目：{error}"))?
+        .is_dir();
+
+    if !source_is_directory && Path::new(&name).extension().is_none() {
+        if let Some(extension) = source.extension().and_then(|value| value.to_str()) {
+            name.push('.');
+            name.push_str(extension);
+        }
+    }
+    if !source_is_directory && !is_supported_document_path(Path::new(&name)) {
+        return Err(
+            "文件扩展名不受支持，请保留为 Markdown、文本、Word、PDF 或图片文件。".to_string(),
+        );
+    }
+
+    let parent = source
+        .parent()
+        .ok_or_else(|| "工作区条目目录无法解析。".to_string())?;
+    let destination = parent.join(name);
+    if !destination.starts_with(&root) {
+        return Err("新名称不能跳出当前工作区。".to_string());
+    }
+    if fs::symlink_metadata(&destination).is_ok() {
+        return Err("目标名称已经存在，请换一个名称。".to_string());
+    }
+
+    fs::rename(&source, &destination).map_err(|error| format!("无法重命名工作区条目：{error}"))?;
+    Ok(display_path(&destination))
+}
+
+fn delete_workspace_entry_inner(root: String, entry_path: String) -> Result<(), String> {
+    let root = canonical_workspace_root(&root)?;
+    let target = resolve_workspace_entry(&root, &entry_path)?;
+    let metadata =
+        fs::symlink_metadata(&target).map_err(|error| format!("无法读取工作区条目：{error}"))?;
+
+    if metadata.is_dir() {
+        fs::remove_dir_all(&target).map_err(|error| format!("无法删除文件夹：{error}"))?;
+    } else {
+        fs::remove_file(&target).map_err(|error| format!("无法删除文件：{error}"))?;
+    }
+    Ok(())
+}
+
+fn reveal_workspace_entry_inner(root: String, entry_path: String) -> Result<(), String> {
+    let root = canonical_workspace_root(&root)?;
+    let target = if entry_path.trim().is_empty() {
+        root
+    } else {
+        resolve_workspace_entry(&root, &entry_path)?
+    };
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        let argument = if target.is_file() {
+            format!("/select,{}", target.display())
+        } else {
+            target.display().to_string()
+        };
+        Command::new("explorer.exe")
+            .creation_flags(0x0800_0000)
+            .arg(argument)
+            .spawn()
+            .map_err(|error| format!("无法打开资源管理器：{error}"))?;
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = target;
+        Err("在当前平台无法打开 Windows 资源管理器。".to_string())
+    }
+}
+
 #[tauri::command]
 pub fn create_workspace_note(
     root: String,
@@ -2477,6 +2606,43 @@ pub fn create_workspace_folder(
         );
     }
     create_workspace_folder_inner(root, parent_path, name)
+}
+
+#[tauri::command]
+pub fn rename_workspace_entry(
+    root: String,
+    entry_path: String,
+    name: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    if !access.is_write_allowed(Path::new(&root)) {
+        return Err("拒绝修改未通过用户文件夹选择的工作区。请重新添加文件夹。".to_string());
+    }
+    rename_workspace_entry_inner(root, entry_path, name)
+}
+
+#[tauri::command]
+pub fn delete_workspace_entry(
+    root: String,
+    entry_path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    if !access.is_write_allowed(Path::new(&root)) {
+        return Err("拒绝删除未通过用户文件夹选择的工作区内容。请重新添加文件夹。".to_string());
+    }
+    delete_workspace_entry_inner(root, entry_path)
+}
+
+#[tauri::command]
+pub fn reveal_workspace_entry(
+    root: String,
+    entry_path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝打开未通过用户选择的工作区路径。请重新添加文件夹。".to_string());
+    }
+    reveal_workspace_entry_inner(root, entry_path)
 }
 
 #[tauri::command]
@@ -2949,18 +3115,19 @@ mod tests {
     use super::{
         access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
-        create_workspace_note_inner, decode_ipc_path, decode_text, extract_markdown_links,
-        extract_tags, extract_title, extract_wiki_links, has_pdf_header, index_workspace_inner,
-        is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
-        list_workspace_files_inner, path_exists_inner, persistent_search_index_path,
-        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
-        search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        sorted_workspace_directories, source_search_tokens, touch_indexed_file,
-        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
-        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
-        MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
+        create_workspace_note_inner, decode_ipc_path, decode_text, delete_workspace_entry_inner,
+        extract_markdown_links, extract_tags, extract_title, extract_wiki_links, has_pdf_header,
+        index_workspace_inner, is_supported_document_path, is_supported_text_path,
+        is_write_allowed_for_new_path, list_workspace_files_inner, path_exists_inner,
+        persistent_search_index_path, prune_search_entries, read_text_file_inner,
+        refresh_workspace_inner, rename_workspace_entry_inner, search_workspace_inner,
+        search_workspace_inner_with_cache, search_workspace_inner_with_cache_and_persistence,
+        should_skip_directory, sorted_workspace_directories, source_search_tokens,
+        touch_indexed_file, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
+        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
+        TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -4198,5 +4365,56 @@ mod tests {
         .is_err());
 
         fs::remove_dir_all(root).expect("remove create entry workspace");
+    }
+
+    #[test]
+    fn renames_and_deletes_workspace_entries_without_leaving_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-manage-entry-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let archive = root.join("Archive");
+        let note = root.join("Today.md");
+        fs::create_dir_all(&archive).expect("create management workspace");
+        fs::write(&note, "# Today").expect("write management note");
+        fs::write(archive.join("Nested.md"), "# Nested").expect("write nested management note");
+        let root_string = root.to_string_lossy().into_owned();
+
+        let renamed_note = rename_workspace_entry_inner(
+            root_string.clone(),
+            "Today.md".to_string(),
+            "Reading".to_string(),
+        )
+        .expect("rename workspace note while preserving extension");
+        assert!(renamed_note.ends_with("Reading.md"));
+        assert!(Path::new(&renamed_note).is_file());
+        assert!(!note.exists());
+
+        let renamed_archive = rename_workspace_entry_inner(
+            root_string.clone(),
+            "Archive".to_string(),
+            "Saved".to_string(),
+        )
+        .expect("rename workspace folder");
+        assert!(Path::new(&renamed_archive).is_dir());
+        assert!(Path::new(&renamed_archive).join("Nested.md").is_file());
+
+        assert!(rename_workspace_entry_inner(
+            root_string.clone(),
+            "../outside".to_string(),
+            "Nope".to_string(),
+        )
+        .is_err());
+        assert!(delete_workspace_entry_inner(root_string.clone(), "".to_string()).is_err());
+
+        delete_workspace_entry_inner(root_string.clone(), "Reading.md".to_string())
+            .expect("delete workspace note");
+        assert!(!Path::new(&renamed_note).exists());
+        delete_workspace_entry_inner(root_string, "Saved".to_string())
+            .expect("delete workspace folder recursively");
+        assert!(!Path::new(&renamed_archive).exists());
+
+        fs::remove_dir_all(root).expect("remove management workspace");
     }
 }

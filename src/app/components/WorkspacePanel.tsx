@@ -6,7 +6,7 @@ import type {
   WorkspaceFile,
   WorkspaceSearchResult,
 } from "../types";
-import { WorkspaceTreeView } from "./WorkspaceTree";
+import { WorkspaceTreeView, type WorkspaceEntryKind } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
 import { MAX_MOUNTED_WORKSPACES } from "../storage";
@@ -53,6 +53,10 @@ type WorkspacePanelProps = {
   onOpenFile: (path: string) => void;
   onCreateNote?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
+  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onRevealEntry?: (entryPath: string) => void;
+  onCopyPath?: (entryPath: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
@@ -100,6 +104,10 @@ export function WorkspacePanel({
   onOpenFile,
   onCreateNote,
   onCreateFolder,
+  onRenameEntry,
+  onDeleteEntry,
+  onRevealEntry,
+  onCopyPath,
   onSearchQueryChange,
   onTagChange,
   onKindChange,
@@ -389,7 +397,7 @@ export function WorkspacePanel({
         </div>
       ) : (
         <>
-          {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0) && (
+          {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0 || !hasFilters) && (
             <div className="workspace-files" aria-label="工作区文件">
               <div className="workspace-subheading">文件</div>
               <WorkspaceTreeView
@@ -399,6 +407,10 @@ export function WorkspacePanel({
                 onOpenFile={onOpenFile}
                 onCreateNote={onCreateNote}
                 onCreateFolder={onCreateFolder}
+                onRenameEntry={onRenameEntry}
+                onDeleteEntry={onDeleteEntry}
+                onRevealEntry={onRevealEntry}
+                onCopyPath={onCopyPath}
               />
             </div>
           )}
