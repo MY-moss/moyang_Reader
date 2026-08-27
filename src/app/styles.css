@@ -4262,6 +4262,15 @@ html.pane-resizing * {
     color: var(--accent-deep);
     outline: 0;
   }
+  .moyang-context-menu button.context-menu-danger {
+    color: var(--danger);
+  }
+  .moyang-context-menu button.context-menu-danger:hover,
+  .moyang-context-menu button.context-menu-danger:focus-visible {
+    border-color: color-mix(in srgb, var(--danger) 46%, var(--line));
+    background: color-mix(in srgb, var(--danger) 10%, var(--surface-strong));
+    color: var(--danger);
+  }
   .moyang-context-menu button:disabled {
     cursor: not-allowed;
     opacity: 0.45;

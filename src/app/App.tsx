@@ -54,6 +54,9 @@ import {
   listWorkspaceDirectories,
   listWorkspaceFiles,
   openExternalUrl,
+  renameWorkspaceEntry,
+  deleteWorkspaceEntry,
+  revealWorkspaceEntry,
   readBinaryFile,
   readAppSettings,
   readTextFile,
@@ -150,6 +153,7 @@ import {
   rememberRecentFile,
   rememberMountedWorkspace,
   rememberRecentWorkspace,
+  saveRecentFiles,
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
@@ -163,6 +167,7 @@ import {
   forgetWorkspaceSession,
   saveWorkspacePath,
 } from "./storage";
+import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
@@ -2031,6 +2036,68 @@ export function App() {
     [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
   );
 
+  const saveDocument = useCallback(async (allowExternalOverwrite = false): Promise<boolean> => {
+    const current = documentStateRef.current;
+    const draft = sourceDraftRef.current;
+    if (!current || !current.modified || !isEditableDocument(current.kind)) return false;
+
+    if (current.externallyModified && !allowExternalOverwrite) {
+      setExternalChangePath(current.path);
+      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
+      return false;
+    }
+
+    const path = current.path;
+    const pathKey = comparablePath(path);
+    let writeCompleted = false;
+    try {
+      if (isTauriRuntime()) {
+        if (!allowExternalOverwrite) {
+          const diskSource = await readTextFile(path);
+          if (diskSource !== current.source) {
+            setDocumentState((latest) =>
+              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
+            );
+            setExternalChangePath(path);
+            setError("文件在保存前已被其他程序修改，请先选择处理方式。");
+            return false;
+          }
+        }
+        selfWritingPathsRef.current.add(pathKey);
+        try {
+          await writeTextFile(path, draft);
+        } finally {
+          selfWritingPathsRef.current.delete(pathKey);
+        }
+        writeCompleted = true;
+        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
+        documentCacheRef.current.remove(path);
+      } else {
+        downloadText(current.name, draft);
+      }
+
+      const rendered = await renderSource(path, draft, {
+        allowRemoteResources: preferencesRef.current.allowRemoteResources,
+      });
+      setDocumentState((latest) =>
+        latest && isSameDocumentPath(latest.path, path)
+          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
+          : latest,
+      );
+      clearDraftSnapshot(path);
+      setDraftSnapshots(loadDraftSnapshots());
+      setDraftRecovery(null);
+      setExternalChangePath(null);
+      setError(null);
+      return true;
+    } catch (cause) {
+      selfWritingPathsRef.current.delete(pathKey);
+      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);
+      setError(cause instanceof Error ? cause.message : "保存失败。");
+      return false;
+    }
+  }, []);
+
   const handleCreateNote = useCallback(
     async (target: string) => {
       if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
@@ -2107,6 +2174,198 @@ export function App() {
     [refreshWorkspaceChanges, workspacePath],
   );
 
+  const handleRenameWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再重命名文件或文件夹。");
+        return;
+      }
+
+      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
+      const oldName = fileNameFromPath(entryPath);
+      const name = window.prompt(kind === "folder" ? "重命名文件夹" : "重命名文件", oldName)?.trim();
+      if (!name || name === oldName) return;
+
+      const current = documentStateRef.current;
+      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
+      if (currentIsAffected && current?.modified) {
+        if (!window.confirm("当前文档有未保存修改，是否先保存后重命名？")) return;
+        if (!(await saveDocument())) return;
+      }
+
+      try {
+        const renamedPath = await renameWorkspaceEntry(root, entryPath, name);
+        documentCacheRef.current.invalidate([oldAbsolutePath, renamedPath]);
+
+        const rebaseTab = (tab: RecentFile): RecentFile => {
+          const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, renamedPath);
+          return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };
+        };
+        const nextTabs = openTabsRef.current.map(rebaseTab);
+        openTabsRef.current = nextTabs;
+        setOpenTabs(nextTabs);
+        saveOpenTabs(nextTabs);
+        setRecentFiles((currentFiles) => {
+          const nextFiles = currentFiles.map(rebaseTab);
+          saveRecentFiles(nextFiles);
+          return nextFiles;
+        });
+
+        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        if (cached) {
+          const cachedTabs = nextTabs.filter(
+            (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+          );
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+            tabs: cachedTabs,
+            activeDocumentPath: cached.activeDocumentPath
+              ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, renamedPath)
+              : null,
+          });
+          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+        }
+
+        let reopenFailed = false;
+        if (currentIsAffected && current) {
+          const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, renamedPath);
+          releaseDocumentResources(current.path);
+          documentStateRef.current = null;
+          setDocumentState(null);
+          setSourceDraft("");
+          sourceDraftRef.current = "";
+          setDraftRecovery(null);
+          setExternalChangePath(null);
+          setMode("rendered");
+          resetEditorHistory("", "");
+          reopenFailed = !(await openPath(nextCurrentPath, true));
+          if (reopenFailed) {
+            setError("文件已重命名，但重新打开失败，请从文件树中再次打开。");
+          }
+        }
+
+        await refreshWorkspaceChanges(root, [oldAbsolutePath, renamedPath]);
+        setSettingsNotice(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);
+        if (!reopenFailed) setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");
+      }
+    },
+    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+  );
+
+  const handleDeleteWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再删除文件或文件夹。");
+        return;
+      }
+
+      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
+      const label = fileNameFromPath(entryPath);
+      const message =
+        kind === "folder"
+          ? `确定删除文件夹“${label}”及其中的全部内容吗？此操作无法撤销。`
+          : `确定删除文件“${label}”吗？此操作无法撤销。`;
+      if (!window.confirm(message)) return;
+
+      const current = documentStateRef.current;
+      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
+      if (currentIsAffected && current?.modified) {
+        if (!window.confirm("当前文档有未保存修改，是否先保存后删除？")) return;
+        if (!(await saveDocument())) return;
+      }
+
+      try {
+        const currentIndex = current
+          ? openTabsRef.current.findIndex((tab) => isSameDocumentPath(tab.path, current.path))
+          : -1;
+        const nextTabs = openTabsRef.current.filter((tab) => !isPathWithinEntry(tab.path, oldAbsolutePath));
+        const affectedTabs = openTabsRef.current.filter((tab) => isPathWithinEntry(tab.path, oldAbsolutePath));
+        for (const tab of affectedTabs) releaseDocumentResources(tab.path);
+        documentCacheRef.current.invalidate([oldAbsolutePath]);
+        await deleteWorkspaceEntry(root, entryPath);
+
+        openTabsRef.current = nextTabs;
+        setOpenTabs(nextTabs);
+        saveOpenTabs(nextTabs);
+        setRecentFiles((currentFiles) => {
+          const nextFiles = currentFiles.filter((file) => !isPathWithinEntry(file.path, oldAbsolutePath));
+          saveRecentFiles(nextFiles);
+          return nextFiles;
+        });
+
+        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        if (cached) {
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+            tabs: nextTabs.filter(
+              (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+            ),
+            activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,
+          });
+          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+        }
+
+        let nextTabFailed = false;
+        if (currentIsAffected) {
+          setDocumentState(null);
+          documentStateRef.current = null;
+          setSourceDraft("");
+          sourceDraftRef.current = "";
+          setDraftRecovery(null);
+          setExternalChangePath(null);
+          setMode("rendered");
+          resetEditorHistory("", "");
+          saveLastDocumentPath(null);
+
+          const nextTab = nextTabs[currentIndex] ?? nextTabs[currentIndex - 1];
+          if (nextTab) nextTabFailed = !(await openPath(nextTab.path, true));
+        }
+
+        await refreshWorkspaceChanges(root, [oldAbsolutePath]);
+        setSettingsNotice(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);
+        if (!nextTabFailed) setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
+      }
+    },
+    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+  );
+
+  const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {
+    const root = workspacePathRef.current;
+    if (!root || !isTauriRuntime()) {
+      setError("当前没有可复制的工作区路径。");
+      return;
+    }
+
+    try {
+      const path = workspaceEntryAbsolutePath(root, entryPath);
+      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持访问剪贴板。");
+      await navigator.clipboard.writeText(path);
+      setSettingsNotice("完整路径已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制路径失败。");
+    }
+  }, []);
+
+  const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {
+    const root = workspacePathRef.current;
+    if (!root || !isTauriRuntime()) {
+      setError("请先添加工作区，再打开资源管理器。");
+      return;
+    }
+
+    try {
+      await revealWorkspaceEntry(root, entryPath);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法打开资源管理器。");
+    }
+  }, []);
+
   const openSelectedFile = useCallback(async () => {
     const nativePaths = await chooseDocumentPaths();
     if (isTauriRuntime()) {
@@ -2132,66 +2391,6 @@ export function App() {
     closeGettingStarted();
     void handleChooseWorkspace();
   }, [closeGettingStarted, handleChooseWorkspace]);
-
-  const saveDocument = useCallback(async (allowExternalOverwrite = false) => {
-    const current = documentStateRef.current;
-    const draft = sourceDraftRef.current;
-    if (!current || !current.modified || !isEditableDocument(current.kind)) return;
-
-    if (current.externallyModified && !allowExternalOverwrite) {
-      setExternalChangePath(current.path);
-      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
-      return;
-    }
-
-    const path = current.path;
-    const pathKey = comparablePath(path);
-    let writeCompleted = false;
-    try {
-      if (isTauriRuntime()) {
-        if (!allowExternalOverwrite) {
-          const diskSource = await readTextFile(path);
-          if (diskSource !== current.source) {
-            setDocumentState((latest) =>
-              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
-            );
-            setExternalChangePath(path);
-            setError("文件在保存前已被其他程序修改，请先选择处理方式。");
-            return;
-          }
-        }
-        selfWritingPathsRef.current.add(pathKey);
-        try {
-          await writeTextFile(path, draft);
-        } finally {
-          selfWritingPathsRef.current.delete(pathKey);
-        }
-        writeCompleted = true;
-        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
-        documentCacheRef.current.remove(path);
-      } else {
-        downloadText(current.name, draft);
-      }
-
-      const rendered = await renderSource(path, draft, {
-        allowRemoteResources: preferencesRef.current.allowRemoteResources,
-      });
-      setDocumentState((latest) =>
-        latest && isSameDocumentPath(latest.path, path)
-          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
-          : latest,
-      );
-      clearDraftSnapshot(path);
-      setDraftSnapshots(loadDraftSnapshots());
-      setDraftRecovery(null);
-      setExternalChangePath(null);
-      setError(null);
-    } catch (cause) {
-      selfWritingPathsRef.current.delete(pathKey);
-      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);
-      setError(cause instanceof Error ? cause.message : "保存失败。");
-    }
-  }, []);
 
   const overwriteExternalChange = useCallback(() => {
     const current = documentStateRef.current;
@@ -4110,6 +4309,10 @@ export function App() {
             onOpenFile={(path) => void handleSelectTab(path)}
             onCreateNote={(parentPath) => void handleCreateWorkspaceNote(parentPath)}
             onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}
+            onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}
+            onDeleteEntry={(entryPath, kind) => void handleDeleteWorkspaceEntry(entryPath, kind)}
+            onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}
+            onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}
@@ -4243,6 +4446,11 @@ export function App() {
                 ariaLabel="Markdown 所见即所得编辑器"
                 onChange={(value) => void updateSource(value)}
                 onInsertLink={() => handleInsertLink()}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={(target) => undoEditor(target)}
+                onRedo={(target) => redoEditor(target)}
+                onStatusMessage={(message) => setSettingsNotice(message)}
                 wikiCandidates={wikiLinkCandidates}
               />
             </Suspense>
@@ -4254,6 +4462,11 @@ export function App() {
               onChange={(value) => void updateSource(value)}
               onPaste={handleSourcePaste}
               onInsertLink={handleInsertLink}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={(target) => undoEditor(target)}
+              onRedo={(target) => redoEditor(target)}
+              onStatusMessage={(message) => setSettingsNotice(message)}
               wikiCompletions={wikiLinkCandidates}
             />
           )}

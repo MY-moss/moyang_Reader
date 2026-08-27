@@ -18,6 +18,11 @@ type SourceEditorProps = {
   onChange: (value: string) => void;
   onPaste?: (context: SourceEditorPasteContext) => boolean;
   onInsertLink?: (context: SourceEditorLinkContext) => void;
+  onUndo?: (focusTarget?: Element | null) => void;
+  onRedo?: (focusTarget?: Element | null) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onStatusMessage?: (message: string) => void;
   wikiCompletions?: readonly WikiLinkCandidate[];
 };
 
@@ -44,6 +49,11 @@ export function SourceEditor({
   onChange,
   onPaste,
   onInsertLink,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
+  onStatusMessage,
   wikiCompletions,
 }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +63,9 @@ export function SourceEditor({
   const onChangeRef = useRef(onChange);
   const onPasteRef = useRef(onPaste);
   const onInsertLinkRef = useRef(onInsertLink);
+  const onUndoRef = useRef(onUndo);
+  const onRedoRef = useRef(onRedo);
+  const onStatusMessageRef = useRef(onStatusMessage);
   const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -95,6 +108,18 @@ export function SourceEditor({
     onInsertLinkRef.current = onInsertLink;
   }, [onInsertLink]);
 
+  useEffect(() => {
+    onUndoRef.current = onUndo;
+  }, [onUndo]);
+
+  useEffect(() => {
+    onRedoRef.current = onRedo;
+  }, [onRedo]);
+
+  useEffect(() => {
+    onStatusMessageRef.current = onStatusMessage;
+  }, [onStatusMessage]);
+
   const replaceSourceValue = (nextValue: string, selectionStart: number, selectionEnd: number) => {
     valueRef.current = nextValue;
     const view = viewRef.current;
@@ -125,6 +150,77 @@ export function SourceEditor({
     const selection = view?.state.selection.main;
     const selectionStart = selection?.from ?? target.selectionStart;
     const selectionEnd = selection?.to ?? target.selectionEnd;
+
+    if (action === "undo" || action === "redo") {
+      (action === "undo" ? onUndoRef.current : onRedoRef.current)?.(containerRef.current);
+      setContextMenu(null);
+      return;
+    }
+
+    if (action === "copy" || action === "cut") {
+      if (selectionStart === selectionEnd) {
+        onStatusMessageRef.current?.("请先选择要复制的文本。");
+        setContextMenu(null);
+        return;
+      }
+
+      const selectedText = currentValue.slice(selectionStart, selectionEnd);
+      const clipboard = navigator.clipboard;
+      if (!clipboard?.writeText) {
+        onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
+        setContextMenu(null);
+        return;
+      }
+      void clipboard
+        .writeText(selectedText)
+        .then(() => {
+          if (action === "cut") {
+            replaceSourceValue(
+              `${currentValue.slice(0, selectionStart)}${currentValue.slice(selectionEnd)}`,
+              selectionStart,
+              selectionStart,
+            );
+          }
+        })
+        .catch(() => onStatusMessageRef.current?.("无法访问剪贴板，请检查应用权限后重试。"));
+      setContextMenu(null);
+      return;
+    }
+
+    if (action === "paste") {
+      const clipboard = navigator.clipboard;
+      if (!clipboard?.readText) {
+        onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
+        setContextMenu(null);
+        return;
+      }
+      void clipboard
+        .readText()
+        .then((pastedText) => {
+          if (!pastedText) return;
+          replaceSourceValue(
+            `${currentValue.slice(0, selectionStart)}${pastedText}${currentValue.slice(selectionEnd)}`,
+            selectionStart + pastedText.length,
+            selectionStart + pastedText.length,
+          );
+        })
+        .catch(() => onStatusMessageRef.current?.("无法读取剪贴板，请使用 Ctrl+V 或检查应用权限。"));
+      setContextMenu(null);
+      return;
+    }
+
+    if (action === "select-all") {
+      if (view) {
+        view.dispatch({ selection: { anchor: 0, head: currentValue.length } });
+        view.focus();
+      } else {
+        const textarea = fallbackRef.current;
+        textarea?.focus();
+        textarea?.setSelectionRange(0, currentValue.length);
+      }
+      setContextMenu(null);
+      return;
+    }
 
     if (action === "link") {
       onInsertLinkRef.current?.({
@@ -166,12 +262,20 @@ export function SourceEditor({
 
   const editorContextGroups = editorContextMenuGroups.map((group) => ({
     label: group.label,
-    items: group.items.map((item) => ({
-      id: `source-${item.action}`,
-      label: item.label,
-      shortcut: item.shortcut,
-      onSelect: () => applyContextAction(item.action),
-    })),
+    items: group.items.map((item) => {
+      const hasSelection = Boolean(contextMenu && contextMenu.selectionStart !== contextMenu.selectionEnd);
+      return {
+        id: `source-${item.action}`,
+        label: item.label,
+        shortcut: item.shortcut,
+        disabled:
+          item.disabled ||
+          (item.action === "undo" && !canUndo) ||
+          (item.action === "redo" && !canRedo) ||
+          ((item.action === "cut" || item.action === "copy") && !hasSelection),
+        onSelect: () => applyContextAction(item.action),
+      };
+    }),
   }));
 
   useEffect(() => {

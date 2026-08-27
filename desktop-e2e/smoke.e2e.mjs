@@ -136,6 +136,34 @@ async function clickWorkspaceFile(name) {
   throw new Error(`workspace file ${name} was not found`);
 }
 
+async function findWorkspaceElement(selector, text) {
+  const entries = await browser.$$(selector);
+  for (const entry of entries) {
+    if ((await entry.getText()).includes(text)) return entry;
+  }
+  return null;
+}
+
+async function openWorkspaceContextMenu(selector, text) {
+  const entry = await findWorkspaceElement(selector, text);
+  assert.ok(entry, `workspace entry ${text} was not found`);
+  await browser.execute((element) => {
+    element.dispatchEvent(
+      new window.MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        buttons: 2,
+        clientX: 24,
+        clientY: 24,
+      }),
+    );
+  }, entry);
+  const menu = await browser.$(".moyang-context-menu");
+  await menu.waitForDisplayed();
+  return menu;
+}
+
 async function discardDraftNotice() {
   const recoveryNotice = await browser.$(".draft-recovery-notice");
   await recoveryNotice.waitForDisplayed();
@@ -219,6 +247,70 @@ describe("Moyang Reader desktop runtime", () => {
     });
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
+  });
+
+  it("manages workspace files and folders from context menus", async () => {
+    const workspacePath = path.dirname(documentPath);
+    const originalFileName = "context-managed.md";
+    const renamedFileName = "context-renamed.md";
+    const originalFilePath = path.join(workspacePath, originalFileName);
+    const renamedFilePath = path.join(workspacePath, renamedFileName);
+    const folderName = "context-managed-folder";
+    const folderPath = path.join(workspacePath, folderName);
+    fs.writeFileSync(originalFilePath, "# Context managed\n", "utf8");
+    fs.mkdirSync(folderPath, { recursive: true });
+    fs.writeFileSync(path.join(folderPath, "nested.md"), "# Nested\n", "utf8");
+
+    try {
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        originalFileName,
+        true,
+        "the context-menu file fixture did not appear in the workspace",
+      );
+      await waitForWorkspaceEntry(
+        ".workspace-folder",
+        folderName,
+        true,
+        "the context-menu folder fixture did not appear in the workspace",
+      );
+
+      await browser.execute(() => {
+        window.__desktopE2EOriginalPrompt = window.prompt;
+        window.prompt = () => "context-renamed";
+      });
+      const renameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
+      await renameMenu.$("button=重命名文件").click();
+      await waitForWorkspaceEntry(".workspace-file", renamedFileName, true, "the context-menu file was not renamed");
+      assert.equal(fs.existsSync(originalFilePath), false);
+      assert.equal(fs.existsSync(renamedFilePath), true);
+
+      await browser.execute(() => {
+        window.__desktopE2EOriginalConfirm = window.confirm;
+        window.confirm = () => true;
+      });
+      const deleteFileMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
+      await deleteFileMenu.$("button=删除文件").click();
+      await waitForWorkspaceEntry(".workspace-file", renamedFileName, false, "the context-menu file was not deleted");
+      assert.equal(fs.existsSync(renamedFilePath), false);
+
+      const deleteFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
+      await deleteFolderMenu.$("button=删除文件夹及内容").click();
+      await waitForWorkspaceEntry(".workspace-folder", folderName, false, "the context-menu folder was not deleted");
+      assert.equal(fs.existsSync(folderPath), false);
+    } finally {
+      await browser
+        .execute(() => {
+          if (window.__desktopE2EOriginalPrompt) window.prompt = window.__desktopE2EOriginalPrompt;
+          if (window.__desktopE2EOriginalConfirm) window.confirm = window.__desktopE2EOriginalConfirm;
+          delete window.__desktopE2EOriginalPrompt;
+          delete window.__desktopE2EOriginalConfirm;
+        })
+        .catch(() => undefined);
+      fs.rmSync(originalFilePath, { force: true });
+      fs.rmSync(renamedFilePath, { force: true });
+      fs.rmSync(folderPath, { recursive: true, force: true });
+    }
   });
 
   it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
