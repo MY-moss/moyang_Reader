@@ -1,6 +1,6 @@
 # Moyang Reader 版本与发布政策
 
-当前稳定基线：`v0.9.3`（GitHub Release、安装包、签名、manifest 和 Cloudflare v0.9.3 公开镜像资产已在线核验；已登记的旧版本 v0.9.2→v0.9.3 实机点击更新、签名校验、替换和重启已补测）。Cloudflare Pages 公开资产当前正确，但 Release 镜像子任务因仓库尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 而失败；不能把公开资产在线误判为自动同步 workflow 全绿。
+当前稳定基线：`v0.9.3`；`v0.9.4` 发布候选包含 #183 标签页文档缓存，待版本提交合并、发布 workflow 和在线更新验证完成后再升级稳定基线。v0.9.3 的 Cloudflare Pages 公开资产当前正确，但 Release 镜像子任务因仓库尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 而失败；不能把公开资产在线误判为自动同步 workflow 全绿。
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
