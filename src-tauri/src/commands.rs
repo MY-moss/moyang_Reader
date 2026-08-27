@@ -2651,11 +2651,13 @@ mod tests {
         source_search_tokens, touch_indexed_file, write_bytes_file_inner, write_text_file_inner,
         AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
         WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
-        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
+        TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::Ordering;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn recognizes_supported_document_extensions_case_insensitively() {
@@ -3309,11 +3311,15 @@ mod tests {
         ));
         fs::create_dir_all(&root).expect("create large search workspace");
         for index in 0..5_000 {
-            let source = if index == 4_999 {
-                "needle in the target note"
+            let mut source = String::with_capacity(2 * 1024);
+            if index == 4_999 {
+                source.push_str("needle in the target note\n中文文档阅读器\n");
             } else {
-                "unrelated document content"
-            };
+                source.push_str("unrelated document content\n普通阅读文档\n");
+            }
+            while source.len() < 2 * 1024 {
+                source.push_str("mixed English and 中文阅读 content for a realistic note.\n");
+            }
             fs::write(root.join(format!("note-{index:04}.md")), source)
                 .expect("write large search note");
         }
@@ -3347,6 +3353,25 @@ mod tests {
         assert_eq!(
             cache.directory_stamp_checks.load(Ordering::Relaxed),
             directory_stamp_checks_after_first_query
+        );
+
+        let mut query_durations = Vec::with_capacity(20);
+        for _ in 0..20 {
+            let started = Instant::now();
+            let repeated =
+                search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+                    .expect("measure warm search latency");
+            query_durations.push(started.elapsed());
+            assert_eq!(repeated.len(), 1);
+        }
+        query_durations.sort_unstable();
+        let p95_index = ((query_durations.len() * 95).saturating_add(99) / 100).saturating_sub(1);
+        let p95 = query_durations[p95_index];
+        eprintln!("5000-document warm search P95: {} ms", p95.as_millis());
+        assert!(
+            p95 < Duration::from_millis(100),
+            "5000-document warm search P95 exceeded the 100 ms target: {} ms",
+            p95.as_millis()
         );
 
         fs::remove_dir_all(root).expect("remove large search workspace");
@@ -3444,6 +3469,54 @@ mod tests {
 
         fs::remove_dir_all(root).expect("remove search fallback workspace");
         fs::remove_dir_all(cache_directory).expect("remove search fallback cache");
+    }
+
+    #[test]
+    fn keeps_high_token_count_documents_in_fallback_without_disabling_index() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-long-document-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create long document workspace");
+        let long_source = (0..=MAX_SEARCH_INDEX_TOKENS_PER_FILE)
+            .map(|index| format!("token-{index}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        fs::write(root.join("long.md"), format!("needle {long_source}"))
+            .expect("write long document");
+        fs::write(root.join("short.md"), "needle in a short document")
+            .expect("write short document");
+
+        let cache = WorkspaceSearchCache::default();
+        let results = search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+            .expect("search long document workspace");
+        let names = results
+            .into_iter()
+            .map(|result| result.file.name)
+            .collect::<Vec<_>>();
+        assert_eq!(names, vec!["long.md", "short.md"]);
+
+        let index = cache
+            .search_indexes
+            .lock()
+            .expect("lock long document search index")
+            .remove(&access_path_key(&root))
+            .expect("long document search index should exist");
+        assert!(!index.disabled);
+        assert!(index
+            .unindexed_files
+            .contains(&access_path_key(&root.join("long.md"))));
+        assert!(!index
+            .unindexed_files
+            .contains(&access_path_key(&root.join("short.md"))));
+        assert!(index
+            .postings
+            .get("needle")
+            .map(|paths| paths.contains(&access_path_key(&root.join("short.md"))))
+            .unwrap_or(false));
+
+        fs::remove_dir_all(root).expect("remove long document workspace");
     }
 
     #[test]
