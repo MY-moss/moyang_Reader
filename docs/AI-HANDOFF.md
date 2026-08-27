@@ -6,7 +6,7 @@
 - 非目标：不改动 Markdown 语义、编辑器、导出格式、更新协议或文档云同步；不新增重量级依赖。
 - 当前分支：`codex/guide-settings-2026-08-27`，基于最新 `origin/main@2d0ab1acbc7c5bf9841dd09184c9a10e9e4cb3c7`。
 - 实现范围：`src/app/app-settings.ts` 统一设置快照和写入校验；Tauri `settings.json` 原子读写兜底；设置面板保存状态；首次使用教程和 `docs/USER-GUIDE.md`。
-- 当前验证：完整 Vitest 191/191、针对性 Vitest 14/14、`npm run lint`、`npm run format:check`、`npm run build`、Rust `cargo fmt -- --check`、`cargo check`、`cargo test`（40/40）和 `cargo clippy --lib -- -D warnings` 已通过；浏览器 E2E 本切片 2/2 通过。真实桌面 E2E 9/10 通过，唯一失败是既有 PDF 导出环境路径（`保存 PDF 失败`），未归因于本切片，需在发布前单独处理或明确豁免；最终 PR Quality checks 待提交后执行。
+- 当前验证：完整 Vitest 191/191、针对性 Vitest 14/14、`npm run lint`、`npm run format:check`、`npm run build`、Rust `cargo fmt -- --check`、`cargo check`、`cargo test`（40/40）和 `cargo clippy --lib -- -D warnings` 已通过；浏览器 E2E 本切片 2/2、a11y 2/2 通过。首次 push CI `33078620566` 仅在 Browser smoke test 暴露设置状态文字的 serious `color-contrast`，已由高对比度主题色修复，等待新提交的 PR Quality checks 复验。真实桌面 E2E 9/10 通过，唯一失败是既有 PDF 导出环境路径（`保存 PDF 失败`），未归因于本切片，需在发布前单独处理或明确豁免。
 - 发布计划：这是用户可见的稳定性修复，PR 合并且 Quality checks 通过后准备 `v0.10.3` Windows x64 安装包、签名和 `latest.json`；Cloudflare 静态镜像仍受 #241 的仓库 Secrets 前置条件影响。
 - 交接要求：本切片只允许一个功能分支和一个 PR；完成后更新本节的 PR、合并 SHA、Release、测试结果和已知限制，然后停止，不自动开始下一切片。
 
