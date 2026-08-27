@@ -67,6 +67,8 @@ pub struct WorkspaceSearchCache {
     metadata_checks: AtomicUsize,
     #[cfg(test)]
     text_reads: AtomicUsize,
+    #[cfg(test)]
+    directory_stamp_checks: AtomicUsize,
 }
 
 struct CachedSearchText {
@@ -561,14 +563,27 @@ impl WorkspaceSearchCache {
     fn list_files(&self, root: &Path) -> Result<Vec<WorkspaceFile>, String> {
         let key = access_path_key(root);
         let access = self.next_access();
-        let current_directories = workspace_directory_stamps(root).ok();
+        let event_driven = self.is_event_driven_root(root);
+        #[cfg(test)]
+        if !event_driven {
+            self.directory_stamp_checks.fetch_add(1, Ordering::Relaxed);
+        }
+        let current_directories = if event_driven {
+            None
+        } else {
+            workspace_directory_stamps(root).ok()
+        };
         if let Ok(file_lists) = self.file_lists.lock() {
             if let Some(cached) = file_lists.get(&key) {
-                if current_directories
-                    .as_ref()
-                    .map(|directories| directories == &cached.directories)
-                    .unwrap_or(false)
-                {
+                let cache_is_valid = if event_driven {
+                    root.is_dir()
+                } else {
+                    current_directories
+                        .as_ref()
+                        .map(|directories| directories == &cached.directories)
+                        .unwrap_or(false)
+                };
+                if cache_is_valid {
                     let files = cached.files.clone();
                     drop(file_lists);
                     if let Ok(mut file_lists) = self.file_lists.lock() {
@@ -582,7 +597,12 @@ impl WorkspaceSearchCache {
         }
 
         let files = sorted_workspace_files(root)?;
-        if let Ok(directories) = workspace_directory_stamps(root) {
+        let directories = if event_driven {
+            Vec::new()
+        } else {
+            workspace_directory_stamps(root).unwrap_or_default()
+        };
+        if event_driven || !directories.is_empty() {
             if let Ok(mut file_lists) = self.file_lists.lock() {
                 file_lists.insert(
                     key,
@@ -3063,6 +3083,8 @@ mod tests {
         assert_eq!(cached_query.len(), 1);
         let metadata_checks_after_first_query = cache.metadata_checks.load(Ordering::Relaxed);
         assert_eq!(metadata_checks_after_first_query, 1);
+        let directory_stamp_checks_after_first_query =
+            cache.directory_stamp_checks.load(Ordering::Relaxed);
 
         let unchanged_query =
             search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
@@ -3071,6 +3093,10 @@ mod tests {
         assert_eq!(
             cache.metadata_checks.load(Ordering::Relaxed),
             metadata_checks_after_first_query
+        );
+        assert_eq!(
+            cache.directory_stamp_checks.load(Ordering::Relaxed),
+            directory_stamp_checks_after_first_query
         );
 
         let added = root.join("added.md");
@@ -3182,6 +3208,58 @@ mod tests {
             .contains(&access_path_key(&root.join("broken.md"))));
 
         fs::remove_dir_all(root).expect("remove unreadable search workspace");
+    }
+
+    #[test]
+    fn reuses_event_driven_index_for_5000_document_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-large-workspace-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create large search workspace");
+        for index in 0..5_000 {
+            let source = if index == 4_999 {
+                "needle in the target note"
+            } else {
+                "unrelated document content"
+            };
+            fs::write(root.join(format!("note-{index:04}.md")), source)
+                .expect("write large search note");
+        }
+
+        let cache = WorkspaceSearchCache::default();
+        cache.enable_event_driven_root(&root);
+        let first = search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+            .expect("search large workspace");
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].file.name, "note-4999.md");
+        let metadata_checks_after_first_query = cache.metadata_checks.load(Ordering::Relaxed);
+        let directory_stamp_checks_after_first_query =
+            cache.directory_stamp_checks.load(Ordering::Relaxed);
+        assert_eq!(metadata_checks_after_first_query, 5_000);
+
+        cache
+            .entries
+            .lock()
+            .expect("lock large search text cache")
+            .clear();
+        cache.text_reads.store(0, Ordering::Relaxed);
+        let repeated =
+            search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+                .expect("repeat search large workspace");
+        assert_eq!(repeated.len(), 1);
+        assert_eq!(cache.text_reads.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            cache.metadata_checks.load(Ordering::Relaxed),
+            metadata_checks_after_first_query
+        );
+        assert_eq!(
+            cache.directory_stamp_checks.load(Ordering::Relaxed),
+            directory_stamp_checks_after_first_query
+        );
+
+        fs::remove_dir_all(root).expect("remove large search workspace");
     }
 
     #[test]
