@@ -1,14 +1,14 @@
 # AI 开发与交接流程
 
-## 当前功能切片（2026-08-28，v0.10.4 开发中）
+## 当前发布切片（2026-08-28，v0.10.4 发布准备）
 
-- 目标：完成 #232 的 Obsidian 风格高频交互：侧栏新建 Markdown 笔记/真实文件夹、根目录/文件夹/文件所在目录右键新建，以及 Markdown/TXT 编辑上下文菜单。
-- 非目标：不实现重命名、删除、拖拽移动、插件市场、Canvas、Dataview、文档云同步或新的编辑器依赖；Markdown 仍是唯一真源，产品仍只支持 Windows x64。
-- 当前分支：`codex/context-menus-2026-08-27`，基于 `main@1f5b22db94e7f044c967967617e3350df434b27f`。
-- 实现范围：新增 `WorkspaceDirectory` 目录状态和增量刷新；Tauri 安全创建笔记/文件夹命令；树节点和根目录 Context Menu；共享键盘可访问菜单；Milkdown/CodeMirror 格式、段落和插入动作；相关单测、需求、路线图和 CHANGELOG。
-- 当前验证：前端完整 Vitest 196/196（加入本切片后定向 16/16）、`npm run build` 已通过；Lint、Prettier、Rust fmt 和 Rust 单测 41/41 已通过。首次构建只暴露并修正 Milkdown 事务类型问题；不把构建警告误报为失败。
-- 发布边界：本切片尚未创建 Release 或安装包；Quality checks、浏览器/Windows 桌面 E2E、PR 合并前不发布。稳定验收通过后累计到 `v0.10.4`，再生成 Windows x64 安装包、签名、`latest.json` 并核验 GitHub/Cloudflare。
-- 交接要求：下一步只做 UI E2E/真实 Windows 桌面路径验证，重点是新建根目录/空文件夹、右键菜单、编辑选区动作和重载后目录仍存在；完成后更新本节、检查 Issues、创建一个 PR 并停止，不自动开启下一个功能。
+- 目标：发布 #232 第一批桌面惯例交互，包括工作区新建 Markdown 笔记/真实文件夹、根目录/文件夹/文件所在目录右键新建，以及 Markdown/TXT 编辑上下文菜单。
+- 功能 PR：[PR #275](https://github.com/MY-moss/moyang_Reader/pull/275) 已通过 Quality checks 并 squash 合并，远程功能合并提交为 `5d0891945c4fb8b7daa0989192e9f2532536bb6b`。
+- 版本准备：发布分支 `codex/release-v0.10.4-2026-08-28` 已从远程 `main` 创建，`package.json`、lock 文件、Cargo、Tauri 配置和 CHANGELOG 已同步为 `0.10.4`。
+- 已验证：PR #275 的 Quality checks run `33092295394` 全绿，包含前端 lint/格式/覆盖率/构建、浏览器 smoke、Windows 桌面 smoke、依赖审计、发布检查和 Rust 门禁；本地 Vitest 196/196、Rust 41/41、编辑右键 E2E 1/1 通过。
+- 发布边界：当前仍未创建 `v0.10.4` tag、GitHub Release 或安装包；版本准备 PR 合并且 main CI 通过后，才推送 tag，由 release workflow 生成 Windows x64 NSIS、`.sig` 和 `latest.json`，随后核验 GitHub/Cloudflare 镜像及旧版更新链路。
+- 已知阻塞：本机 Git HTTPS fetch 在合并后连续两次连接重置，因此发布分支通过 GitHub API 从远程 `main` 建立；不强推、不上传私钥。Cloudflare 静态镜像仍取决于仓库 Secrets 配置。
+- 交接要求：下一步只审查该发布分支的版本差异、创建一个版本准备 PR 并等待门禁；发布完成后更新 `docs/UPDATE.md`、本节和 Issue 状态，然后停止，不自动开启下一个功能。
 
 ## 快速启动模板（交给任何 AI 时直接粘贴）
 
