@@ -75,7 +75,8 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - PR #259 同时修正快速路径边界：watcher 事件先失效 Rust 缓存，只有成功启用 watcher 的工作区才跳过重复索引元数据检查；未启用 watcher 时仍检测直接文件修改。无新依赖、无持久化索引格式变化、无 Release/安装包。
 - #104 的工作区文件列表缓存切片已由 [PR #261](https://github.com/MY-moss/moyang_Reader/pull/261) 合并，合并提交为 `b5e62e7b8d00634261aa1b269cec13fb8853500f`。未变化的工作区快照会复用 Rust 文件列表，避免重复的逐文件读取；watcher、保存和显式刷新仍负责失效。新增 5000 文档回归基准通过，#104 的正式 P95、索引上限和长文档验收仍保持 open。
 - PR #261 不改变搜索结果、Markdown 真源、持久化索引格式或依赖，也不创建 Release/安装包；当前稳定版本仍为 `v0.9.5`。
-- #104 索引容量切片已在功能分支 `codex/search-index-lru-2026-08-27` 完成：posting 预算达到上限时按文件最近使用顺序淘汰旧 posting，并将被淘汰文件保留在线性回退集合；索引候选命中会更新 LRU，持久化索引记录访问序列并升级缓存版本。#104 仍保持 open，正式 5000 文档 P95 和长文档验收留待后续切片。
+- #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并，合并提交为 `d109baab2624735b64d2e60d19dc5a7113936cbb`：posting 预算达到上限时按文件最近使用顺序淘汰旧 posting，并将被淘汰文件保留在线性回退集合；索引候选命中会更新 LRU，持久化索引记录访问序列并升级缓存版本。#104 仍保持 open，正式 5000 文档 P95 和长文档验收留待后续切片。
+- PR #264 的 Quality checks `33049962606` 全部通过（前端 lint/覆盖率/构建、浏览器与 Windows 桌面 smoke、依赖/发布检查、Rust fmt/clippy/tests）；无新依赖、无用户可见行为变化、无 Release/安装包。
 - 本轮验证：Rust `commands::tests` 39/39、Rust fmt 和 `cargo clippy --lib -- -D warnings` 通过；无新依赖、无用户可见行为变化、无 Release/安装包。
 - 撤回/重做视口修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6d`。Ctrl+Z/Ctrl+Shift+Z 现在会恢复中央阅读区及 Milkdown/CodeMirror 内部滚动位置，并用文档路径校验避免延迟恢复污染新文档。
 - PR #262 的 Quality checks `33046894608` 全部通过（前端覆盖率、构建、浏览器/Windows 桌面 smoke、依赖、发布元数据和 Rust 门禁）；新增视口单测 2/2、undo/redo E2E 1/1。本次不生成安装包，`v0.9.6` 作为重要体验 Bug 的 patch 候选保留。
@@ -91,7 +92,7 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@dbac7224d1ff188116cf52a9ac441c231ab83b3f`）**
+> **最新检查点（2026-08-27，验证基线：`main@d109baab2624735b64d2e60d19dc5a7113936cbb`）**
 >
 > - #104 的未变化索引快速路径、ASCII 子串候选和工作区文件列表缓存已由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257)、[PR #259](https://github.com/MY-moss/moyang_Reader/pull/259)、[PR #261](https://github.com/MY-moss/moyang_Reader/pull/261) 合并；针对性 Rust 测试、完整 Rust 测试、fmt、clippy、5000 文档回归和对应 Quality checks 均通过。
 > - 本切片保持 Windows x64 范围，不生成新的安装包；当前稳定版本仍为 `v0.9.5`。#104 的正式 P95、索引上限和长文档验收仍未完成。
@@ -100,8 +101,8 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
 > - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
 > - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过。本次不生成安装包，`v0.9.6` 仍是待稳定批次评估的 patch 候选。
-> - 本轮 #104 索引容量切片已在 `codex/search-index-lru-2026-08-27` 完成：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试通过，持久化索引版本升级为 4，旧缓存会安全重建。该分支不生成安装包。
-> - 下一位 AI 的唯一下一步：完成本轮功能分支的 PR/Quality checks/合并后，从最新 `main` 重新检查 Issues，再完成 #104 剩余的正式 5000 文档 P95 和长文档验收；不要重复 #104 已完成的缓存切片、PR #262 或 v0.9.5 发布。
+> - #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试和 Quality checks 通过，持久化索引版本升级为 4，旧缓存会安全重建。本切片不生成安装包。
+> - 下一位 AI 的唯一下一步：从最新 `main@d109baab2624735b64d2e60d19dc5a7113936cbb` 重新检查 Issues，再完成 #104 剩余的正式 5000 文档 P95 和长文档验收；不要重复 #104 已完成的缓存切片、PR #262、PR #264 或 v0.9.5 发布。
 
 ## 历史功能切片快照
 
