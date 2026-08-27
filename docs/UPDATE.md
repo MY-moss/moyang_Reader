@@ -27,11 +27,13 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
-## v0.10.2 发布准备（2026-08-27）
+## v0.10.2 发布记录（2026-08-27）
 
 - 发布范围：#187 的已验收子切片——Windows 最小窗口宽度 720px，以及工具栏真实横向溢出提示；完整响应式断点体系继续保持 open。
-- 当前状态：功能 PR #269 已合并，版本文件统一为 `0.10.2`，版本准备提交等待主线 CI 通过后创建 `v0.10.2` 标签；安装包、签名、`latest.json` 和镜像资产以 Release workflow 成功结果为准。
-- 发布边界：只生成 Windows x64 NSIS 安装包；Cloudflare 静态镜像仍需 #241 所跟踪的仓库 Secrets，缺少凭据时不能把旧镜像当作新版本。
+- 当前状态：功能 PR #269 和版本准备 PR #270 已合并，`v0.10.2` tag 指向 `main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`；GitHub Release 已公开，包含 Windows x64 NSIS 安装包、签名和 `latest.json`。
+- 已核验：Release workflow [33069798614](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614) 的 Windows 发布 job [98508812457](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614/job/98508812457) 成功；安装包 4,873,310 字节，SHA-256 `626df63dadb79b2a9b564a505b4bbacf140a44c88e7ba7899e319d5b7a7ad36d`；`.sig` 428 字节，SHA-256 `0a22446928e600dc3ef854ac500d538f56027f8f074888ed0775e25a64c27748`；`latest.json` 1,411 字节。
+- 在线核验：GitHub 根/版本 manifest 和 Cloudflare 根/版本 manifest 均 HTTP 200，版本均为 `0.10.2`；GitHub 与 Cloudflare 安装包、签名均 HTTP 200，安装包和签名 SHA-256 一致，签名字段存在且下载地址有效。
+- 发布边界：只生成 Windows x64 NSIS 安装包；Release 总 run 因静态镜像子任务失败而显示 failure，原因是仓库 Actions 尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`。动态 Cloudflare 镜像仍可用，版本目录 manifest 当前回退到 GitHub 资产地址；不能把静态镜像子任务记为全绿。旧 v0.10.1 安装实例的完整自动更新重启回归尚未执行。
 
 ## v0.10.1 发布记录（2026-08-27）
 
@@ -60,9 +62,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。因此本次 `v0.10.1` 发布后，根路径和版本路径已在线反映新版本；静态资产同步仍保留版本目录策略作为可选发布路径。
+当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。因此本次 `v0.10.2` 发布后，根路径已在线反映新版本；版本目录 manifest 当前仍回退到 GitHub 资产地址，静态资产同步仍保留版本目录策略作为可选发布路径。
 
-镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.1` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会回退到第二个 GitHub 更新端点。
+镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.2` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会回退到第二个 GitHub 更新端点。
 
 `scripts/mirror-worker.js` 保留为手动应急回滚方案，不是当前默认发布路径。静态镜像部署完成后，工作流会重试检查根 manifest、版本目录 manifest、安装包和 `.sig`，并校验版本、HTTP 状态和安装包大小。
 

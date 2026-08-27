@@ -1,6 +1,6 @@
 # Moyang Reader 版本路线
 
-当前稳定基线：`v0.10.1`，当前发布准备：`v0.10.2`。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 已完成 Windows x64 稳定发布。撤回/重做阅读位置修复已由 PR #262 合并并随 v0.10.1 发布。GitHub 与 Cloudflare 公开资产已核验可用，但 Cloudflare 静态镜像自动部署凭据仍由 #241 跟踪。PR #269 已合并 v0.10.2 的首个 UI 切片，当前正在准备稳定安装包；#187 的完整响应式断点验收仍保持 open。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
+当前稳定基线：`v0.10.2`，下一开发目标：`v0.10.3`。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 已完成 Windows x64 稳定发布。撤回/重做阅读位置修复已由 PR #262 合并并随 v0.10.1 发布。PR #269 已合并 v0.10.2 的首个 UI 切片，PR #270 已完成版本准备并发布 Windows x64 安装包；#187 的完整响应式断点验收仍保持 open。GitHub 与 Cloudflare 动态公开资产已核验可用，但静态镜像部署仍因仓库 Actions Secrets 未配置而失败。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
 
 ## 平台范围收敛
 
@@ -21,7 +21,7 @@
 | v0.9.6  | 已合并、未单独发布：撤回/重做后保持中央阅读区和编辑器内部滚动位置，避免 Ctrl+Z 打断阅读；该修复已随 v0.10.1 稳定安装包发布                                                                                                                                         | 用户反馈、#165（编辑器覆盖相关）                                |
 | v0.10.0 | 双链补全、嵌入、显式块 ID、块引用、属性和关系图筛选                                                                                                                                                                                                                | #109                                                            |
 | v0.10.1 | 已发布：#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU 淘汰及正式验收，合并撤回/重做阅读位置修复；提供 Windows x64 安装包、签名、`latest.json` 和在线更新地址                                                                                 | #104                                                            |
-| v0.10.2 | 发布准备：#187 Windows 紧凑窗口最小宽度 720px、响应式工具栏横向滚动和真实溢出提示已由 PR #269 合并；完整断点体系仍需后续验收                                                                                                                                       | #187                                                            |
+| v0.10.2 | 已发布：#187 Windows 紧凑窗口最小宽度 720px、响应式工具栏横向滚动和真实溢出提示已由 PR #269 合并；完整断点体系仍需后续验收，并已提供 Windows x64 安装包、签名和 manifest                                                                                           | #187                                                            |
 | v0.11.0 | Worker/分批导出、取消、分页和分享模板                                                                                                                                                                                                                              | #87                                                             |
 | v0.12.0 | Windows 发布稳定性：镜像巡检、manifest 完整性、更新器回归、签名评估和安装包体验                                                                                                                                                                                    | #112、#33、#51                                                  |
 | v1.0.0  | Windows x64 核心功能冻结、长期兼容性维护和稳定更新链路                                                                                                                                                                                                             | #52                                                             |
@@ -75,12 +75,15 @@
 - 限制：同一 Release 的镜像子任务 [98470047373](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371/job/98470047373) 在可复用工作流凭据预检前失败且没有执行步骤，原因是仓库尚未配置 #241 所跟踪的 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`；这不影响 GitHub 安装包或当前动态镜像，但自动静态部署链路仍未记为全绿。
 - 未完成边界：本轮核验了 GitHub/Cloudflare 在线更新资源，尚未在已登记的旧 Windows 安装实例上自动点击 v0.9.5→v0.10.1 并重启；#187 完整响应式断点体系仍保持 open。回滚时保留 v0.9.5 Release，修复后发布更高 patch，不删除现有资产。
 
-## v0.10.2 当前切片（#187）
+## v0.10.2 已发布切片（#187 部分范围）
 
 - 已实现：`src-tauri/tauri.conf.json` 的 Windows 最小窗口宽度从 900px 调整为 720px；工具栏在实际 `scrollWidth > clientWidth` 时显示边缘提示和本地化标题，并继续支持横向滚动。
 - 已验证：`npm run lint`、`npm run format:check`、`npm run build` 和 3 条相关 Playwright smoke（390px 溢出提示、390px 正文无横向溢出、顶部菜单互斥）通过；无新依赖，不改变 Markdown 真源、保存和编辑逻辑。
-- 已合并：PR #269 已合并到 `main`，并通过主线 Quality checks；本切片正在准备 v0.10.2 Windows x64 Release、安装包、签名和 `latest.json`。
-- 未完成边界：#187 的完整断点体系、720/840/640/360 全档桌面实机验收仍保持 open；本次发布只覆盖已验收的 720px 最小宽度和真实工具栏溢出提示。
+- 已合并：PR #269 合并到 `main`，版本准备 PR #270 随后合并，`v0.10.2` tag 指向 `main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`。
+- 已发布：Release workflow [33069798614](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614) 的 Windows 发布 job [98508812457](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614/job/98508812457) 成功；[GitHub Release v0.10.2](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.2) 已公开，包含 `latest.json`（1,411 字节）、Windows x64 安装包（4,873,310 字节）和 `.sig`（428 字节）。
+- 已核验：安装包 SHA-256 为 `626df63dadb79b2a9b564a505b4bbacf140a44c88e7ba7899e319d5b7a7ad36d`，`.sig` SHA-256 为 `0a22446928e600dc3ef854ac500d538f56027f8f074888ed0775e25a64c27748`；GitHub 与 Cloudflare 安装包/签名均 HTTP 200，Cloudflare 安装包和签名哈希与 GitHub 一致，根 manifest 和版本 manifest 均报告 `0.10.2`。
+- 发布边界：Release 总 run 因静态镜像子任务失败而显示 failure；Windows 发布 job 成功，Cloudflare 动态镜像可用，但版本目录 manifest 当前回退到 GitHub 资产地址。仓库尚未配置 Cloudflare Pages 静态部署 Secrets，不把该子任务记为全绿。
+- 未完成边界：#187 的完整断点体系、720/840/640/360 全档桌面实机验收仍保持 open；本次发布只覆盖已验收的 720px 最小宽度和真实工具栏溢出提示，尚未在已登记旧 Windows 安装实例上执行 v0.10.1→v0.10.2 的完整自动更新重启回归。
 
 ## v0.9.6 撤回位置修复（已合并，随 v0.10.1 发布）
 
@@ -89,7 +92,7 @@
 - 已合并：由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，`main` 合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6d`；代码、测试、流程文档和路线图在同一功能 PR 中完成。
 - 验证：定向编辑历史视口单测 2/2、相关 lint/format、一次新构建、undo/redo 浏览器 E2E 1/1、Windows 桌面 smoke、依赖/发布检查和 Rust 门禁均通过；本切片未单独生成安装包，修复已纳入 v0.10.1 稳定发布。
 
-## UI 与交互深化方向（v0.10.2 候选切片）
+## UI 与交互深化方向（v0.10.3 候选切片）
 
 按“先统一令牌、再做微交互、最后做高级动效”的顺序推进，每项独立成切片、可单独验收：
 
