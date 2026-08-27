@@ -100,6 +100,15 @@ git push origin v0.9.0
 - 已登记的 v0.9.2 Windows 安装实例已通过应用内更新升级到 v0.9.3；注册表 `DisplayVersion`、文件 `ProductVersion` 和运行进程版本均为 v0.9.3，更新前后进程 PID 不同。
 - Release 镜像子任务 [98365959782](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据检查阶段失败；公开镜像当前可用不等于本次自动部署 workflow 全绿，#241 暂不关闭。
 
+## v0.9.4 在线核验记录（2026-08-27）
+
+- GitHub Release：[v0.9.4](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.4)，发布 workflow [33030470944](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 的 Windows 构建/发布 job 成功；质量门禁和 Rust 依赖审计也已通过。
+- `latest.json`：1,401 字节，SHA-256 `c12f59118f31ce2a4638e14d691b36d90079bbf119bdf9fcc1aef726919b804`。
+- Windows x64 NSIS 安装包：4,867,204 字节，SHA-256 `dd59f1f7b70b77df118672e4ce0ffe5af92f5895e5b54fcb962067a08418fe6b`；`.sig`：424 字节，SHA-256 `4cc07d181afa855172f3ffdb688c0bb110c0ccd48fe166cbb94b3a138e457838`。
+- Cloudflare Pages 的根 manifest、`/v0.9.4/` 安装包和 `.sig` 均 HTTP 200；镜像安装包和签名的大小及 SHA-256 与 GitHub Release 一致，镜像 manifest 版本为 `0.9.4`，下载地址指向镜像。
+- 已登记的 v0.9.3 Windows 安装实例已通过应用内更新升级到 v0.9.4；签名校验、替换和自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion`、运行进程和页面版本均为 v0.9.4。
+- Release 镜像子任务 [98382698574](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；公开镜像当前可用不等于本次自动部署 workflow 全绿，#241 暂不关闭。
+
 ## v0.8.2 在线核验记录
 
 - GitHub Release：[v0.8.2](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.8.2)，Release workflow [32900250651](https://github.com/MY-moss/moyang_Reader/actions/runs/32900250651) 全部通过。

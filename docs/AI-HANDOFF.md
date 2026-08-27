@@ -69,18 +69,18 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@51eaa1643f0a0fc08aee419a3cab42c126056887`）**
+> **最新检查点（2026-08-27，验证基线：`main@2b35c83f6d03c7faaa20baa1b4771b1454958610`）**
 >
-> - 稳定基线仍为 `v0.9.3`；[PR #250](https://github.com/MY-moss/moyang_Reader/pull/250) 已将 #183 合并到 `main`，合并提交为 `51eaa1643f0a0fc08aee419a3cab42c126056887`。当前分支是 `codex/release-v0.9.4-2026-08-27`，用于版本同步和稳定发布；#241 的 Cloudflare Secrets 外部前置仍未混入本切片实现。
+> - 稳定基线已升级为 `v0.9.4`；[PR #250](https://github.com/MY-moss/moyang_Reader/pull/250) 已将 #183 合并到 `main`，版本准备 [PR #251](https://github.com/MY-moss/moyang_Reader/pull/251) 随后合并，当前 `main` 合并提交为 `2b35c83f6d03c7faaa20baa1b4771b1454958610`。#241 的 Cloudflare Secrets 外部前置仍未解决。
 > - v0.9.3 已包含 Windows PDF 当前文档保存、Edge headless 渲染、有效 PDF 文件头校验、原子替换和真实桌面 smoke；Markdown、TXT、Word、PDF、图片既有打开行为保持不变。
-> - 发布 workflow [33025181022](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 的 Windows 构建/发布 job 成功；GitHub Release [v0.9.3](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.3) 已上传 `latest.json`（1,401 字节）、Windows x64 NSIS 安装包（4,856,795 字节）和 `.sig`（424 字节）。安装包 SHA-256 为 `255ccfb5236b1516ea0c31c9ca66c34bfe896571984be77a5ebb1bb575af0b3c`，`.sig` SHA-256 为 `45f8aa9ebb017dd83a7b6a4bb29db3bf33691cb97bfd1e448065fac22c4c0d5d`，manifest SHA-256 为 `7fd5a1250a8fa192a3e66bf7d59c4dd92d02e3724e5bf9c8cb4a90f7650f10c2`。
-> - v0.9.3 发布门禁曾通过；#183 新增验证为前端完整测试 176 项、缓存/桥接针对性测试 7 项、lint、format、构建、浏览器 E2E 38 项、Windows 桌面 E2E 10 项、Rust fmt/clippy/37 个 Rust tests。
-> - 已登记的 Windows x64 v0.9.2 安装实例已实际点击更新到 v0.9.3；下载、签名校验、替换、自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion` 和运行进程版本均为 v0.9.3，更新前后进程 PID 不同。未登记的旧副本不计入回归。
-> - Cloudflare 根 manifest、`/v0.9.3/` 安装包和 `.sig` 均 HTTP 200，大小和 SHA-256 与 GitHub Release 一致；但 Release 镜像子任务 [98365959782](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 在 `Require Cloudflare credentials` 阶段因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败。公开镜像在线不等于自动部署 workflow 全绿，不能把该子任务记录为成功，也不能把令牌写入文档。
-> - #241 保持 open，仅等待维护者在 GitHub Actions Secrets 中安全配置 Cloudflare 凭据后，重跑同一版本镜像 workflow 并确认自动同步全绿；GitHub Release、签名资产和当前 v0.9.3 公开镜像已经可用。
+> - v0.9.4 发布 workflow [33030470944](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 的 Windows 构建/发布 job [98381570060](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944/job/98381570060) 成功；GitHub Release [v0.9.4](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.4) 已上传 `latest.json`（1,401 字节）、Windows x64 NSIS 安装包（4,867,204 字节）和 `.sig`（424 字节）。安装包 SHA-256 为 `dd59f1f7b70b77df118672e4ce0ffe5af92f5895e5b54fcb962067a08418fe6b`，`.sig` SHA-256 为 `4cc07d181afa855172f3ffdb688c0bb110c0ccd48fe166cbb94b3a138e457838`，manifest SHA-256 为 `c12f59118f31ce2a4638e14d691b36d90079bbf119bdf9fcc1aef726919b804`。
+> - v0.9.4 发布门禁全部通过：质量门禁 run [33029947556](https://github.com/MY-moss/moyang_Reader/actions/runs/33029947556) 成功，Rust 依赖审计 run [33029950442](https://github.com/MY-moss/moyang_Reader/actions/runs/33029950442) 成功；本地和 PR 验证保持前端完整测试 176 项、缓存/桥接针对性测试 7 项、浏览器 E2E 38 项、Windows 桌面 E2E 10 项、Rust 37 个 tests，以及 lint、format、构建、fmt/clippy 全部通过。
+> - 已登记的 Windows x64 v0.9.3 安装实例已实际点击更新到 v0.9.4；下载、签名校验、替换、自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion` 和运行进程版本均为 v0.9.4，安装文件大小为 15,232,000 字节。未登记的旧副本不计入回归。
+> - Cloudflare 根 manifest、`/v0.9.4/` 安装包和 `.sig` 均 HTTP 200；镜像安装包（4,867,204 字节）和 `.sig`（424 字节）与 GitHub Release 的 SHA-256 完全一致，镜像 manifest 版本为 `0.9.4` 且下载地址指向镜像。Release 镜像子任务 [98382698574](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 仍因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；公开镜像在线不等于自动部署 workflow 全绿，不能把该子任务记录为成功，也不能把令牌写入文档。
+> - #241 保持 open，仅等待维护者在 GitHub Actions Secrets 中安全配置 Cloudflare 凭据后，重跑镜像 workflow 并确认自动同步全绿；GitHub Release、签名资产和当前 v0.9.4 公开镜像已经可用。
 > - 当前发布切片：v0.9.4 / #183；已加入会话级有界文档缓存、轻量文件标记命令、变更/保存/关闭失效边界及针对性测试；缓存不写盘、不改变 Markdown 真源。
-> - 本地和远程代码门禁已通过：本地新增提交 `9f69003`，push Quality checks run `33028498563` 全绿；真实 Windows 桌面 E2E 10 项通过。当前尚未创建 v0.9.4 tag/Release，安装包和镜像在线验证必须在本发布分支合并后完成。
-> - 下一位 AI 的唯一下一步：审查版本号和 CHANGELOG，运行 `npm run release:check -- --version=v0.9.4`、发布相关完整门禁后推送分支并创建一个 PR；Quality checks 全绿且无真实冲突时按流程合并，再创建 v0.9.4 tag/Release，并补写安装包、镜像和旧版本更新结果。#241 仍保持 open，不把镜像凭据写入仓库或上下文。
+> - v0.9.4 tag、Release、Windows x64 安装包、签名和 `latest.json` 已完成；旧 v0.9.3 安装实例已完成应用内更新回归。镜像静态资产目前在线且内容一致，但自动镜像子任务仍受 #241 阻塞。
+> - 下一位 AI 的唯一下一步：从最新 `main@2b35c83f6d03c7faaa20baa1b4771b1454958610` 创建新的 `codex/<scope>-<date>` 分支，先检查 Issues，再从 Ready backlog 选择一个独立功能切片；不要重复 v0.9.4 发布，也不要把 #241 的凭据写入仓库或上下文。
 
 > **历史检查点（2026-08-27，v0.9.2；优先级低于上方当前检查点）**
 >
