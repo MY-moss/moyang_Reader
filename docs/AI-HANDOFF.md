@@ -1,12 +1,15 @@
 # AI 开发与交接流程
 
-## 进行中的 v0.10.6 发布准备（2026-08-28）
+## 已完成发布切片（2026-08-28，v0.10.6）
 
-- 目标：将 PR #281 已合并的文件/文件夹右键管理与正文编辑动作作为稳定 Windows x64 patch 发布。
-- 基线：功能 PR #281 已 squash 合并到 main@10f4977539be1430b22916915c0758fa7ccb6506；功能分支的最终远程提交为 30ef871e6335b6d7ff0a2efb423e3d53dff5182b。
-- 已通过门禁：PR CI 33118796197 与 main CI 33119469014 的前端、Rust、构建、浏览器 smoke、Windows 桌面 smoke、依赖审计和发布预检均成功。
-- 发布边界：仅发布 Windows x64 安装包、.sig、latest.json 和镜像资产；不上传私钥，不处理 #241 的 PDF 文件落盘回归。
-- 当前状态：版本准备分支正在更新版本号、CHANGELOG 和交接文档；下一步创建版本 PR，门禁通过后合并、创建 v0.10.6 Release，并验证 GitHub/Cloudflare 更新资产。
+- 目标：将 PR #281 的文件/文件夹右键管理与正文编辑动作作为稳定 Windows x64 patch 发布。
+- 基线：功能 PR #281 与版本准备 PR [#282](https://github.com/MY-moss/moyang_Reader/pull/282) 已合并；发布提交为 main@ec64aa7909f62c99ba25a6720080fdeeb8a7d84d，tag 为 v0.10.6。
+- 质量门禁：PR Quality checks 33120355283、PR Rust dependency audit 33120398093、main CI 33120915721、main Rust audit 33120915661，以及 Release Quality gate 均成功。
+- 发布资产：Release workflow 33121420237 的 Windows 构建/发布 job 98688939326 成功；安装包 4,900,782 字节，SHA-256 `799cc6b826dae0c67882e764505279247439941d69e49ec7d65f59bf983b43f1`；`.sig` 428 字节，SHA-256 `fb432b0cc3e8af2077d9d8a181237e1a66cb6df914e2929069be0e39e17b8f99`；latest.json 1,411 字节，SHA-256 `37ffcbeee4f07532c5188e4193b545b4142bd2e17213d83f14afee77e6fadbeb`。
+- 在线核验：GitHub Release 和 Cloudflare 动态镜像的 manifest、安装包、签名均 HTTP 200；动态镜像版本为 0.10.6，资产大小和 SHA-256 一致。
+- 镜像边界：静态镜像子 job 98690424253 因仓库未配置 Cloudflare Secrets 失败；未上传私钥或 Cloudflare 凭据。后续若要让静态 Pages workflow 变绿，需维护者在 GitHub Secrets 中配置凭据后重新运行。
+- 已知事项：#241 的 PDF 文件落盘/旧更新器实机回归和 #232 的剩余桌面交互范围保持 open。
+- 交接：本切片已完成；下一位 AI 只能从已确认的 Ready backlog 选择单一切片，不重复发布 v0.10.6，不扩大范围。
 
 ## 已完成发布切片（2026-08-28，v0.10.5）
 
