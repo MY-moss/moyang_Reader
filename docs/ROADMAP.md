@@ -1,6 +1,6 @@
 # Moyang Reader 版本路线
 
-当前稳定基线：`v0.9.5`，当前发布候选：`v0.10.1`。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 版本准备等待稳定发布 workflow。撤回/重做阅读位置修复已由 PR #262 合并。GitHub 与 Cloudflare 公开资产已核验一致，但 Cloudflare 自动镜像凭据仍由 #241 跟踪。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
+当前稳定基线：`v0.10.1`，下一开发目标：`v0.10.2`。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 已完成 Windows x64 稳定发布。撤回/重做阅读位置修复已由 PR #262 合并并随 v0.10.1 发布。GitHub 与 Cloudflare 公开资产已核验可用，但 Cloudflare 静态镜像自动部署凭据仍由 #241 跟踪。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
 
 ## 平台范围收敛
 
@@ -18,9 +18,9 @@
 | v0.9.3  | 已发布：Windows PDF 文件真实落盘、旧版本更新器 v0.9.2→v0.9.3 实机回归、Release/manifest/签名和 Cloudflare v0.9.3 公开资产核验；自动镜像 workflow 仍等待 Cloudflare Secrets 配置后全绿                                                                              | #241                                                            |
 | v0.9.4  | 已发布：标签页文档缓存；按路径、文件大小和修改时间校验，最多 32 条且总内存预算 64 MiB，监听变更/保存/关闭时失效；已完成 Release、镜像资产和旧版自动更新核验，自动镜像 Secrets 仍由 #241 跟踪                                                                       | #183、#241                                                      |
 | v0.9.5  | 已发布：修复右侧目录在中央滚动容器中的跳转、清理侧栏嵌套滚动条、补齐左右侧栏拖拽/键盘调宽、快捷键开关和本机布局记忆；#187 的完整响应式断点验收仍保持 open                                                                                                          | #187                                                            |
-| v0.9.6  | 已合并、未发布：撤回/重做后保持中央阅读区和编辑器内部滚动位置，避免 Ctrl+Z 打断阅读；稳定 patch 安装包待发布批次决定                                                                                                                                               | 用户反馈、#165（编辑器覆盖相关）                                |
+| v0.9.6  | 已合并、未单独发布：撤回/重做后保持中央阅读区和编辑器内部滚动位置，避免 Ctrl+Z 打断阅读；该修复已随 v0.10.1 稳定安装包发布                                                                                                                                         | 用户反馈、#165（编辑器覆盖相关）                                |
 | v0.10.0 | 双链补全、嵌入、显式块 ID、块引用、属性和关系图筛选                                                                                                                                                                                                                | #109                                                            |
-| v0.10.1 | 发布候选：#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU 淘汰及正式验收已完成并关闭；合并 v0.10.1 版本准备后生成 Windows x64 稳定安装包                                                                                                       | #104                                                            |
+| v0.10.1 | 已发布：#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU 淘汰及正式验收，合并撤回/重做阅读位置修复；提供 Windows x64 安装包、签名、`latest.json` 和在线更新地址                                                                                 | #104                                                            |
 | v0.10.2 | UI 视觉与微交互深化批次（见下方“UI 与交互深化方向”）                                                                                                                                                                                                               | 待建 Issue                                                      |
 | v0.11.0 | Worker/分批导出、取消、分页和分享模板                                                                                                                                                                                                                              | #87                                                             |
 | v0.12.0 | Windows 发布稳定性：镜像巡检、manifest 完整性、更新器回归、签名评估和安装包体验                                                                                                                                                                                    | #112、#33、#51                                                  |
@@ -60,7 +60,7 @@
 - 已核验：Cloudflare 根 manifest、`/v0.9.5/` 安装包和 `.sig` 均 HTTP 200，版本为 `0.9.5`，安装包和签名的大小、SHA-256 与 GitHub 一致；自动镜像 job [98402066927](https://github.com/MY-moss/moyang_Reader/actions/runs/33036785808/job/98402066927) 因 #241 缺少 Secrets 失败。
 - 未完成边界：当前登记的旧实例为 v0.9.4，本轮完成在线更新资源核验，尚未自动点击 v0.9.4→v0.9.5 并重启；#187 完整响应式断点体系仍保持 open。
 
-## v0.10.1 已完成切片（#104，未发布）
+## v0.10.1 已完成切片与发布记录（#104）
 
 - 已完成：搜索索引在工作区文件快照未变化时复用现有索引，跳过重复的逐文件元数据检查和重复持久化；watcher、保存和显式刷新仍负责失效，搜索结果保持不变。由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257) 合并，`main` 合并提交为 `2d2209e35a2e45b66a0455edfcfba7074f4036ff`。
 - 已完成：ASCII 非完整词查询复用已有 posting 生成候选，最终仍按 substring 规则确认结果；读取失败文件进入回退集合，watcher 事件先失效 Rust 缓存，未启用 watcher 时保留直接文件修改检测。由 [PR #259](https://github.com/MY-moss/moyang_Reader/pull/259) 合并，`main` 合并提交为 `a1c986c1bf5f54bcd32468e4147ad9674129ddc6`。
@@ -69,14 +69,18 @@
 - 已验证：PR #257/#259/#261 的针对性搜索/工作区测试、完整 Rust 测试、Rust fmt、clippy 与 Windows Quality checks 均通过；本轮新增 LRU 回归也通过，持久化索引格式升级为版本 4，旧缓存会安全重建。
 - 已完成正式验收：5000 篇每篇至少 2 KiB、混合中英文的文档在暖缓存查询中执行 20 次 P95 计时；本机记录为 38 ms，测试门槛为 P95 <100 ms。超出单文件索引 token 上限的长文档保留在线性回退集合，短文档仍可使用倒排索引，索引不会被整体关闭；PR #266 已合并，#104 已关闭。
 - 本切片只增加验收回归测试和交接记录，不改变搜索结果、用户文档格式、依赖或运行时产品功能；版本准备与稳定发布另行执行。
-- 发布边界：v0.10.1 将统一承载本性能验收和 v0.9.6 阅读位置修复，生成 Windows x64 安装包、更新 manifest 和镜像资产；当前仍以发布 workflow 的实际结果为准。
+- 已发布：版本准备 [PR #267](https://github.com/MY-moss/moyang_Reader/pull/267) 已合并，`v0.10.1` tag 指向 `main@0e8b4e9d5ea2471b6a318fec6335f8e7a2dc000d`；[GitHub Release v0.10.1](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.1) 已公开。
+- 已核验：Release workflow [33057606371](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371) 的 Windows 构建/发布 job [98468201360](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371/job/98468201360) 成功；安装包 4,876,807 字节，SHA-256 `2e386893e2026986c684ede967d9758b0e52c0c990adc1d65ad7ef6171395a10`；`.sig` 428 字节，SHA-256 `03ba73d07dab409ce2bf16b0b3de76d40fca40690ecf8ee8613299ec06c671f8`；`latest.json` 1,411 字节，SHA-256 `f1ea49a293ef785d428e8fb5e3a1472341da2bd0d4053e3deda1a67d50caf0cc`。
+- 已核验：GitHub Release 和 Cloudflare 根 manifest、`/v0.10.1/` 安装包及 `.sig` 均 HTTP 200，manifest 版本均为 `0.10.1`，镜像 URL 指向当前版本；Cloudflare 公开地址实际通过轻量代理读取最新 GitHub Release。
+- 限制：同一 Release 的镜像子任务 [98470047373](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371/job/98470047373) 在可复用工作流凭据预检前失败且没有执行步骤，原因是仓库尚未配置 #241 所跟踪的 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`；这不影响 GitHub 安装包或当前动态镜像，但自动静态部署链路仍未记为全绿。
+- 未完成边界：本轮核验了 GitHub/Cloudflare 在线更新资源，尚未在已登记的旧 Windows 安装实例上自动点击 v0.9.5→v0.10.1 并重启；#187 完整响应式断点体系仍保持 open。回滚时保留 v0.9.5 Release，修复后发布更高 patch，不删除现有资产。
 
-## v0.9.6 撤回位置修复（已合并，未发布）
+## v0.9.6 撤回位置修复（已合并，随 v0.10.1 发布）
 
 - 目标：撤回/重做时捕获并恢复中央 `.content-area` 以及 Milkdown/CodeMirror 内部滚动面，避免编辑器状态更新或重新聚焦把用户带回文档顶部。
 - 边界：不改变撤回/重做历史、Markdown 真源、布局和依赖；文档切换时使用路径校验，延迟恢复不会污染新文档。
 - 已合并：由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，`main` 合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6d`；代码、测试、流程文档和路线图在同一功能 PR 中完成。
-- 验证：定向编辑历史视口单测 2/2、相关 lint/format、一次新构建、undo/redo 浏览器 E2E 1/1、Windows 桌面 smoke、依赖/发布检查和 Rust 门禁均通过；本切片不生成安装包，后续按重要体验 Bug 的 patch 规则决定是否发布 `v0.9.6`。
+- 验证：定向编辑历史视口单测 2/2、相关 lint/format、一次新构建、undo/redo 浏览器 E2E 1/1、Windows 桌面 smoke、依赖/发布检查和 Rust 门禁均通过；本切片未单独生成安装包，修复已纳入 v0.10.1 稳定发布。
 
 ## UI 与交互深化方向（v0.10.2 候选切片）
 
