@@ -79,6 +79,7 @@ v0.10.2 已发布：包含紧凑 Windows 窗口可用性和工具栏溢出提示
 - 内置文档适配器注册表统一格式能力，后续可在不改动阅读主流程的情况下接入新格式
 - 核心工具栏和设置区支持简体中文/English 切换；未迁移的状态和错误文案按中文安全回退
 - 更新安装失败后会在下次启动提示保留当前版本、不要降级并等待更高补丁版本；发布前置会校验双更新端点和镜像工作流
+- 首次启动提供轻量“快速上手”教程，空白页和设置中都可重新打开；设置会显示保存状态，并在 Windows 桌面端使用应用配置文件作为本机持久化兜底
 
 生产构建会把 Markdown、DOCX 适配器拆成按需加载的 chunk：空白启动页不需要加载完整文档解析器，打开对应类型时才加载。
 
@@ -111,6 +112,8 @@ npm run desktop
 更新链路、版本规则、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”；当前已支持应用内分页版式预览，后续继续补充更完整的 PDF 模板和附件处理。
 
 顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；远程图片设置立即应用，启动更新检查设置从下一次启动生效，手动更新按钮不受影响。更新下载中可以隐藏提示，并从顶部“下载中…”入口恢复进度查看。
+
+第一次使用请阅读 [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md)；其中包含打开文件、添加多个阅读库、编辑、设置保存、导出和更新说明。
 
 贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
 

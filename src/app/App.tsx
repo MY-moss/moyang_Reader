@@ -19,6 +19,7 @@ import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
+import { GettingStartedDialog } from "./components/GettingStartedDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
@@ -50,6 +51,7 @@ import {
   listWorkspaceFiles,
   openExternalUrl,
   readBinaryFile,
+  readAppSettings,
   readTextFile,
   refreshWorkspace,
   resolveOpenPaths,
@@ -59,6 +61,7 @@ import {
   subscribeToCloseRequest,
   subscribeToOpenPaths,
   writeBinaryFile,
+  writeAppSettings,
   writeTextFile,
 } from "./bridge";
 import type { Update } from "@tauri-apps/plugin-updater";
@@ -150,6 +153,16 @@ import {
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
+import {
+  createAppSettingsSnapshot,
+  loadAppSettingsSnapshot,
+  parseAppSettings,
+  saveAppSettingsSnapshot,
+  serializeAppSettings,
+  type AppSettingsSnapshot,
+  type SettingsPersistenceStatus,
+} from "./app-settings";
+import { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";
 import {
   documentKindFromPath,
   emptyRenderedDocument,
@@ -393,6 +406,11 @@ type CachedWorkspace = {
 
 type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
 
+type PendingAppSettingsWrite = {
+  snapshot: AppSettingsSnapshot;
+  localSaved: boolean;
+};
+
 function updateCachedWorkspace(
   cache: Map<string, CachedWorkspace>,
   root: string,
@@ -422,6 +440,7 @@ function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: Recen
 }
 
 export function App() {
+  const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
   const [sourceDraft, setSourceDraft] = useState("");
@@ -433,14 +452,22 @@ export function App() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
-  const [theme, setTheme] = useState<ThemeMode>(readSavedTheme);
-  const [locale, setLocale] = useState<Locale>(loadLocale);
+  const [theme, setTheme] = useState<ThemeMode>(() => storedAppSettings?.theme ?? readSavedTheme());
+  const [locale, setLocale] = useState<Locale>(() => storedAppSettings?.locale ?? loadLocale());
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
-  const [rightPanelOpen, setRightPanelOpen] = useState(loadContextPanelOpen);
-  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(loadContextPanelTab);
-  const [paneWidths, setPaneWidths] = useState(loadPaneWidths);
-  const [preferences, setPreferences] = useState<ReaderPreferences>(loadReaderPreferences);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => storedAppSettings?.sidebarCollapsed ?? loadSidebarCollapsed(),
+  );
+  const [rightPanelOpen, setRightPanelOpen] = useState(
+    () => storedAppSettings?.rightPanelOpen ?? loadContextPanelOpen(),
+  );
+  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(
+    () => storedAppSettings?.activeContextTab ?? loadContextPanelTab(),
+  );
+  const [paneWidths, setPaneWidths] = useState(() => storedAppSettings?.paneWidths ?? loadPaneWidths());
+  const [preferences, setPreferences] = useState<ReaderPreferences>(
+    () => storedAppSettings?.preferences ?? loadReaderPreferences(),
+  );
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
@@ -455,6 +482,9 @@ export function App() {
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
+  const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
+  const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -515,6 +545,12 @@ export function App() {
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
   const pendingHeadingRef = useRef<string | null>(null);
+  const nativeSettingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingAppSettingsWriteRef = useRef<PendingAppSettingsWrite | null>(null);
+  const appSettingsFlushTimerRef = useRef<number | null>(null);
+  const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const settingsWriteRevisionRef = useRef(0);
+  const settingsCloseInFlightRef = useRef(false);
 
   const updateReadingRail = useCallback(() => {
     const contentArea = contentAreaRef.current;
@@ -547,6 +583,47 @@ export function App() {
     }));
   }, []);
 
+  const enqueueNativeSettingsWrite = useCallback((pending: PendingAppSettingsWrite): Promise<boolean> => {
+    const revision = ++settingsWriteRevisionRef.current;
+    const nativeWrite = nativeSettingsWriteQueueRef.current
+      .catch(() => undefined)
+      .then(() => writeAppSettings(serializeAppSettings(pending.snapshot)));
+    const result = nativeWrite.then(
+      () => {
+        if (revision === settingsWriteRevisionRef.current) {
+          setSettingsPersistenceStatus(pending.localSaved ? "saved" : "fallback");
+        }
+        return true;
+      },
+      () => {
+        if (revision === settingsWriteRevisionRef.current) {
+          setSettingsPersistenceStatus(pending.localSaved ? "fallback" : "error");
+        }
+        return false;
+      },
+    );
+    nativeSettingsWriteQueueRef.current = result.then(() => undefined);
+    lastNativeSettingsWriteRef.current = result;
+    return result;
+  }, []);
+
+  const flushAppSettings = useCallback(async (): Promise<boolean> => {
+    if (!isTauriRuntime()) return true;
+
+    const timer = appSettingsFlushTimerRef.current;
+    if (timer !== null) {
+      window.clearTimeout(timer);
+      appSettingsFlushTimerRef.current = null;
+    }
+
+    const pending = pendingAppSettingsWriteRef.current;
+    if (pending) {
+      pendingAppSettingsWriteRef.current = null;
+      return enqueueNativeSettingsWrite(pending);
+    }
+    return lastNativeSettingsWriteRef.current;
+  }, [enqueueNativeSettingsWrite]);
+
   const navigateToHeading = useCallback(
     (item: TocItem) => {
       pendingHeadingRef.current = item.id;
@@ -561,11 +638,10 @@ export function App() {
   );
 
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
-    setPreferences((current) => {
-      const next = { ...current, ...changes };
-      saveReaderPreferences(next);
-      return next;
-    });
+    const next = { ...preferencesRef.current, ...changes };
+    preferencesRef.current = next;
+    saveReaderPreferences(next);
+    setPreferences(next);
   }, []);
 
   const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {
@@ -689,16 +765,28 @@ export function App() {
 
   const cancelCloseConfirmation = useCallback(() => {
     closeConfirmationOpenRef.current = false;
+    settingsCloseInFlightRef.current = false;
     setCloseConfirmationOpen(false);
   }, []);
 
   const confirmClose = useCallback(() => {
     closeConfirmationOpenRef.current = false;
     setCloseConfirmationOpen(false);
-    void closeWindow().catch((cause) => {
-      setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
-    });
-  }, []);
+    settingsCloseInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (!(await flushAppSettings())) {
+          setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+          return;
+        }
+        await closeWindow();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+      } finally {
+        settingsCloseInFlightRef.current = false;
+      }
+    })();
+  }, [flushAppSettings]);
 
   const exportPortableSettings = useCallback(async () => {
     try {
@@ -746,6 +834,7 @@ export function App() {
           saveMountedWorkspaces([...bundle.mountedWorkspaces]);
           saveWorkspacePath(bundle.workspacePath);
           saveLastDocumentPath(bundle.lastDocumentPath);
+          preferencesRef.current = bundle.preferences;
           setPreferences(bundle.preferences);
           setLocale(bundle.locale);
           saveLocale(bundle.locale);
@@ -771,6 +860,95 @@ export function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    void readAppSettings()
+      .then((serialized) => {
+        if (!active) return;
+        const nativeSnapshot = serialized ? parseAppSettings(serialized) : null;
+        if (nativeSnapshot && (!storedAppSettings || nativeSnapshot.savedAt > storedAppSettings.savedAt)) {
+          preferencesRef.current = nativeSnapshot.preferences;
+          setPreferences(nativeSnapshot.preferences);
+          setTheme(nativeSnapshot.theme);
+          setLocale(nativeSnapshot.locale);
+          setSidebarCollapsed(nativeSnapshot.sidebarCollapsed);
+          setRightPanelOpen(nativeSnapshot.rightPanelOpen);
+          setActiveContextTab(nativeSnapshot.activeContextTab);
+          setPaneWidths(nativeSnapshot.paneWidths);
+        }
+        setNativeSettingsReady(true);
+      })
+      .catch(() => {
+        // Older installations may not have a native settings file yet. Legacy local storage remains usable.
+        if (active) setNativeSettingsReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [storedAppSettings]);
+
+  useEffect(() => {
+    if (!nativeSettingsReady) return;
+
+    const snapshot = createAppSettingsSnapshot({
+      preferences,
+      theme,
+      locale,
+      sidebarCollapsed,
+      rightPanelOpen,
+      activeContextTab,
+      paneWidths,
+    });
+    const localResult = saveAppSettingsSnapshot(
+      {
+        preferences,
+        theme,
+        locale,
+        sidebarCollapsed,
+        rightPanelOpen,
+        activeContextTab,
+        paneWidths,
+      },
+      snapshot.savedAt,
+    );
+
+    if (!isTauriRuntime()) {
+      setSettingsPersistenceStatus(localResult.ok ? "saved" : "error");
+      return;
+    }
+
+    pendingAppSettingsWriteRef.current = { snapshot, localSaved: localResult.ok };
+    const timer = window.setTimeout(
+      () => {
+        appSettingsFlushTimerRef.current = null;
+        const pending = pendingAppSettingsWriteRef.current;
+        pendingAppSettingsWriteRef.current = null;
+        if (pending) void enqueueNativeSettingsWrite(pending);
+      },
+      localResult.ok ? 220 : 0,
+    );
+    appSettingsFlushTimerRef.current = timer;
+    setSettingsPersistenceStatus("saving");
+
+    return () => {
+      window.clearTimeout(timer);
+      if (appSettingsFlushTimerRef.current === timer) appSettingsFlushTimerRef.current = null;
+    };
+  }, [
+    activeContextTab,
+    enqueueNativeSettingsWrite,
+    locale,
+    nativeSettingsReady,
+    paneWidths,
+    preferences,
+    rightPanelOpen,
+    sidebarCollapsed,
+    theme,
+  ]);
 
   useEffect(() => {
     documentCacheRef.current.clear();
@@ -939,7 +1117,7 @@ export function App() {
     let active = true;
     let unlisten: (() => void) | null = null;
     const handleCloseRequest = () => {
-      if (closeConfirmationOpenRef.current) return;
+      if (closeConfirmationOpenRef.current || settingsCloseInFlightRef.current) return;
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
         const result = saveDraftSnapshot({
@@ -955,9 +1133,20 @@ export function App() {
         setCloseConfirmationOpen(true);
         return;
       }
-      void closeWindow().catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
-      });
+      settingsCloseInFlightRef.current = true;
+      void (async () => {
+        try {
+          if (!(await flushAppSettings())) {
+            if (active) setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+            return;
+          }
+          await closeWindow();
+        } catch (cause) {
+          if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+        } finally {
+          settingsCloseInFlightRef.current = false;
+        }
+      })();
     };
 
     void subscribeToCloseRequest(handleCloseRequest).then((dispose) => {
@@ -972,7 +1161,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [handleDraftSaveResult]);
+  }, [flushAppSettings, handleDraftSaveResult]);
 
   useEffect(() => {
     workspacePathRef.current = workspacePath;
@@ -1801,6 +1990,21 @@ export function App() {
     }
     inputRef.current?.click();
   }, [handleOpenPaths]);
+
+  const closeGettingStarted = useCallback(() => {
+    markGettingStartedSeen();
+    setGuideOpen(false);
+  }, []);
+
+  const openDocumentFromGuide = useCallback(() => {
+    closeGettingStarted();
+    void openSelectedFile();
+  }, [closeGettingStarted, openSelectedFile]);
+
+  const addWorkspaceFromGuide = useCallback(() => {
+    closeGettingStarted();
+    void handleChooseWorkspace();
+  }, [closeGettingStarted, handleChooseWorkspace]);
 
   const saveDocument = useCallback(async (allowExternalOverwrite = false) => {
     const current = documentStateRef.current;
@@ -3598,6 +3802,8 @@ export function App() {
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
         onExportSettings={() => void exportPortableSettings()}
         onImportSettings={importPortableSettings}
+        onOpenGuide={() => setGuideOpen(true)}
+        settingsPersistenceStatus={settingsPersistenceStatus}
         onOpen={() => void openSelectedFile()}
         onAddWorkspace={() => void handleChooseWorkspace()}
         workspaceOpen={Boolean(workspacePath)}
@@ -3798,6 +4004,7 @@ export function App() {
             <EmptyState
               onOpen={() => void openSelectedFile()}
               onChooseWorkspace={() => void handleChooseWorkspace()}
+              onOpenGuide={() => setGuideOpen(true)}
               hasWorkspace={Boolean(workspacePath)}
               showWorkspaceAction={!workspacePath && !sidebarCollapsed}
             />
@@ -3992,6 +4199,14 @@ export function App() {
       {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
       {externalOverwriteConfirmationOpen && (
         <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
+      )}
+      {guideOpen && (
+        <GettingStartedDialog
+          locale={locale}
+          onClose={closeGettingStarted}
+          onOpenDocument={openDocumentFromGuide}
+          onAddWorkspace={addWorkspaceFromGuide}
+        />
       )}
     </div>
   );

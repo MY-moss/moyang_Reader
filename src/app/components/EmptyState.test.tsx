@@ -14,6 +14,7 @@ function renderEmptyState(hasWorkspace: boolean, showWorkspaceAction: boolean) {
       <EmptyState
         onOpen={() => {}}
         onChooseWorkspace={() => {}}
+        onOpenGuide={() => {}}
         hasWorkspace={hasWorkspace}
         showWorkspaceAction={showWorkspaceAction}
       />,

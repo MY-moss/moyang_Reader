@@ -3,9 +3,16 @@ type EmptyStateProps = {
   onChooseWorkspace: () => void;
   hasWorkspace: boolean;
   showWorkspaceAction: boolean;
+  onOpenGuide: () => void;
 };
 
-export function EmptyState({ onOpen, onChooseWorkspace, hasWorkspace, showWorkspaceAction }: EmptyStateProps) {
+export function EmptyState({
+  onOpen,
+  onChooseWorkspace,
+  hasWorkspace,
+  showWorkspaceAction,
+  onOpenGuide,
+}: EmptyStateProps) {
   return (
     <section className="empty-state" aria-labelledby="empty-title">
       <div className="empty-mark" aria-hidden="true">
@@ -34,6 +41,9 @@ export function EmptyState({ onOpen, onChooseWorkspace, hasWorkspace, showWorksp
             添加整个文件夹
           </button>
         )}
+        <button type="button" className="empty-action secondary" onClick={onOpenGuide}>
+          查看使用教程
+        </button>
       </div>
       <p className="empty-hint">
         {hasWorkspace ? "也可以把文档拖到窗口中" : "桌面版还可以把文档或整个文件夹拖到窗口中"}
