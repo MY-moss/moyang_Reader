@@ -177,6 +177,7 @@ a:focus-visible {
   flex: 0 1 auto;
   gap: 6px;
   min-width: 0;
+  position: relative;
 }
 .toolbar-button {
   border: 1px solid var(--line);
@@ -3113,6 +3114,7 @@ html.pane-resizing * {
     min-width: 160px;
   }
   .toolbar {
+    flex: 1 1 auto;
     max-width: 100%;
     overflow-x: auto;
     gap: 4px;
@@ -3121,6 +3123,28 @@ html.pane-resizing * {
   }
   .toolbar::-webkit-scrollbar {
     display: none;
+  }
+  .toolbar.has-overflow::before {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    right: 4px;
+    color: var(--accent-deep);
+    content: "›";
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .toolbar.has-overflow::after {
+    position: absolute;
+    z-index: 1;
+    inset: 0 0 0 auto;
+    width: 28px;
+    background: linear-gradient(90deg, transparent, var(--surface-strong) 78%);
+    content: "";
+    pointer-events: none;
   }
   .toolbar-button,
   .toolbar-overflow {
