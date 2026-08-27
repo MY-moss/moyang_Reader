@@ -4031,6 +4031,13 @@ html.pane-resizing * {
 }
 
 @media screen and (max-width: 640px) {
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .pane-resize-handle-sidebar {
+    display: none;
+  }
   .context-sidebar {
     width: min(350px, calc(100vw - 20px));
   }
