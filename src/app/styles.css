@@ -72,6 +72,8 @@ a:focus-visible {
 }
 
 .app-shell {
+  --sidebar-width: 260px;
+  --context-width: 320px;
   width: 100%;
   height: 100vh;
   height: 100dvh;
@@ -1044,11 +1046,12 @@ a:focus-visible {
 }
 
 .workspace-grid {
+  position: relative;
   width: 100%;
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
 }
 .sidebar-collapsed .workspace-grid {
   grid-template-columns: minmax(0, 1fr);
@@ -1058,10 +1061,63 @@ a:focus-visible {
 }
 .sidebar {
   min-width: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-right: 1px solid var(--line);
   background: linear-gradient(180deg, color-mix(in srgb, var(--canvas) 74%, var(--surface)) 0%, var(--canvas) 100%);
   padding: 24px 16px;
+}
+.pane-resize-handle {
+  position: absolute;
+  z-index: 18;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: col-resize;
+  touch-action: none;
+}
+.pane-resize-handle-sidebar {
+  left: var(--sidebar-width);
+  transform: translateX(-50%);
+}
+.pane-resize-handle-context {
+  right: var(--context-width);
+  transform: translateX(50%);
+}
+.pane-resize-handle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 44px;
+  border-radius: 99px;
+  background: var(--accent);
+  content: "";
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 150ms ease,
+    height 150ms ease;
+}
+.pane-resize-handle:hover::after,
+.pane-resize-handle:focus-visible::after,
+.pane-resize-handle.is-dragging::after {
+  height: 72px;
+  opacity: 0.72;
+}
+.pane-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+html.pane-resizing,
+html.pane-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 .workspace-panel {
   padding-bottom: 24px;
@@ -1342,10 +1398,8 @@ a:focus-visible {
 .workspace-export-failures ul {
   display: grid;
   gap: 6px;
-  max-height: 168px;
   margin: 0;
   padding: 0 10px 10px 27px;
-  overflow: auto;
 }
 .workspace-export-failures li {
   padding-left: 2px;
@@ -1425,8 +1479,8 @@ a:focus-visible {
   display: grid;
   gap: 3px;
   margin-top: 17px;
-  max-height: min(38vh, 420px);
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 .workspace-subheading {
   padding: 0 7px 5px;
@@ -1759,6 +1813,7 @@ a:focus-visible {
 }
 .outline-list a {
   display: block;
+  min-width: 0;
   overflow: hidden;
   padding: 6px 8px;
   color: #70695e;
@@ -1794,7 +1849,9 @@ a:focus-visible {
   container-type: inline-size;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background:
     radial-gradient(circle at 82% -8%, color-mix(in srgb, var(--accent-soft) 58%, transparent), transparent 26rem),
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--canvas)) 0%, var(--surface) 220px);
@@ -3294,6 +3351,7 @@ a:focus-visible {
   .navigation-strip,
   .tab-strip,
   .sidebar,
+  .pane-resize-handle,
   .context-sidebar,
   .statusbar,
   .graph-backdrop,
@@ -3420,20 +3478,23 @@ a:focus-visible {
 @media screen {
   .workspace-grid {
     position: relative;
-    grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr) clamp(260px, 25vw, 340px);
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--context-width);
   }
   .sidebar-collapsed .workspace-grid {
-    grid-template-columns: minmax(0, 1fr) clamp(260px, 25vw, 340px);
+    grid-template-columns: minmax(0, 1fr) var(--context-width);
   }
   .right-panel-collapsed .workspace-grid {
-    grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   }
   .sidebar-collapsed.right-panel-collapsed .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   .context-sidebar {
     min-width: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     border-right: 0;
     border-left: 1px solid var(--line);
     background:
@@ -3484,6 +3545,12 @@ a:focus-visible {
     background: color-mix(in srgb, var(--surface-strong) 76%, transparent);
     box-shadow: var(--shadow-soft);
   }
+  .context-document-card .file-type {
+    width: auto;
+    min-width: 48px;
+    padding-inline: 7px;
+    white-space: nowrap;
+  }
   .context-document-copy {
     display: grid;
     min-width: 0;
@@ -3523,11 +3590,14 @@ a:focus-visible {
     font-size: 10px;
     white-space: nowrap;
   }
-  .context-tab:hover,
-  .context-tab.active {
+  .context-tab:hover {
     background: var(--surface-strong);
     color: var(--accent-deep);
-    box-shadow: 0 2px 8px rgba(47, 49, 41, 0.08);
+  }
+  .context-tab.active {
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
   .context-panel-body {
     min-width: 0;
@@ -3914,14 +3984,14 @@ a:focus-visible {
   .sidebar-collapsed .workspace-grid,
   .right-panel-collapsed .workspace-grid,
   .sidebar-collapsed.right-panel-collapsed .workspace-grid {
-    grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   }
   .sidebar-collapsed .workspace-grid,
   .sidebar-collapsed.right-panel-collapsed .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   .right-panel-collapsed .workspace-grid {
-    grid-template-columns: clamp(220px, 23vw, 280px) minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   }
   .context-sidebar {
     position: absolute;
@@ -3929,8 +3999,11 @@ a:focus-visible {
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(340px, calc(100vw - 56px));
+    width: min(var(--context-width), calc(100vw - 56px));
     box-shadow: var(--shadow-lifted);
+  }
+  .pane-resize-handle-context {
+    right: min(var(--context-width), calc(100vw - 56px));
   }
   .wysiwyg-editor,
   .wysiwyg-loading-state {
@@ -3941,6 +4014,9 @@ a:focus-visible {
 @media screen and (max-width: 840px) {
   .context-sidebar {
     width: min(340px, calc(100vw - 32px));
+  }
+  .pane-resize-handle-context {
+    right: min(var(--context-width), calc(100vw - 32px));
   }
   .wysiwyg-editor {
     width: calc(100% - 48px);
@@ -3955,8 +4031,18 @@ a:focus-visible {
 }
 
 @media screen and (max-width: 640px) {
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .pane-resize-handle-sidebar {
+    display: none;
+  }
   .context-sidebar {
     width: min(350px, calc(100vw - 20px));
+  }
+  .pane-resize-handle-context {
+    right: min(var(--context-width), calc(100vw - 20px));
   }
   .context-tab-list {
     position: sticky;

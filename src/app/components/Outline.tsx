@@ -4,9 +4,10 @@ import type { TocItem } from "../types";
 type OutlineProps = {
   items: TocItem[];
   activeId?: string | null;
+  onNavigate: (item: TocItem) => void;
 };
 
-export function Outline({ items, activeId = null }: OutlineProps) {
+export function Outline({ items, activeId = null, onNavigate }: OutlineProps) {
   const activeLinkRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
@@ -26,8 +27,12 @@ export function Outline({ items, activeId = null }: OutlineProps) {
               <a
                 ref={item.id === activeId ? activeLinkRef : undefined}
                 className={item.id === activeId ? "active" : undefined}
-                href={`#${item.id}`}
+                href={`#${encodeURIComponent(item.id)}`}
                 aria-current={item.id === activeId ? "location" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onNavigate(item);
+                }}
               >
                 {item.text}
               </a>
