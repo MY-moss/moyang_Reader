@@ -1,6 +1,6 @@
 # Moyang Reader 版本与发布政策
 
-当前稳定基线：`v0.10.4`；该版本已完成 Windows x64 Release、安装包、签名和 manifest 在线核验。v0.10.4 的动态 Cloudflare 镜像也已反映新版本；静态镜像子任务仍因仓库尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 而失败，不能把公开资产在线误判为自动静态同步 workflow 全绿。下一发布目标为 `v0.10.5`。
+当前稳定基线：`v0.10.5`；该版本已完成 Windows x64 Release、安装包、签名和 manifest 在线核验。Cloudflare 动态镜像已反映新版本；静态镜像子任务仍因仓库尚未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 而失败，不能把公开资产在线误判为自动静态同步 workflow 全绿。下一发布目标为 `v0.11.0`。
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
