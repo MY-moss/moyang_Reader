@@ -1,13 +1,13 @@
 # AI 开发与交接流程
 
-## 当前功能切片（2026-08-27，开发中）
+## 当前功能切片（2026-08-27，v0.10.3 发布准备）
 
 - 目标：为首次使用者提供可重新打开的快速上手教程，并修复 Windows 桌面端设置修改后可能无法跨重启保存且没有明确反馈的问题。
 - 非目标：不改动 Markdown 语义、编辑器、导出格式、更新协议或文档云同步；不新增重量级依赖。
-- 当前分支：`codex/guide-settings-2026-08-27`，基于最新 `origin/main@2d0ab1acbc7c5bf9841dd09184c9a10e9e4cb3c7`。
-- 实现范围：`src/app/app-settings.ts` 统一设置快照和写入校验；Tauri `settings.json` 原子读写兜底；设置面板保存状态；首次使用教程和 `docs/USER-GUIDE.md`。
-- 当前验证：完整 Vitest 191/191、针对性 Vitest 14/14、`npm run lint`、`npm run format:check`、`npm run build`、Rust `cargo fmt -- --check`、`cargo check`、`cargo test`（40/40）和 `cargo clippy --lib -- -D warnings` 已通过；浏览器 E2E 本切片 2/2、a11y 2/2 通过。首次 push CI `33078620566` 仅在 Browser smoke test 暴露设置状态文字的 serious `color-contrast`，已由高对比度主题色修复，等待新提交的 PR Quality checks 复验。真实桌面 E2E 9/10 通过，唯一失败是既有 PDF 导出环境路径（`保存 PDF 失败`），未归因于本切片，需在发布前单独处理或明确豁免。
-- 发布计划：这是用户可见的稳定性修复，PR 合并且 Quality checks 通过后准备 `v0.10.3` Windows x64 安装包、签名和 `latest.json`；Cloudflare 静态镜像仍受 #241 的仓库 Secrets 前置条件影响。
+- 当前分支：`codex/release-v0.10.3-2026-08-27`，基于已合并的 `main@be2dcb2`。
+- 实现范围：`src/app/app-settings.ts` 统一设置快照和写入校验；Tauri `settings.json` 原子读写兜底；设置面板保存状态；首次使用教程和 `docs/USER-GUIDE.md`；版本文件与 CHANGELOG 已准备为 `0.10.3`。
+- 当前验证：PR #272 的 Quality checks `33079519834` 已通过（前端 lint、格式、覆盖率、构建、浏览器/桌面 smoke、依赖/发布检查和 Rust 门禁）；完整 Vitest 191/191、浏览器 E2E 本切片 2/2、a11y 2/2 通过。真实桌面 E2E 本机 9/10 通过，唯一失败是既有 PDF 导出环境路径（`保存 PDF 失败`），但 CI 桌面 smoke 已通过。
+- 发布计划：版本准备 PR 通过后合并，创建 `v0.10.3` 标签，生成 Windows x64 安装包、签名和 `latest.json`；Cloudflare 静态镜像仍受 #241 的仓库 Secrets 前置条件影响。
 - 交接要求：本切片只允许一个功能分支和一个 PR；完成后更新本节的 PR、合并 SHA、Release、测试结果和已知限制，然后停止，不自动开始下一切片。
 
 ## 快速启动模板（交给任何 AI 时直接粘贴）
@@ -106,7 +106,7 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`）**
+> **最新检查点（2026-08-27，验证基线：`main@be2dcb28504b8a10f2be90f9deedd8e90e1151b5`）**
 >
 > - #104 的未变化索引快速路径、ASCII 子串候选、工作区文件列表缓存和文件级 LRU 淘汰已由 PR #257、#259、#261、#264 合并；当前 `main@0e8b4e9…` 已包含上述实现和交接文档。
 > - PR #266 已将 5000 篇每篇至少 2 KiB、混合中英文文档的暖缓存 P95 验收，以及超出单文件 token 上限时的线性回退验收合并到 `main`；#104 已标记 completed。
@@ -117,13 +117,14 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 > - v0.10.2 版本准备由 PR #270 合并，`v0.10.2` tag 指向 `main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`；Release workflow [33069798614](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614) 的 Windows 发布 job [98508812457](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614/job/98508812457) 成功，GitHub Release 已公开并包含 Windows x64 安装包、`.sig` 和 `latest.json`。
 > - v0.10.2 安装包为 4,873,310 字节，SHA-256 `626df63dadb79b2a9b564a505b4bbacf140a44c88e7ba7899e319d5b7a7ad36d`；`.sig` 为 428 字节，SHA-256 `0a22446928e600dc3ef854ac500d538f56027f8f074888ed0775e25a64c27748`。GitHub 与 Cloudflare 公开下载均 HTTP 200 且哈希一致，根/版本 manifest 均为 `0.10.2`。
 > - Release 总 run 因 Cloudflare 静态镜像子任务失败而显示 failure；仓库 Actions 尚未配置 Cloudflare Pages Secrets，动态镜像仍可用，不能把静态同步记为全绿；版本目录 manifest 当前回退到 GitHub 资产地址。
+> - PR #272 已合并为 `main@be2dcb28504b8a10f2be90f9deedd8e90e1151b5`；`CI #543`（run `33079519834`）全绿，包含浏览器/桌面 smoke、覆盖率、依赖审计、发布检查和 Rust 门禁。v0.10.3 版本准备分支正在生成 Windows x64 安装包。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
 > - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
 > - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过，该修复已随 v0.10.1 发布。
 > - #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试和 Quality checks 通过，持久化索引版本升级为 4，旧缓存会安全重建。本切片不生成安装包。
-> - 下一位 AI 的唯一下一步：先检查 Issues 和本文件，按 Ready backlog 选择一个独立的 v0.10.3 功能切片；不要重复 #187、v0.10.2 发布、v0.10.1、#104、PR #262 或 PR #264 的实现。若处理镜像基础设施，先由维护者在 GitHub Actions Secrets 配置 Cloudflare Pages 部署凭据，再单独重跑镜像 workflow；不要把凭据写入仓库或 AI 上下文。
+> - 下一位 AI 的唯一下一步：检查 v0.10.3 版本准备 PR 的 Quality checks；通过后合并、创建 `v0.10.3` 标签，核验 Windows 安装包、签名、manifest、Cloudflare 镜像和旧版本更新。不要重复 PR #272、v0.10.2 发布、v0.10.1、#104、PR #262 或 PR #264 的实现；不要把 Cloudflare 或签名凭据写入仓库或 AI 上下文。
 
 ## 历史功能切片快照
 
