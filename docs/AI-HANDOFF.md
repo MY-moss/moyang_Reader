@@ -1,13 +1,15 @@
 # AI 开发与交接流程
 
-## 当前发布切片（2026-08-28，v0.10.5 版本准备）
+## 已完成发布切片（2026-08-28，v0.10.5）
 
 - 目标：将已合并的文件/文件夹右键管理和正文编辑动作作为稳定 Windows x64 patch 发布，版本号、CHANGELOG、安装包、签名、manifest 和镜像保持一致。
-- 基线：PR #278 已 squash 合并到 `main@69819064a261bf411ea98f9f3b901548e7175`；该提交的 main CI `33108161186` 已通过（Quality checks job `98643541985`）。
-- 发布分支：`codex/release-v0.10.5-2026-08-28`，由已合并内容建立；版本文件与发布文档正在同步，保持一个版本准备 PR。
-- 发布验收：版本一致性、lint、格式、覆盖率、构建、浏览器 smoke、Windows 桌面 smoke、依赖审计、Release preflight、Rust fmt/Clippy/测试全部通过后，推送 `v0.10.5` tag。
-- 未完成：版本准备分支尚未提交、推送或创建 PR；tag、GitHub Release、Windows x64 安装包、`.sig`、`latest.json` 和镜像仍未生成。PDF 文件落盘/旧版本更新器实机回归继续由 #241 跟踪。
-- 交接要求：只完成版本准备、发布资产和在线核验；发布后更新 `docs/UPDATE.md`、本节、路线图和 Issue 状态，然后停止，不自动开启 v0.11 功能。
+- 基线：PR #278 已 squash 合并到 `main@69819064a261bf411ea98f36f9f3b901548e7175`；版本准备 PR #279 已 squash 合并到 `main@d9c0a5967f673af0152746130a46a551994628df`。
+- 质量门禁：main CI `33109821835`（Quality checks job `98649371453`）和 Rust dependency audit `33109821807` 均成功；Release workflow `33110395454` 的 Windows 构建/发布 job `98651395153` 成功。
+- 发布资产：GitHub Release [v0.10.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.5) 已公开；Windows x64 安装包 4,900,301 字节，SHA-256 `83a06f1cd88fef435cea0c486b6c99c5e99f2fb9661d4fe24bf6e6b99ae8d36c`；`.sig` 428 字节，SHA-256 `fd3a547c358c20381c425bec5cb527f7345502a3034fc3973b56b4572edc3912`；`latest.json` 1,411 字节，SHA-256 `5f899d3fa81986b001a24f422cf178936d4f8d9a08cfebe4925ee717eb62e830`。
+- 在线核验：GitHub Release 的安装包、`.sig` 和 `latest.json` 均已上传；Cloudflare 动态镜像根 manifest 返回版本 `0.10.5`，版本目录安装包和 `.sig` 均 HTTP 200，Content-Length 分别为 4,900,301 和 428 字节。
+- 镜像边界：Release workflow 的静态镜像子任务 `98653318098` 因仓库缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；动态镜像仍可用，客户端保留 GitHub Release 回退。不能把静态自动同步记为全绿。
+- 未完成：PDF 文件落盘与旧版本更新器实机回归继续由 #241 跟踪；Cloudflare 静态自动部署需维护者在 GitHub Actions Secrets 配置凭据后重新运行和核验。
+- 交接要求：v0.10.5 发布切片已完成；下一位 AI 只能从已确认的 Ready backlog 选择单一切片，不自动扩大范围或重复发布本版本。
 
 ## 已完成功能切片（2026-08-28，v0.10.5 文件/文件夹管理与文本右键）
 
@@ -18,7 +20,7 @@
 - 当前验证：前端 lint、树/路径定向测试 8/8、一次前端生产构建、Rust 全部 42 项测试通过；`cargo fmt` 已执行，前端格式检查通过。构建仅保留既有入口 chunk size warning。
 - 桌面验证：新增 Windows Tauri CRUD smoke 定向用例 1/1 通过；完整桌面 smoke 的其余 9 项通过，既有 PDF 文件导出用例仍因“保存 PDF 失败”失败。Tauri 内嵌 WebDriver 报告 `tauri-driver` 缺失警告，但本机 embedded driver 仍完成测试。
 - 文档同步：`docs/REQUIREMENTS.md`、`docs/UI-INTERACTION.md`、`docs/ROADMAP.md`、`docs/USER-GUIDE.md`、本文件和 `CHANGELOG.md` 已补充 v0.10.5 边界、验收与交接信息。
-- 发布边界：`v0.10.4` 已有独立 Release；本切片不覆盖或重复该发布。合并后的 main CI 和 PR Quality checks 已通过，v0.10.5 安装包、`.sig`、`latest.json` 和镜像仍由当前发布切片生成并核验。
+- 发布边界：`v0.10.4` 已有独立 Release；本切片不覆盖或重复该发布。合并后的 main CI 和 PR Quality checks 已通过，v0.10.5 安装包、`.sig`、`latest.json` 和镜像已由发布 workflow 生成并核验。
 - 已完成：代码、测试、文档和 PR 已交付；PDF 文件落盘/旧版本更新器实机回归继续留在 #241，不扩大本功能切片范围。
 
 ## 已完成开发切片（2026-08-28，v0.10.4 #232 第二批）
