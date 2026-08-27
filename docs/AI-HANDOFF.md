@@ -69,6 +69,8 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 最近完成切片（2026-08-27）
 
+- #104 搜索性能切片已由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257) 合并，合并提交为 `2d2209e35a2e45b66a0455edfcfba7074f4036ff`。未变化的工作区索引现在复用文件快照，跳过重复的逐文件元数据检查和重复持久化；watcher、保存和显式刷新失效路径保持不变。
+- 本切片不改变搜索结果、Markdown 真源或依赖，也不创建 Release/安装包。#104 仍保持 open；5000 文档基准、索引上限和未入索引文件的进一步命中策略留给 v0.10.1 后续切片。
 - 功能分支 `codex/three-pane-navigation-2026-08-27` 已由 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 合并，合并提交为 `57860bb2ae0ad54e3a42d1e8846a37d2769af165`；版本准备由 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并，当前 `main` 为 `086888f6c5ce5a7e2219510d0de31a575564248d`。
 - 用户可见范围：修复右侧目录在中央正文中的定位、清理侧栏嵌套滚动、修复窄屏布局，并支持左右侧栏拖拽/键盘调宽、双击重置、快捷键开关和本机布局记忆。#187 的完整响应式断点体系仍保持 open。
 - 验证：前端完整单测 182/182、lint、format、构建、浏览器 E2E 39/39；PR #253 Quality checks 和 v0.9.5 Release 的 Windows 质量门禁均通过。没有新增依赖，也没有改变 Markdown 真源。
@@ -81,12 +83,14 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@086888f6c5ce5a7e2219510d0de31a575564248d`）**
+> **最新检查点（2026-08-27，验证基线：`main@2d2209e35a2e45b66a0455edfcfba7074f4036ff`）**
 >
+> - #104 的未变化索引快速路径已由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257) 合并；针对性 Rust 测试、完整 Rust 测试、fmt 和 clippy，以及 PR Quality checks 均通过。
+> - 本切片保持 Windows x64 范围，不生成新的安装包；当前稳定版本仍为 `v0.9.5`。#104 的 5000 文档基准和进一步索引策略仍未完成。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
-> - 下一位 AI 只从 Ready backlog 选择新的独立切片，并在完成后更新本文件；不要重复已经完成的 v0.9.5 发布。
+> - 下一位 AI 只从 Ready backlog 选择新的独立切片，并在完成后更新本文件；不要重复 #104 已完成的快速路径或 v0.9.5 发布。
 
 ## 历史功能切片快照
 
@@ -157,3 +161,4 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
 - 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；确认 v0.9.2 发布资产和镜像状态后，从最新 `main` 选择一个已确认的 Ready 切片。若 #241 尚未具备 Ready 条件，不要提前实现 PDF/更新器功能；若先处理发布基础设施，优先由维护者在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，再验证自动镜像。不要把 token 放入聊天、仓库或文档，也不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
 - CI 触发记录：PR #236 的 head `e364648fe703c4689a148f894525a68d25452a1b` 的 push `Quality checks` 曾被并发重跑取消，恢复后的 job `98264563669` 已成功；PR #236 已合并为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。Release workflow `32996354493` 已成功，镜像 workflow `32998515986` 仅因 Cloudflare Secrets 缺失失败。
+
