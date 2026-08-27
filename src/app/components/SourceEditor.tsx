@@ -7,6 +7,7 @@ import {
   matchWikiLinkTrigger,
   type WikiLinkCandidate,
 } from "../wiki-link-completion";
+import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 
 type SourceEditorProps = {
   value: string;
@@ -61,9 +62,14 @@ export function SourceEditor({
     const view = viewRef.current;
     if (!view || view.state.doc.toString() === value) return;
 
+    const viewport = captureEditorViewport(
+      containerRef.current?.closest<HTMLElement>(".content-area") ?? null,
+      containerRef.current,
+    );
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: value },
     });
+    restoreEditorViewport(viewport);
   }, [value]);
 
   useEffect(() => {

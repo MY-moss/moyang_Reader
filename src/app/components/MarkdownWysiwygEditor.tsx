@@ -13,6 +13,7 @@ import { insertTableCommand } from "@milkdown/kit/preset/gfm";
 import { callCommand, replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
+import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 import { filterSlashCommands, matchSlashTrigger, slashCommands, type SlashCommand } from "../slash-command-menu";
 import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import {
@@ -213,7 +214,12 @@ function MilkdownSurface({
 
     // A flush rebuilds the ProseMirror state without emitting a local edit event,
     // so an external watcher refresh cannot mark the document as dirty again.
+    const viewport = captureEditorViewport(
+      containerRef.current?.closest<HTMLElement>(".content-area") ?? null,
+      containerRef.current,
+    );
     editor.action(replaceAll(source, true));
+    restoreEditorViewport(viewport);
     // markdownUpdated skips replaceAll transactions (no history entry), so keep
     // the flush marker aligned with the externally-applied document.
     const view = editor.ctx.get(editorViewCtx) as unknown as EditorViewInstance;
