@@ -1,6 +1,6 @@
 {
   "name": "moyang-reader",
-  "version": "0.9.5",
+  "version": "0.10.1",
   "private": true,
   "type": "module",
   "scripts": {
