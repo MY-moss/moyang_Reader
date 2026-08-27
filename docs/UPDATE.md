@@ -27,11 +27,13 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
-## v0.10.1 发布准备（2026-08-27）
+## v0.10.1 发布记录（2026-08-27）
 
 - 发布范围：#104 大工作区搜索性能验收，以及撤回/重做后保持阅读位置的稳定性修复。
-- 当前状态：版本文件已统一为 `0.10.1`，发布提交合并到 `main` 后才创建 `v0.10.1` 标签；安装包、签名、`latest.json` 和镜像资产以 Release workflow 成功结果为准。
-- 发布边界：只生成 Windows x64 NSIS 安装包；Cloudflare 镜像仍需 `#241` 所跟踪的仓库 Secrets，缺少凭据时不能把旧镜像当作新版本。
+- 当前状态：版本文件已统一为 `0.10.1`，`v0.10.1` 标签已指向 `main@0e8b4e9d5ea2471b6a318fec6335f8e7a2dc000d`，Windows x64 Release 已公开。
+- 已核验：Release workflow [33057606371](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371) 的 Windows 构建/发布 job [98468201360](https://github.com/MY-moss/moyang_Reader/actions/runs/33057606371/job/98468201360) 成功；安装包 4,876,807 字节、SHA-256 `2e386893e2026986c684ede967d9758b0e52c0c990adc1d65ad7ef6171395a10`；`.sig` 428 字节、SHA-256 `03ba73d07dab409ce2bf16b0b3de76d40fca40690ecf8ee8613299ec06c671f8`；`latest.json` 1,411 字节、SHA-256 `f1ea49a293ef785d428e8fb5e3a1472341da2bd0d4053e3deda1a67d50caf0cc`。
+- 在线核验：GitHub 和 Cloudflare 的根 manifest、`/v0.10.1/` 安装包及 `.sig` 均 HTTP 200，manifest 版本均为 `0.10.1`，签名字段存在且下载地址有效。
+- 发布边界：只生成 Windows x64 NSIS 安装包；本轮未在已登记旧安装实例上自动点击更新并重启，因此不把完整旧版本桌面升级回归记为完成。
 
 不能长期只更新 `main` 而不提供安装包。稳定版本发布时，版本号、CHANGELOG、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和 Cloudflare 镜像必须同步到同一个版本，并验证旧版本自动更新。完整规则见 [`docs/RELEASE-POLICY.md`](RELEASE-POLICY.md)。
 
@@ -52,9 +54,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-当前生产镜像以 Cloudflare Pages 静态资产为主：每次 GitHub Release 发布后，`.github/workflows/mirror-release.yml` 下载该 Release 的安装包、`.sig` 和 `latest.json`，使用 `scripts/prepare-mirror.mjs` 生成版本目录，再通过 Wrangler 上传到 Pages。镜像会保留 `/vX.Y.Z/` 版本目录，根路径 `latest.json` 指向最新稳定版本。
+当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。因此本次 `v0.10.1` 发布后，根路径和版本路径已在线反映新版本；静态资产同步仍保留版本目录策略作为可选发布路径。
 
-镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。正式同步缺少 Cloudflare 凭据时会直接失败，不能以“只验证旧镜像”的绿色状态结束；GitHub Release 仍保留，客户端会回退到第二个 GitHub 更新端点。
+镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.1` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会回退到第二个 GitHub 更新端点。
 
 `scripts/mirror-worker.js` 保留为手动应急回滚方案，不是当前默认发布路径。静态镜像部署完成后，工作流会重试检查根 manifest、版本目录 manifest、安装包和 `.sig`，并校验版本、HTTP 状态和安装包大小。
 
@@ -65,7 +67,7 @@ https://moyang-reader-mirror.pages.dev
 - `CLOUDFLARE_API_TOKEN`：仅授予 Pages 项目部署权限的 API Token。
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
 
-这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。Cloudflare 部署失败时 GitHub Release 仍然保留，客户端会继续使用第二个 GitHub 更新端点，但发布流程必须修复镜像后才能视为完成。
+这两个值只存在于 GitHub Secrets，不要提交到仓库或发到聊天中。Cloudflare 静态部署失败时 GitHub Release 仍然保留，当前动态代理仍可提供最新公开资产；配置 Secrets 后应重新执行镜像 workflow，并将静态自动部署重新核验为全绿。
 
 如果私钥丢失，旧版本将无法验证后续更新。若密钥已经泄露，应立即停止发布，生成新密钥，并在还没有公开用户之前更新配置；一旦已有用户安装旧公钥版本，换钥匙需要专门的密钥轮换机制，不能直接覆盖。
 
