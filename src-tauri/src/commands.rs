@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
@@ -60,6 +62,8 @@ pub struct WorkspaceSearchCache {
     file_lists: Mutex<HashMap<String, CachedWorkspaceFileList>>,
     search_indexes: Mutex<HashMap<String, CachedSearchIndex>>,
     access_counter: AtomicU64,
+    #[cfg(test)]
+    metadata_checks: AtomicUsize,
 }
 
 struct CachedSearchText {
@@ -90,6 +94,13 @@ struct CachedSearchIndex {
     posting_count: usize,
     last_used: u64,
     disabled: bool,
+    file_snapshot: Option<Vec<SearchIndexFileStamp>>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct SearchIndexFileStamp {
+    path: String,
+    size: u64,
 }
 
 struct IndexedSearchFile {
@@ -275,6 +286,19 @@ fn source_search_tokens(source: &str) -> Option<HashSet<String>> {
     }
 
     Some(tokens)
+}
+
+fn search_index_file_snapshot(files: &[WorkspaceFile]) -> Vec<SearchIndexFileStamp> {
+    files
+        .iter()
+        .filter(|file| {
+            is_supported_text_path(Path::new(&file.path)) && file.size <= MAX_SEARCH_FILE_BYTES
+        })
+        .map(|file| SearchIndexFileStamp {
+            path: access_path_key(Path::new(&file.path)),
+            size: file.size,
+        })
+        .collect()
 }
 
 fn system_time_marker(modified: Option<SystemTime>) -> Option<u64> {
@@ -615,6 +639,16 @@ impl WorkspaceSearchCache {
                     .and_then(|directory| load_persisted_search_index(directory, root))
             })
             .unwrap_or_default();
+        let file_snapshot = search_index_file_snapshot(files);
+
+        if !index.disabled && index.file_snapshot.as_ref() == Some(&file_snapshot) {
+            index.last_used = access;
+            if let Ok(mut indexes) = self.search_indexes.lock() {
+                indexes.insert(key, index);
+                prune_search_indexes(&mut indexes);
+            }
+            return;
+        }
 
         if !index.disabled {
             let eligible_paths = files
@@ -643,6 +677,8 @@ impl WorkspaceSearchCache {
                     remove_indexed_file(&mut index, &path);
                     continue;
                 };
+                #[cfg(test)]
+                self.metadata_checks.fetch_add(1, Ordering::Relaxed);
                 let modified = metadata.modified().ok();
                 if index
                     .files
@@ -665,6 +701,10 @@ impl WorkspaceSearchCache {
                     }
                 }
             }
+        }
+
+        if !index.disabled {
+            index.file_snapshot = Some(file_snapshot);
         }
 
         index.last_used = access;
@@ -2966,6 +3006,17 @@ mod tests {
             search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
                 .expect("search cached query");
         assert_eq!(cached_query.len(), 1);
+        let metadata_checks_after_first_query = cache.metadata_checks.load(Ordering::Relaxed);
+        assert_eq!(metadata_checks_after_first_query, 1);
+
+        let unchanged_query =
+            search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
+                .expect("search unchanged index query");
+        assert_eq!(unchanged_query.len(), 1);
+        assert_eq!(
+            cache.metadata_checks.load(Ordering::Relaxed),
+            metadata_checks_after_first_query
+        );
 
         let added = root.join("added.md");
         fs::write(&added, "added needle").expect("add search cache note");
@@ -2985,6 +3036,7 @@ mod tests {
         let updated = search_workspace_inner_with_cache(root.clone(), "second".to_string(), &cache)
             .expect("search updated query");
         assert_eq!(updated.len(), 1);
+        assert!(cache.metadata_checks.load(Ordering::Relaxed) > metadata_checks_after_first_query);
         let added_result =
             search_workspace_inner_with_cache(root.clone(), "added".to_string(), &cache)
                 .expect("search newly added note");
