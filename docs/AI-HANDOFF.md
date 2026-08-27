@@ -10,6 +10,7 @@
 - 镜像边界：静态镜像子 job 98690424253 因仓库未配置 Cloudflare Secrets 失败；未上传私钥或 Cloudflare 凭据。后续若要让静态 Pages workflow 变绿，需维护者在 GitHub Secrets 中配置凭据后重新运行。
 - 已知事项：#241 的 PDF 文件落盘/旧更新器实机回归和 #232 的剩余桌面交互范围保持 open。
 - 交接：本切片已完成；下一位 AI 只能从已确认的 Ready backlog 选择单一切片，不重复发布 v0.10.6，不扩大范围。
+
 ## 已完成发布切片（2026-08-28，v0.10.5）
 
 - 目标：将已合并的文件/文件夹右键管理和正文编辑动作作为稳定 Windows x64 patch 发布，版本号、CHANGELOG、安装包、签名、manifest 和镜像保持一致。
