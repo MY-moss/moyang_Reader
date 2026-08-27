@@ -67,20 +67,30 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 一个 PR 保持一个清晰目标；无关重构另开 Issue。
 - 代码、文档和验证结果一起提交，减少下一位 AI 的重复探索。
 
-## 本轮候选切片（2026-08-27）
+## 最近完成切片（2026-08-27）
 
-- 分支：`codex/three-pane-navigation-2026-08-27`，基于 `origin/main@d2087fa34bd46209f5b81dc05066be481bbedc6c`。
-- 目标：修复右侧目录跳转不稳定、上下文卡片排版和侧栏嵌套滚动；补齐左右侧栏拖拽/键盘调宽、本机记忆和右栏快捷键。
-- 范围：`App.tsx`、目录导航、上下文面板、顶部快捷键、布局存储、样式、浏览器 smoke 与新增单测；不引入依赖，不改文档格式，不处理未选中的 #234。
-- 验收：目录只在当前中央正文内跳转；渲染延迟时有限重试；中央区和两侧各自只有一个滚动层；拖拽、键盘调宽、双击重置和刷新后记忆可用；`Ctrl+Shift+B/R` 分别控制左右栏。
-- 验证：前端全量单测 182/182、lint、format、构建和目标浏览器 E2E 均通过；本地改动尚未推送/创建 PR。
-- Issue：#187 只记录本切片的已修复范围，完整响应式断点体系仍保持 open；合并后按重要 UI 修复评估 `v0.9.5` Windows 安装包。
-- 回滚：回滚本功能分支即可；没有数据迁移，Markdown 仍是唯一真源。
-- 唯一下一步：完成 diff 审核后推送该分支，创建一个对应 PR，等待 Quality checks；不要在本切片完成前开启新的业务功能。
+- 功能分支 `codex/three-pane-navigation-2026-08-27` 已由 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 合并，合并提交为 `57860bb2ae0ad54e3a42d1e8846a37d2769af165`；版本准备由 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并，当前 `main` 为 `086888f6c5ce5a7e2219510d0de31a575564248d`。
+- 用户可见范围：修复右侧目录在中央正文中的定位、清理侧栏嵌套滚动、修复窄屏布局，并支持左右侧栏拖拽/键盘调宽、双击重置、快捷键开关和本机布局记忆。#187 的完整响应式断点体系仍保持 open。
+- 验证：前端完整单测 182/182、lint、format、构建、浏览器 E2E 39/39；PR #253 Quality checks 和 v0.9.5 Release 的 Windows 质量门禁均通过。没有新增依赖，也没有改变 Markdown 真源。
+- v0.9.5 已发布：Release workflow [33036785808](https://github.com/MY-moss/moyang_Reader/actions/runs/33036785808) 的 Windows 构建/发布 job [98401073429](https://github.com/MY-moss/moyang_Reader/actions/runs/33036785808/job/98401073429) 成功；[GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已包含 `latest.json`（1,401 字节）、Windows x64 安装包（4,868,087 字节）和 `.sig`（424 字节）。
+- v0.9.5 资产核验：安装包 SHA-256 为 `8af02aa74e4b2bea5a02ec07feb7c9a1d215c8b822d790e92a11129125dababd`，`.sig` SHA-256 为 `7f069913d679fde7e0a63b0c730d15a38f667e505568906b843e576239d8da93`，`latest.json` SHA-256 为 `1da1a9971b33a72cc1ad90e5b91fd61e41df9dc37ec411a08d4845e2d7fafa7f`；版本、签名字段和 Release 资产一致。
+- Cloudflare 根 manifest、`/v0.9.5/` 安装包和 `.sig` 均 HTTP 200，版本为 `0.9.5`，安装包 4,868,087 字节且 SHA-256 与 GitHub 一致，签名 424 字节且 SHA-256 与 GitHub 一致。自动镜像子任务 [98402066927](https://github.com/MY-moss/moyang_Reader/actions/runs/33036785808/job/98402066927) 仍因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败，#241 保持 open。
+- 当前登记的 Windows 安装实例为 v0.9.4；本轮已完成新版本 manifest、安装包、签名和两个下载端点的在线核验，但尚未在本轮自动点击 v0.9.4→v0.9.5 并重启，因此不把完整旧版本桌面升级回归记为已完成。
+- 回滚：保留 v0.9.4 Release；若 v0.9.5 出现问题，修复后发布更高 patch，不删除已有 Release 或 manifest。
+- 下一位 AI 的唯一下一步：从最新 `main@086888f6c5ce5a7e2219510d0de31a575564248d` 创建新的 `codex/<scope>-<date>` 分支，先检查 Issues，再从 Ready backlog 选择一个独立切片；不要重复 v0.9.5 发布，也不要把 #241 凭据写入仓库或上下文。
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@2b35c83f6d03c7faaa20baa1b4771b1454958610`）**
+> **最新检查点（2026-08-27，验证基线：`main@086888f6c5ce5a7e2219510d0de31a575564248d`）**
+>
+> - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
+> - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
+> - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
+> - 下一位 AI 只从 Ready backlog 选择新的独立切片，并在完成后更新本文件；不要重复已经完成的 v0.9.5 发布。
+
+## 历史功能切片快照
+
+> **历史检查点（2026-08-27，v0.9.4，验证基线：`main@2b35c83f6d03c7faaa20baa1b4771b1454958610`）**
 >
 > - 稳定基线已升级为 `v0.9.4`；[PR #250](https://github.com/MY-moss/moyang_Reader/pull/250) 已将 #183 合并到 `main`，版本准备 [PR #251](https://github.com/MY-moss/moyang_Reader/pull/251) 随后合并，当前 `main` 合并提交为 `2b35c83f6d03c7faaa20baa1b4771b1454958610`。#241 的 Cloudflare Secrets 外部前置仍未解决。
 > - v0.9.3 已包含 Windows PDF 当前文档保存、Edge headless 渲染、有效 PDF 文件头校验、原子替换和真实桌面 smoke；Markdown、TXT、Word、PDF、图片既有打开行为保持不变。
