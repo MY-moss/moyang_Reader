@@ -199,6 +199,7 @@ import {
   undoEditorChange,
   type EditorHistoryState,
 } from "./editor-history";
+import { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -594,6 +595,8 @@ export function App() {
         ? (document.activeElement?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??
           document.querySelector<HTMLElement>(".source-editor, .wysiwyg-editor"))
         : null);
+    const viewport = captureEditorViewport(contentAreaRef.current, activeEditor);
+    const historyDocumentKey = nextHistory.documentKey;
     editorHistoryRef.current = nextHistory;
     setEditorHistory(nextHistory);
     sourceDraftRef.current = nextHistory.present;
@@ -603,11 +606,20 @@ export function App() {
         ? { ...current, modified: nextHistory.present !== current.source }
         : current,
     );
-    if (activeEditor) {
+    const restoreViewport = () => {
+      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;
+      restoreEditorViewport(viewport);
+    };
+    window.requestAnimationFrame(() => {
+      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;
+      if (activeEditor) focusEditorSurface(activeEditor);
+      restoreViewport();
+      // Milkdown may rebuild its ProseMirror state in a passive effect after
+      // the first frame; restore once more after that DOM update.
       window.requestAnimationFrame(() => {
-        focusEditorSurface(activeEditor);
+        restoreViewport();
       });
-    }
+    });
   }, []);
 
   const undoEditor = useCallback(

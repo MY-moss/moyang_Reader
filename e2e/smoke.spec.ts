@@ -278,10 +278,18 @@ test("keeps outline navigation inside the reader and supports resizable sidebars
 
 test("shares undo and redo history between WYSIWYG and source editing", async ({ page }) => {
   await page.goto("/");
+  const initialSource = [
+    "# Editor history",
+    "",
+    "原始内容。",
+    "",
+    ...Array.from({ length: 60 }, (_, index) => `阅读位置测试段落 ${index + 1}。`),
+    "",
+  ].join("\n");
   await page.locator('input[type="file"]').setInputFiles({
     name: "editor-history.md",
     mimeType: "text/markdown",
-    buffer: Buffer.from("# Editor history\n\n原始内容。\n"),
+    buffer: Buffer.from(initialSource),
   });
 
   const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
@@ -299,23 +307,37 @@ test("shares undo and redo history between WYSIWYG and source editing", async ({
   const redoButton = page.getByRole("button", { name: "重做", exact: true });
   await expect(undoButton).toBeEnabled();
 
+  const contentArea = page.locator(".content-area");
+  await contentArea.evaluate((element) => {
+    element.scrollTop = Math.min(320, element.scrollHeight - element.clientHeight);
+    element.dispatchEvent(new Event("scroll"));
+  });
+  const positionBeforeUndo = await contentArea.evaluate((element) => element.scrollTop);
+  expect(positionBeforeUndo).toBeGreaterThan(0);
+
   await page.keyboard.press("Control+Z");
   await expect(editable).not.toContainText("可撤销内容。");
+  await expect
+    .poll(() => contentArea.evaluate((element) => element.scrollTop), { timeout: 5_000 })
+    .toBeGreaterThanOrEqual(Math.max(0, positionBeforeUndo - 4));
   await expect(redoButton).toBeEnabled();
 
   await page.keyboard.press("Control+Shift+Z");
   await expect(redoButton).toBeDisabled();
   await expect(editable).toContainText("可撤销内容。");
+  await expect
+    .poll(() => contentArea.evaluate((element) => element.scrollTop), { timeout: 5_000 })
+    .toBeGreaterThanOrEqual(Math.max(0, positionBeforeUndo - 4));
 
   await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
-  await expectEditorText(editor, "# Editor history\n\n原始内容。\n\n可撤销内容。\n");
+  await expect.poll(() => readEditorText(editor)).toContain("可撤销内容。");
 
   await editor.click();
   await page.keyboard.press("Control+Z");
-  await expectEditorText(editor, "# Editor history\n\n原始内容。\n");
+  await expect.poll(() => readEditorText(editor)).not.toContain("可撤销内容。");
   await page.keyboard.press("Control+Y");
-  await expectEditorText(editor, "# Editor history\n\n原始内容。\n\n可撤销内容。\n");
+  await expect.poll(() => readEditorText(editor)).toContain("可撤销内容。");
 });
 
 test("opens the command palette and restores trigger focus", async ({ page }) => {
