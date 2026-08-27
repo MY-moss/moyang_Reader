@@ -1,18 +1,27 @@
 # AI 开发与交接流程
 
-## 当前功能切片（2026-08-28，v0.10.5 文件/文件夹管理与文本右键）
+## 当前发布切片（2026-08-28，v0.10.5 版本准备）
+
+- 目标：将已合并的文件/文件夹右键管理和正文编辑动作作为稳定 Windows x64 patch 发布，版本号、CHANGELOG、安装包、签名、manifest 和镜像保持一致。
+- 基线：PR #278 已 squash 合并到 `main@69819064a261bf411ea98f9f3b901548e7175`；该提交的 main CI `33108161186` 已通过（Quality checks job `98643541985`）。
+- 发布分支：`codex/release-v0.10.5-2026-08-28`，由已合并内容建立；版本文件与发布文档正在同步，保持一个版本准备 PR。
+- 发布验收：版本一致性、lint、格式、覆盖率、构建、浏览器 smoke、Windows 桌面 smoke、依赖审计、Release preflight、Rust fmt/Clippy/测试全部通过后，推送 `v0.10.5` tag。
+- 未完成：版本准备分支尚未提交、推送或创建 PR；tag、GitHub Release、Windows x64 安装包、`.sig`、`latest.json` 和镜像仍未生成。PDF 文件落盘/旧版本更新器实机回归继续由 #241 跟踪。
+- 交接要求：只完成版本准备、发布资产和在线核验；发布后更新 `docs/UPDATE.md`、本节、路线图和 Issue 状态，然后停止，不自动开启 v0.11 功能。
+
+## 已完成功能切片（2026-08-28，v0.10.5 文件/文件夹管理与文本右键）
 
 - 目标：在已有工作区树和编辑器菜单上补齐高频右键管理，不引入新运行时依赖或云同步。
-- 分支：`codex/context-menu-crud-2026-08-28`，基于 `origin/main@804e56e9fc936b156c3b8f024ff65f975684fc03`；已推送提交 `75749655c61cc44a794dfcb05a58988433e7ebe4`，对应 [PR #278](https://github.com/MY-moss/moyang_Reader/pull/278)。当前切片只使用这一条功能分支和一个 PR。
+- 分支：`codex/context-menu-crud-2026-08-28`，基于 `origin/main@804e56e9fc936b156c3b8f024ff65f975684fc03`；提交 `75749655c61cc44a794dfcb05a58988433e7ebe4` 和交接提交 `104e19fb43bb0bda43d91343afff289da74f745c` 已由 [PR #278](https://github.com/MY-moss/moyang_Reader/pull/278) squash 合并到 `main@69819064a261bf411ea98f36f9f3b901548e7175`。
 - 已实现：文件/文件夹右键打开、重命名、删除、资源管理器定位、复制完整路径；根目录保留新建/定位/路径复制；文件树支持空工作区根目录菜单；Markdown/TXT 源码与 WYSIWYG 菜单补齐撤销、重做、剪切、复制、粘贴、全选。
 - 安全边界：Tauri 端再次校验授权工作区、相对路径、路径穿越、目标重名和最终符号链接；文件重命名默认保留原扩展名；资源管理器调用使用无控制台窗口的 Windows 原生进程参数。
 - 当前验证：前端 lint、树/路径定向测试 8/8、一次前端生产构建、Rust 全部 42 项测试通过；`cargo fmt` 已执行，前端格式检查通过。构建仅保留既有入口 chunk size warning。
 - 桌面验证：新增 Windows Tauri CRUD smoke 定向用例 1/1 通过；完整桌面 smoke 的其余 9 项通过，既有 PDF 文件导出用例仍因“保存 PDF 失败”失败。Tauri 内嵌 WebDriver 报告 `tauri-driver` 缺失警告，但本机 embedded driver 仍完成测试。
 - 文档同步：`docs/REQUIREMENTS.md`、`docs/UI-INTERACTION.md`、`docs/ROADMAP.md`、`docs/USER-GUIDE.md`、本文件和 `CHANGELOG.md` 已补充 v0.10.5 边界、验收与交接信息。
-- 发布边界：`v0.10.4` tag 已推送且其 Release workflow `33102819737` 当时仍在进行；本切片不覆盖或重复该发布。当前功能合并并通过 Windows x64 门禁后，作为 `v0.10.5` 稳定 patch 生成安装包、`.sig`、`latest.json` 并核验镜像。
-- 未完成：PR #278 尚未合并，需等待 Quality checks；PDF 文件落盘失败继续留在 #241，不扩大本切片范围。合并并通过 Windows x64 门禁后才发布 v0.10.5 安装包；不在本切片自动开始跨目录移动、批量操作或其他新功能。
+- 发布边界：`v0.10.4` 已有独立 Release；本切片不覆盖或重复该发布。合并后的 main CI 和 PR Quality checks 已通过，v0.10.5 安装包、`.sig`、`latest.json` 和镜像仍由当前发布切片生成并核验。
+- 已完成：代码、测试、文档和 PR 已交付；PDF 文件落盘/旧版本更新器实机回归继续留在 #241，不扩大本功能切片范围。
 
-## 当前开发切片（2026-08-28，v0.10.4 #232 第二批）
+## 已完成开发切片（2026-08-28，v0.10.4 #232 第二批）
 
 - 目标：补齐标签页中键关闭、原生拖拽排序和阅读区连续缩放，延续 #232 的桌面惯例交互。
 - 分支：`codex/tab-zoom-2026-08-28`，基于远程 `main@769784f642426310c15e0aae6c923e1d0b9e19f4`；本切片只包含一个主题、一个 PR，不修改 Markdown 存储格式或新增运行时依赖。
@@ -21,7 +30,7 @@
 - 发布边界：这是 v0.10.4 稳定批次的功能补齐，不单独创建 Release；合并并通过 Quality checks 后再纳入 v0.10.4 安装包。
 - 下一步：审查该唯一 PR 的 Quality checks；合并后从最新 `main` 创建下一条 Ready 分支并停止本切片，不自动扩展下一功能。
 
-## 当前发布切片（2026-08-28，v0.10.4 发布准备）
+## 已完成发布切片（2026-08-28，v0.10.4 发布准备）
 
 - 目标：发布 #232 第一批桌面惯例交互，包括工作区新建 Markdown 笔记/真实文件夹、根目录/文件夹/文件所在目录右键新建，以及 Markdown/TXT 编辑上下文菜单。
 - 功能 PR：[PR #275](https://github.com/MY-moss/moyang_Reader/pull/275) 已通过 Quality checks 并 squash 合并，远程功能合并提交为 `5d0891945c4fb8b7daa0989192e9f2532536bb6b`。
