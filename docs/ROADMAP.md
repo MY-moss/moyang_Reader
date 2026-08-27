@@ -1,6 +1,6 @@
 # Moyang Reader 版本路线
 
-当前稳定基线：`v0.9.2`。Moyang Reader 当前只支持 Windows x64 桌面版；本版本包含渲染异常恢复边界、阅读/WYSIWYG/HTML 导出的排版层级修复、顶栏菜单交互修复，以及此前已完成的编辑、工作区和桌面稳定化切片。GitHub Release 与 Windows x64 资产已发布并核验；Cloudflare 公开镜像资产已在线核验，但本次自动镜像工作流因仓库缺少 Cloudflare Secrets 未通过，后续需补齐凭据后再验证自动同步。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
+当前稳定基线：`v0.9.3`。Moyang Reader 当前只支持 Windows x64 桌面版；本版本完成 PDF 文件真实落盘、旧版本更新器实机回归，以及 GitHub Release、manifest、签名和 Cloudflare 公开资产核验。GitHub Release 资产和 Cloudflare v0.9.3 公开镜像均可用，但 Release 工作流的镜像子任务因仓库缺少 Cloudflare Secrets 未通过，自动镜像链路仍需补齐凭据后重新验证。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
 
 ## 平台范围收敛
 
@@ -14,8 +14,8 @@
 | v0.8.3  | 重要视觉缺陷 patch：系统暗色模式下文档内搜索高亮可读性修复                                                                                                                                                                                                         | #170                                                            |
 | v0.9.0  | 已发布：三栏 UI、状态边界、多阅读库并存、直接 WYSIWYG 编辑入口和 Windows 无控制台桌面启动                                                                                                                                                                          | #16、#103、#111、#221                                           |
 | v0.9.1  | 已发布：搜索索引预算回退、编辑器保真、统一撤销/重做历史、WYSIWYG 渲染性能、阅读位置稳定性、Windows 桌面启动/编辑/保存与无冲突外部刷新 smoke、模态键盘契约、草稿切换与恢复安全、a11y/i18n 稳定化；GitHub 与 Cloudflare 当前资产已核验，发布工作流镜像调用改造已合并 | #88、#104、#119、#111、#165、#164、#177、#180、#184、#185、#186 |
-| v0.9.2  | 已发布：渲染异常恢复边界；阅读/WYSIWYG/HTML 导出的 h4 层级与列表节奏；顶栏菜单外点/Esc 关闭；此前已完成的桌面 watcher/refresh、导出写盘、关闭确认、更新提示与外部修改安全切片随本批次发布；不包含尚未完成的 PDF 文件落盘和旧版本更新器实机回归                     | #174、#188、#231、#178、#192                                    |
-| v0.9.3  | Windows 发布稳定性：PDF 文件真实落盘（当前切片已实现并补齐真实桌面 smoke）、旧版本更新器实机回归、Release/manifest/签名和 Cloudflare 镜像端到端核验；全部完成后再发布                                                                                              | #241                                                            |
+| v0.9.2  | 已发布：渲染异常恢复边界；阅读/WYSIWYG/HTML 导出的 h4 层级与列表节奏；顶栏菜单外点/Esc 关闭；此前已完成的桌面 watcher/refresh、导出写盘、关闭确认、更新提示与外部修改安全切片随本批次发布                                                                          | #174、#188、#231、#178、#192                                    |
+| v0.9.3  | 已发布：Windows PDF 文件真实落盘、旧版本更新器 v0.9.2→v0.9.3 实机回归、Release/manifest/签名和 Cloudflare v0.9.3 公开资产核验；自动镜像 workflow 仍等待 Cloudflare Secrets 配置后全绿                                                                              | #241                                                            |
 | v0.10.0 | 双链补全、嵌入、显式块 ID、块引用、属性和关系图筛选                                                                                                                                                                                                                | #109                                                            |
 | v0.10.1 | 有界增量搜索和长文档性能                                                                                                                                                                                                                                           | #104                                                            |
 | v0.10.2 | UI 视觉与微交互深化批次（见下方“UI 与交互深化方向”）                                                                                                                                                                                                               | 待建 Issue                                                      |
@@ -27,7 +27,10 @@
 
 - 已完成：当前文档的 Windows PDF 保存路径、Edge headless 渲染、有效 PDF 文件头校验、原子替换，以及真实 Tauri 桌面 smoke；已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并，远程 `main` 合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`。
 - 已完成：从已登记的 Windows x64 v0.8.0 安装实例启动，检查到 v0.9.2，并完成下载、签名校验、替换、自动重启和版本号确认；未登记的旧副本不计入回归。
-- 未完成：将 PDF 与更新器回归纳入 v0.9.3 的版本同步、Release、manifest、签名和 Cloudflare 镜像稳定发布；完成前不关闭 #241。
+- 已完成：v0.9.3 版本同步、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和在线资产校验；Release workflow `33025181022` 的 Windows 构建与发布 job 成功。
+- 已完成：从同一已登记安装位置的 v0.9.2 实机检查到 v0.9.3，完成下载、签名校验、替换、自动重启；注册表版本、文件版本和运行进程均为 v0.9.3。
+- 已核验：Cloudflare 根 manifest 和 `/v0.9.3/` 安装包、`.sig` 均 HTTP 200，资产大小与 SHA-256 和 GitHub Release 一致。
+- 待处理：Release 镜像子任务 `98365959782` 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据预检阶段失败；#241 保持 open，待安全配置 Secrets 后重新执行并确认自动镜像 workflow 全绿。
 
 ## UI 与交互深化方向（v0.10.2 候选切片）
 
