@@ -32,7 +32,7 @@ const MAX_SEARCH_INDEX_ROOTS: usize = 8;
 const MAX_SEARCH_INDEX_POSTINGS: usize = 500_000;
 const MAX_SEARCH_INDEX_TOKENS_PER_FILE: usize = 100_000;
 const MAX_SEARCH_INDEX_TOKEN_CHARS: usize = 256;
-const SEARCH_INDEX_CACHE_VERSION: u32 = 3;
+const SEARCH_INDEX_CACHE_VERSION: u32 = 4;
 const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
@@ -97,6 +97,7 @@ struct CachedSearchIndex {
     unindexed_files: HashSet<String>,
     postings: HashMap<String, HashSet<String>>,
     posting_count: usize,
+    file_access_counter: u64,
     last_used: u64,
     disabled: bool,
     file_snapshot: Option<Vec<SearchIndexFileStamp>>,
@@ -112,6 +113,7 @@ struct IndexedSearchFile {
     size: u64,
     modified: Option<SystemTime>,
     tokens: HashSet<String>,
+    last_used: u64,
 }
 
 #[derive(Deserialize)]
@@ -129,6 +131,7 @@ struct PersistedIndexedSearchFile {
     size: u64,
     modified_nanos: Option<u64>,
     tokens: Vec<String>,
+    last_used: u64,
 }
 
 #[derive(Serialize)]
@@ -146,6 +149,7 @@ struct PersistedIndexedSearchFileSnapshot<'a> {
     size: u64,
     modified_nanos: Option<u64>,
     tokens: Vec<&'a String>,
+    last_used: u64,
 }
 
 fn collect_workspace_directory_stamps(
@@ -331,6 +335,84 @@ fn persistent_search_index_path(cache_directory: &Path, root: &Path) -> PathBuf 
         .join(format!("{}.json", persistent_search_index_key(root)))
 }
 
+fn next_indexed_file_access(index: &mut CachedSearchIndex) -> u64 {
+    let access = index.file_access_counter;
+    index.file_access_counter = index.file_access_counter.saturating_add(1);
+    access
+}
+
+fn store_unindexed_file(
+    index: &mut CachedSearchIndex,
+    path: String,
+    size: u64,
+    modified: Option<SystemTime>,
+) {
+    let last_used = next_indexed_file_access(index);
+    index.unindexed_files.insert(path.clone());
+    index.files.insert(
+        path,
+        IndexedSearchFile {
+            size,
+            modified,
+            tokens: HashSet::new(),
+            last_used,
+        },
+    );
+}
+
+fn oldest_indexed_file(index: &CachedSearchIndex) -> Option<String> {
+    index
+        .files
+        .iter()
+        .filter(|(_, file)| !file.tokens.is_empty())
+        .min_by(|(left_path, left), (right_path, right)| {
+            left.last_used
+                .cmp(&right.last_used)
+                .then_with(|| left_path.cmp(right_path))
+        })
+        .map(|(path, _)| path.clone())
+}
+
+fn demote_indexed_file(index: &mut CachedSearchIndex, path: &str) -> bool {
+    let Some(file) = index.files.get_mut(path) else {
+        return false;
+    };
+    if file.tokens.is_empty() {
+        return false;
+    }
+
+    let tokens = std::mem::take(&mut file.tokens);
+    for token in tokens {
+        if let Some(paths) = index.postings.get_mut(&token) {
+            if paths.remove(path) {
+                index.posting_count = index.posting_count.saturating_sub(1);
+            }
+            if paths.is_empty() {
+                index.postings.remove(&token);
+            }
+        }
+    }
+    index.unindexed_files.insert(path.to_string());
+    true
+}
+
+fn touch_indexed_file(index: &mut CachedSearchIndex, path: &str) {
+    if index.unindexed_files.contains(path)
+        || !index
+            .files
+            .get(path)
+            .map(|file| !file.tokens.is_empty())
+            .unwrap_or(false)
+    {
+        return;
+    }
+
+    let last_used = next_indexed_file_access(index);
+    if let Some(file) = index.files.get_mut(path) {
+        file.last_used = last_used;
+    }
+}
+
 fn add_indexed_file_with_tokens(
     index: &mut CachedSearchIndex,
     path: String,
@@ -356,6 +438,7 @@ fn add_indexed_file_with_limit(
     tokens: HashSet<String>,
     posting_limit: usize,
 ) -> bool {
+    remove_indexed_file(index, &path);
     if tokens.len() > MAX_SEARCH_INDEX_TOKENS_PER_FILE
         || tokens
             .iter()
@@ -374,20 +457,23 @@ fn add_indexed_file_with_limit(
                 .unwrap_or(false)
         })
         .count();
+
+    while index.posting_count.saturating_add(additional_postings) > posting_limit {
+        let Some(oldest_path) = oldest_indexed_file(index) else {
+            break;
+        };
+        if !demote_indexed_file(index, &oldest_path) {
+            break;
+        }
+    }
+
     if index.posting_count.saturating_add(additional_postings) > posting_limit {
-        index.unindexed_files.insert(path.clone());
-        index.files.insert(
-            path,
-            IndexedSearchFile {
-                size,
-                modified,
-                tokens: HashSet::new(),
-            },
-        );
+        store_unindexed_file(index, path, size, modified);
         return true;
     }
 
     let path_key = path.clone();
+    let last_used = next_indexed_file_access(index);
     for token in &tokens {
         let paths = index.postings.entry(token.clone()).or_default();
         if paths.insert(path.clone()) {
@@ -400,6 +486,7 @@ fn add_indexed_file_with_limit(
             size,
             modified,
             tokens,
+            last_used,
         },
     );
     index.unindexed_files.remove(&path_key);
@@ -430,17 +517,29 @@ fn load_persisted_search_index(cache_directory: &Path, root: &Path) -> Option<Ca
         return Some(index);
     }
 
-    for file in snapshot.files {
+    let mut persisted_files = snapshot.files;
+    persisted_files.sort_by(|left, right| {
+        left.last_used
+            .cmp(&right.last_used)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    for file in persisted_files {
+        let path = file.path;
+        let last_used = file.last_used;
         let tokens = file.tokens.into_iter().collect::<HashSet<_>>();
         if !add_indexed_file_with_tokens(
             &mut index,
-            file.path,
+            path.clone(),
             file.size,
             marker_system_time(file.modified_nanos),
             tokens,
         ) {
             return None;
         }
+        if let Some(indexed_file) = index.files.get_mut(&path) {
+            indexed_file.last_used = last_used;
+        }
+        index.file_access_counter = index.file_access_counter.max(last_used.saturating_add(1));
     }
     index.unindexed_files = snapshot.unindexed_files.into_iter().collect();
     if !index
@@ -471,6 +570,7 @@ fn persist_search_index(cache_directory: &Path, root: &Path, index: &CachedSearc
                 size: file.size,
                 modified_nanos: system_time_marker(file.modified),
                 tokens: file.tokens.iter().collect(),
+                last_used: file.last_used,
             })
             .collect(),
         unindexed_files: index.unindexed_files.iter().collect(),
@@ -518,15 +618,7 @@ fn add_indexed_file(
     source: &str,
 ) -> bool {
     let Some(tokens) = source_search_tokens(source) else {
-        index.unindexed_files.insert(path.clone());
-        index.files.insert(
-            path,
-            IndexedSearchFile {
-                size,
-                modified,
-                tokens: HashSet::new(),
-            },
-        );
+        store_unindexed_file(index, path, size, modified);
         return true;
     };
     add_indexed_file_with_tokens(index, path, size, modified, tokens)
@@ -751,15 +843,7 @@ impl WorkspaceSearchCache {
                         break;
                     }
                 } else {
-                    index.unindexed_files.insert(path.clone());
-                    index.files.insert(
-                        path,
-                        IndexedSearchFile {
-                            size: metadata.len(),
-                            modified,
-                            tokens: HashSet::new(),
-                        },
-                    );
+                    store_unindexed_file(&mut index, path, metadata.len(), modified);
                 }
             }
         }
@@ -784,8 +868,8 @@ impl WorkspaceSearchCache {
         }
 
         let key = access_path_key(root);
-        let indexes = self.search_indexes.lock().ok()?;
-        let index = indexes.get(&key)?;
+        let mut indexes = self.search_indexes.lock().ok()?;
+        let index = indexes.get_mut(&key)?;
         if index.disabled {
             return None;
         }
@@ -823,10 +907,16 @@ impl WorkspaceSearchCache {
 
         let fallback_paths = index.unindexed_files.clone();
         if missing_cjk_token {
+            for path in &fallback_paths {
+                touch_indexed_file(index, path);
+            }
             return Some(fallback_paths);
         }
         let mut candidates = candidates.unwrap_or_default();
         candidates.extend(fallback_paths);
+        for path in &candidates {
+            touch_indexed_file(index, path);
+        }
         Some(candidates)
     }
 
@@ -2558,8 +2648,8 @@ mod tests {
         persistent_search_index_path, prune_search_entries, read_text_file_inner,
         refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        source_search_tokens, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
-        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
+        source_search_tokens, touch_indexed_file, write_bytes_file_inner, write_text_file_inner,
+        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
         WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
         MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
@@ -3357,9 +3447,9 @@ mod tests {
     }
 
     #[test]
-    fn falls_back_only_the_file_that_exceeds_the_posting_budget() {
+    fn evicts_the_least_recently_used_file_before_falling_back() {
         let mut index = CachedSearchIndex::default();
-        let first_tokens = ["alpha", "beta"].into_iter().map(str::to_string).collect();
+        let first_tokens = ["alpha"].into_iter().map(str::to_string).collect();
 
         assert!(add_indexed_file_with_limit(
             &mut index,
@@ -3369,15 +3459,28 @@ mod tests {
             first_tokens,
             2,
         ));
-        assert_eq!(index.posting_count, 2);
+        assert_eq!(index.posting_count, 1);
 
-        let second_tokens = ["gamma"].into_iter().map(str::to_string).collect();
+        let second_tokens = ["beta"].into_iter().map(str::to_string).collect();
         assert!(add_indexed_file_with_limit(
             &mut index,
             "second.md".to_string(),
             1,
             None,
             second_tokens,
+            2,
+        ));
+        assert_eq!(index.posting_count, 2);
+
+        touch_indexed_file(&mut index, "first.md");
+
+        let third_tokens = ["gamma"].into_iter().map(str::to_string).collect();
+        assert!(add_indexed_file_with_limit(
+            &mut index,
+            "third.md".to_string(),
+            1,
+            None,
+            third_tokens,
             2,
         ));
 
@@ -3387,7 +3490,12 @@ mod tests {
             Some(0)
         );
         assert!(index.unindexed_files.contains("second.md"));
-        assert!(!index.postings.contains_key("gamma"));
+        assert_eq!(
+            index.files.get("third.md").map(|file| file.tokens.len()),
+            Some(1)
+        );
+        assert!(!index.postings.contains_key("beta"));
+        assert!(index.postings.contains_key("gamma"));
         assert!(index.postings.contains_key("alpha"));
     }
 
