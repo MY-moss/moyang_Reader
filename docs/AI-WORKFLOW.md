@@ -142,13 +142,13 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 - 预计文件：`src-tauri/src/commands.rs`、相关 Rust 测试、`docs/AI-HANDOFF.md`。
 - 测试：T1；三个性能切片已通过针对性测试、完整 Rust 门禁和 PR Quality checks，公开 Release 仍待 v0.10.1 稳定批次验收。
 
-### 当前执行切片：撤回后保持阅读位置（用户反馈，T2，v0.9.6 patch 候选）
+### 最近完成切片：撤回后保持阅读位置（用户反馈，T2，v0.9.6 patch 候选）
 
 - 目标：Ctrl+Z/Ctrl+Shift+Z 后保留中央阅读区、Milkdown 和 CodeMirror 的当前滚动位置，让撤回/重做不打断阅读。
 - 非目标：不改变撤回历史语义、Markdown 真源、编辑器依赖、三栏布局或其它 UI 功能。
 - 验收：长文档中撤回和重做前后中央 `scrollTop` 偏差不超过 4px；切换源文本和 WYSIWYG 不丢位置；编辑器状态重建后仍能恢复；文档切换时延迟恢复不能污染新文档。
 - 预计文件：`src/app/App.tsx`、`src/app/editor-history-viewport.ts`、Markdown/CodeMirror 编辑器组件、相关单测和 `e2e/smoke.spec.ts`；本次同步流程规则与交接状态文档，不另建无行为变化 PR。
-- 测试：T2；定向单测、lint/format、一次构建和一个 undo/redo 浏览器 E2E；合并后再按稳定 patch 发布规则决定是否生成安装包。
+- 测试：T2；定向单测、lint/format、一次构建和一个 undo/redo 浏览器 E2E 已通过；PR #262 的 Quality checks `33046894608` 全绿，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`。本切片不生成安装包，后续按稳定 patch 发布规则决定是否发布 `v0.9.6`。
 
 ### R2：可取消的分批导出与失败清单（#87，T2，目标 v0.11.0）
 

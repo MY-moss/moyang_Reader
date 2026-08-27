@@ -75,6 +75,8 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - PR #259 同时修正快速路径边界：watcher 事件先失效 Rust 缓存，只有成功启用 watcher 的工作区才跳过重复索引元数据检查；未启用 watcher 时仍检测直接文件修改。无新依赖、无持久化索引格式变化、无 Release/安装包。
 - #104 的工作区文件列表缓存切片已由 [PR #261](https://github.com/MY-moss/moyang_Reader/pull/261) 合并，合并提交为 `b5e62e7b8d00634261aa1b269cec13fb8853500f`。未变化的工作区快照会复用 Rust 文件列表，避免重复的逐文件读取；watcher、保存和显式刷新仍负责失效。新增 5000 文档回归基准通过，#104 的正式 P95、索引上限和长文档验收仍保持 open。
 - PR #261 不改变搜索结果、Markdown 真源、持久化索引格式或依赖，也不创建 Release/安装包；当前稳定版本仍为 `v0.9.5`。
+- 撤回/重做视口修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6d`。Ctrl+Z/Ctrl+Shift+Z 现在会恢复中央阅读区及 Milkdown/CodeMirror 内部滚动位置，并用文档路径校验避免延迟恢复污染新文档。
+- PR #262 的 Quality checks `33046894608` 全部通过（前端覆盖率、构建、浏览器/Windows 桌面 smoke、依赖、发布元数据和 Rust 门禁）；新增视口单测 2/2、undo/redo E2E 1/1。本次不生成安装包，`v0.9.6` 作为重要体验 Bug 的 patch 候选保留。
 - 功能分支 `codex/three-pane-navigation-2026-08-27` 已由 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 合并，合并提交为 `57860bb2ae0ad54e3a42d1e8846a37d2769af165`；版本准备由 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并，当前 `main` 为 `086888f6c5ce5a7e2219510d0de31a575564248d`。
 - 用户可见范围：修复右侧目录在中央正文中的定位、清理侧栏嵌套滚动、修复窄屏布局，并支持左右侧栏拖拽/键盘调宽、双击重置、快捷键开关和本机布局记忆。#187 的完整响应式断点体系仍保持 open。
 - 验证：前端完整单测 182/182、lint、format、构建、浏览器 E2E 39/39；PR #253 Quality checks 和 v0.9.5 Release 的 Windows 质量门禁均通过。没有新增依赖，也没有改变 Markdown 真源。
@@ -87,16 +89,16 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@b5e62e7b8d00634261aa1b269cec13fb8853500f`）**
+> **最新检查点（2026-08-27，验证基线：`main@a76613b63d319a123d51cf98d7816a1492ca7e6d`）**
 >
 > - #104 的未变化索引快速路径、ASCII 子串候选和工作区文件列表缓存已由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257)、[PR #259](https://github.com/MY-moss/moyang_Reader/pull/259)、[PR #261](https://github.com/MY-moss/moyang_Reader/pull/261) 合并；针对性 Rust 测试、完整 Rust 测试、fmt、clippy、5000 文档回归和对应 Quality checks 均通过。
 > - 本切片保持 Windows x64 范围，不生成新的安装包；当前稳定版本仍为 `v0.9.5`。#104 的正式 P95、索引上限和长文档验收仍未完成。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
-> - 当前已选功能切片：修复 Ctrl+Z/Ctrl+Shift+Z 后中央阅读区和编辑器内部滚动位置被重置的问题；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、一个共享滚动位置辅助模块和对应回归测试，不改变撤回语义或 Markdown 真源。
-> - 当前切片的验证：定向 Vitest 2/2、定向 ESLint、Prettier、一次新构建和相关 Playwright undo/redo E2E 已通过；开发阶段不重复生成安装包，合并后按重要体验 Bug 作为 `v0.9.6` patch 候选评估。
-> - 下一位 AI 若接手本切片，应先检查当前功能分支/PR 的 Quality checks 并完成合并；合并后记录最终 merge SHA，再从最新 `main` 选择新的 Ready 切片。不要重复 #104 已完成的三个性能切片或 v0.9.5 发布。
+> - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
+> - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过。本次不生成安装包，`v0.9.6` 仍是待稳定批次评估的 patch 候选。
+> - 下一位 AI 的唯一下一步：从最新 `main@a76613b63d319a123d51cf98d7816a1492ca7e6d` 重新检查 Issues，再选择一个 Ready 切片；优先完成 #104 剩余的正式 P95/索引上限/长文档验收。不要重复 #104 已完成的三个性能切片、PR #262 或 v0.9.5 发布。
 
 ## 历史功能切片快照
 
