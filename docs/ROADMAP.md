@@ -1,6 +1,6 @@
 # Moyang Reader 版本路线
 
-当前稳定基线：`v0.9.3`。Moyang Reader 当前只支持 Windows x64 桌面版；本版本完成 PDF 文件真实落盘、旧版本更新器实机回归，以及 GitHub Release、manifest、签名和 Cloudflare 公开资产核验。GitHub Release 资产和 Cloudflare v0.9.3 公开镜像均可用，但 Release 工作流的镜像子任务因仓库缺少 Cloudflare Secrets 未通过，自动镜像链路仍需补齐凭据后重新验证。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
+当前稳定基线：`v0.9.4`。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.4 完成标签页文档缓存、GitHub Release、manifest、签名、Cloudflare 公开资产和旧版自动更新核验。Windows 发布作业已成功，Cloudflare v0.9.4 静态资产在线且与 GitHub 安装包/签名一致，但 Release 镜像子任务仍因仓库缺少 Cloudflare Secrets 未通过，自动镜像链路由 #241 跟踪。每个版本可以包含多个功能切片；达到一个用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
 
 ## 平台范围收敛
 
@@ -16,7 +16,7 @@
 | v0.9.1  | 已发布：搜索索引预算回退、编辑器保真、统一撤销/重做历史、WYSIWYG 渲染性能、阅读位置稳定性、Windows 桌面启动/编辑/保存与无冲突外部刷新 smoke、模态键盘契约、草稿切换与恢复安全、a11y/i18n 稳定化；GitHub 与 Cloudflare 当前资产已核验，发布工作流镜像调用改造已合并 | #88、#104、#119、#111、#165、#164、#177、#180、#184、#185、#186 |
 | v0.9.2  | 已发布：渲染异常恢复边界；阅读/WYSIWYG/HTML 导出的 h4 层级与列表节奏；顶栏菜单外点/Esc 关闭；此前已完成的桌面 watcher/refresh、导出写盘、关闭确认、更新提示与外部修改安全切片随本批次发布                                                                          | #174、#188、#231、#178、#192                                    |
 | v0.9.3  | 已发布：Windows PDF 文件真实落盘、旧版本更新器 v0.9.2→v0.9.3 实机回归、Release/manifest/签名和 Cloudflare v0.9.3 公开资产核验；自动镜像 workflow 仍等待 Cloudflare Secrets 配置后全绿                                                                              | #241                                                            |
-| v0.9.4  | 发布候选：标签页文档缓存；按路径、文件大小和修改时间校验，最多 32 条且总内存预算 64 MiB，监听变更/保存/关闭时失效，避免切换已打开文档时重复读取和渲染                                                                                                              | #183                                                            |
+| v0.9.4  | 已发布：标签页文档缓存；按路径、文件大小和修改时间校验，最多 32 条且总内存预算 64 MiB，监听变更/保存/关闭时失效；已完成 Release、镜像资产和旧版自动更新核验，自动镜像 Secrets 仍由 #241 跟踪                                                                       | #183、#241                                                      |
 | v0.10.0 | 双链补全、嵌入、显式块 ID、块引用、属性和关系图筛选                                                                                                                                                                                                                | #109                                                            |
 | v0.10.1 | 有界增量搜索和长文档性能                                                                                                                                                                                                                                           | #104                                                            |
 | v0.10.2 | UI 视觉与微交互深化批次（见下方“UI 与交互深化方向”）                                                                                                                                                                                                               | 待建 Issue                                                      |
@@ -24,7 +24,7 @@
 | v0.12.0 | Windows 发布稳定性：镜像巡检、manifest 完整性、更新器回归、签名评估和安装包体验                                                                                                                                                                                    | #112、#33、#51                                                  |
 | v1.0.0  | Windows x64 核心功能冻结、长期兼容性维护和稳定更新链路                                                                                                                                                                                                             | #52                                                             |
 
-## v0.9.3 当前进度
+## v0.9.3 已发布记录
 
 - 已完成：当前文档的 Windows PDF 保存路径、Edge headless 渲染、有效 PDF 文件头校验、原子替换，以及真实 Tauri 桌面 smoke；已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并，远程 `main` 合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`。
 - 已完成：从已登记的 Windows x64 v0.8.0 安装实例启动，检查到 v0.9.2，并完成下载、签名校验、替换、自动重启和版本号确认；未登记的旧副本不计入回归。
@@ -33,13 +33,22 @@
 - 已核验：Cloudflare 根 manifest 和 `/v0.9.3/` 安装包、`.sig` 均 HTTP 200，资产大小与 SHA-256 和 GitHub Release 一致。
 - 待处理：Release 镜像子任务 `98365959782` 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据预检阶段失败；#241 保持 open，待安全配置 Secrets 后重新执行并确认自动镜像 workflow 全绿。
 
-## v0.9.4 当前切片（#183）
+## v0.9.4 已发布切片（#183）
 
 - 已实现并由 [PR #250](https://github.com/MY-moss/moyang_Reader/pull/250) 合并：本地 Markdown、纯文本、Word、PDF 和图片文档使用“路径 + 文件大小 + 修改时间”作为会话缓存校验；命中时跳过重复磁盘读取，Markdown/TXT 跳过重复渲染，二进制预览在预算内复用字节和已准备内容。
 - 已实现：缓存只存在当前进程内，最多 32 条、总估算内存 64 MiB；单个超预算文件不缓存，不把用户文档写入应用缓存或同步到云端。
 - 已实现：工作区 watcher 变更、成功保存、关闭标签页和应用退出都会清理对应缓存；修改时间或大小不一致时自动丢弃旧条目，磁盘文件仍是唯一真源。
 - 已验证：缓存/桥接针对性测试、前端完整测试 176 项、lint、format、前端构建、浏览器 E2E 38 项、Rust fmt/clippy 和 Rust 37 项测试均通过；真实 Windows 桌面 E2E 10 项也已通过。
-- 发布计划：该切片属于用户可感知的性能改进；当前分支用于同步版本号并执行 v0.9.4 完整发布门禁，随后生成 Windows x64 安装包、`.sig`、`latest.json` 和镜像资产，并完成在线哈希与旧版本更新验证。
+- 已完成：该版本的用户可感知性能改进已随 v0.9.4 安装包发布；具体 Release、镜像和旧版更新结果见下方 v0.9.4 发布记录。
+
+## v0.9.4 发布记录（#183）
+
+- 已完成：标签页文档缓存功能由 [PR #250](https://github.com/MY-moss/moyang_Reader/pull/250) 合并，版本同步由 [PR #251](https://github.com/MY-moss/moyang_Reader/pull/251) 合并，`v0.9.4` tag 指向 `main` 合并提交 `2b35c83f6d03c7faaa20baa1b4771b1454958610`。
+- 已完成：Release workflow [33030470944](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 的 Windows 发布 job 成功；Release [v0.9.4](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.4) 已上传 `latest.json`（1,401 字节）、Windows x64 NSIS 安装包（4,867,204 字节）和 `.sig`（424 字节）。
+- 已核验：GitHub 安装包 SHA-256 为 `dd59f1f7b70b77df118672e4ce0ffe5af92f5895e5b54fcb962067a08418fe6b`，`.sig` 为 `4cc07d181afa855172f3ffdb688c0bb110c0ccd48fe166cbb94b3a138e457838`，`latest.json` 为 `c12f59118f31ce2a4638e14d691b36d90079bbf119bdf9fcc1aef726919b804`。
+- 已核验：Cloudflare 根 manifest、`/v0.9.4/` 安装包和 `.sig` 均 HTTP 200；镜像安装包和 `.sig` 的大小及 SHA-256 与 GitHub 一致，镜像 manifest 版本为 `0.9.4` 并指向镜像 URL。
+- 已完成：登记的 Windows x64 v0.9.3 安装实例通过应用内“更新”下载并安装 v0.9.4，签名校验、替换和自动重启成功；注册表、文件、进程和页面版本均为 `v0.9.4`。
+- 限制：Release 镜像子任务 [98382698574](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；#241 保持 open，补齐 Secrets 后再重跑并确认自动镜像链路全绿。
 
 ## UI 与交互深化方向（v0.10.2 候选切片）
 
