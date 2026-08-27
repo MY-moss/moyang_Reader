@@ -1,14 +1,14 @@
 # AI 开发与交接流程
 
-## 当前功能切片（2026-08-27，v0.10.3 已发布）
+## 当前功能切片（2026-08-28，v0.10.4 开发中）
 
-- 目标：为首次使用者提供可重新打开的快速上手教程，并修复 Windows 桌面端设置修改后可能无法跨重启保存且没有明确反馈的问题。
-- 非目标：不改动 Markdown 语义、编辑器、导出格式、更新协议或文档云同步；不新增重量级依赖。
-- 当前分支：发布记录待同步分支，基于 `main@33c171c32aa81c291b1606203b500ef4ed9e861f`。
-- 实现范围：`src/app/app-settings.ts` 统一设置快照和写入校验；Tauri `settings.json` 原子读写兜底；设置面板保存状态；首次使用教程和 `docs/USER-GUIDE.md`；版本文件与 CHANGELOG 已准备为 `0.10.3`。
-- 当前验证：PR #272 的 Quality checks `33079519834` 已通过（前端 lint、格式、覆盖率、构建、浏览器/桌面 smoke、依赖/发布检查和 Rust 门禁）；完整 Vitest 191/191、浏览器 E2E 本切片 2/2、a11y 2/2 通过。真实桌面 E2E 本机 9/10 通过，唯一失败是既有 PDF 导出环境路径（`保存 PDF 失败`），但 CI 桌面 smoke 已通过。
-- 发布结果：版本准备 PR #273 已合并；`v0.10.3` Release、Windows x64 安装包、签名和 `latest.json` 已完成在线核验。Release workflow [33084715056](https://github.com/MY-moss/moyang_Reader/actions/runs/33084715056) 的 Windows 构建/发布 job [98561110937](https://github.com/MY-moss/moyang_Reader/actions/runs/33084715056/job/98561110937) 成功；静态 Cloudflare 子任务因 #241 的仓库 Secrets 缺失失败，动态镜像仍可用。
-- 交接要求：本切片已完成；更新本节的 Release、测试结果和已知限制后停止，不自动开始下一切片。下一位 AI 只从最新 `main@33c171c32aa81c291b1606203b500ef4ed9e861f` 检查 Issues，再选择一个已确认的 Ready 功能切片。
+- 目标：完成 #232 的 Obsidian 风格高频交互：侧栏新建 Markdown 笔记/真实文件夹、根目录/文件夹/文件所在目录右键新建，以及 Markdown/TXT 编辑上下文菜单。
+- 非目标：不实现重命名、删除、拖拽移动、插件市场、Canvas、Dataview、文档云同步或新的编辑器依赖；Markdown 仍是唯一真源，产品仍只支持 Windows x64。
+- 当前分支：`codex/context-menus-2026-08-27`，基于 `main@1f5b22db94e7f044c967967617e3350df434b27f`。
+- 实现范围：新增 `WorkspaceDirectory` 目录状态和增量刷新；Tauri 安全创建笔记/文件夹命令；树节点和根目录 Context Menu；共享键盘可访问菜单；Milkdown/CodeMirror 格式、段落和插入动作；相关单测、需求、路线图和 CHANGELOG。
+- 当前验证：前端完整 Vitest 196/196（加入本切片后定向 16/16）、`npm run build` 已通过；Lint、Prettier、Rust fmt 和 Rust 单测 41/41 已通过。首次构建只暴露并修正 Milkdown 事务类型问题；不把构建警告误报为失败。
+- 发布边界：本切片尚未创建 Release 或安装包；Quality checks、浏览器/Windows 桌面 E2E、PR 合并前不发布。稳定验收通过后累计到 `v0.10.4`，再生成 Windows x64 安装包、签名、`latest.json` 并核验 GitHub/Cloudflare。
+- 交接要求：下一步只做 UI E2E/真实 Windows 桌面路径验证，重点是新建根目录/空文件夹、右键菜单、编辑选区动作和重载后目录仍存在；完成后更新本节、检查 Issues、创建一个 PR 并停止，不自动开启下一个功能。
 
 ## 快速启动模板（交给任何 AI 时直接粘贴）
 

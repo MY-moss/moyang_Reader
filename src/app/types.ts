@@ -44,6 +44,12 @@ export type WorkspaceFile = {
   kind: DocumentKind;
 };
 
+export type WorkspaceDirectory = {
+  path: string;
+  name: string;
+  relativePath: string;
+};
+
 export type WorkspaceSearchResult = {
   file: WorkspaceFile;
   preview: string;
@@ -63,6 +69,8 @@ export type WorkspaceIndexEntry = {
 
 export type WorkspaceRefreshResult = {
   scopePaths: string[];
+  folderScopePaths: string[];
+  folders: WorkspaceDirectory[];
   files: WorkspaceFile[];
   index: WorkspaceIndexEntry[];
 };

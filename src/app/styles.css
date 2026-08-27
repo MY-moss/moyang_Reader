@@ -1290,6 +1290,60 @@ html.pane-resizing * {
   cursor: not-allowed;
   opacity: 0.45;
 }
+.workspace-create-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.workspace-create-button {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 52%, transparent);
+  list-style: none;
+}
+.workspace-create-button::-webkit-details-marker {
+  display: none;
+}
+.workspace-create-button::after {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--muted);
+  content: "⌄";
+  font-size: 10px;
+}
+.workspace-create-menu[open] .workspace-create-button,
+.workspace-create-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.workspace-create-menu-panel {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: 172px;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+  padding: 6px;
+}
+.workspace-create-menu-panel button {
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 9px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+}
+.workspace-create-menu-panel button:hover,
+.workspace-create-menu-panel button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
 .workspace-export-cancel {
   border-color: color-mix(in srgb, var(--accent-warm) 45%, var(--line));
   color: var(--accent-warm);
@@ -1630,6 +1684,10 @@ html.pane-resizing * {
   max-height: none;
   overflow: visible;
 }
+.workspace-tree {
+  position: relative;
+  min-height: 24px;
+}
 .workspace-subheading {
   padding: 0 7px 5px;
   color: #9a9285;
@@ -1686,13 +1744,20 @@ html.pane-resizing * {
   color: var(--accent-deep);
   box-shadow: inset 3px 0 0 var(--accent);
 }
-.workspace-folder > span:nth-child(2) {
+.workspace-folder-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
   font-weight: 600;
+}
+.workspace-folder-icon {
+  flex: 0 0 12px;
+  color: var(--accent-warm);
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.78;
 }
 .workspace-folder small {
   margin-left: auto;
@@ -4035,6 +4100,90 @@ html.pane-resizing * {
     max-width: 46%;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .moyang-context-menu {
+    position: fixed;
+    z-index: 80;
+    display: grid;
+    width: min(248px, calc(100vw - 16px));
+    max-height: min(620px, calc(100vh - 16px));
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--surface-strong) 97%, var(--canvas));
+    box-shadow: 0 18px 46px color-mix(in srgb, var(--ink) 22%, transparent);
+    padding: 5px;
+    animation: context-menu-in 120ms ease-out;
+  }
+  .moyang-context-menu-title {
+    overflow: hidden;
+    padding: 7px 9px 6px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .moyang-context-menu-group + .moyang-context-menu-group {
+    margin-top: 4px;
+    border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+    padding-top: 4px;
+  }
+  .moyang-context-menu-label {
+    padding: 4px 9px 3px;
+    color: var(--accent-deep);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .moyang-context-menu button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink);
+    padding: 8px 9px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .moyang-context-menu button:hover,
+  .moyang-context-menu button:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    outline: 0;
+  }
+  .moyang-context-menu button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .moyang-context-menu button small {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 9px;
+  }
+  @keyframes context-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-3px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .moyang-context-menu {
+      animation: none;
+    }
   }
   .wysiwyg-editor .editor {
     min-height: 440px;

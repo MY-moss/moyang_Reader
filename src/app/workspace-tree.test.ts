@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkspaceTree } from "./workspace-tree";
-import type { WorkspaceFile } from "./types";
+import type { WorkspaceDirectory, WorkspaceFile } from "./types";
 
 function file(relativePath: string): WorkspaceFile {
   return {
@@ -9,6 +9,14 @@ function file(relativePath: string): WorkspaceFile {
     relativePath,
     size: 1,
     kind: "markdown",
+  };
+}
+
+function directory(relativePath: string): WorkspaceDirectory {
+  return {
+    path: `C:/vault/${relativePath}`,
+    name: relativePath.split(/[\\/]/).pop() ?? relativePath,
+    relativePath,
   };
 }
 
@@ -51,5 +59,14 @@ describe("workspace tree", () => {
     buildWorkspaceTree(files);
 
     expect(files.map((item) => item.relativePath)).toEqual(originalOrder);
+  });
+
+  it("keeps empty directories visible", () => {
+    const tree = buildWorkspaceTree([], [directory("Archive"), directory("Archive/2026")]);
+
+    expect(tree.folders).toHaveLength(1);
+    expect(tree.folders[0].name).toBe("Archive");
+    expect(tree.folders[0].fileCount).toBe(0);
+    expect(tree.folders[0].folders[0].name).toBe("2026");
   });
 });

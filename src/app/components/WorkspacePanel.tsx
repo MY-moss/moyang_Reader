@@ -1,6 +1,7 @@
 import type {
   RecentFile,
   RecentWorkspace,
+  WorkspaceDirectory,
   WorkspaceExportFailure,
   WorkspaceFile,
   WorkspaceSearchResult,
@@ -22,6 +23,7 @@ const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }>
 type WorkspacePanelProps = {
   workspacePath: string | null;
   files: WorkspaceFile[];
+  folders?: WorkspaceDirectory[];
   visibleFiles: WorkspaceFile[];
   visibleResultCount: number;
   exportableFiles: WorkspaceFile[];
@@ -49,6 +51,8 @@ type WorkspacePanelProps = {
   workspaceExportNotice: string | null;
   workspaceIndexLoading: boolean;
   onOpenFile: (path: string) => void;
+  onCreateNote?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
@@ -66,6 +70,7 @@ function isBatchExportable(file: WorkspaceFile): boolean {
 export function WorkspacePanel({
   workspacePath,
   files,
+  folders = [],
   visibleFiles,
   visibleResultCount,
   exportableFiles,
@@ -93,6 +98,8 @@ export function WorkspacePanel({
   workspaceExportNotice,
   workspaceIndexLoading,
   onOpenFile,
+  onCreateNote,
+  onCreateFolder,
   onSearchQueryChange,
   onTagChange,
   onKindChange,
@@ -102,6 +109,7 @@ export function WorkspacePanel({
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
   const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
   const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));
+  const treeFolders = hasFilters ? [] : folders;
 
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -111,6 +119,34 @@ export function WorkspacePanel({
           <h2 id="workspace-title">阅读库</h2>
         </div>
         <div className="workspace-actions">
+          {workspacePath && onCreateNote && onCreateFolder && (
+            <details className="workspace-create-menu">
+              <summary className="quiet-button workspace-create-button">新建</summary>
+              <div className="workspace-create-menu-panel" role="menu">
+                <div className="workspace-switcher-label">阅读库根目录</div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onCreateNote("");
+                  }}
+                >
+                  新建笔记
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onCreateFolder("");
+                  }}
+                >
+                  新建文件夹
+                </button>
+              </div>
+            </details>
+          )}
           {(canBatchExport || workspaceExporting) && (
             <details className="export-menu workspace-export-menu">
               <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
@@ -353,10 +389,17 @@ export function WorkspacePanel({
         </div>
       ) : (
         <>
-          {workspacePath && visibleFiles.length > 0 && (
+          {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0) && (
             <div className="workspace-files" aria-label="工作区文件">
               <div className="workspace-subheading">文件</div>
-              <WorkspaceTreeView files={visibleFiles} activePath={activePath} onOpenFile={onOpenFile} />
+              <WorkspaceTreeView
+                files={visibleFiles}
+                folders={treeFolders}
+                activePath={activePath}
+                onOpenFile={onOpenFile}
+                onCreateNote={onCreateNote}
+                onCreateFolder={onCreateFolder}
+              />
             </div>
           )}
 

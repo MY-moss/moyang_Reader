@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceRefreshResult } from "./types";
 import {
+  applyWorkspaceFolderDelta,
   applyWorkspaceFileDelta,
   applyWorkspaceIndexDelta,
   isCurrentWorkspaceLoad,
@@ -35,6 +36,8 @@ describe("workspace refresh guards", () => {
     } as const;
     const delta: WorkspaceRefreshResult = {
       scopePaths: ["c:\\vault\\notes"],
+      folderScopePaths: [],
+      folders: [],
       files: [replacement],
       index: [{ file: replacement, title: "Today", links: [], tags: ["work"] }],
     };
@@ -55,9 +58,32 @@ describe("workspace refresh guards", () => {
       size: 1,
       kind: "markdown",
     } as const;
-    const delta: WorkspaceRefreshResult = { scopePaths: ["C:/Vault/removed.md"], files: [], index: [] };
+    const delta: WorkspaceRefreshResult = {
+      scopePaths: ["C:/Vault/removed.md"],
+      folderScopePaths: [],
+      folders: [],
+      files: [],
+      index: [],
+    };
 
     expect(applyWorkspaceFileDelta([file], delta)).toEqual([]);
     expect(applyWorkspaceIndexDelta([{ file, title: "Removed", links: [], tags: [] }], delta)).toEqual([]);
+  });
+
+  it("refreshes empty folders without disturbing unrelated folders", () => {
+    const current = [
+      { path: "C:/Vault/old", name: "old", relativePath: "old" },
+      { path: "C:/Vault/notes", name: "notes", relativePath: "notes" },
+    ];
+    const replacement = { path: "C:/Vault/notes/new", name: "new", relativePath: "notes/new" };
+    const delta: WorkspaceRefreshResult = {
+      scopePaths: ["C:/Vault/notes"],
+      folderScopePaths: ["C:/Vault/notes"],
+      folders: [replacement],
+      files: [],
+      index: [],
+    };
+
+    expect(applyWorkspaceFolderDelta(current, delta)).toEqual([replacement, current[0]]);
   });
 });
