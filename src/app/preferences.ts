@@ -1,9 +1,11 @@
 import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth } from "./types";
+import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 
 export type ReaderPreferences = {
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
   readingScale: ReadingScale;
+  readingZoom: number;
   readingWidth: ReadingWidth;
   exportPaper: ExportPaper;
   exportOrientation: ExportOrientation;
@@ -14,6 +16,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   allowRemoteResources: false,
   startupUpdateCheck: false,
   readingScale: "medium",
+  readingZoom: 100,
   readingWidth: "standard",
   exportPaper: "a4",
   exportOrientation: "portrait",
@@ -34,6 +37,11 @@ export function loadReaderPreferences(): ReaderPreferences {
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return defaultReaderPreferences;
 
+    const readingScale =
+      parsed.readingScale === "small" || parsed.readingScale === "large" || parsed.readingScale === "medium"
+        ? parsed.readingScale
+        : defaultReaderPreferences.readingScale;
+
     return {
       allowRemoteResources:
         typeof parsed.allowRemoteResources === "boolean"
@@ -43,10 +51,8 @@ export function loadReaderPreferences(): ReaderPreferences {
         typeof parsed.startupUpdateCheck === "boolean"
           ? parsed.startupUpdateCheck
           : defaultReaderPreferences.startupUpdateCheck,
-      readingScale:
-        parsed.readingScale === "small" || parsed.readingScale === "large" || parsed.readingScale === "medium"
-          ? parsed.readingScale
-          : defaultReaderPreferences.readingScale,
+      readingScale,
+      readingZoom: normalizeReadingZoom(parsed.readingZoom, readingZoomFromScale(readingScale)),
       readingWidth:
         parsed.readingWidth === "narrow" || parsed.readingWidth === "wide" || parsed.readingWidth === "standard"
           ? parsed.readingWidth

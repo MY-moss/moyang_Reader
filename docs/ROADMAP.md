@@ -28,6 +28,11 @@
 | v0.12.0 | Windows 发布稳定性：镜像巡检、manifest 完整性、更新器回归、签名评估和安装包体验                                                                                                                                                                                    | #112、#33、#51                                                  |
 | v1.0.0  | Windows x64 核心功能冻结、长期兼容性维护和稳定更新链路                                                                                                                                                                                                             | #52                                                             |
 
+## v0.10.4 当前追加切片
+
+- 标签页支持鼠标中键关闭和原生拖拽排序；阅读区支持 Ctrl+滚轮、Ctrl+=/Ctrl+- 和 Ctrl+0 连续缩放，设置提供 75%–150% 调节。
+- 本切片与工作区新建/上下文菜单共同进入 v0.10.4 稳定批次；完成 Windows x64 Quality checks 后统一发布安装包。
+
 ## v0.9.3 已发布记录
 
 - 已完成：当前文档的 Windows PDF 保存路径、Edge headless 渲染、有效 PDF 文件头校验、原子替换，以及真实 Tauri 桌面 smoke；已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并，远程 `main` 合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`。

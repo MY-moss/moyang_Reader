@@ -39,6 +39,8 @@ export type MessageKey =
   | "settings.fontSize.compact"
   | "settings.fontSize.standard"
   | "settings.fontSize.comfortable"
+  | "settings.zoomHint"
+  | "settings.zoomReset"
   | "settings.width"
   | "settings.width.narrow"
   | "settings.width.standard"
@@ -101,6 +103,8 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.fontSize.compact": "紧凑",
     "settings.fontSize.standard": "标准",
     "settings.fontSize.comfortable": "舒适",
+    "settings.zoomHint": "Ctrl+滚轮或 Ctrl+± 即时调整",
+    "settings.zoomReset": "恢复标准",
     "settings.width": "正文宽度",
     "settings.width.narrow": "窄",
     "settings.width.standard": "标准",
@@ -162,6 +166,8 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.fontSize.compact": "Compact",
     "settings.fontSize.standard": "Standard",
     "settings.fontSize.comfortable": "Comfortable",
+    "settings.zoomHint": "Use Ctrl+wheel or Ctrl+± to adjust instantly",
+    "settings.zoomReset": "Reset",
     "settings.width": "Text width",
     "settings.width.narrow": "Narrow",
     "settings.width.standard": "Standard",

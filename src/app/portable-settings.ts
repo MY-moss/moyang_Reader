@@ -3,6 +3,7 @@ import type { WorkspaceSession } from "./storage";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
 import type { Locale } from "./i18n";
 import { normalizePathKey } from "./path-key";
+import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 
 const PORTABLE_SETTINGS_FORMAT = "moyang-reader-settings";
 const PORTABLE_SETTINGS_VERSION = 1;
@@ -37,6 +38,11 @@ function optionalPath(value: unknown): string | null {
 function parsePreferences(value: unknown): ReaderPreferences {
   if (!isRecord(value)) throw new Error("设置备份缺少有效的阅读偏好。");
 
+  const readingScale =
+    value.readingScale === "small" || value.readingScale === "large" || value.readingScale === "medium"
+      ? value.readingScale
+      : defaultReaderPreferences.readingScale;
+
   return {
     allowRemoteResources:
       typeof value.allowRemoteResources === "boolean"
@@ -46,10 +52,8 @@ function parsePreferences(value: unknown): ReaderPreferences {
       typeof value.startupUpdateCheck === "boolean"
         ? value.startupUpdateCheck
         : defaultReaderPreferences.startupUpdateCheck,
-    readingScale:
-      value.readingScale === "small" || value.readingScale === "large" || value.readingScale === "medium"
-        ? value.readingScale
-        : defaultReaderPreferences.readingScale,
+    readingScale,
+    readingZoom: normalizeReadingZoom(value.readingZoom, readingZoomFromScale(readingScale)),
     readingWidth:
       value.readingWidth === "narrow" || value.readingWidth === "wide" || value.readingWidth === "standard"
         ? value.readingWidth
