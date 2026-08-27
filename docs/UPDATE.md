@@ -27,6 +27,12 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
+## v0.10.1 发布准备（2026-08-27）
+
+- 发布范围：#104 大工作区搜索性能验收，以及撤回/重做后保持阅读位置的稳定性修复。
+- 当前状态：版本文件已统一为 `0.10.1`，发布提交合并到 `main` 后才创建 `v0.10.1` 标签；安装包、签名、`latest.json` 和镜像资产以 Release workflow 成功结果为准。
+- 发布边界：只生成 Windows x64 NSIS 安装包；Cloudflare 镜像仍需 `#241` 所跟踪的仓库 Secrets，缺少凭据时不能把旧镜像当作新版本。
+
 不能长期只更新 `main` 而不提供安装包。稳定版本发布时，版本号、CHANGELOG、GitHub Release、NSIS 安装包、`.sig`、`latest.json` 和 Cloudflare 镜像必须同步到同一个版本，并验证旧版本自动更新。完整规则见 [`docs/RELEASE-POLICY.md`](RELEASE-POLICY.md)。
 
 ## 首次配置 GitHub Secrets
