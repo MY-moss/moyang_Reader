@@ -24,6 +24,7 @@ type ContextPanelProps = {
   onSelectTag: (tag: string | null) => void;
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
+  onNavigateHeading: (item: TocItem) => void;
 };
 
 const tabs: Array<{ id: ContextPanelTab; label: string }> = [
@@ -69,6 +70,7 @@ export function ContextPanel({
   onSelectTag,
   onScrollToTop,
   onScrollToBottom,
+  onNavigateHeading,
 }: ContextPanelProps) {
   const properties = documentState?.kind === "markdown" ? frontmatterProperties(documentState.source) : [];
 
@@ -122,7 +124,7 @@ export function ContextPanel({
       </nav>
 
       <div className="context-panel-body" role="tabpanel">
-        {activeTab === "outline" && <Outline items={toc} activeId={activeHeadingId} />}
+        {activeTab === "outline" && <Outline items={toc} activeId={activeHeadingId} onNavigate={onNavigateHeading} />}
         {activeTab === "backlinks" && (
           <RelatedPanel
             entry={entry}

@@ -366,6 +366,7 @@ export function TopBar({
           className="toolbar-button sidebar-toggle"
           onClick={onToggleSidebar}
           aria-pressed={sidebarCollapsed}
+          aria-keyshortcuts="Control+Shift+B"
           title={sidebarCollapsed ? "显示侧栏 (Ctrl+Shift+B)" : "隐藏侧栏 (Ctrl+Shift+B)"}
         >
           {sidebarCollapsed ? t("action.showSidebar") : t("action.hideSidebar")}
@@ -375,7 +376,8 @@ export function TopBar({
           className="toolbar-button context-toggle"
           onClick={onToggleRightPanel}
           aria-pressed={rightPanelOpen}
-          title={rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板"}
+          aria-keyshortcuts="Control+Shift+R"
+          title={rightPanelOpen ? "隐藏上下文面板 (Ctrl+Shift+R)" : "显示上下文面板 (Ctrl+Shift+R)"}
         >
           {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
         </button>
