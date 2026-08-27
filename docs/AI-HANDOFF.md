@@ -69,17 +69,18 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@7fa0576376d3cf6274c7dab19000e3399ed9dd6a`）**
+> **最新检查点（2026-08-27，验证基线：`main@d650fb08a45ce4c3cb9226c2f932792f2a692d4d`）**
 >
-> - 稳定基线仍为 `v0.9.2`；PDF 子切片已由 [PR #244](https://github.com/MY-moss/moyang_Reader/pull/244) 合并到远程 `main`，合并提交为 `ba81e9d12cab64a0270f231496e19e0a01a3417a`，交接事实又由 [PR #245](https://github.com/MY-moss/moyang_Reader/pull/245) 同步到主线，文档合并提交为 `ed731b2608d353074410956a82c0bbfb4ef32f93`。
-> - 本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，只完成其中的 PDF 子项：Windows 桌面当前文档可选择保存位置，由隐藏的 Microsoft Edge headless 生成真实 PDF；输出先校验 `%PDF-` 文件头，再原子替换到目标路径，失败不会留下半成品。
-> - 变更入口：`src/app/bridge.ts` 增加 PDF IPC；`src-tauri/src/commands.rs` 增加 Windows PDF 命令、Edge 路径探测、临时文件清理和有效文件校验；`src-tauri/src/lib.rs` 注册命令；`src/app/App.tsx` 将桌面主动作和打印预览动作接入保存路径，并稳定阅读位置恢复；`src/app/components/PrintPreview.tsx` 支持桌面“保存 PDF”文案；`desktop-e2e/smoke.e2e.mjs` 增加真实 PDF 文件存在性、大小、`%PDF-` 和 `%%EOF` 校验，同时稳定阅读位置场景。
-> - 已验证：本地 `npm run build`、`npm test -- --run`（171/171）、`npm run lint`、`npm run format:check`、`cargo fmt -- --check`、`cargo clippy --all-targets -- -D warnings`、浏览器打印预览 E2E（1/1）和真实 Tauri Windows desktop smoke（10/10）通过；远程 CI run [33019830925](https://github.com/MY-moss/moyang_Reader/actions/runs/33019830925) 全绿。
-> - 更新器子项已完成实机回归：使用已登记的 Windows x64 v0.8.0 NSIS 安装实例检查到 v0.9.2，下载并完成签名校验、替换安装、自动重启；更新前后注册表安装位置一致，文件版本为 v0.9.2，重启后的进程 PID 已变化。一个未登记的旧副本不能作为安装更新回归依据。
-> - #241 仍保持 open：PDF 与更新器行为均已验证，但 v0.9.3 还需要把 PDF 变更纳入版本号、Release、manifest、签名和 Cloudflare 镜像的稳定发布批次；本次只记录回归结果，不创建新 Release 或安装包。
-> - 下一位 AI 的唯一下一步：从最新 `main` 创建新的独立发布分支，按 `docs/RELEASE-POLICY.md` 准备 v0.9.3 版本同步、Release 预检、Windows 安装包、manifest/签名和镜像验证；不要重新修改 PDF 或更新器实现。
+> - 稳定基线已升为 `v0.9.3`；发布准备由 [PR #248](https://github.com/MY-moss/moyang_Reader/pull/248) 完成并合并到 `main`，合并提交为 `d650fb08a45ce4c3cb9226c2f932792f2a692d4d`。本切片关联 [#241](https://github.com/MY-moss/moyang_Reader/issues/241)，不再重复修改 PDF 或更新器实现。
+> - v0.9.3 已包含 Windows PDF 当前文档保存、Edge headless 渲染、有效 PDF 文件头校验、原子替换和真实桌面 smoke；Markdown、TXT、Word、PDF、图片既有打开行为保持不变。
+> - 发布 workflow [33025181022](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 的 Windows 构建/发布 job 成功；GitHub Release [v0.9.3](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.3) 已上传 `latest.json`（1,401 字节）、Windows x64 NSIS 安装包（4,856,795 字节）和 `.sig`（424 字节）。安装包 SHA-256 为 `255ccfb5236b1516ea0c31c9ca66c34bfe896571984be77a5ebb1bb575af0b3c`，`.sig` SHA-256 为 `45f8aa9ebb017dd83a7b6a4bb29db3bf33691cb97bfd1e448065fac22c4c0d5d`，manifest SHA-256 为 `7fd5a1250a8fa192a3e66bf7d59c4dd92d02e3724e5bf9c8cb4a90f7650f10c2`。
+> - 本地和远程发布门禁均通过：前端 lint、格式、171 个测试、构建、浏览器 E2E 38 项、Windows 桌面 E2E 10 项、release 检查/测试、Rust fmt/clippy/37 个 Rust tests，以及远程 CI `33024776253` 和 Rust 审计 `33024776310`。
+> - 已登记的 Windows x64 v0.9.2 安装实例已实际点击更新到 v0.9.3；下载、签名校验、替换、自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion` 和运行进程版本均为 v0.9.3，更新前后进程 PID 不同。未登记的旧副本不计入回归。
+> - Cloudflare 根 manifest、`/v0.9.3/` 安装包和 `.sig` 均 HTTP 200，大小和 SHA-256 与 GitHub Release 一致；但 Release 镜像子任务 [98365959782](https://github.com/MY-moss/moyang_Reader/actions/runs/33025181022) 在 `Require Cloudflare credentials` 阶段因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败。公开镜像在线不等于自动部署 workflow 全绿，不能把该子任务记录为成功，也不能把令牌写入文档。
+> - #241 保持 open，仅等待维护者在 GitHub Actions Secrets 中安全配置 Cloudflare 凭据后，重跑同一版本镜像 workflow 并确认自动同步全绿；GitHub Release、签名资产和当前 v0.9.3 公开镜像已经可用。
+> - 下一位 AI 的唯一下一步：先检查 #241 和 Cloudflare Secrets/镜像 workflow 状态；若 Secrets 已配置则只重跑 v0.9.3 镜像验证，若仍未配置则报告外部前置，不创建新的 v0.9.3 Release/tag，也不重复实现已完成的 PDF 或更新器功能。
 
-> **最新检查点（2026-08-27，优先于下方历史条目）**
+> **历史检查点（2026-08-27，v0.9.2；优先级低于上方当前检查点）**
 >
 > - 稳定基线：`v0.9.2`；PR #242 已合并到 `main`，合并提交为 `62af5b7cbadb76aa7071c59e0ccd17d79cdf7608`，包含已完成的 #174、#188、#231 稳定化切片。
 > - GitHub Release [`v0.9.2`](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.2) 已发布；Release workflow [`33012202887`](https://github.com/MY-moss/moyang_Reader/actions/runs/33012202887) 的 Windows 构建 job 成功，安装包 4,868,757 字节，SHA-256 `33d4879f2d6d267391acb5e18a1c84a6627f5e0f1e9a5884ccd684840b6d0047`；`.sig` 424 字节，SHA-256 `fcc2ac968a384d43bb2289ad1f7c85c983ad81ad5fd88942547fd22585760468`；`latest.json` 已随 Release 上传。
