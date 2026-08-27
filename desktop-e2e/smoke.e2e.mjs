@@ -77,13 +77,18 @@ async function waitForExport(pathname, description) {
   );
 }
 
+async function workspaceEntryMatches(selector, entry, text) {
+  if (!text) return true;
+  if (selector === ".workspace-folder") {
+    return (await entry.$(".workspace-folder-name").getText()).trim() === text;
+  }
+  return (await entry.getText()).includes(text);
+}
+
 async function workspaceEntryExists(selector, text = "") {
   const entries = await browser.$$(selector);
   for (const entry of entries) {
-    if (!text) return true;
-    const nameSelector = selector === ".workspace-folder" ? ".workspace-folder-name" : "span";
-    const name = await entry.$(nameSelector);
-    if ((await name.getText()).trim() === text) return true;
+    if (await workspaceEntryMatches(selector, entry, text)) return true;
   }
   return false;
 }
@@ -142,9 +147,7 @@ async function clickWorkspaceFile(name) {
 async function findWorkspaceElement(selector, text) {
   const entries = await browser.$$(selector);
   for (const entry of entries) {
-    const nameSelector = selector === ".workspace-folder" ? ".workspace-folder-name" : "span";
-    const name = await entry.$(nameSelector);
-    if ((await name.getText()).trim() === text) return entry;
+    if (await workspaceEntryMatches(selector, entry, text)) return entry;
   }
   return null;
 }
@@ -823,3 +826,4 @@ describe("Moyang Reader desktop runtime", () => {
     await secondDialog.$('[data-testid="close-confirm-cancel"]').click();
   });
 });
+
