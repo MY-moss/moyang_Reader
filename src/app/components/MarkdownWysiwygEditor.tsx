@@ -1,21 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { defaultValueCtx, Editor, editorViewCtx, rootCtx, serializerCtx } from "@milkdown/kit/core";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import {
+  insertImageCommand,
+  toggleEmphasisCommand,
+  toggleInlineCodeCommand,
+  toggleStrongCommand,
   createCodeBlockCommand,
   insertHrCommand,
+  turnIntoTextCommand,
   wrapInBlockquoteCommand,
   wrapInBulletListCommand,
   wrapInHeadingCommand,
   wrapInOrderedListCommand,
 } from "@milkdown/kit/preset/commonmark";
-import { insertTableCommand } from "@milkdown/kit/preset/gfm";
+import { insertTableCommand, toggleStrikethroughCommand } from "@milkdown/kit/preset/gfm";
 import { callCommand, replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 import { filterSlashCommands, matchSlashTrigger, slashCommands, type SlashCommand } from "../slash-command-menu";
 import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
+import { ContextMenu } from "./ContextMenu";
+import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
 import {
   filterWikiLinkCandidates,
   formatWikiLinkInsert,
@@ -40,7 +47,12 @@ type EditorViewInstance = {
   dispatch: (transaction: unknown) => void;
   state: {
     doc: unknown;
-    selection: { empty: boolean; $from: { pos: number; parentOffset: number; parent: ParentNodeLike } };
+    selection: {
+      empty: boolean;
+      from: number;
+      to: number;
+      $from: { pos: number; parentOffset: number; parent: ParentNodeLike };
+    };
     tr: {
       insertText: (text: string, from: number, to?: number) => unknown;
       delete: (from: number, to: number) => unknown;
@@ -168,6 +180,7 @@ function MilkdownSurface({
   const wikiCandidatesRef = useRef<readonly WikiLinkCandidate[]>(wikiCandidates ?? []);
   const completionRef = useRef<CompletionOverlayState | null>(null);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -268,6 +281,100 @@ function MilkdownSurface({
       setCompletion(null);
     }
   }, []);
+
+  const applyContextAction = useCallback(
+    (action: EditorContextAction) => {
+      const editor = getRef.current();
+      const view = viewRef.current;
+      if (!editor || !view) return;
+
+      if (action === "link") {
+        onInsertLink();
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "wikilink") {
+        const target = window.prompt("输入双链目标", "");
+        if (target?.trim()) {
+          view.dispatch(
+            view.state.tr.insertText(`[[${target.trim()}]]`, view.state.selection.from, view.state.selection.to),
+          );
+        }
+        view.focus();
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "image") {
+        const target = window.prompt("输入图片路径或 URL", "");
+        if (target?.trim()) {
+          editor.action(callCommand(insertImageCommand.key, { src: target.trim(), alt: target.trim() }));
+        }
+        view.focus();
+        setContextMenu(null);
+        return;
+      }
+
+      switch (action) {
+        case "bold":
+          editor.action(callCommand(toggleStrongCommand.key));
+          break;
+        case "italic":
+          editor.action(callCommand(toggleEmphasisCommand.key));
+          break;
+        case "strike":
+          editor.action(callCommand(toggleStrikethroughCommand.key));
+          break;
+        case "inline-code":
+          editor.action(callCommand(toggleInlineCodeCommand.key));
+          break;
+        case "paragraph":
+          editor.action(callCommand(turnIntoTextCommand.key));
+          break;
+        case "heading-1":
+          editor.action(callCommand(wrapInHeadingCommand.key, 1));
+          break;
+        case "heading-2":
+          editor.action(callCommand(wrapInHeadingCommand.key, 2));
+          break;
+        case "heading-3":
+          editor.action(callCommand(wrapInHeadingCommand.key, 3));
+          break;
+        case "bullet-list":
+          editor.action(callCommand(wrapInBulletListCommand.key));
+          break;
+        case "ordered-list":
+          editor.action(callCommand(wrapInOrderedListCommand.key));
+          break;
+        case "quote":
+          editor.action(callCommand(wrapInBlockquoteCommand.key));
+          break;
+        case "code-block":
+          editor.action(callCommand(createCodeBlockCommand.key));
+          break;
+        case "table":
+          editor.action(callCommand(insertTableCommand.key, { row: 3, col: 3 }));
+          break;
+        case "horizontal-rule":
+          editor.action(callCommand(insertHrCommand.key));
+          break;
+      }
+      view.focus();
+      setContextMenu(null);
+    },
+    [onInsertLink],
+  );
+
+  const editorContextGroups = editorContextMenuGroups.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      id: `wysiwyg-${item.action}`,
+      label: item.label,
+      shortcut: item.shortcut,
+      onSelect: () => applyContextAction(item.action),
+    })),
+  }));
 
   useEffect(() => {
     const container = containerRef.current;
@@ -424,6 +531,13 @@ function MilkdownSurface({
       ref={containerRef}
       className={`wysiwyg-editor${loading ? " is-loading" : ""}`}
       aria-busy={loading}
+      onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
+        if (loading || mountFailed) return;
+        event.preventDefault();
+        completionRef.current = null;
+        setCompletion(null);
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
       onKeyDown={(event) => {
         if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
         event.preventDefault();
@@ -459,6 +573,16 @@ function MilkdownSurface({
             </button>
           ))}
         </div>
+      )}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          title="编辑操作"
+          ariaLabel="正文编辑菜单"
+          groups={editorContextGroups}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   );

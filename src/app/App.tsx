@@ -41,6 +41,8 @@ import {
   authorizeStoredPath,
   closeWindow,
   createMarkdownFile,
+  createWorkspaceFolder,
+  createWorkspaceNote,
   exportPdfFile,
   fileExists,
   fileSize,
@@ -48,6 +50,7 @@ import {
   indexWorkspace,
   initialPaths,
   isTauriRuntime,
+  listWorkspaceDirectories,
   listWorkspaceFiles,
   openExternalUrl,
   readBinaryFile,
@@ -94,6 +97,7 @@ import type {
   ThemeMode,
   TocItem,
   WorkspaceExportFailure,
+  WorkspaceDirectory,
   WorkspaceFile,
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
@@ -173,7 +177,12 @@ import {
 } from "../lib/document-adapters";
 import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
 import type { QuickOpenCandidate } from "./quick-open";
-import { applyWorkspaceFileDelta, applyWorkspaceIndexDelta, isCurrentWorkspaceLoad } from "./workspace-refresh";
+import {
+  applyWorkspaceFileDelta,
+  applyWorkspaceFolderDelta,
+  applyWorkspaceIndexDelta,
+  isCurrentWorkspaceLoad,
+} from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
@@ -395,6 +404,7 @@ type CachedWorkspace = {
   path: string;
   name: string;
   files: WorkspaceFile[];
+  folders: WorkspaceDirectory[];
   index: WorkspaceIndexEntry[];
   revision: number;
   selectedTag: string | null;
@@ -470,6 +480,7 @@ export function App() {
   );
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
+  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
@@ -1404,6 +1415,11 @@ export function App() {
         updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
         return next;
       });
+      setWorkspaceFolders((current) => {
+        const next = applyWorkspaceFolderDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });
+        return next;
+      });
       setWorkspaceIndex((current) => {
         const next = applyWorkspaceIndexDelta(current, delta);
         updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
@@ -1475,6 +1491,7 @@ export function App() {
         workspacePathRef.current = cached.path;
         setWorkspacePath(cached.path);
         setWorkspaceFiles(cached.files);
+        setWorkspaceFolders(cached.folders);
         setWorkspaceIndex(cached.index);
         setWorkspaceRevision(cached.revision);
         setWorkspaceQuery(cached.searchQuery);
@@ -1502,14 +1519,18 @@ export function App() {
 
         void (async () => {
           try {
-            const files = await listWorkspaceFiles(cached.path);
+            const [files, folders] = await Promise.all([
+              listWorkspaceFiles(cached.path),
+              listWorkspaceDirectories(cached.path),
+            ]);
             if (
               !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
             ) {
               return;
             }
             setWorkspaceFiles(files);
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files });
+            setWorkspaceFolders(folders);
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files, folders });
             setWorkspaceRevision((current) => {
               const next = current + 1;
               updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
@@ -1534,7 +1555,7 @@ export function App() {
         return;
       }
 
-      const files = await listWorkspaceFiles(root);
+      const [files, folders] = await Promise.all([listWorkspaceFiles(root), listWorkspaceDirectories(root)]);
       if (requestId !== workspaceLoadRequestRef.current) return;
 
       const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
@@ -1545,6 +1566,7 @@ export function App() {
       mountedWorkspaceCacheRef.current.set(comparablePath(root), {
         ...workspaceRecord,
         files,
+        folders,
         index: [],
         revision: 0,
         selectedTag: null,
@@ -1556,6 +1578,7 @@ export function App() {
       workspacePathRef.current = root;
       setWorkspacePath(root);
       setWorkspaceFiles(files);
+      setWorkspaceFolders(folders);
       if (switchedWorkspace || !previousWorkspacePath) {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
@@ -1602,6 +1625,7 @@ export function App() {
         setWorkspacePath(null);
         workspacePathRef.current = null;
         setWorkspaceFiles([]);
+        setWorkspaceFolders([]);
         setWorkspaceIndex([]);
         saveWorkspacePath(null);
         mountedWorkspaceCacheRef.current.delete(comparablePath(root));
@@ -1980,6 +2004,57 @@ export function App() {
     [documentState, flushCurrentDraft, loadWorkspace, openPath, workspacePath],
   );
 
+  const handleCreateWorkspaceNote = useCallback(
+    async (parentPath: string) => {
+      if (!workspacePath || !isTauriRuntime()) {
+        setError("请先添加一个工作区文件夹，再新建笔记。");
+        return;
+      }
+      const name = window.prompt("新建笔记", "未命名笔记")?.trim();
+      if (!name) return;
+
+      const currentDocument = documentStateRef.current;
+      const draftOutcome = currentDocument?.modified ? flushCurrentDraft() : "not-needed";
+      if (
+        currentDocument?.modified &&
+        (draftOutcome === "failed" ||
+          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))
+      ) {
+        return;
+      }
+
+      try {
+        const path = await createWorkspaceNote(workspacePath, parentPath, name);
+        await refreshWorkspaceChanges(workspacePath, [path]);
+        await openPath(path);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新笔记。");
+      }
+    },
+    [flushCurrentDraft, openPath, refreshWorkspaceChanges, workspacePath],
+  );
+
+  const handleCreateWorkspaceFolder = useCallback(
+    async (parentPath: string) => {
+      if (!workspacePath || !isTauriRuntime()) {
+        setError("请先添加一个工作区文件夹，再新建文件夹。");
+        return;
+      }
+      const name = window.prompt("新建文件夹", "新建文件夹")?.trim();
+      if (!name) return;
+
+      try {
+        const path = await createWorkspaceFolder(workspacePath, parentPath, name);
+        await refreshWorkspaceChanges(workspacePath, [path]);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新文件夹。");
+      }
+    },
+    [refreshWorkspaceChanges, workspacePath],
+  );
+
   const openSelectedFile = useCallback(async () => {
     const nativePaths = await chooseDocumentPaths();
     if (isTauriRuntime()) {
@@ -2133,6 +2208,7 @@ export function App() {
             workspacePathRef.current = null;
             setWorkspacePath(null);
             setWorkspaceFiles([]);
+            setWorkspaceFolders([]);
             setWorkspaceIndex([]);
           }
         }
@@ -3910,6 +3986,7 @@ export function App() {
             workspaceIndexLoading={workspaceIndexLoading}
             workspacePath={workspacePath}
             files={workspaceFiles}
+            folders={workspaceFolders}
             visibleFiles={visibleWorkspaceFiles}
             visibleResultCount={visibleWorkspaceResults.length}
             exportableFiles={workspaceExportFiles}
@@ -3928,6 +4005,8 @@ export function App() {
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onRemoveWorkspace={handleRemoveMountedWorkspace}
             onOpenFile={(path) => void handleSelectTab(path)}
+            onCreateNote={(parentPath) => void handleCreateWorkspaceNote(parentPath)}
+            onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}

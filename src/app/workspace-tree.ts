@@ -1,4 +1,4 @@
-import type { WorkspaceFile } from "./types";
+import type { WorkspaceDirectory, WorkspaceFile } from "./types";
 import { normalizePathKey } from "./path-key";
 
 export type WorkspaceTreeFolder = {
@@ -24,7 +24,7 @@ function sortFolder(folder: WorkspaceTreeFolder): void {
   folder.folders.forEach(sortFolder);
 }
 
-export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
+export function buildWorkspaceTree(files: WorkspaceFile[], directories: WorkspaceDirectory[] = []): WorkspaceTree {
   const root: WorkspaceTreeFolder = {
     name: "",
     path: "",
@@ -34,12 +34,9 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
   };
   const foldersByPath = new Map<string, WorkspaceTreeFolder>([["", root]]);
 
-  for (const file of files) {
-    const parts = file.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
-    const fileName = parts.pop() || file.name;
+  const ensureFolder = (relativePath: string): WorkspaceTreeFolder => {
+    const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
     let current = root;
-    current.fileCount += 1;
-
     for (const part of parts) {
       const folderPath = current.path ? `${current.path}/${part}` : part;
       const folderKey = normalizePathKey(folderPath);
@@ -56,6 +53,20 @@ export function buildWorkspaceTree(files: WorkspaceFile[]): WorkspaceTree {
         foldersByPath.set(folderKey, folder);
       }
       current = folder;
+    }
+    return current;
+  };
+
+  for (const directory of directories) ensureFolder(directory.relativePath);
+
+  for (const file of files) {
+    const parts = file.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+    const fileName = parts.pop() || file.name;
+    let current = root;
+    current.fileCount += 1;
+
+    for (const part of parts) {
+      current = ensureFolder(current.path ? `${current.path}/${part}` : part);
       current.fileCount += 1;
     }
 

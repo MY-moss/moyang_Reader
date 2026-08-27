@@ -8,6 +8,9 @@ import {
   type WikiLinkCandidate,
 } from "../wiki-link-completion";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
+import { applySourceEditorAction } from "../editor-context-actions";
+import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import { ContextMenu } from "./ContextMenu";
 
 type SourceEditorProps = {
   value: string;
@@ -44,6 +47,7 @@ export function SourceEditor({
   wikiCompletions,
 }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackRef = useRef<HTMLTextAreaElement>(null);
   const viewRef = useRef<EditorViewInstance | null>(null);
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
@@ -52,6 +56,13 @@ export function SourceEditor({
   const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    selectionStart: number;
+    selectionEnd: number;
+    value: string;
+  } | null>(null);
 
   useEffect(() => {
     wikiCompletionsRef.current = wikiCompletions ?? [];
@@ -83,6 +94,85 @@ export function SourceEditor({
   useEffect(() => {
     onInsertLinkRef.current = onInsertLink;
   }, [onInsertLink]);
+
+  const replaceSourceValue = (nextValue: string, selectionStart: number, selectionEnd: number) => {
+    valueRef.current = nextValue;
+    const view = viewRef.current;
+    if (view) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: nextValue },
+        selection: { anchor: selectionStart, head: selectionEnd },
+      });
+      view.focus();
+      return;
+    }
+
+    onChangeRef.current(nextValue);
+    window.requestAnimationFrame(() => {
+      const textarea = fallbackRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
+  const applyContextAction = (action: EditorContextAction) => {
+    const target = contextMenu;
+    if (!target) return;
+
+    const view = viewRef.current;
+    const currentValue = view?.state.doc.toString() ?? valueRef.current;
+    const selection = view?.state.selection.main;
+    const selectionStart = selection?.from ?? target.selectionStart;
+    const selectionEnd = selection?.to ?? target.selectionEnd;
+
+    if (action === "link") {
+      onInsertLinkRef.current?.({
+        selectionStart,
+        selectionEnd,
+        value: currentValue,
+        replace: (replacement) => {
+          replaceSourceValue(
+            `${currentValue.slice(0, selectionStart)}${replacement}${currentValue.slice(selectionEnd)}`,
+            selectionStart + replacement.length,
+            selectionStart + replacement.length,
+          );
+        },
+      });
+      setContextMenu(null);
+      return;
+    }
+
+    let insertionText: string | undefined;
+    if (action === "wikilink") {
+      insertionText = window.prompt("输入双链目标", "")?.trim();
+      if (!insertionText) {
+        setContextMenu(null);
+        return;
+      }
+    }
+    if (action === "image") {
+      insertionText = window.prompt("输入图片路径或 URL", "")?.trim();
+      if (!insertionText) {
+        setContextMenu(null);
+        return;
+      }
+    }
+
+    const result = applySourceEditorAction(currentValue, selectionStart, selectionEnd, action, insertionText);
+    if (result) replaceSourceValue(result.value, result.selectionStart, result.selectionEnd);
+    setContextMenu(null);
+  };
+
+  const editorContextGroups = editorContextMenuGroups.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      id: `source-${item.action}`,
+      label: item.label,
+      shortcut: item.shortcut,
+      onSelect: () => applyContextAction(item.action),
+    })),
+  }));
 
   useEffect(() => {
     const parent = containerRef.current;
@@ -205,6 +295,18 @@ export function SourceEditor({
                   });
                   return true;
                 },
+                contextmenu: (event, editorView) => {
+                  event.preventDefault();
+                  const selection = editorView.state.selection.main;
+                  setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    selectionStart: selection.from,
+                    selectionEnd: selection.to,
+                    value: editorView.state.doc.toString(),
+                  });
+                  return true;
+                },
                 paste: (event, editorView) => {
                   const handler = onPasteRef.current;
                   if (!handler || !event.clipboardData) return false;
@@ -273,32 +375,65 @@ export function SourceEditor({
 
   if (loadFailed) {
     return (
-      <textarea
-        className="source-editor"
-        aria-label={ariaLabel}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
-          const handler = onPasteRef.current;
-          if (!handler) return;
+      <>
+        <textarea
+          ref={fallbackRef}
+          className="source-editor"
+          aria-label={ariaLabel}
+          value={value}
+          onChange={(event) => onChangeRef.current(event.target.value)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              selectionStart: event.currentTarget.selectionStart,
+              selectionEnd: event.currentTarget.selectionEnd,
+              value: event.currentTarget.value,
+            });
+          }}
+          onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
+            const handler = onPasteRef.current;
+            if (!handler) return;
 
-          const handled = handler({
-            clipboardData: event.clipboardData,
-            selectionStart: event.currentTarget.selectionStart,
-            selectionEnd: event.currentTarget.selectionEnd,
-            value: event.currentTarget.value,
-            preventDefault: () => event.preventDefault(),
-          });
-          if (handled) event.preventDefault();
-        }}
-        spellCheck={false}
-      />
+            const handled = handler({
+              clipboardData: event.clipboardData,
+              selectionStart: event.currentTarget.selectionStart,
+              selectionEnd: event.currentTarget.selectionEnd,
+              value: event.currentTarget.value,
+              preventDefault: () => event.preventDefault(),
+            });
+            if (handled) event.preventDefault();
+          }}
+          spellCheck={false}
+        />
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            title="编辑操作"
+            ariaLabel="正文编辑菜单"
+            groups={editorContextGroups}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready}>
       {!ready && <span className="source-editor-loading">正在加载编辑器…</span>}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          title="编辑操作"
+          ariaLabel="正文编辑菜单"
+          groups={editorContextGroups}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

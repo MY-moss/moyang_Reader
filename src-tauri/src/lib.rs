@@ -105,7 +105,10 @@ pub fn run() {
             commands::write_binary_file_raw,
             commands::export_pdf_file,
             commands::create_markdown_file,
+            commands::create_workspace_note,
+            commands::create_workspace_folder,
             commands::list_workspace_files,
+            commands::list_workspace_directories,
             commands::search_workspace,
             commands::index_workspace,
             commands::refresh_workspace

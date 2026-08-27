@@ -526,6 +526,30 @@ test("inserts a list from the source mode slash menu", async ({ page }) => {
   await expect.poll(async () => readEditorText(editor)).toContain("- ");
 });
 
+test("opens an editor context menu and keeps the selected Markdown formatting", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "context-menu-sample.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Context menu\n\n选择这段文字。\n"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  const paragraph = page.locator(".wysiwyg-editor .editor p").first();
+  await paragraph.selectText();
+  await paragraph.click({ button: "right" });
+
+  const menu = page.getByRole("menu", { name: "正文编辑菜单" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "粗体" }).click();
+  await expect(menu).toHaveCount(0);
+
+  await clickToolbarAction(page, "源文本");
+  const source = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect.poll(async () => readEditorText(source)).toContain("**选择这段文字。**");
+});
+
 test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
   // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
   // one canonical form. This test pins the exact output so a Milkdown/remark

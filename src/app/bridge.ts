@@ -4,6 +4,7 @@ import type {
   FileStamp,
   OpenPath,
   WorkspaceFile,
+  WorkspaceDirectory,
   WorkspaceIndexEntry,
   WorkspaceRefreshResult,
   WorkspaceSearchResult,
@@ -71,6 +72,11 @@ export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]>
   return invoke<WorkspaceFile[]>("list_workspace_files", { root });
 }
 
+export async function listWorkspaceDirectories(root: string): Promise<WorkspaceDirectory[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<WorkspaceDirectory[]>("list_workspace_directories", { root });
+}
+
 export async function searchWorkspace(root: string, query: string): Promise<WorkspaceSearchResult[]> {
   if (!isTauriRuntime()) return [];
   return invoke<WorkspaceSearchResult[]>("search_workspace", { root, query });
@@ -82,7 +88,7 @@ export async function indexWorkspace(root: string): Promise<WorkspaceIndexEntry[
 }
 
 export async function refreshWorkspace(root: string, paths: string[]): Promise<WorkspaceRefreshResult> {
-  if (!isTauriRuntime()) return { scopePaths: paths, files: [], index: [] };
+  if (!isTauriRuntime()) return { scopePaths: paths, folderScopePaths: [], folders: [], files: [], index: [] };
   return invoke<WorkspaceRefreshResult>("refresh_workspace", { root, paths });
 }
 
@@ -91,6 +97,20 @@ export async function createMarkdownFile(root: string, baseFile: string, target:
     throw new Error("浏览器预览模式不能创建工作区文档。");
   }
   return invoke<string>("create_markdown_file", { root, baseFile, target });
+}
+
+export async function createWorkspaceNote(root: string, parentPath: string, name: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能创建工作区文档。");
+  }
+  return invoke<string>("create_workspace_note", { root, parentPath, name });
+}
+
+export async function createWorkspaceFolder(root: string, parentPath: string, name: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能创建工作区文件夹。");
+  }
+  return invoke<string>("create_workspace_folder", { root, parentPath, name });
 }
 
 export async function subscribeToWorkspaceChanges(

@@ -1087,6 +1087,14 @@ pub struct WorkspaceFile {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceDirectory {
+    pub path: String,
+    pub name: String,
+    pub relative_path: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct WorkspaceSearchResult {
     pub file: WorkspaceFile,
     pub preview: String,
@@ -1105,6 +1113,8 @@ pub struct WorkspaceIndexEntry {
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceRefreshResult {
     pub scope_paths: Vec<String>,
+    pub folder_scope_paths: Vec<String>,
+    pub folders: Vec<WorkspaceDirectory>,
     pub files: Vec<WorkspaceFile>,
     pub index: Vec<WorkspaceIndexEntry>,
 }
@@ -1729,6 +1739,46 @@ fn collect_workspace_files(
     Ok(())
 }
 
+fn workspace_directory(root: &Path, path: &Path) -> Result<WorkspaceDirectory, String> {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "工作区中存在无法解析名称的文件夹。".to_string())?;
+    let relative_path = path
+        .strip_prefix(root)
+        .map_err(|error| format!("无法计算工作区文件夹相对路径：{error}"))?
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    Ok(WorkspaceDirectory {
+        path: path.to_string_lossy().into_owned(),
+        name: name.to_string(),
+        relative_path,
+    })
+}
+
+fn collect_workspace_directories(
+    root: &Path,
+    directory: &Path,
+    directories: &mut Vec<WorkspaceDirectory>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(directory).map_err(|error| format!("无法读取工作区目录：{error}"))?
+    {
+        let entry = entry.map_err(|error| format!("无法读取工作区条目：{error}"))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("无法读取工作区条目类型：{error}"))?;
+
+        if file_type.is_dir() && !should_skip_directory(&path) {
+            directories.push(workspace_directory(root, &path)?);
+            collect_workspace_directories(root, &path, directories)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
     if !root.is_dir() {
         return Err("请选择一个有效的工作区文件夹。".to_string());
@@ -1738,6 +1788,17 @@ fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
     collect_workspace_files(root, root, &mut files)?;
     files.sort_by_key(|file| file.relative_path.to_ascii_lowercase());
     Ok(files)
+}
+
+fn sorted_workspace_directories(root: &Path) -> Result<Vec<WorkspaceDirectory>, String> {
+    if !root.is_dir() {
+        return Err("请选择一个有效的工作区文件夹。".to_string());
+    }
+
+    let mut directories = Vec::new();
+    collect_workspace_directories(root, root, &mut directories)?;
+    directories.sort_by_key(|directory| directory.relative_path.to_ascii_lowercase());
+    Ok(directories)
 }
 
 #[tauri::command]
@@ -1753,6 +1814,19 @@ pub fn list_workspace_files(
 
 fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, String> {
     sorted_workspace_files(&root)
+}
+
+#[tauri::command]
+pub fn list_workspace_directories(
+    root: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<WorkspaceDirectory>, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+    }
+    let root = fs::canonicalize(PathBuf::from(root))
+        .map_err(|error| format!("无法确认工作区路径：{error}"))?;
+    sorted_workspace_directories(&root)
 }
 
 #[tauri::command]
@@ -2239,6 +2313,172 @@ fn create_markdown_file_inner(
     Ok(display_path(&candidate))
 }
 
+fn validate_workspace_entry_name(raw_name: &str) -> Result<String, String> {
+    let name = raw_name.trim();
+    if name.is_empty() || name == "." || name == ".." {
+        return Err("名称不能为空，也不能使用 . 或 ..。".to_string());
+    }
+    if name.contains(['/', '\\']) {
+        return Err("名称只能是一层文件名，不能包含路径分隔符。".to_string());
+    }
+    if name.chars().any(|character| {
+        matches!(character, '<' | '>' | '"' | '|' | '?' | '*' | ':') || character == '\0'
+    }) {
+        return Err("名称包含 Windows 不允许的文件名字符。".to_string());
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err("名称不能以句点或空格结尾。".to_string());
+    }
+
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
+    if matches!(
+        stem.as_str(),
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
+    ) {
+        return Err("这个名称是 Windows 保留设备名，请换一个名称。".to_string());
+    }
+
+    Ok(name.to_string())
+}
+
+fn resolve_workspace_parent(root: &Path, parent_path: &str) -> Result<PathBuf, String> {
+    let parent_path = parent_path.trim().replace('\\', "/");
+    if parent_path.starts_with('/') || parent_path.contains(':') {
+        return Err("父文件夹必须是工作区内的相对路径。".to_string());
+    }
+
+    let mut candidate = root.to_path_buf();
+    for part in parent_path.split('/') {
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        if part == ".." || part.contains(['<', '>', '"', '|', '?', '*', ':']) {
+            return Err("父文件夹路径不是有效的工作区相对路径。".to_string());
+        }
+        candidate.push(part);
+    }
+
+    let canonical =
+        fs::canonicalize(&candidate).map_err(|error| format!("无法读取父文件夹：{error}"))?;
+    if !canonical.starts_with(root) || !canonical.is_dir() {
+        return Err("父文件夹不在当前工作区内。".to_string());
+    }
+    Ok(canonical)
+}
+
+fn create_workspace_note_inner(
+    root: String,
+    parent_path: String,
+    raw_name: String,
+) -> Result<String, String> {
+    let root = fs::canonicalize(PathBuf::from(root))
+        .map_err(|error| format!("无法读取工作区目录：{error}"))?;
+    if !root.is_dir() {
+        return Err("工作区路径不是文件夹。".to_string());
+    }
+    let parent = resolve_workspace_parent(&root, &parent_path)?;
+    let mut name = validate_workspace_entry_name(&raw_name)?;
+    if let Some(extension) = Path::new(&name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+    {
+        if !markdown_extension(Some(extension)) {
+            return Err("新建笔记只能使用 Markdown 扩展名。".to_string());
+        }
+    } else {
+        name.push_str(".md");
+    }
+
+    let candidate = parent.join(&name);
+    let file_stem = candidate
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("未命名笔记");
+    let contents = format!("# {file_stem}\n\n");
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&candidate)
+        .map_err(|error| format!("无法创建新笔记：{error}"))?;
+    file.write_all(contents.as_bytes())
+        .map_err(|error| format!("无法写入新笔记：{error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("无法刷新新笔记：{error}"))?;
+
+    Ok(display_path(&candidate))
+}
+
+fn create_workspace_folder_inner(
+    root: String,
+    parent_path: String,
+    raw_name: String,
+) -> Result<String, String> {
+    let root = fs::canonicalize(PathBuf::from(root))
+        .map_err(|error| format!("无法读取工作区目录：{error}"))?;
+    if !root.is_dir() {
+        return Err("工作区路径不是文件夹。".to_string());
+    }
+    let parent = resolve_workspace_parent(&root, &parent_path)?;
+    let name = validate_workspace_entry_name(&raw_name)?;
+    let candidate = parent.join(&name);
+    fs::create_dir(&candidate).map_err(|error| format!("无法创建文件夹：{error}"))?;
+    Ok(display_path(&candidate))
+}
+
+#[tauri::command]
+pub fn create_workspace_note(
+    root: String,
+    parent_path: String,
+    name: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    if !access.is_write_allowed(Path::new(&root)) {
+        return Err("拒绝在未通过用户文件夹选择的工作区中创建笔记。请重新添加文件夹。".to_string());
+    }
+    create_workspace_note_inner(root, parent_path, name)
+}
+
+#[tauri::command]
+pub fn create_workspace_folder(
+    root: String,
+    parent_path: String,
+    name: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    if !access.is_write_allowed(Path::new(&root)) {
+        return Err(
+            "拒绝在未通过用户文件夹选择的工作区中创建文件夹。请重新添加文件夹。".to_string(),
+        );
+    }
+    create_workspace_folder_inner(root, parent_path, name)
+}
+
 #[tauri::command]
 pub fn index_workspace(
     root: String,
@@ -2306,6 +2546,8 @@ fn refresh_workspace_inner(
     }
 
     let mut scope_paths = Vec::new();
+    let mut folder_scope_paths = Vec::new();
+    let mut folders = Vec::new();
     let mut files = Vec::new();
     for raw_path in paths {
         let requested = PathBuf::from(raw_path);
@@ -2324,6 +2566,30 @@ fn refresh_workspace_inner(
             scope_paths.push(display);
         }
 
+        let folder_scope = if scope.is_dir() {
+            Some(scope.clone())
+        } else if !scope.is_file() {
+            scope
+                .parent()
+                .filter(|parent| access_path_contains(&root, parent))
+                .map(Path::to_path_buf)
+        } else {
+            None
+        };
+        if let Some(folder_scope) = folder_scope {
+            if !folder_scope_paths.iter().any(|existing| {
+                access_path_key(Path::new(existing)) == access_path_key(&folder_scope)
+            }) {
+                folder_scope_paths.push(display_path(&folder_scope));
+                if folder_scope.is_dir() {
+                    if folder_scope != root {
+                        folders.push(workspace_directory(&root, &folder_scope)?);
+                    }
+                    collect_workspace_directories(&root, &folder_scope, &mut folders)?;
+                }
+            }
+        }
+
         if scope.is_dir() {
             collect_workspace_files(&root, &scope, &mut files)?;
         } else if scope.is_file() && is_supported_document_path(&scope) {
@@ -2336,6 +2602,11 @@ fn refresh_workspace_inner(
         access_path_key(Path::new(&left.path)) == access_path_key(Path::new(&right.path))
     });
 
+    folders.sort_by_key(|folder| folder.relative_path.to_ascii_lowercase());
+    folders.dedup_by(|left, right| {
+        access_path_key(Path::new(&left.path)) == access_path_key(Path::new(&right.path))
+    });
+
     let index = files
         .iter()
         .filter_map(|file| index_entry_for_file(file.clone()))
@@ -2343,6 +2614,8 @@ fn refresh_workspace_inner(
 
     Ok(WorkspaceRefreshResult {
         scope_paths,
+        folder_scope_paths,
+        folders,
         files,
         index,
     })
@@ -2675,18 +2948,19 @@ fn replace_file(temp: &Path, destination: &Path) -> std::io::Result<()> {
 mod tests {
     use super::{
         access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
-        collect_open_paths, create_markdown_file_inner, decode_ipc_path, decode_text,
-        extract_markdown_links, extract_tags, extract_title, extract_wiki_links, has_pdf_header,
-        index_workspace_inner, is_supported_document_path, is_supported_text_path,
-        is_write_allowed_for_new_path, list_workspace_files_inner, path_exists_inner,
-        persistent_search_index_path, prune_search_entries, read_text_file_inner,
-        refresh_workspace_inner, search_workspace_inner, search_workspace_inner_with_cache,
+        collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
+        create_workspace_note_inner, decode_ipc_path, decode_text, extract_markdown_links,
+        extract_tags, extract_title, extract_wiki_links, has_pdf_header, index_workspace_inner,
+        is_supported_document_path, is_supported_text_path, is_write_allowed_for_new_path,
+        list_workspace_files_inner, path_exists_inner, persistent_search_index_path,
+        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
+        search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        source_search_tokens, touch_indexed_file, write_bytes_file_inner, write_text_file_inner,
-        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
-        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
-        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
-        TEMP_FILE_COUNTER,
+        sorted_workspace_directories, source_search_tokens, touch_indexed_file,
+        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
+        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
+        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
+        MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -3850,6 +4124,9 @@ mod tests {
         assert_eq!(delta.index.len(), 1);
         assert_eq!(delta.index[0].title, "Before");
         assert!(!delta.files.iter().any(|file| file.name == "README.md"));
+        assert_eq!(delta.folders.len(), 1);
+        assert_eq!(delta.folders[0].relative_path, "notes");
+        assert_eq!(delta.folder_scope_paths.len(), 1);
 
         fs::write(&changed, "# After\n\n#topic").expect("update changed document");
         let updated =
@@ -3867,5 +4144,59 @@ mod tests {
         assert!(removed.index.is_empty());
 
         fs::remove_dir_all(root).expect("remove refresh workspace");
+    }
+
+    #[test]
+    fn creates_workspace_entries_without_path_traversal_or_placeholder_files() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-create-entry-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let projects = root.join("Projects");
+        fs::create_dir_all(&projects).expect("create projects directory");
+        let root_string = root.to_string_lossy().into_owned();
+
+        let created_folder = create_workspace_folder_inner(
+            root_string.clone(),
+            "Projects".to_string(),
+            "Archive".to_string(),
+        )
+        .expect("create nested workspace folder");
+        assert_eq!(
+            fs::canonicalize(&created_folder).expect("canonicalize created folder"),
+            fs::canonicalize(projects.join("Archive")).expect("canonicalize expected folder")
+        );
+
+        let created_note = create_workspace_note_inner(
+            root_string.clone(),
+            "Projects/Archive".to_string(),
+            "Plan".to_string(),
+        )
+        .expect("create nested workspace note");
+        assert_eq!(
+            fs::read_to_string(&created_note).expect("read created workspace note"),
+            "# Plan\n\n"
+        );
+        assert_eq!(
+            sorted_workspace_directories(&root)
+                .expect("list workspace directories")
+                .len(),
+            2
+        );
+        assert!(create_workspace_folder_inner(
+            root_string.clone(),
+            "Projects".to_string(),
+            "../Outside".to_string(),
+        )
+        .is_err());
+        assert!(create_workspace_note_inner(
+            root_string,
+            "Projects".to_string(),
+            "CON".to_string()
+        )
+        .is_err());
+
+        fs::remove_dir_all(root).expect("remove create entry workspace");
     }
 }

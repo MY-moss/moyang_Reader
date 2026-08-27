@@ -1,4 +1,4 @@
-import type { WorkspaceFile, WorkspaceIndexEntry, WorkspaceRefreshResult } from "./types";
+import type { WorkspaceDirectory, WorkspaceFile, WorkspaceIndexEntry, WorkspaceRefreshResult } from "./types";
 import { normalizePathKey } from "./path-key";
 
 function normalizeWorkspacePath(value: string | null): string {
@@ -33,6 +33,20 @@ export function applyWorkspaceIndexDelta(
   for (const entry of delta.index) byPath.set(normalizeWorkspacePath(entry.file.path), entry);
   return [...byPath.values()].sort((left, right) =>
     left.file.relativePath.localeCompare(right.file.relativePath, undefined, { sensitivity: "base" }),
+  );
+}
+
+export function applyWorkspaceFolderDelta(
+  current: WorkspaceDirectory[],
+  delta: WorkspaceRefreshResult,
+): WorkspaceDirectory[] {
+  const retained = current.filter(
+    (folder) => !delta.folderScopePaths.some((scope) => isWithinScope(folder.path, scope)),
+  );
+  const byPath = new Map(retained.map((folder) => [normalizeWorkspacePath(folder.path), folder]));
+  for (const folder of delta.folders) byPath.set(normalizeWorkspacePath(folder.path), folder);
+  return [...byPath.values()].sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath, undefined, { sensitivity: "base" }),
   );
 }
 
