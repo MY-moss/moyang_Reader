@@ -24,8 +24,10 @@ type WorkspaceTreeProps = {
   onCreateFolder?: (parentPath: string) => void;
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
 };
 
 function formatSize(size: number): string {
@@ -120,6 +122,7 @@ type WorkspaceFolderProps = {
   onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
 };
@@ -134,6 +137,7 @@ function WorkspaceFolder({
   onOpenContextMenu,
   onRenameEntry,
   onDeleteEntry,
+  onDuplicateEntry,
   onRevealEntry,
   onCopyPath,
 }: WorkspaceFolderProps) {
@@ -206,6 +210,7 @@ function WorkspaceFolder({
               onOpenContextMenu={onOpenContextMenu}
               onRenameEntry={onRenameEntry}
               onDeleteEntry={onDeleteEntry}
+              onDuplicateEntry={onDuplicateEntry}
               onRevealEntry={onRevealEntry}
               onCopyPath={onCopyPath}
             />
@@ -225,14 +230,23 @@ export function WorkspaceTreeView({
   onCreateFolder,
   onRenameEntry,
   onDeleteEntry,
+  onDuplicateEntry,
   onRevealEntry,
   onCopyPath,
+  onCopyRelativePath,
 }: WorkspaceTreeProps) {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);
   const tree = useMemo(() => buildWorkspaceTree(files, folders), [files, folders]);
   const canManage = Boolean(
-    onCreateNote || onCreateFolder || onRenameEntry || onDeleteEntry || onRevealEntry || onCopyPath,
+    onCreateNote ||
+    onCreateFolder ||
+    onRenameEntry ||
+    onDeleteEntry ||
+    onDuplicateEntry ||
+    onRevealEntry ||
+    onCopyPath ||
+    onCopyRelativePath,
   );
 
   const toggleFolder = (path: string) => {
@@ -287,6 +301,7 @@ export function WorkspaceTreeView({
           onOpenContextMenu={openContextMenu}
           onRenameEntry={onRenameEntry}
           onDeleteEntry={onDeleteEntry}
+          onDuplicateEntry={onDuplicateEntry}
           onRevealEntry={onRevealEntry}
           onCopyPath={onCopyPath}
         />
@@ -339,11 +354,24 @@ export function WorkspaceTreeView({
                   },
                 ]
               : []),
-            ...(contextMenu.entryKind !== "root" && (onRenameEntry || onDeleteEntry)
+            ...(contextMenu.entryKind !== "root" && (onRenameEntry || onDeleteEntry || onDuplicateEntry)
               ? [
                   {
                     label: "管理",
                     items: [
+                      ...(onDuplicateEntry
+                        ? [
+                            {
+                              id: "duplicate-entry",
+                              label: contextMenu.entryKind === "folder" ? "复制文件夹" : "复制文件",
+                              onSelect: () => {
+                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {
+                                  onDuplicateEntry(contextMenu.entryPath, contextMenu.entryKind);
+                                }
+                              },
+                            },
+                          ]
+                        : []),
                       ...(onRenameEntry
                         ? [
                             {
@@ -375,7 +403,21 @@ export function WorkspaceTreeView({
                   },
                 ]
               : []),
-            ...(onRevealEntry || onCopyPath
+            ...(contextMenu.entryKind === "folder"
+              ? [
+                  {
+                    label: "视图",
+                    items: [
+                      {
+                        id: "toggle-folder",
+                        label: collapsedFolders.has(contextMenu.entryPath) ? "展开文件夹" : "折叠文件夹",
+                        onSelect: () => toggleFolder(contextMenu.entryPath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(onRevealEntry || onCopyPath || onCopyRelativePath
               ? [
                   {
                     label: "路径",
@@ -395,6 +437,15 @@ export function WorkspaceTreeView({
                               id: "copy-entry-path",
                               label: "复制完整路径",
                               onSelect: () => onCopyPath(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
+                      ...(contextMenu.entryKind !== "root" && onCopyRelativePath
+                        ? [
+                            {
+                              id: "copy-relative-entry-path",
+                              label: "复制相对路径",
+                              onSelect: () => onCopyRelativePath(contextMenu.entryPath),
                             },
                           ]
                         : []),

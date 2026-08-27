@@ -2548,6 +2548,81 @@ fn delete_workspace_entry_inner(root: String, entry_path: String) -> Result<(), 
     Ok(())
 }
 
+fn copy_workspace_directory(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir(destination).map_err(|error| format!("无法创建副本文件夹：{error}"))?;
+    let result = (|| {
+        for entry in fs::read_dir(source).map_err(|error| format!("无法读取源文件夹：{error}"))?
+        {
+            let entry = entry.map_err(|error| format!("无法读取源文件夹内容：{error}"))?;
+            let source_child = entry.path();
+            let destination_child = destination.join(entry.file_name());
+            let file_type = entry
+                .file_type()
+                .map_err(|error| format!("无法读取副本内容类型：{error}"))?;
+            if file_type.is_symlink() {
+                return Err("副本中包含符号链接，出于安全原因无法复制。".to_string());
+            }
+            if file_type.is_dir() {
+                copy_workspace_directory(&source_child, &destination_child)?;
+            } else if file_type.is_file() {
+                fs::copy(&source_child, &destination_child)
+                    .map_err(|error| format!("无法复制文件到副本：{error}"))?;
+            } else {
+                return Err("副本中包含不支持的文件类型。".to_string());
+            }
+        }
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_dir_all(destination);
+    }
+    result
+}
+
+fn duplicate_workspace_entry_inner(
+    root: String,
+    entry_path: String,
+    raw_name: String,
+) -> Result<String, String> {
+    let root = canonical_workspace_root(&root)?;
+    let source = resolve_workspace_entry(&root, &entry_path)?;
+    let source_metadata =
+        fs::symlink_metadata(&source).map_err(|error| format!("无法读取工作区条目：{error}"))?;
+    let source_is_directory = source_metadata.is_dir();
+    let mut name = validate_workspace_entry_name(&raw_name)?;
+
+    if !source_is_directory && Path::new(&name).extension().is_none() {
+        if let Some(extension) = source.extension().and_then(|value| value.to_str()) {
+            name.push('.');
+            name.push_str(extension);
+        }
+    }
+    if !source_is_directory && !is_supported_document_path(Path::new(&name)) {
+        return Err(
+            "文件扩展名不受支持，请保留为 Markdown、文本、Word、PDF 或图片文件。".to_string(),
+        );
+    }
+
+    let parent = source
+        .parent()
+        .ok_or_else(|| "工作区条目目录无法解析。".to_string())?;
+    let destination = parent.join(name);
+    if !destination.starts_with(&root) {
+        return Err("副本名称不能跳出当前工作区。".to_string());
+    }
+    if fs::symlink_metadata(&destination).is_ok() {
+        return Err("目标名称已经存在，请换一个名称。".to_string());
+    }
+
+    if source_is_directory {
+        copy_workspace_directory(&source, &destination)?;
+    } else {
+        fs::copy(&source, &destination).map_err(|error| format!("无法创建文件副本：{error}"))?;
+    }
+    Ok(display_path(&destination))
+}
+
 fn reveal_workspace_entry_inner(root: String, entry_path: String) -> Result<(), String> {
     let root = canonical_workspace_root(&root)?;
     let target = if entry_path.trim().is_empty() {
@@ -2631,6 +2706,19 @@ pub fn delete_workspace_entry(
         return Err("拒绝删除未通过用户文件夹选择的工作区内容。请重新添加文件夹。".to_string());
     }
     delete_workspace_entry_inner(root, entry_path)
+}
+
+#[tauri::command]
+pub fn duplicate_workspace_entry(
+    root: String,
+    entry_path: String,
+    name: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
+    if !access.is_write_allowed(Path::new(&root)) {
+        return Err("拒绝在未通过用户文件夹选择的工作区中创建副本。请重新添加文件夹。".to_string());
+    }
+    duplicate_workspace_entry_inner(root, entry_path, name)
 }
 
 #[tauri::command]
@@ -3116,18 +3204,18 @@ mod tests {
         access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner, clean_tag,
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
         create_workspace_note_inner, decode_ipc_path, decode_text, delete_workspace_entry_inner,
-        extract_markdown_links, extract_tags, extract_title, extract_wiki_links, has_pdf_header,
-        index_workspace_inner, is_supported_document_path, is_supported_text_path,
-        is_write_allowed_for_new_path, list_workspace_files_inner, path_exists_inner,
-        persistent_search_index_path, prune_search_entries, read_text_file_inner,
-        refresh_workspace_inner, rename_workspace_entry_inner, search_workspace_inner,
-        search_workspace_inner_with_cache, search_workspace_inner_with_cache_and_persistence,
-        should_skip_directory, sorted_workspace_directories, source_search_tokens,
-        touch_indexed_file, write_bytes_file_inner, write_text_file_inner, AccessRegistry,
-        CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
-        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
-        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
-        TEMP_FILE_COUNTER,
+        duplicate_workspace_entry_inner, extract_markdown_links, extract_tags, extract_title,
+        extract_wiki_links, has_pdf_header, index_workspace_inner, is_supported_document_path,
+        is_supported_text_path, is_write_allowed_for_new_path, list_workspace_files_inner,
+        path_exists_inner, persistent_search_index_path, prune_search_entries,
+        read_text_file_inner, refresh_workspace_inner, rename_workspace_entry_inner,
+        search_workspace_inner, search_workspace_inner_with_cache,
+        search_workspace_inner_with_cache_and_persistence, should_skip_directory,
+        sorted_workspace_directories, source_search_tokens, touch_indexed_file,
+        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
+        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
+        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
+        MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -4416,5 +4504,53 @@ mod tests {
         assert!(!Path::new(&renamed_archive).exists());
 
         fs::remove_dir_all(root).expect("remove management workspace");
+    }
+
+    #[test]
+    fn duplicates_workspace_files_and_folders_inside_the_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-duplicate-entry-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let source_folder = root.join("Projects");
+        let source_file = source_folder.join("Plan.md");
+        fs::create_dir_all(&source_folder).expect("create duplicate workspace");
+        fs::write(&source_file, "# Plan\n\ncontent").expect("write duplicate source");
+        let root_string = root.to_string_lossy().into_owned();
+
+        let copied_file = duplicate_workspace_entry_inner(
+            root_string.clone(),
+            "Projects/Plan.md".to_string(),
+            "Plan copy".to_string(),
+        )
+        .expect("duplicate workspace file");
+        assert!(copied_file.ends_with("Plan copy.md"));
+        assert_eq!(
+            fs::read_to_string(&copied_file).expect("read copied file"),
+            "# Plan\n\ncontent"
+        );
+
+        let copied_folder = duplicate_workspace_entry_inner(
+            root_string.clone(),
+            "Projects".to_string(),
+            "Projects copy".to_string(),
+        )
+        .expect("duplicate workspace folder");
+        assert!(Path::new(&copied_folder).join("Plan.md").is_file());
+        assert!(duplicate_workspace_entry_inner(
+            root_string.clone(),
+            "Projects/Plan.md".to_string(),
+            "../outside".to_string(),
+        )
+        .is_err());
+        assert!(duplicate_workspace_entry_inner(
+            root_string,
+            "Projects/Plan.md".to_string(),
+            "Plan".to_string(),
+        )
+        .is_err());
+
+        fs::remove_dir_all(root).expect("remove duplicate workspace");
     }
 }

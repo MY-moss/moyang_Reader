@@ -55,8 +55,10 @@ type WorkspacePanelProps = {
   onCreateFolder?: (parentPath: string) => void;
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
@@ -106,8 +108,10 @@ export function WorkspacePanel({
   onCreateFolder,
   onRenameEntry,
   onDeleteEntry,
+  onDuplicateEntry,
   onRevealEntry,
   onCopyPath,
+  onCopyRelativePath,
   onSearchQueryChange,
   onTagChange,
   onKindChange,
@@ -409,8 +413,10 @@ export function WorkspacePanel({
                 onCreateFolder={onCreateFolder}
                 onRenameEntry={onRenameEntry}
                 onDeleteEntry={onDeleteEntry}
+                onDuplicateEntry={onDuplicateEntry}
                 onRevealEntry={onRevealEntry}
                 onCopyPath={onCopyPath}
+                onCopyRelativePath={onCopyRelativePath}
               />
             </div>
           )}
