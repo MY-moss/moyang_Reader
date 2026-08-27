@@ -272,7 +272,8 @@ export function SourceEditor({
           item.disabled ||
           (item.action === "undo" && !canUndo) ||
           (item.action === "redo" && !canRedo) ||
-          ((item.action === "cut" || item.action === "copy") && !hasSelection),
+          ((item.action === "cut" || item.action === "copy") && !hasSelection) ||
+          (item.action === "clear-format" && !hasSelection),
         onSelect: () => applyContextAction(item.action),
       };
     }),

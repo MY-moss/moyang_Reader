@@ -80,7 +80,10 @@ async function waitForExport(pathname, description) {
 async function workspaceEntryExists(selector, text = "") {
   const entries = await browser.$$(selector);
   for (const entry of entries) {
-    if (!text || (await entry.getText()).includes(text)) return true;
+    if (!text) return true;
+    const nameSelector = selector === ".workspace-folder" ? ".workspace-folder-name" : "span";
+    const name = await entry.$(nameSelector);
+    if ((await name.getText()).trim() === text) return true;
   }
   return false;
 }
@@ -139,7 +142,9 @@ async function clickWorkspaceFile(name) {
 async function findWorkspaceElement(selector, text) {
   const entries = await browser.$$(selector);
   for (const entry of entries) {
-    if ((await entry.getText()).includes(text)) return entry;
+    const nameSelector = selector === ".workspace-folder" ? ".workspace-folder-name" : "span";
+    const name = await entry.$(nameSelector);
+    if ((await name.getText()).trim() === text) return entry;
   }
   return null;
 }
@@ -255,8 +260,17 @@ describe("Moyang Reader desktop runtime", () => {
     const renamedFileName = "context-renamed.md";
     const originalFilePath = path.join(workspacePath, originalFileName);
     const renamedFilePath = path.join(workspacePath, renamedFileName);
+    const copiedFileName = "context-managed-copy.md";
+    const copiedFilePath = path.join(workspacePath, copiedFileName);
     const folderName = "context-managed-folder";
     const folderPath = path.join(workspacePath, folderName);
+    const copiedFolderName = "context-managed-folder-copy";
+    const copiedFolderPath = path.join(workspacePath, copiedFolderName);
+    fs.rmSync(originalFilePath, { force: true });
+    fs.rmSync(renamedFilePath, { force: true });
+    fs.rmSync(copiedFilePath, { force: true });
+    fs.rmSync(folderPath, { recursive: true, force: true });
+    fs.rmSync(copiedFolderPath, { recursive: true, force: true });
     fs.writeFileSync(originalFilePath, "# Context managed\n", "utf8");
     fs.mkdirSync(folderPath, { recursive: true });
     fs.writeFileSync(path.join(folderPath, "nested.md"), "# Nested\n", "utf8");
@@ -277,8 +291,27 @@ describe("Moyang Reader desktop runtime", () => {
 
       await browser.execute(() => {
         window.__desktopE2EOriginalPrompt = window.prompt;
-        window.prompt = () => "context-renamed";
+        window.prompt = (message) => {
+          if (message === "复制文件") return "context-managed-copy";
+          if (message === "复制文件夹") return "context-managed-folder-copy";
+          return "context-renamed";
+        };
       });
+      const duplicateFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
+      await duplicateFileMenu.$("button=复制文件").click();
+      await waitForWorkspaceEntry(".workspace-file", copiedFileName, true, "the context-menu file was not copied");
+      assert.equal(fs.readFileSync(copiedFilePath, "utf8"), "# Context managed\n");
+
+      const duplicateFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
+      await duplicateFolderMenu.$("button=复制文件夹").click();
+      await waitForWorkspaceEntry(
+        ".workspace-folder",
+        copiedFolderName,
+        true,
+        "the context-menu folder was not copied",
+      );
+      assert.equal(fs.readFileSync(path.join(copiedFolderPath, "nested.md"), "utf8"), "# Nested\n");
+
       const renameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
       await renameMenu.$("button=重命名文件").click();
       await waitForWorkspaceEntry(".workspace-file", renamedFileName, true, "the context-menu file was not renamed");
@@ -309,7 +342,9 @@ describe("Moyang Reader desktop runtime", () => {
         .catch(() => undefined);
       fs.rmSync(originalFilePath, { force: true });
       fs.rmSync(renamedFilePath, { force: true });
+      fs.rmSync(copiedFilePath, { force: true });
       fs.rmSync(folderPath, { recursive: true, force: true });
+      fs.rmSync(copiedFolderPath, { recursive: true, force: true });
     }
   });
 

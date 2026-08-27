@@ -6,6 +6,13 @@ export type SourceEditorActionResult = {
   selectionEnd: number;
 };
 
+export function formatEditorDate(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function replaceSelection(
   value: string,
   selectionStart: number,
@@ -60,6 +67,33 @@ function lineBounds(value: string, selectionStart: number, selectionEnd: number)
 function stripBlockPrefix(line: string): string {
   const indentation = line.match(/^\s*/)?.[0] ?? "";
   return `${indentation}${line.slice(indentation.length).replace(/^(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s?)/, "")}`;
+}
+
+function stripInlineFormatting(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/~~(.*?)~~/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1$2")
+    .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1$2");
+}
+
+function clearLineFormatting(line: string): string {
+  const indentation = line.match(/^\s*/)?.[0] ?? "";
+  const body = line.slice(indentation.length);
+  const withoutTask = stripBlockPrefix(body).replace(/^\[[ xX]\]\s+/, "");
+  return `${indentation}${stripInlineFormatting(withoutTask)}`;
+}
+
+function taskListLine(line: string): string {
+  const indentation = line.match(/^\s*/)?.[0] ?? "";
+  const body = line.slice(indentation.length);
+  if (/^(?:[-*+]\s+)?\[[ xX]\]\s+/.test(body)) return line;
+  return `${indentation}- [ ] ${stripBlockPrefix(body)}`;
 }
 
 function transformLines(
@@ -142,8 +176,14 @@ export function applySourceEditorAction(
       const text = selected ? `\`\`\`\n${selected.replace(/\n?$/, "")}\n\`\`\`` : "```\n\n```";
       return insertBlock(value, selectionStart, selectionEnd, text, selected ? 4 : 4);
     }
+    case "clear-format":
+      return transformLines(value, selectionStart, selectionEnd, clearLineFormatting);
+    case "task-list":
+      return transformLines(value, selectionStart, selectionEnd, taskListLine);
     case "horizontal-rule":
       return insertBlock(value, selectionStart, selectionEnd, "---", 3);
+    case "insert-date":
+      return replaceSelection(value, selectionStart, selectionEnd, formatEditorDate());
     case "table":
       return insertBlock(
         value,

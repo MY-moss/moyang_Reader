@@ -109,6 +109,7 @@ pub fn run() {
             commands::create_workspace_folder,
             commands::rename_workspace_entry,
             commands::delete_workspace_entry,
+            commands::duplicate_workspace_entry,
             commands::reveal_workspace_entry,
             commands::list_workspace_files,
             commands::list_workspace_directories,

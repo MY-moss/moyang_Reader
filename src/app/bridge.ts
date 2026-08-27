@@ -127,6 +127,13 @@ export async function deleteWorkspaceEntry(root: string, entryPath: string): Pro
   await invoke("delete_workspace_entry", { root, entryPath });
 }
 
+export async function duplicateWorkspaceEntry(root: string, entryPath: string, name: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能创建工作区副本。");
+  }
+  return invoke<string>("duplicate_workspace_entry", { root, entryPath, name });
+}
+
 export async function revealWorkspaceEntry(root: string, entryPath: string): Promise<void> {
   if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式不能打开资源管理器定位本地路径。");

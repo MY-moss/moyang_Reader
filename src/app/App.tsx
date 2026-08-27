@@ -44,6 +44,7 @@ import {
   createMarkdownFile,
   createWorkspaceFolder,
   createWorkspaceNote,
+  duplicateWorkspaceEntry,
   exportPdfFile,
   fileExists,
   fileSize,
@@ -239,6 +240,14 @@ import { captureEditorViewport, restoreEditorViewport } from "./editor-history-v
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
+}
+
+function duplicateEntryName(path: string, kind: "file" | "folder"): string {
+  const name = fileNameFromPath(path);
+  if (kind === "folder") return `${name} 副本`;
+  const extensionIndex = name.lastIndexOf(".");
+  if (extensionIndex > 0) return `${name.slice(0, extensionIndex)} 副本${name.slice(extensionIndex)}`;
+  return `${name} 副本`;
 }
 
 function focusEditorSurface(surface: Element | null): void {
@@ -2351,6 +2360,47 @@ export function App() {
     }
   }, []);
 
+  const handleCopyWorkspaceRelativePath = useCallback(async (entryPath: string) => {
+    const relativePath = entryPath.replace(/[\\/]+/g, "\\").replace(/^\\+|\\+$/g, "");
+    if (!relativePath) {
+      setError("当前条目没有可复制的相对路径。");
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持访问剪贴板。");
+      await navigator.clipboard.writeText(relativePath);
+      setSettingsNotice("相对路径已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制相对路径失败。");
+    }
+  }, []);
+
+  const handleDuplicateWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再复制文件或文件夹。");
+        return;
+      }
+
+      const defaultName = duplicateEntryName(entryPath, kind);
+      const name = window.prompt(kind === "folder" ? "复制文件夹" : "复制文件", defaultName)?.trim();
+      if (!name) return;
+
+      try {
+        const duplicatedPath = await duplicateWorkspaceEntry(root, entryPath, name);
+        await refreshWorkspaceChanges(root, [duplicatedPath]);
+        setSettingsNotice(`已创建副本：${fileNameFromPath(duplicatedPath)}`);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建工作区副本。");
+      }
+    },
+    [refreshWorkspaceChanges],
+  );
+
   const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {
     const root = workspacePathRef.current;
     if (!root || !isTauriRuntime()) {
@@ -4311,8 +4361,10 @@ export function App() {
             onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}
             onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}
             onDeleteEntry={(entryPath, kind) => void handleDeleteWorkspaceEntry(entryPath, kind)}
+            onDuplicateEntry={(entryPath, kind) => void handleDuplicateWorkspaceEntry(entryPath, kind)}
             onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}
             onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}
+            onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}

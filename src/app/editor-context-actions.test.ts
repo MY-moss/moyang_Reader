@@ -25,4 +25,14 @@ describe("source editor context actions", () => {
     expect(applySourceEditorAction("", 0, 0, "wikilink", "Note")?.value).toBe("[[Note]]");
     expect(applySourceEditorAction("", 0, 0, "image", "cover.png")?.value).toBe("![](cover.png)");
   });
+
+  it("adds task list markers and clears common Markdown formatting", () => {
+    expect(applySourceEditorAction("# **Plan**\n- [x] Done", 0, 19, "clear-format")?.value).toBe("Plan\nDone");
+    expect(applySourceEditorAction("One\n> Two", 0, 8, "task-list")?.value).toBe("- [ ] One\n- [ ] Two");
+  });
+
+  it("inserts a stable local date format", () => {
+    const result = applySourceEditorAction("Today: ", 7, 7, "insert-date");
+    expect(result?.value).toMatch(/^Today: \d{4}-\d{2}-\d{2}$/);
+  });
 });

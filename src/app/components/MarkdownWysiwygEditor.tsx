@@ -19,6 +19,7 @@ import { callCommand, replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
+import { formatEditorDate } from "../editor-context-actions";
 import { filterSlashCommands, matchSlashTrigger, slashCommands, type SlashCommand } from "../slash-command-menu";
 import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import { ContextMenu } from "./ContextMenu";
@@ -51,7 +52,10 @@ type EditorViewInstance = {
   coordsAtPos: (pos: number) => { top: number; bottom: number; left: number };
   dispatch: (transaction: unknown) => void;
   state: {
-    doc: unknown;
+    doc: {
+      nodesBetween: (from: number, to: number, callback: (node: EditorNodeLike, pos: number) => void) => void;
+      textBetween: (from: number, to: number, blockSeparator?: string, leafText?: string) => string;
+    };
     selection: {
       empty: boolean;
       from: number;
@@ -61,8 +65,14 @@ type EditorViewInstance = {
     tr: {
       insertText: (text: string, from: number, to?: number) => unknown;
       delete: (from: number, to: number) => unknown;
+      setNodeMarkup: (pos: number, type?: unknown, attrs?: Record<string, unknown>) => unknown;
     };
   };
+};
+
+type EditorNodeLike = {
+  type: { name: string };
+  attrs: Record<string, unknown>;
 };
 
 type DesktopE2eEditorView = {
@@ -82,6 +92,40 @@ type ParentNodeLike = {
   type?: { name?: string };
   textBetween: (from: number, to: number, blockSeparator?: string, leafText?: string) => string;
 };
+
+function markCurrentListItemsAsTasks(view: EditorViewInstance): boolean {
+  const positions = new Set<number>();
+  const { state } = view;
+  state.doc.nodesBetween(state.selection.from, state.selection.to, (node, pos) => {
+    if (node.type.name === "list_item") positions.add(pos);
+  });
+
+  // A collapsed selection does not visit its containing list item, so walk the
+  // ancestor chain as well. The GFM preset stores task state on list_item.
+  const selectionFrom = state.selection.$from as typeof state.selection.$from & {
+    depth?: number;
+    node?: (depth: number) => EditorNodeLike;
+    before?: (depth: number) => number;
+  };
+  if (selectionFrom.depth !== undefined && selectionFrom.node && selectionFrom.before) {
+    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
+      const node = selectionFrom.node(depth);
+      if (node.type.name === "list_item") positions.add(selectionFrom.before(depth));
+    }
+  }
+
+  if (positions.size === 0) return false;
+  const transaction = state.tr;
+  positions.forEach((pos) => {
+    const node = state.doc as unknown as { nodeAt?: (position: number) => EditorNodeLike | null };
+    const listItem = node.nodeAt?.(pos);
+    if (listItem?.type.name === "list_item") {
+      transaction.setNodeMarkup(pos, undefined, { ...listItem.attrs, checked: false });
+    }
+  });
+  view.dispatch(transaction);
+  return true;
+}
 
 type CompletionOverlayKind = "wiki" | "slash";
 
@@ -359,6 +403,37 @@ function MilkdownSurface({
         return;
       }
 
+      if (action === "clear-format") {
+        if (view.state.selection.empty) {
+          onStatusMessageRef.current?.("请先选择要清除格式的文本。");
+        } else {
+          const { from, to } = view.state.selection;
+          const plainText = view.state.doc.textBetween(from, to, "\n");
+          view.dispatch(view.state.tr.insertText(plainText, from, to));
+          view.focus();
+        }
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "insert-date") {
+        const { from, to } = view.state.selection;
+        view.dispatch(view.state.tr.insertText(formatEditorDate(), from, to));
+        view.focus();
+        setContextMenu(null);
+        return;
+      }
+
+      if (action === "task-list") {
+        if (!markCurrentListItemsAsTasks(view)) {
+          editor.action(callCommand(wrapInBulletListCommand.key));
+          markCurrentListItemsAsTasks(view);
+        }
+        view.focus();
+        setContextMenu(null);
+        return;
+      }
+
       if (action === "link") {
         onInsertLink();
         setContextMenu(null);
@@ -447,7 +522,8 @@ function MilkdownSurface({
         item.disabled ||
         (item.action === "undo" && !canUndo) ||
         (item.action === "redo" && !canRedo) ||
-        ((item.action === "cut" || item.action === "copy") && !contextMenu?.hasSelection),
+        ((item.action === "cut" || item.action === "copy") && !contextMenu?.hasSelection) ||
+        (item.action === "clear-format" && !contextMenu?.hasSelection),
       onSelect: () => applyContextAction(item.action),
     })),
   }));

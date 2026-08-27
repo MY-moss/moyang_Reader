@@ -17,6 +17,9 @@ export type EditorContextAction =
   | "ordered-list"
   | "quote"
   | "code-block"
+  | "clear-format"
+  | "task-list"
+  | "insert-date"
   | "link"
   | "wikilink"
   | "image"
@@ -54,6 +57,7 @@ export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
       { action: "italic", label: "斜体", shortcut: "Ctrl I" },
       { action: "strike", label: "删除线" },
       { action: "inline-code", label: "行内代码" },
+      { action: "clear-format", label: "清除格式" },
     ],
   },
   {
@@ -67,6 +71,7 @@ export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
       { action: "ordered-list", label: "有序列表" },
       { action: "quote", label: "引用" },
       { action: "code-block", label: "代码块" },
+      { action: "task-list", label: "任务列表" },
     ],
   },
   {
@@ -77,6 +82,7 @@ export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
       { action: "image", label: "图片" },
       { action: "table", label: "表格" },
       { action: "horizontal-rule", label: "分隔线" },
+      { action: "insert-date", label: "插入今天日期" },
     ],
   },
 ];
