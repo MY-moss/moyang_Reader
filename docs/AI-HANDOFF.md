@@ -92,17 +92,19 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@d109baab2624735b64d2e60d19dc5a7113936cbb`）**
+> **最新检查点（2026-08-27，验证基线：`main@55be1887fb6449344e4d9441dc5b11649257de7d`）**
 >
-> - #104 的未变化索引快速路径、ASCII 子串候选和工作区文件列表缓存已由 [PR #257](https://github.com/MY-moss/moyang_Reader/pull/257)、[PR #259](https://github.com/MY-moss/moyang_Reader/pull/259)、[PR #261](https://github.com/MY-moss/moyang_Reader/pull/261) 合并；针对性 Rust 测试、完整 Rust 测试、fmt、clippy、5000 文档回归和对应 Quality checks 均通过。
-> - 本切片保持 Windows x64 范围，不生成新的安装包；当前稳定版本仍为 `v0.9.5`。#104 的正式 P95、索引上限和长文档验收仍未完成。
+> - #104 的未变化索引快速路径、ASCII 子串候选、工作区文件列表缓存和文件级 LRU 淘汰已由 PR #257、#259、#261、#264 合并；当前 `main@55be188…` 已包含上述实现和交接文档。
+> - 当前唯一功能分支为 `codex/search-p95-long-doc-2026-08-27`：补齐 5000 篇每篇至少 2 KiB、混合中英文文档的暖缓存 P95 验收，以及超出单文件 token 上限时的线性回退验收；本切片不改变生产搜索逻辑。
+> - 本机正式验收记录：5000 文档暖查询 P95 为 38 ms，低于 #104 的 100 ms 目标；长文档回退、完整 Rust 测试 40/40、Rust fmt 和 `cargo clippy --lib -- -D warnings` 均通过。CI 仍需对该 PR 执行 Windows Quality checks。
+> - 本切片保持 Windows x64 范围，不生成新的安装包；当前稳定版本仍为 `v0.9.5`。PR 合并后关闭 #104，再单独评估 v0.10.1 稳定发布，不在本切片混入版本同步或镜像发布。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
 > - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
 > - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过。本次不生成安装包，`v0.9.6` 仍是待稳定批次评估的 patch 候选。
 > - #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试和 Quality checks 通过，持久化索引版本升级为 4，旧缓存会安全重建。本切片不生成安装包。
-> - 下一位 AI 的唯一下一步：从最新 `main@d109baab2624735b64d2e60d19dc5a7113936cbb` 重新检查 Issues，再完成 #104 剩余的正式 5000 文档 P95 和长文档验收；不要重复 #104 已完成的缓存切片、PR #262、PR #264 或 v0.9.5 发布。
+> - 下一位 AI 的唯一下一步：检查当前功能分支对应 PR 的 Quality checks；若全部通过且 `main` 未发生新冲突，直接合并并将 #104 标记为 completed，同时在 Issue 中记录 5000 文档 P95 和长文档回退结果。合并后另开发布任务评估 v0.10.1 安装包，不要重复 #104 已完成的实现、PR #262、PR #264 或 v0.9.5 发布。
 
 ## 历史功能切片快照
 
