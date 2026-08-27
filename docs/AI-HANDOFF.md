@@ -96,22 +96,24 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@dfa008c3bb572786e85769768960999fe559ad98`）**
+> **最新检查点（2026-08-27，验证基线：`main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`）**
 >
 > - #104 的未变化索引快速路径、ASCII 子串候选、工作区文件列表缓存和文件级 LRU 淘汰已由 PR #257、#259、#261、#264 合并；当前 `main@0e8b4e9…` 已包含上述实现和交接文档。
 > - PR #266 已将 5000 篇每篇至少 2 KiB、混合中英文文档的暖缓存 P95 验收，以及超出单文件 token 上限时的线性回退验收合并到 `main`；#104 已标记 completed。
 > - 本机正式验收记录：5000 文档暖查询 P95 为 38 ms，低于 #104 的 100 ms 目标；长文档回退、完整 Rust 测试 40/40、Rust fmt 和 `cargo clippy --lib -- -D warnings` 均通过；PR #266 的 Windows Quality checks 已通过。
 > - `v0.10.1` 版本准备已由 PR #267 合并，标签、Release 和 Windows x64 安装包已完成；不要重复版本准备、#104 验收或 v0.10.1 打包。
 > - PR #269 已将当前功能切片（#187）合并到 `main`：Windows 最小窗口宽度调整为 720px；工具栏按真实横向溢出显示边缘提示和标题，保持现有横向滚动与快捷操作不变。
-> - 本切片已通过 `npm run lint`、`npm run format:check`、`npm run build`、3 条相关 Playwright smoke，以及主线 Quality checks `33067255980`；没有新增依赖或数据格式变化，#187 完整断点验收保持 open。
-> - 当前唯一发布分支为 `codex/release-v0.10.2-2026-08-27`：同步版本文件、CHANGELOG、README、发布政策、路线图和发布交接，目标为 v0.10.2 Windows x64 稳定安装包。
+> - 本切片已通过 `npm run lint`、`npm run format:check`、`npm run build`、3 条相关 Playwright smoke，以及主线 Quality checks `33067255980`；版本准备 PR #270 的 Quality checks `33068718042`、主线 CI `33069290326` 和 Rust audit `33069290435` 也全部通过；没有新增依赖或数据格式变化，#187 完整断点验收保持 open。
+> - v0.10.2 版本准备由 PR #270 合并，`v0.10.2` tag 指向 `main@38973bd1a72f1d61bb50ea26ee6a1014934f7fce`；Release workflow [33069798614](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614) 的 Windows 发布 job [98508812457](https://github.com/MY-moss/moyang_Reader/actions/runs/33069798614/job/98508812457) 成功，GitHub Release 已公开并包含 Windows x64 安装包、`.sig` 和 `latest.json`。
+> - v0.10.2 安装包为 4,873,310 字节，SHA-256 `626df63dadb79b2a9b564a505b4bbacf140a44c88e7ba7899e319d5b7a7ad36d`；`.sig` 为 428 字节，SHA-256 `0a22446928e600dc3ef854ac500d538f56027f8f074888ed0775e25a64c27748`。GitHub 与 Cloudflare 公开下载均 HTTP 200 且哈希一致，根/版本 manifest 均为 `0.10.2`。
+> - Release 总 run 因 Cloudflare 静态镜像子任务失败而显示 failure；仓库 Actions 尚未配置 Cloudflare Pages Secrets，动态镜像仍可用，不能把静态同步记为全绿；版本目录 manifest 当前回退到 GitHub 资产地址。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
 > - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
 > - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过，该修复已随 v0.10.1 发布。
 > - #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试和 Quality checks 通过，持久化索引版本升级为 4，旧缓存会安全重建。本切片不生成安装包。
-> - 下一位 AI 的唯一下一步：检查 v0.10.2 版本准备 PR 的 Quality checks；若全部通过，合并版本准备提交，确认主线 CI 通过后创建 `v0.10.2` 标签并核验 Windows 安装包、签名、manifest、Cloudflare 镜像和旧版本更新。不要重复 #187、v0.10.1、#104、PR #262 或 PR #264 的实现。
+> - 下一位 AI 的唯一下一步：先检查 Issues 和本文件，按 Ready backlog 选择一个独立的 v0.10.3 功能切片；不要重复 #187、v0.10.2 发布、v0.10.1、#104、PR #262 或 PR #264 的实现。若处理镜像基础设施，先由维护者在 GitHub Actions Secrets 配置 Cloudflare Pages 部署凭据，再单独重跑镜像 workflow；不要把凭据写入仓库或 AI 上下文。
 
 ## 历史功能切片快照
 
