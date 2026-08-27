@@ -684,6 +684,44 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
 });
 
+test("supports tab gestures and reading zoom shortcuts", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "gesture-first.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Gesture first"),
+    },
+    {
+      name: "gesture-second.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Gesture second"),
+    },
+  ]);
+
+  await switchToRenderedMode(page);
+  const tabItems = page.locator(".tab-item");
+  await expect(tabItems).toHaveCount(2);
+  await expect(tabItems.first()).toHaveAttribute("draggable", "true");
+  const reader = page.locator(".reader-content");
+  await expect(reader).toHaveCSS("font-size", "17px");
+
+  await tabItems.first().dragTo(tabItems.nth(1));
+  await expect(page.locator(".tab-label")).toHaveText(["gesture-second.md", "gesture-first.md"]);
+
+  await page.keyboard.press("Control+Equal");
+  await expect(page.locator(".reading-zoom-hud")).toHaveText("阅读缩放 110%");
+  await expect(reader).toHaveCSS("font-size", "18.7px");
+  await page.keyboard.press("Control+0");
+  await expect(page.locator(".reading-zoom-hud")).toHaveText("阅读缩放 100%");
+  await page.locator(".reader-content").dispatchEvent("wheel", { deltaY: -100, ctrlKey: true });
+  await expect(page.locator(".reading-zoom-hud")).toHaveText("阅读缩放 105%");
+
+  await tabItems.first().click({ button: "middle" });
+  await expect(page.locator(".tab-item")).toHaveCount(1);
+});
+
 test("keeps same-named browser documents in separate tabs", async ({ page }) => {
   await page.goto("/");
 
@@ -981,7 +1019,11 @@ test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
 
   await openSettingsMenu(page);
-  await page.getByLabel("正文字号").selectOption("large");
+  const readingZoom = page.getByLabel("阅读缩放");
+  await readingZoom.focus();
+  await readingZoom.press("ArrowRight");
+  await readingZoom.press("ArrowRight");
+  await readingZoom.press("ArrowRight");
   await page.getByLabel("正文宽度").selectOption("narrow");
   await page.getByLabel("导出纸张").selectOption("letter");
   await page.getByLabel("导出方向").selectOption("landscape");
@@ -989,7 +1031,7 @@ test("persists reading layout preferences", async ({ page }) => {
   await page.reload();
   await openSettingsMenu(page);
 
-  await expect(page.getByLabel("正文字号")).toHaveValue("large");
+  await expect(page.getByLabel("阅读缩放")).toHaveValue("115");
   await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
   await expect(page.getByLabel("导出纸张")).toHaveValue("letter");
   await expect(page.getByLabel("导出方向")).toHaveValue("landscape");
@@ -1185,3 +1227,4 @@ test("dismisses topbar menus with an outside click or Escape", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(overflowMenu).not.toHaveAttribute("open");
 });
+

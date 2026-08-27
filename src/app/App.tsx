@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type DragEvent,
   type MouseEvent,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { EmptyState } from "./components/EmptyState";
 import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
@@ -104,6 +105,14 @@ import type {
 } from "./types";
 import { DocumentCache } from "./document-cache";
 import { nextReaderModeAfterOpen } from "./reader-mode";
+import {
+  READING_ZOOM_DEFAULT,
+  READING_ZOOM_STEP,
+  normalizeReadingZoom,
+  readingScaleFromZoom,
+  stepReadingZoom,
+} from "./reading-zoom";
+import { reorderTabs } from "./tab-order";
 import { checkMarkdownEditorSafety } from "./markdown-editor-support";
 import { buildWikiLinkCandidates } from "./wiki-link-completion";
 import {
@@ -529,6 +538,7 @@ export function App() {
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
   const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
+  const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
@@ -544,6 +554,7 @@ export function App() {
   const preferencesRef = useRef<ReaderPreferences>(preferences);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const openTabsRef = useRef<RecentFile[]>(openTabs);
+  const readingZoomNoticeTimerRef = useRef<number | null>(null);
   const workspaceRestorePendingRef = useRef(false);
   const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
   const documentCacheRef = useRef(new DocumentCache());
@@ -654,6 +665,47 @@ export function App() {
     saveReaderPreferences(next);
     setPreferences(next);
   }, []);
+
+  const announceReadingZoom = useCallback((zoom: number) => {
+    setReadingZoomNotice(zoom);
+    if (readingZoomNoticeTimerRef.current !== null) {
+      window.clearTimeout(readingZoomNoticeTimerRef.current);
+    }
+    readingZoomNoticeTimerRef.current = window.setTimeout(() => {
+      readingZoomNoticeTimerRef.current = null;
+      setReadingZoomNotice(null);
+    }, 1_200);
+  }, []);
+
+  const setReadingZoom = useCallback(
+    (value: number) => {
+      const nextZoom = normalizeReadingZoom(value);
+      setReaderPreferences({ readingZoom: nextZoom, readingScale: readingScaleFromZoom(nextZoom) });
+      announceReadingZoom(nextZoom);
+    },
+    [announceReadingZoom, setReaderPreferences],
+  );
+
+  const handleReaderWheel = useCallback(
+    (event: ReactWheelEvent<HTMLElement>) => {
+      if (!event.ctrlKey || event.altKey || mode !== "rendered") return;
+      const kind = documentStateRef.current?.kind;
+      if (!kind || kind === "pdf" || kind === "image") return;
+      const target = event.target instanceof Element ? event.target.closest(".reader-content") : null;
+      if (!target) return;
+
+      event.preventDefault();
+      setReadingZoom(preferencesRef.current.readingZoom + (event.deltaY < 0 ? READING_ZOOM_STEP : -READING_ZOOM_STEP));
+    },
+    [mode, setReadingZoom],
+  );
+
+  useEffect(
+    () => () => {
+      if (readingZoomNoticeTimerRef.current !== null) window.clearTimeout(readingZoomNoticeTimerRef.current);
+    },
+    [],
+  );
 
   const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {
     if (!result.ok) {
@@ -2449,6 +2501,42 @@ export function App() {
       const eventTarget = event.target instanceof HTMLElement ? event.target : null;
       const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const isCodeMirrorEditor = Boolean(eventTarget?.closest(".cm-editor") ?? activeElement?.closest(".cm-editor"));
+      const isTextEntry = Boolean(
+        eventTarget?.closest('input, textarea, [contenteditable="true"], .cm-editor') ??
+        activeElement?.closest('input, textarea, [contenteditable="true"], .cm-editor'),
+      );
+      const zoomKey = event.key;
+      const isZoomShortcut =
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.isComposing &&
+        !isTextEntry &&
+        mode === "rendered" &&
+        ["markdown", "text", "docx"].includes(documentStateRef.current?.kind ?? "") &&
+        (event.code === "Equal" ||
+          event.code === "NumpadAdd" ||
+          event.code === "Minus" ||
+          event.code === "NumpadSubtract" ||
+          event.code === "Digit0" ||
+          event.code === "Numpad0" ||
+          zoomKey === "+" ||
+          zoomKey === "=" ||
+          zoomKey === "-" ||
+          zoomKey === "0");
+      if (isZoomShortcut) {
+        event.preventDefault();
+        if (event.code === "Digit0" || event.code === "Numpad0" || zoomKey === "0") {
+          setReadingZoom(READING_ZOOM_DEFAULT);
+        } else {
+          setReadingZoom(
+            stepReadingZoom(
+              preferencesRef.current.readingZoom,
+              event.code === "Minus" || event.code === "NumpadSubtract" || zoomKey === "-" ? "out" : "in",
+            ),
+          );
+        }
+        return;
+      }
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "f" &&
@@ -2512,7 +2600,16 @@ export function App() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [focusMode, handleChooseWorkspace, handleInsertLink, mode, openSelectedFile, saveDocument, toggleReadingEditing]);
+  }, [
+    focusMode,
+    handleChooseWorkspace,
+    handleInsertLink,
+    mode,
+    openSelectedFile,
+    saveDocument,
+    setReadingZoom,
+    toggleReadingEditing,
+  ]);
 
   useEffect(() => {
     const handleEditorHistoryShortcut = (event: KeyboardEvent) => {
@@ -3191,6 +3288,10 @@ export function App() {
     [documentState, flushCurrentDraft, openPath, openTabs, releaseDocumentResources, workspacePath],
   );
 
+  const handleReorderTabs = useCallback((sourcePath: string, targetPath: string) => {
+    setOpenTabs((current) => reorderTabs(current, sourcePath, targetPath));
+  }, []);
+
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -3834,13 +3935,14 @@ export function App() {
 
   return (
     <div
-      className={`app-shell reading-scale-${preferences.readingScale} reading-width-${preferences.readingWidth}${
+      className={`app-shell reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
       }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
       style={
         {
           "--sidebar-width": `${paneWidths.sidebar}px`,
           "--context-width": `${paneWidths.context}px`,
+          "--reading-zoom": `${preferences.readingZoom / 100}`,
         } as CSSProperties
       }
       onDragOver={(event) => event.preventDefault()}
@@ -3862,12 +3964,12 @@ export function App() {
         searchResultIndex={searchResultIndex}
         theme={theme}
         locale={locale}
-        readingScale={preferences.readingScale}
+        readingZoom={preferences.readingZoom}
         readingWidth={preferences.readingWidth}
         exportPaper={preferences.exportPaper}
         exportOrientation={preferences.exportOrientation}
         exportMargin={preferences.exportMargin}
-        onReadingScaleChange={(scale) => setReaderPreferences({ readingScale: scale })}
+        onReadingZoomChange={setReadingZoom}
         onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
         onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}
         onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}
@@ -3970,6 +4072,7 @@ export function App() {
           }}
           onSelect={(path) => void handleSelectTab(path)}
           onClose={(path) => void handleCloseTab(path)}
+          onReorder={handleReorderTabs}
         />
       </div>
       <div className="workspace-grid">
@@ -4040,7 +4143,12 @@ export function App() {
           />
         )}
 
-        <main ref={contentAreaRef} className="content-area" aria-live="polite">
+        <main ref={contentAreaRef} className="content-area" aria-live="polite" onWheel={handleReaderWheel}>
+          {readingZoomNotice !== null && (
+            <div className="reading-zoom-hud" role="status" aria-live="polite">
+              阅读缩放 {readingZoomNotice}%
+            </div>
+          )}
           {sidebarCollapsed && !focusMode && (
             <button
               type="button"
@@ -4290,3 +4398,4 @@ export function App() {
     </div>
   );
 }
+

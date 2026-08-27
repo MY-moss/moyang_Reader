@@ -4,7 +4,6 @@ import type {
   ExportMargin,
   ExportOrientation,
   ExportPaper,
-  ReadingScale,
   ReadingWidth,
   ReaderMode,
   ThemeMode,
@@ -27,12 +26,12 @@ type TopBarProps = {
   searchResultIndex: number;
   theme: ThemeMode;
   locale: Locale;
-  readingScale: ReadingScale;
+  readingZoom: number;
   readingWidth: ReadingWidth;
   exportPaper: ExportPaper;
   exportOrientation: ExportOrientation;
   exportMargin: ExportMargin;
-  onReadingScaleChange: (scale: ReadingScale) => void;
+  onReadingZoomChange: (zoom: number) => void;
   onReadingWidthChange: (width: ReadingWidth) => void;
   onExportPaperChange: (paper: ExportPaper) => void;
   onExportOrientationChange: (orientation: ExportOrientation) => void;
@@ -105,12 +104,12 @@ export function TopBar({
   searchResultIndex,
   theme,
   locale,
-  readingScale,
+  readingZoom,
   readingWidth,
   exportPaper,
   exportOrientation,
   exportMargin,
-  onReadingScaleChange,
+  onReadingZoomChange,
   onReadingWidthChange,
   onExportPaperChange,
   onExportOrientationChange,
@@ -585,18 +584,27 @@ export function TopBar({
                     </span>
                   </label>
                   <div className="settings-divider">{t("settings.reading")}</div>
-                  <label className="settings-select-option">
-                    <span>{t("settings.fontSize")}</span>
-                    <select
-                      aria-label="正文字号"
-                      value={readingScale}
-                      onChange={(event) => onReadingScaleChange(event.target.value as ReadingScale)}
-                    >
-                      <option value="small">{t("settings.fontSize.compact")}</option>
-                      <option value="medium">{t("settings.fontSize.standard")}</option>
-                      <option value="large">{t("settings.fontSize.comfortable")}</option>
-                    </select>
-                  </label>
+                  <div className="settings-range-option">
+                    <div className="settings-range-heading">
+                      <span>{t("settings.fontSize")}</span>
+                      <output aria-live="polite">{readingZoom}%</output>
+                    </div>
+                    <input
+                      aria-label="阅读缩放"
+                      type="range"
+                      min="75"
+                      max="150"
+                      step="5"
+                      value={readingZoom}
+                      onChange={(event) => onReadingZoomChange(Number(event.target.value))}
+                    />
+                    <div className="settings-range-footer">
+                      <small>{t("settings.zoomHint")}</small>
+                      <button type="button" className="quiet-button" onClick={() => onReadingZoomChange(100)}>
+                        {t("settings.zoomReset")}
+                      </button>
+                    </div>
+                  </div>
                   <label className="settings-select-option">
                     <span>{t("settings.width")}</span>
                     <select
@@ -749,3 +757,4 @@ export function TopBar({
     </header>
   );
 }
+

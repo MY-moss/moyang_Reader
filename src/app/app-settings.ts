@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n";
 import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
+import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 import type { ContextPanelTab, ThemeMode } from "./types";
 
 const appSettingsKey = "moyang-reader-app-settings";
@@ -34,6 +35,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parsePreferences(value: unknown): ReaderPreferences {
   if (!isRecord(value)) return { ...defaultReaderPreferences };
 
+  const readingScale =
+    value.readingScale === "small" || value.readingScale === "medium" || value.readingScale === "large"
+      ? value.readingScale
+      : defaultReaderPreferences.readingScale;
+
   return {
     allowRemoteResources:
       typeof value.allowRemoteResources === "boolean"
@@ -43,10 +49,8 @@ function parsePreferences(value: unknown): ReaderPreferences {
       typeof value.startupUpdateCheck === "boolean"
         ? value.startupUpdateCheck
         : defaultReaderPreferences.startupUpdateCheck,
-    readingScale:
-      value.readingScale === "small" || value.readingScale === "medium" || value.readingScale === "large"
-        ? value.readingScale
-        : defaultReaderPreferences.readingScale,
+    readingScale,
+    readingZoom: normalizeReadingZoom(value.readingZoom, readingZoomFromScale(readingScale)),
     readingWidth:
       value.readingWidth === "narrow" || value.readingWidth === "standard" || value.readingWidth === "wide"
         ? value.readingWidth
@@ -164,3 +168,4 @@ export function saveAppSettingsSnapshot(input: AppSettingsInput, savedAt = Date.
     return { ok: false, reason: "本机设置存储不可用。" };
   }
 }
+
