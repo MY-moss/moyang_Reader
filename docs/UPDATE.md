@@ -27,11 +27,13 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
 
-## v0.10.3 发布准备（2026-08-27）
+## v0.10.3 发布记录（2026-08-27）
 
 - 发布范围：首次使用“快速上手”教程、设置保存状态、统一设置快照、Windows 应用配置文件原子兜底和关闭前等待配置写入。
-- 当前状态：功能 PR #272 已合并，版本准备分支将 package.json、Cargo.toml、tauri.conf.json、锁文件和 CHANGELOG 统一为 `0.10.3`；主线质量门禁通过后创建 `v0.10.3` 标签。
-- 发布边界：只生成 Windows x64 NSIS 安装包、`.sig` 和 `latest.json`；Cloudflare 静态镜像仍需 #241 所跟踪的仓库 Secrets，缺少凭据时不能把旧镜像当作新版本。
+- 发布结果：版本准备 PR #273 已合并，`v0.10.3` tag 指向 `main@33c171c32aa81c291b1606203b500ef4ed9e861f`；GitHub Release [v0.10.3](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.3) 已公开。
+- 已核验：Release workflow [33084715056](https://github.com/MY-moss/moyang_Reader/actions/runs/33084715056) 的 Windows 构建/发布 job [98561110937](https://github.com/MY-moss/moyang_Reader/actions/runs/33084715056/job/98561110937) 成功；安装包 4,873,988 字节，SHA-256 `4d20950202aa71e319c848635a105fc93cda6b5a0514bd6cd4c135cae861fdc3`；`.sig` 428 字节，SHA-256 `2b3b0350ad1b1f136b820e65a6c6a6cff00bd5ad02fbcfeb13d0538fdb4ab082`；GitHub `latest.json` 1,411 字节，SHA-256 `6616538994de3dcbee3f30f5a778fa6141e29e9fbc5c431c1cfa8ddd36767ddd`。
+- 在线核验：GitHub 根 manifest、Cloudflare 根 manifest、Cloudflare `/v0.10.3/` manifest、安装包和 `.sig` 均 HTTP 200，manifest 版本均为 `0.10.3`；Cloudflare 版本目录的安装包为 4,873,988 字节、`.sig` 为 428 字节，SHA-256 与 GitHub Release 完全一致，签名字段存在且下载地址有效。
+- 发布边界：Release 总 run 因静态镜像子任务 [98564736672](https://github.com/MY-moss/moyang_Reader/actions/runs/33084715056/job/98564736672) 缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 而显示 failure；动态 Cloudflare 镜像已经可用，但不能把静态自动同步记为全绿，#241 保持 open。旧版本自动下载、替换和重启回归尚未在本轮执行。
 
 ## v0.10.2 发布记录（2026-08-27）
 
