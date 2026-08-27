@@ -23,6 +23,14 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## v0.10.5 发布记录（2026-08-28）
+
+- 发布范围：文件/文件夹右键打开、重命名、删除、资源管理器定位、路径复制，以及 Markdown/TXT 编辑器的撤销、重做、剪切、复制、粘贴和全选。
+- 发布结果：版本准备 PR #279 已合并，`v0.10.5` tag 指向 `main@d9c0a5967f673af0152746130a46a551994628df`；GitHub Release [v0.10.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.5) 已公开。
+- 已核验：Release workflow [33110395454](https://github.com/MY-moss/moyang_Reader/actions/runs/33110395454) 的 Windows 构建/发布 job [98651395153](https://github.com/MY-moss/moyang_Reader/actions/runs/33110395454/job/98651395153) 成功；安装包 4,900,301 字节，SHA-256 `83a06f1cd88fef435cea0c486b6c99c5e99f2fb9661d4fe24bf6e6b99ae8d36c`；`.sig` 428 字节，SHA-256 `fd3a547c358c20381c425bec5cb527f7345502a3034fc3973b56b4572edc3912`；`latest.json` 1,411 字节，SHA-256 `5f899d3fa81986b001a24f422cf178936d4f8d9a08cfebe4925ee717eb62e830`。
+- 在线核验：GitHub Release 三个资产均已公开；Cloudflare 动态镜像 `latest.json` 返回 `0.10.5`，`/v0.10.5/` 安装包和 `.sig` 均 HTTP 200，大小分别为 4,900,301 和 428 字节。
+- 发布边界：静态镜像子任务 [98653318098](https://github.com/MY-moss/moyang_Reader/actions/runs/33110395454/job/98653318098) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据检查阶段失败；动态镜像可用，客户端会回退到 GitHub Release。#241 保持 open，旧版本自动更新重启尚未在本轮执行。
+
 ## 开发期与稳定批次
 
 功能切片可以先在分支上快速开发、测试、同步文档并合并，不需要为每个 commit 或纯文档/测试改动创建 Release。但完成一个用户功能小版本后必须及时公开发布，例如 v0.8.1 的下一组稳定功能完成后发布 v0.9.0；重要 Bug、保存、更新、签名或安全修复可以直接发布 patch 版本，例如 v0.8.1 → v0.8.2。
