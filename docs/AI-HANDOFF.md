@@ -249,4 +249,3 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
 - 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；确认 v0.9.2 发布资产和镜像状态后，从最新 `main` 选择一个已确认的 Ready 切片。若 #241 尚未具备 Ready 条件，不要提前实现 PDF/更新器功能；若先处理发布基础设施，优先由维护者在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，再验证自动镜像。不要把 token 放入聊天、仓库或文档，也不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
 - CI 触发记录：PR #236 的 head `e364648fe703c4689a148f894525a68d25452a1b` 的 push `Quality checks` 曾被并发重跑取消，恢复后的 job `98264563669` 已成功；PR #236 已合并为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。Release workflow `32996354493` 已成功，镜像 workflow `32998515986` 仅因 Cloudflare Secrets 缺失失败。
-

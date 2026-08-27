@@ -824,4 +824,3 @@ describe("Moyang Reader desktop runtime", () => {
     await secondDialog.$('[data-testid="close-confirm-cancel"]').click();
   });
 });
-

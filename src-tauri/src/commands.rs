@@ -4556,4 +4556,3 @@ mod tests {
         fs::remove_dir_all(root).expect("remove duplicate workspace");
     }
 }
-
