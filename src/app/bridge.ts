@@ -13,6 +13,16 @@ export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 }
 
+export async function readAppSettings(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  return invoke<string | null>("read_app_settings");
+}
+
+export async function writeAppSettings(contents: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("write_app_settings", { contents });
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   const normalized = url.startsWith("//") ? `${window.location.protocol}${url}` : url;
   if (isTauriRuntime()) {

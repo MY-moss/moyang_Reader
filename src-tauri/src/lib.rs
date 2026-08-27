@@ -91,6 +91,8 @@ pub fn run() {
             commands::authorize_stored_path,
             commands::choose_save_path,
             commands::close_window,
+            commands::read_app_settings,
+            commands::write_app_settings,
             commands::read_text_file,
             commands::read_binary_file,
             commands::path_exists,

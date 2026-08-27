@@ -972,6 +972,19 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
+test("opens and closes the getting started guide from the empty state", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "查看使用教程" }).click();
+  const dialog = page.getByRole("dialog", { name: "快速上手 Moyang Reader" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("添加阅读库");
+  await expect(dialog).toContainText("设置保存到本机");
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("switches and remembers the core interface locale", async ({ page }) => {
   await page.goto("/");
 

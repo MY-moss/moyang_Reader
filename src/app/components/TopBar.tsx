@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import { translate, type Locale, type MessageKey } from "../i18n";
 import type { UpdateStatus } from "../updater";
+import type { SettingsPersistenceStatus } from "../app-settings";
 
 type TopBarProps = {
   fileName: string | null;
@@ -79,6 +80,8 @@ type TopBarProps = {
   onStartupUpdateCheckChange: (enabled: boolean) => void;
   onExportSettings: () => void;
   onImportSettings: () => void;
+  onOpenGuide: () => void;
+  settingsPersistenceStatus: SettingsPersistenceStatus;
   onToggleSearch: () => void;
   onSearchQueryChange: (query: string) => void;
   onSearchPrevious: () => void;
@@ -155,6 +158,8 @@ export function TopBar({
   onStartupUpdateCheckChange,
   onExportSettings,
   onImportSettings,
+  onOpenGuide,
+  settingsPersistenceStatus,
   onToggleSearch,
   onSearchQueryChange,
   onSearchPrevious,
@@ -276,6 +281,26 @@ export function TopBar({
       : updateVersion
         ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
         : "检查应用更新";
+  const settingsStatusLabel =
+    settingsPersistenceStatus === "saving"
+      ? locale === "en-US"
+        ? "Saving settings…"
+        : "正在保存设置…"
+      : settingsPersistenceStatus === "saved"
+        ? locale === "en-US"
+          ? "Settings saved locally"
+          : "设置已保存到本机"
+        : settingsPersistenceStatus === "fallback"
+          ? locale === "en-US"
+            ? "Saved with local fallback"
+            : "设置已保存（使用本机备用存储）"
+          : settingsPersistenceStatus === "error"
+            ? locale === "en-US"
+              ? "Settings could not be saved"
+              : "设置保存失败"
+            : locale === "en-US"
+              ? "Settings stay on this device"
+              : "设置保存在本机";
 
   return (
     <header className="topbar">
@@ -514,6 +539,18 @@ export function TopBar({
                 </summary>
                 <div className="settings-menu-panel">
                   <div className="settings-menu-title">{t("settings.localFirst")}</div>
+                  <div
+                    className={`settings-persistence-status settings-persistence-${settingsPersistenceStatus}`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span className="settings-persistence-dot" aria-hidden="true" />
+                    <span>{settingsStatusLabel}</span>
+                  </div>
+                  <button type="button" className="settings-guide-button" onClick={onOpenGuide}>
+                    <span>使用教程</span>
+                    <span aria-hidden="true">↗</span>
+                  </button>
                   <label className="settings-select-option">
                     <span>{t("settings.language")}</span>
                     <select

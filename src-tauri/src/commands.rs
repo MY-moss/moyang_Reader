@@ -37,6 +37,8 @@ const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
 const MAX_PDF_HTML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_APP_SETTINGS_BYTES: usize = 256 * 1024;
+const APP_SETTINGS_FILE_NAME: &str = "settings.json";
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Default)]
@@ -1428,6 +1430,38 @@ pub fn close_window(app: AppHandle) -> Result<(), String> {
     window
         .destroy()
         .map_err(|error| format!("关闭窗口失败：{error}"))
+}
+
+fn app_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|directory| directory.join(APP_SETTINGS_FILE_NAME))
+        .map_err(|error| format!("无法定位应用配置目录：{error}"))
+}
+
+#[tauri::command]
+pub fn read_app_settings(app: AppHandle) -> Result<Option<String>, String> {
+    let path = app_settings_path(&app)?;
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("无法读取应用设置文件信息：{error}")),
+    };
+    if metadata.len() > MAX_APP_SETTINGS_BYTES as u64 {
+        return Err("应用设置文件过大，已拒绝读取。".to_string());
+    }
+    fs::read_to_string(&path)
+        .map(Some)
+        .map_err(|error| format!("无法读取应用设置文件：{error}"))
+}
+
+#[tauri::command]
+pub fn write_app_settings(app: AppHandle, contents: String) -> Result<(), String> {
+    if contents.len() > MAX_APP_SETTINGS_BYTES {
+        return Err("应用设置内容过大，已拒绝保存。".to_string());
+    }
+    let path = app_settings_path(&app)?;
+    write_bytes_file_inner(path, contents.as_bytes(), false)
 }
 
 #[tauri::command]
