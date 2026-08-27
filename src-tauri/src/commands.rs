@@ -61,9 +61,12 @@ pub struct WorkspaceSearchCache {
     entries: Mutex<HashMap<String, CachedSearchText>>,
     file_lists: Mutex<HashMap<String, CachedWorkspaceFileList>>,
     search_indexes: Mutex<HashMap<String, CachedSearchIndex>>,
+    event_driven_roots: Mutex<HashSet<String>>,
     access_counter: AtomicU64,
     #[cfg(test)]
     metadata_checks: AtomicUsize,
+    #[cfg(test)]
+    text_reads: AtomicUsize,
 }
 
 struct CachedSearchText {
@@ -528,6 +531,29 @@ fn add_indexed_file(
 }
 
 impl WorkspaceSearchCache {
+    fn enable_event_driven_root(&self, root: &Path) {
+        let root_key = access_path_key(root);
+        self.invalidate_scopes(std::slice::from_ref(&root_key));
+        if let Ok(mut roots) = self.event_driven_roots.lock() {
+            roots.clear();
+            roots.insert(root_key);
+        }
+    }
+
+    fn disable_event_driven_root(&self, root: &Path) {
+        if let Ok(mut roots) = self.event_driven_roots.lock() {
+            roots.remove(&access_path_key(root));
+        }
+        self.invalidate_scopes(&[root.to_string_lossy().into_owned()]);
+    }
+
+    fn is_event_driven_root(&self, root: &Path) -> bool {
+        self.event_driven_roots
+            .lock()
+            .map(|roots| roots.contains(&access_path_key(root)))
+            .unwrap_or(false)
+    }
+
     fn next_access(&self) -> u64 {
         self.access_counter.fetch_add(1, Ordering::Relaxed)
     }
@@ -603,6 +629,8 @@ impl WorkspaceSearchCache {
             entries.remove(&key);
         }
 
+        #[cfg(test)]
+        self.text_reads.fetch_add(1, Ordering::Relaxed);
         let source = read_text_file_inner(path).ok()?;
         if let Ok(mut entries) = self.entries.lock() {
             entries.insert(
@@ -641,7 +669,10 @@ impl WorkspaceSearchCache {
             .unwrap_or_default();
         let file_snapshot = search_index_file_snapshot(files);
 
-        if !index.disabled && index.file_snapshot.as_ref() == Some(&file_snapshot) {
+        if !index.disabled
+            && self.is_event_driven_root(root)
+            && index.file_snapshot.as_ref() == Some(&file_snapshot)
+        {
             index.last_used = access;
             if let Ok(mut indexes) = self.search_indexes.lock() {
                 indexes.insert(key, index);
@@ -699,6 +730,16 @@ impl WorkspaceSearchCache {
                         index.posting_count = 0;
                         break;
                     }
+                } else {
+                    index.unindexed_files.insert(path.clone());
+                    index.files.insert(
+                        path,
+                        IndexedSearchFile {
+                            size: metadata.len(),
+                            modified,
+                            tokens: HashSet::new(),
+                        },
+                    );
                 }
             }
         }
@@ -735,26 +776,31 @@ impl WorkspaceSearchCache {
         }
 
         let mut candidates: Option<HashSet<String>> = None;
-        let mut missing_ascii_token = false;
         let mut missing_cjk_token = false;
         for token in tokens {
-            let Some(paths) = index.postings.get(&token) else {
-                if token.is_ascii() {
-                    missing_ascii_token = true;
-                } else {
-                    missing_cjk_token = true;
+            let paths = if token.is_ascii() {
+                if token.chars().count() < 2 {
+                    return None;
                 }
+                let mut paths = HashSet::new();
+                for (indexed_token, indexed_paths) in &index.postings {
+                    if indexed_token.is_ascii() && indexed_token.contains(&token) {
+                        paths.extend(indexed_paths.iter().cloned());
+                    }
+                }
+                paths
+            } else if let Some(paths) = index.postings.get(&token) {
+                paths.clone()
+            } else {
+                missing_cjk_token = true;
                 continue;
             };
             candidates = Some(match candidates {
-                Some(current) => current.intersection(paths).cloned().collect(),
-                None => paths.clone(),
+                Some(current) => current.intersection(&paths).cloned().collect(),
+                None => paths,
             });
         }
 
-        if missing_ascii_token {
-            return None;
-        }
         let fallback_paths = index.unindexed_files.clone();
         if missing_cjk_token {
             return Some(fallback_paths);
@@ -1362,6 +1408,7 @@ pub fn watch_workspace(
     root: String,
     access: State<'_, AccessRegistry>,
     workspace_watcher: State<'_, WorkspaceWatcher>,
+    cache: State<'_, WorkspaceSearchCache>,
     app: AppHandle,
 ) -> Result<(), String> {
     let requested_root = PathBuf::from(&root);
@@ -1376,6 +1423,7 @@ pub fn watch_workspace(
     }
 
     let event_root = root.clone();
+    let event_app = app.clone();
     let watcher = RecommendedWatcher::new(
         move |result: notify::Result<notify::Event>| {
             let Ok(event) = result else {
@@ -1393,7 +1441,10 @@ pub fn watch_workspace(
                 return;
             }
 
-            let _ = app.emit(
+            if let Some(cache) = event_app.try_state::<WorkspaceSearchCache>() {
+                cache.invalidate_scopes(&paths);
+            }
+            let _ = event_app.emit(
                 "workspace-changed",
                 WorkspaceChangeEvent {
                     root: event_root.clone(),
@@ -1420,6 +1471,7 @@ pub fn watch_workspace(
     });
     drop(current);
     drop(previous);
+    cache.enable_event_driven_root(&requested_root);
     Ok(())
 }
 
@@ -1427,6 +1479,7 @@ pub fn watch_workspace(
 pub fn unwatch_workspace(
     root: String,
     workspace_watcher: State<'_, WorkspaceWatcher>,
+    cache: State<'_, WorkspaceSearchCache>,
 ) -> Result<(), String> {
     let root_key = access_path_key(Path::new(&root));
     let mut current = workspace_watcher
@@ -1440,6 +1493,7 @@ pub fn unwatch_workspace(
         .unwrap_or(false);
     if should_unwatch {
         current.take();
+        cache.disable_event_driven_root(Path::new(&root));
     }
     Ok(())
 }
@@ -2978,6 +3032,7 @@ mod tests {
         fs::write(&note, "first needle").expect("write search cache note");
 
         let cache = WorkspaceSearchCache::default();
+        cache.enable_event_driven_root(&root);
         let first = search_workspace_inner_with_cache(root.clone(), "first".to_string(), &cache)
             .expect("search first query");
         assert_eq!(first.len(), 1);
@@ -3055,19 +3110,38 @@ mod tests {
         fs::create_dir_all(&root).expect("create search index workspace");
         fs::write(root.join("first.md"), "alpha Needle content").expect("write indexed match");
         fs::write(root.join("second.md"), "unrelated content").expect("write indexed non-match");
+        fs::write(root.join("third.md"), "needless content").expect("write substring match");
 
         let cache = WorkspaceSearchCache::default();
+        cache.enable_event_driven_root(&root);
         let indexed = search_workspace_inner_with_cache(root.clone(), "eedl".to_string(), &cache)
             .expect("search indexed substring");
-        assert_eq!(indexed.len(), 1);
-        assert_eq!(indexed[0].file.name, "first.md");
+        assert_eq!(
+            indexed
+                .iter()
+                .map(|result| result.file.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["first.md", "third.md"]
+        );
+
+        cache
+            .entries
+            .lock()
+            .expect("lock search text cache")
+            .clear();
+        cache.text_reads.store(0, Ordering::Relaxed);
+        let repeated_substring =
+            search_workspace_inner_with_cache(root.clone(), "eedl".to_string(), &cache)
+                .expect("search repeated indexed substring");
+        assert_eq!(repeated_substring.len(), 2);
+        assert_eq!(cache.text_reads.load(Ordering::Relaxed), 2);
 
         let exact_candidates = cache
             .content_candidates(&root, "needle")
             .expect("exact ASCII word should use the index");
-        assert_eq!(exact_candidates.len(), 1);
+        assert_eq!(exact_candidates.len(), 2);
         assert!(exact_candidates.contains(&access_path_key(&root.join("first.md"))));
-        assert!(cache.content_candidates(&root, "eedl").is_none());
+        assert!(exact_candidates.contains(&access_path_key(&root.join("third.md"))));
 
         let short_query = search_workspace_inner_with_cache(root.clone(), "a".to_string(), &cache)
             .expect("search short query");
@@ -3076,6 +3150,38 @@ mod tests {
             .any(|result| result.file.name == "first.md"));
 
         fs::remove_dir_all(root).expect("remove search index workspace");
+    }
+
+    #[test]
+    fn keeps_unreadable_text_files_in_search_fallback() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-unreadable-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create unreadable search workspace");
+        fs::write(root.join("indexed.md"), "needle in an indexed note")
+            .expect("write indexed unreadable fallback note");
+        fs::write(root.join("broken.md"), b"\0\0\0\0").expect("write unreadable fallback note");
+
+        let cache = WorkspaceSearchCache::default();
+        let results = search_workspace_inner_with_cache(root.clone(), "needle".to_string(), &cache)
+            .expect("search with unreadable fallback note");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].file.name, "indexed.md");
+
+        let root_key = access_path_key(&root);
+        let indexes = cache
+            .search_indexes
+            .lock()
+            .expect("lock unreadable fallback index");
+        assert!(indexes
+            .get(&root_key)
+            .expect("search index should exist")
+            .unindexed_files
+            .contains(&access_path_key(&root.join("broken.md"))));
+
+        fs::remove_dir_all(root).expect("remove unreadable search workspace");
     }
 
     #[test]
