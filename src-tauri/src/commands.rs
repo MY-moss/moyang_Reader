@@ -3032,6 +3032,8 @@ fn export_pdf_file_windows(path: PathBuf, html: &str) -> Result<(), String> {
             .arg("--no-first-run")
             .arg("--no-default-browser-check")
             .arg("--no-pdf-header-footer")
+            .arg("--run-all-compositor-stages-before-draw")
+            .arg("--virtual-time-budget=1000")
             .arg(format!("--user-data-dir={}", temp_profile.display()))
             .arg(format!("--print-to-pdf={}", temp_pdf.display()))
             .arg(edge_file_url(&temp_html))
@@ -4554,3 +4556,4 @@ mod tests {
         fs::remove_dir_all(root).expect("remove duplicate workspace");
     }
 }
+

@@ -1,5 +1,14 @@
 # AI 开发与交接流程
 
+## 进行中功能切片（2026-08-28，#241 PDF 文件落盘）
+
+- 目标：修复 Windows 桌面“保存 PDF”偶发退出码为 0 但没有生成文件的问题，并保留有效 PDF 文件头、原子替换和路径授权边界。
+- 分支：`codex/pdf-export-file-2026-08-28`，基于 `origin/main@9052016bebebb2f6f1516ab3a26d1ec438dfaf42`。
+- 非目标：本切片不处理 #241 中旧版本自动更新器的实机回归，不修改更新协议、签名密钥、Cloudflare 凭据或其他导出格式。
+- 实现：Windows Edge headless 导出增加 `--run-all-compositor-stages-before-draw` 与 `--virtual-time-budget=1000`，避免 Edge 在页面完成绘制前退出；桌面 PDF smoke 改为通过实际“更多操作”菜单触发保存动作，适配窄窗口布局。
+- 当前验证：Rust 格式检查和 `cargo build --features wdio` 通过；直接使用 Edge 同等参数生成并校验 `%PDF-`/`%%EOF` 成功。完整本机桌面 smoke 未通过，首个根因是 Tauri WebDriver 未进入应用页面（`Tauri core.invoke not available`、`tauri-driver` 缺失警告），后续用例因此连锁失败，不能据此判定 PDF 修复失败。
+- 交接：提交前补跑针对性 Rust/前端门禁；推送本分支并创建唯一 PR 关联 #241。合并与主线门禁通过后，再单独执行 v0.10.7 patch 发布和安装包/manifest/镜像核验；旧更新器仍由 #241 的后续切片负责。
+
 ## 已完成发布切片（2026-08-28，v0.10.6）
 
 - 目标：将 PR #281 的文件/文件夹右键管理与正文编辑动作作为稳定 Windows x64 patch 发布。
@@ -240,3 +249,4 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 - 回滚方式：回滚本功能分支即可；无数据迁移，Markdown 文件仍是唯一真源。
 - 下一位 AI 的唯一下一步：先查看“最新检查点”、Issues 和当前 PR；确认 v0.9.2 发布资产和镜像状态后，从最新 `main` 选择一个已确认的 Ready 切片。若 #241 尚未具备 Ready 条件，不要提前实现 PDF/更新器功能；若先处理发布基础设施，优先由维护者在 GitHub Actions Secrets 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）和 `CLOUDFLARE_ACCOUNT_ID`，再验证自动镜像。不要把 token 放入聊天、仓库或文档，也不要重复实现已完成的编辑、搜索、阅读位置、外部修改保护和工作区入口功能。
 - CI 触发记录：PR #236 的 head `e364648fe703c4689a148f894525a68d25452a1b` 的 push `Quality checks` 曾被并发重跑取消，恢复后的 job `98264563669` 已成功；PR #236 已合并为 `c08987ac6d5b7b778b0f4814937714c7f302e55b`。Release workflow `32996354493` 已成功，镜像 workflow `32998515986` 仅因 Cloudflare Secrets 缺失失败。
+
