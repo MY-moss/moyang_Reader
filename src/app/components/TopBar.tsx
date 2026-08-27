@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   DocumentKind,
   ExportMargin,
@@ -166,6 +166,8 @@ export function TopBar({
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const settingsMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const toolbarRef = useRef<HTMLElement>(null);
+  const [toolbarHasOverflow, setToolbarHasOverflow] = useState(false);
   useEffect(() => {
     const menuRefs = [moreMenuRef, settingsMenuRef, exportMenuRef];
     const closeMenus = () => {
@@ -196,6 +198,41 @@ export function TopBar({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, []);
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    const updateOverflow = () => {
+      setToolbarHasOverflow(toolbar.scrollWidth > toolbar.clientWidth + 1);
+    };
+
+    const frameId = window.requestAnimationFrame(updateOverflow);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateOverflow);
+    resizeObserver?.observe(toolbar);
+    window.addEventListener("resize", updateOverflow);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [
+    canEdit,
+    copyFeedback,
+    documentKind,
+    draftCount,
+    externallyModified,
+    fileName,
+    focusMode,
+    locale,
+    mode,
+    modified,
+    rightPanelOpen,
+    searchOpen,
+    sidebarCollapsed,
+    updateStatus,
+    workspaceLimitReached,
+    workspaceOpen,
+  ]);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
   const closeDropdownMenus = () => {
@@ -268,7 +305,12 @@ export function TopBar({
         )}
       </div>
 
-      <nav className="toolbar" aria-label="文档操作">
+      <nav
+        ref={toolbarRef}
+        className={"toolbar" + (toolbarHasOverflow ? " has-overflow" : "")}
+        title={toolbarHasOverflow ? "还有更多操作，可横向滚动" : undefined}
+        aria-label="文档操作"
+      >
         <button
           type="button"
           className="toolbar-button"

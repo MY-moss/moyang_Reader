@@ -96,19 +96,21 @@ PR 说明必须包含目标、非目标、测试、手动 UI 路径、文档同�
 
 ## 当前功能切片快照
 
-> **最新检查点（2026-08-27，验证基线：`main@0e8b4e9d5ea2471b6a318fec6335f8e7a2dc000d`）**
+> **最新检查点（2026-08-27，验证基线：`main@d6f48943dc5badf4e81974716cd81f0fa993a80f`）**
 >
 > - #104 的未变化索引快速路径、ASCII 子串候选、工作区文件列表缓存和文件级 LRU 淘汰已由 PR #257、#259、#261、#264 合并；当前 `main@0e8b4e9…` 已包含上述实现和交接文档。
 > - PR #266 已将 5000 篇每篇至少 2 KiB、混合中英文文档的暖缓存 P95 验收，以及超出单文件 token 上限时的线性回退验收合并到 `main`；#104 已标记 completed。
 > - 本机正式验收记录：5000 文档暖查询 P95 为 38 ms，低于 #104 的 100 ms 目标；长文档回退、完整 Rust 测试 40/40、Rust fmt 和 `cargo clippy --lib -- -D warnings` 均通过；PR #266 的 Windows Quality checks 已通过。
 > - `v0.10.1` 版本准备已由 PR #267 合并，标签、Release 和 Windows x64 安装包已完成；不要重复版本准备、#104 验收或 v0.10.1 打包。
+> - 当前功能切片（#187，分支 `codex/responsive-layout-2026-08-27`）：Windows 最小窗口宽度已调整为 720px；工具栏按真实横向溢出显示边缘提示和标题，保持现有横向滚动与快捷操作不变。
+> - 本切片已通过 `npm run lint`、`npm run format:check`、`npm run build` 和 3 条相关 Playwright smoke；没有新增依赖或数据格式变化，尚未创建 Release/安装包，#187 完整断点验收保持 open。
 > - v0.9.5 已完成三栏导航、目录跳转、侧栏滚动、面板调宽和窄屏布局修复，并已通过 [PR #253](https://github.com/MY-moss/moyang_Reader/pull/253) 与 [PR #254](https://github.com/MY-moss/moyang_Reader/pull/254) 合并。
 > - [GitHub Release v0.9.5](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.9.5) 已发布，Windows 构建/发布 job 成功；安装包、`.sig`、`latest.json` 均已在线核验。
 > - Cloudflare v0.9.5 公开资产在线且与 GitHub 的大小和 SHA-256 一致，但自动镜像 job 因 #241 缺少 Secrets 失败；公开资产在线不等于自动镜像 workflow 全绿。
 > - 撤回/重做阅读位置修复已由 [PR #262](https://github.com/MY-moss/moyang_Reader/pull/262) 合并，合并提交为 `a76613b63d319a123d51cf98d7816a1492ca7e6`；修改集中在编辑历史应用、Markdown/CodeMirror 状态同步、共享滚动位置辅助模块和回归测试，不改变撤回语义或 Markdown 真源。
 > - PR #262 的 Quality checks `33046894608` 全部通过；视口单测 2/2、undo/redo Playwright E2E 1/1、构建、Windows 桌面 smoke 和 Rust 门禁均通过，该修复已随 v0.10.1 发布。
 > - #104 索引容量切片已由 [PR #264](https://github.com/MY-moss/moyang_Reader/pull/264) 合并：posting 预算按文件 LRU 淘汰并安全回退线性扫描；新增回归测试和 Quality checks 通过，持久化索引版本升级为 4，旧缓存会安全重建。本切片不生成安装包。
-> - 下一位 AI 的唯一下一步：先检查 Issues/PR 和 `#241` 的 Cloudflare Secrets 状态，再从已确认的 v0.10.2 Ready backlog 选择一个独立的小垂直切片；不要重复 v0.10.1 发布、#104、PR #262 或 PR #264 的实现。
+> - 下一位 AI 的唯一下一步：先检查当前分支差异与 #187 PR 状态；若 PR 尚未创建，完成提交并创建一个关联 PR，等待主线 Quality checks；合并后再决定是否将本切片纳入 v0.10.2 Windows 安装包发布。不要重复 v0.10.1 发布、#104、PR #262 或 PR #264 的实现。
 
 ## 历史功能切片快照
 
