@@ -1,13 +1,14 @@
 # AI 开发与交接流程
 
-## 当前发布切片（2026-08-28，v0.10.10 版本准备）
+## 已完成发布切片（2026-08-28，v0.10.10 工作区转移与纯文本粘贴）
 
 - 目标：将已合并的工作区内文件/文件夹剪切复制粘贴与编辑器纯文本粘贴作为 Windows x64 稳定版本发布。
-- 基线：PR #296 已 squash 合并，合并提交为 `main@2ff2330368af5415a84e7f9b8ce084b128efa99c`；Quality checks run `33150649302` 全部通过。
-- 版本分支：`codex/release-v0.10.10-2026-08-28` 已从合并提交创建；`package.json`、`package-lock.json`、Cargo、Tauri 配置和 CHANGELOG 已同步为 `0.10.10`。
-- 发布状态：当前只完成版本准备，尚未创建 `v0.10.10` tag、GitHub Release 或安装包；需要先通过版本 PR 的完整质量门禁，再推送 tag 触发 Windows x64 安装包、签名、`latest.json` 和镜像流程。
-- 安全边界：不上传私钥；签名只使用 GitHub Actions Secret，Cloudflare 凭据不进入仓库、PR、Release 或 AI 上下文。
-- 下一步唯一动作：验证版本一致性和发布检查，推送版本分支并创建一个版本 PR；合并后确认 main CI，再创建 `v0.10.10` tag。发布资产和镜像在线核验完成后停止，不自动开启下一功能。
+- 基线：PR [#296](https://github.com/MY-moss/moyang_Reader/pull/296) 已 squash 合并，合并提交为 `main@2ff2330368af5415a84e7f9b8ce084b128efa99c`；版本准备 PR [#297](https://github.com/MY-moss/moyang_Reader/pull/297) 已合并，发布提交为 `main@369411206b6bfd8b4a75cd70e37d81c91b20f5d7`。
+- 质量门禁：PR #296 的 Quality checks run `33150649302` 全绿；版本 PR #297 的 Quality checks run `33151532148` 在一次既有 watcher smoke 瞬时失败后重跑全绿，Rust audit `33151597033` 和 main CI `33152550659`、Rust audit `33152550649` 均通过。
+- 发布资产：tag `v0.10.10` 已指向 `369411206b6bfd8b4a75cd70e37d81c91b20f5d7`；Release workflow `33153221247` 的 Windows 构建/发布 job `98789862805` 成功。GitHub Release [v0.10.10](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.10) 已公开；安装包 4,904,672 字节，SHA-256 `e49ccf9f689bad64b966d9513761e236c52d784d1869020ee55b0149890cf91c`；`.sig` 428 字节，SHA-256 `5c1c072418adef0e3209acdb5b456f39f62b52b763eac127dbfd4c079147e9fe`；`latest.json` 1,413 字节，SHA-256 `bcbf62897a32f6a95a215377a9668f87d97f1de98d5542cca4a0a6c6c8dce1de`。
+- 在线核验：GitHub Release 三项资产可下载；Cloudflare Pages 的 `latest.json`、v0.10.10 安装包和签名均 HTTP 200，manifest 版本为 `0.10.10`，镜像安装包 4,904,672 字节且 SHA-256 与 GitHub Release 一致，签名内容一致。
+- 镜像边界：Release workflow 的静态镜像子 job `98791213977` 失败；当前仓库仍未配置 Cloudflare 部署 Secret，因此不能把静态上传 workflow 记为全绿。公开 Pages 镜像代理当前可用，客户端仍保留 GitHub Release 回退；本轮没有上传私钥或 Cloudflare 凭据。
+- 交接：v0.10.10 发布与在线资产核验完成，本功能切片停止。下一位 AI 先检查 Issues 和镜像状态，再从 Ready backlog 选择单一事项；不得重复创建 v0.10.10 Release、安装包或 tag。
 
 ## 已完成功能切片（2026-08-28，v0.10.9 右键快速管理补全）
 
@@ -16,7 +17,7 @@
 - 已实现：文件树刷新当前范围、复制名称、文件夹相对路径、活动文件关闭标签；阅读模式选中文本复制/查找、链接复制/打开、进入编辑、复制文档路径；内部双链、标题锚点、本地文档和外部链接复用同一解析边界。
 - 非目标：文件移动、回收站恢复、批量文件操作、属性写回、DOCX/PDF 原格式编辑和用户文档云同步。
 - 验收：WorkspaceTree/ReaderContextMenu/编辑器动作定向测试、类型检查、Lint、Prettier、阅读模式浏览器 E2E 通过；GitHub Quality checks run `33142306368` 的浏览器 smoke、Windows 桌面 smoke、依赖审计、发布预检和 Rust 门禁全部通过。#232 已评论并以 completed 关闭。
-- 交接：本切片已完成，未创建 Release 或安装包；下一位 AI 只需从最新 `main` 复查 v0.10.9 发布条件，再单独执行 Windows x64 版本准备、安装包、签名、manifest 和镜像核验。不要扩展到文件移动或批量操作。
+- 交接：v0.10.9 Windows x64 Release 已公开；本节后续工作已由 PR #296 和 v0.10.10 发布切片完成，不要重复执行旧版本发布或扩展已关闭的范围。
 
 ## 已完成发布切片（2026-08-28，v0.10.8 右键管理增强）
 

@@ -23,6 +23,14 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## v0.10.10 发布记录（2026-08-28）
+
+- 发布范围：PR [#296](https://github.com/MY-moss/moyang_Reader/pull/296) 增加工作区内文件/文件夹剪切、复制、粘贴和编辑器“粘贴为纯文本”；版本准备 PR [#297](https://github.com/MY-moss/moyang_Reader/pull/297) 同步版本号、CHANGELOG 和发布文档。
+- 发布结果：tag `v0.10.10` 指向 `main@369411206b6bfd8b4a75cd70e37d81c91b20f5d7`；GitHub Release [v0.10.10](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.10) 已公开。
+- 已核验：Release workflow [33153221247](https://github.com/MY-moss/moyang_Reader/actions/runs/33153221247) 的 Windows 构建/发布 job [98789862805](https://github.com/MY-moss/moyang_Reader/actions/runs/33153221247/job/98789862805) 成功；安装包 4,904,672 字节，SHA-256 `e49ccf9f689bad64b966d9513761e236c52d784d1869020ee55b0149890cf91c`；`.sig` 428 字节，SHA-256 `5c1c072418adef0e3209acdb5b456f39f62b52b763eac127dbfd4c079147e9fe`；`latest.json` 1,413 字节，SHA-256 `bcbf62897a32f6a95a215377a9668f87d97f1de98d5542cca4a0a6c6c8dce1de`。
+- 在线核验：GitHub Release 和 Cloudflare Pages 的 `latest.json`、Windows x64 安装包及签名均 HTTP 200；两处安装包大小和 SHA-256 一致，manifest 版本均为 `0.10.10`，签名内容一致。
+- 镜像边界：Release workflow 静态镜像子 job [98791213977](https://github.com/MY-moss/moyang_Reader/actions/runs/33153221247/job/98791213977) 失败，当前仓库仍缺少 Cloudflare 部署 Secret；公开 Pages 镜像代理可用，客户端仍保留 GitHub Release 回退。本轮未上传任何凭据。
+
 ## v0.10.7 发布记录（2026-08-28）
 
 - 发布范围：PR [#284](https://github.com/MY-moss/moyang_Reader/pull/284) 修复 Windows Edge headless PDF 异步落盘，确认有效 PDF 后再执行原子替换；版本准备 PR [#285](https://github.com/MY-moss/moyang_Reader/pull/285) 已同步版本号和 CHANGELOG。
