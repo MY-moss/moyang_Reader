@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
-import { buildWorkspaceTree, type WorkspaceTreeFolder } from "../workspace-tree";
+import {
+  buildWorkspaceTree,
+  flattenWorkspaceTree,
+  getWorkspaceTreeWindow,
+  WORKSPACE_TREE_OVERSCAN,
+  WORKSPACE_TREE_ROW_HEIGHT,
+  type WorkspaceTreeFolder,
+  type WorkspaceTreeRow,
+} from "../workspace-tree";
 import { ContextMenu } from "./ContextMenu";
 
 export type WorkspaceEntryKind = "file" | "folder";
@@ -83,6 +91,99 @@ function canPasteClipboard(clipboard: WorkspaceEntryClipboard, destinationParent
     return false;
   }
   return true;
+}
+
+function findScrollParent(element: HTMLElement): HTMLElement | Window {
+  let parent = element.parentElement;
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return parent;
+    parent = parent.parentElement;
+  }
+  return window;
+}
+
+function useWorkspaceTreeWindow(treeRef: RefObject<HTMLDivElement>, rowCount: number) {
+  const [treeWindow, setTreeWindow] = useState(() =>
+    getWorkspaceTreeWindow(rowCount, 0, 600, WORKSPACE_TREE_ROW_HEIGHT, WORKSPACE_TREE_OVERSCAN),
+  );
+
+  useEffect(() => {
+    const treeElement = treeRef.current;
+    if (!treeElement) return;
+
+    const scrollParent = findScrollParent(treeElement);
+    let frame: number | null = null;
+    const measure = () => {
+      frame = null;
+      const treeRect = treeElement.getBoundingClientRect();
+      if (treeRect.height === 0) {
+        setTreeWindow(
+          getWorkspaceTreeWindow(
+            rowCount,
+            0,
+            rowCount <= 200 ? 0 : 600,
+            WORKSPACE_TREE_ROW_HEIGHT,
+            WORKSPACE_TREE_OVERSCAN,
+          ),
+        );
+        return;
+      }
+
+      let metrics: { scrollTop: number; viewportHeight: number; treeTop: number };
+      if (scrollParent instanceof HTMLElement) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const scrollTop = scrollParent.scrollTop;
+        metrics = {
+          scrollTop,
+          viewportHeight: scrollParent.clientHeight,
+          treeTop: treeRect.top - parentRect.top + scrollTop,
+        };
+      } else {
+        const scrollTop = window.scrollY;
+        metrics = {
+          scrollTop,
+          viewportHeight: window.innerHeight,
+          treeTop: treeRect.top + scrollTop,
+        };
+      }
+
+      const { scrollTop, viewportHeight, treeTop } = metrics;
+      if (viewportHeight <= 0) {
+        setTreeWindow({ start: 0, end: rowCount });
+        return;
+      }
+
+      setTreeWindow(
+        getWorkspaceTreeWindow(
+          rowCount,
+          scrollTop - treeTop,
+          viewportHeight,
+          WORKSPACE_TREE_ROW_HEIGHT,
+          WORKSPACE_TREE_OVERSCAN,
+        ),
+      );
+    };
+    const scheduleMeasure = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(measure);
+    };
+
+    scrollParent.addEventListener("scroll", scheduleMeasure, { passive: true });
+    window.addEventListener("resize", scheduleMeasure);
+    scheduleMeasure();
+    return () => {
+      scrollParent.removeEventListener("scroll", scheduleMeasure);
+      window.removeEventListener("resize", scheduleMeasure);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [rowCount, treeRef]);
+
+  return treeWindow;
+}
+
+function workspaceTreeRowKey(row: WorkspaceTreeRow): string {
+  return `${row.kind}:${row.kind === "file" ? row.file.path : row.folder.path}`;
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {
@@ -171,60 +272,53 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContex
   );
 }
 
-type WorkspaceFolderProps = {
+type WorkspaceFolderButtonProps = {
   folder: WorkspaceTreeFolder;
   depth: number;
-  collapsedFolders: ReadonlySet<string>;
+  isOpen: boolean;
   onToggleFolder: (path: string) => void;
-  activePath: string | null;
-  onOpenFile: (path: string) => void;
   onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
-  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
-  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
-  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
-  onShowDetails?: (details: WorkspaceEntryDetails) => void;
-  onRevealEntry?: (entryPath: string) => void;
-  onCopyPath?: (entryPath: string) => void;
-  onCopyRelativePath?: (entryPath: string) => void;
-  onCopyName?: (entryPath: string) => void;
-  onRefresh?: (entryPath: string) => void;
 };
 
-function WorkspaceFolder({
+function WorkspaceFolderButton({
   folder,
   depth,
-  collapsedFolders,
+  isOpen,
   onToggleFolder,
-  activePath,
-  onOpenFile,
   onOpenContextMenu,
-  onRenameEntry,
-  onDeleteEntry,
-  onDuplicateEntry,
-  onShowDetails,
-  onRevealEntry,
-  onCopyPath,
-  onCopyRelativePath,
-  onCopyName,
-  onRefresh,
-}: WorkspaceFolderProps) {
-  const isOpen = !collapsedFolders.has(folder.path);
+}: WorkspaceFolderButtonProps) {
   const folderLabel = `“${folder.path}”`;
 
   return (
-    <div className="workspace-folder-group">
-      <button
-        type="button"
-        className="workspace-folder"
-        style={{ paddingLeft: `${7 + depth * 14}px` }}
-        aria-expanded={isOpen}
-        onClick={() => onToggleFolder(folder.path)}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onOpenContextMenu({
-            x: event.clientX,
-            y: event.clientY,
+    <button
+      type="button"
+      className="workspace-folder"
+      style={{ paddingLeft: `${7 + depth * 14}px` }}
+      aria-expanded={isOpen}
+      onClick={() => onToggleFolder(folder.path)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          parentPath: folder.path,
+          label: folderLabel,
+          entryPath: folder.path,
+          entryKind: "folder",
+          details: {
+            kind: "folder",
+            name: folder.name,
+            relativePath: folder.path,
+            fileCount: folder.fileCount,
+          },
+        });
+      }}
+      onKeyDown={(event) => {
+        if (!isContextMenuKey(event)) return;
+        event.preventDefault();
+        onOpenContextMenu(
+          targetFromKeyboard(event, {
             parentPath: folder.path,
             label: folderLabel,
             entryPath: folder.path,
@@ -235,72 +329,19 @@ function WorkspaceFolder({
               relativePath: folder.path,
               fileCount: folder.fileCount,
             },
-          });
-        }}
-        onKeyDown={(event) => {
-          if (!isContextMenuKey(event)) return;
-          event.preventDefault();
-          onOpenContextMenu(
-            targetFromKeyboard(event, {
-              parentPath: folder.path,
-              label: folderLabel,
-              entryPath: folder.path,
-              entryKind: "folder",
-              details: {
-                kind: "folder",
-                name: folder.name,
-                relativePath: folder.path,
-                fileCount: folder.fileCount,
-              },
-            }),
-          );
-        }}
-      >
-        <span className="workspace-folder-caret" aria-hidden="true">
-          {isOpen ? "⌄" : "›"}
-        </span>
-        <span className="workspace-folder-icon" aria-hidden="true">
-          ▱
-        </span>
-        <span className="workspace-folder-name">{folder.name}</span>
-        <small>{folder.fileCount > 0 ? folder.fileCount : "空"}</small>
-      </button>
-      {isOpen && (
-        <>
-          {folder.files.map((file) => (
-            <WorkspaceFileButton
-              key={file.path}
-              file={file}
-              activePath={activePath}
-              depth={depth + 1}
-              onOpenFile={onOpenFile}
-              onOpenContextMenu={onOpenContextMenu}
-            />
-          ))}
-          {folder.folders.map((child) => (
-            <WorkspaceFolder
-              key={child.path}
-              folder={child}
-              depth={depth + 1}
-              collapsedFolders={collapsedFolders}
-              onToggleFolder={onToggleFolder}
-              activePath={activePath}
-              onOpenFile={onOpenFile}
-              onOpenContextMenu={onOpenContextMenu}
-              onRenameEntry={onRenameEntry}
-              onDeleteEntry={onDeleteEntry}
-              onDuplicateEntry={onDuplicateEntry}
-              onShowDetails={onShowDetails}
-              onRevealEntry={onRevealEntry}
-              onCopyPath={onCopyPath}
-              onCopyRelativePath={onCopyRelativePath}
-              onCopyName={onCopyName}
-              onRefresh={onRefresh}
-            />
-          ))}
-        </>
-      )}
-    </div>
+          }),
+        );
+      }}
+    >
+      <span className="workspace-folder-caret" aria-hidden="true">
+        {isOpen ? "⌄" : "›"}
+      </span>
+      <span className="workspace-folder-icon" aria-hidden="true">
+        ▱
+      </span>
+      <span className="workspace-folder-name">{folder.name}</span>
+      <small>{folder.fileCount > 0 ? folder.fileCount : "空"}</small>
+    </button>
   );
 }
 
@@ -328,6 +369,9 @@ export function WorkspaceTreeView({
   const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);
   const [clipboard, setClipboard] = useState<WorkspaceEntryClipboard | null>(null);
   const tree = useMemo(() => buildWorkspaceTree(files, folders), [files, folders]);
+  const rows = useMemo(() => flattenWorkspaceTree(tree, collapsedFolders), [tree, collapsedFolders]);
+  const treeRef = useRef<HTMLDivElement>(null);
+  const treeWindow = useWorkspaceTreeWindow(treeRef, rows.length);
 
   useEffect(() => {
     if (!clipboard) return;
@@ -399,7 +443,9 @@ export function WorkspaceTreeView({
 
   return (
     <div
+      ref={treeRef}
       className="workspace-tree"
+      style={{ height: `${rows.length * WORKSPACE_TREE_ROW_HEIGHT}px` }}
       onContextMenu={(event) => {
         if (!canManage || event.target !== event.currentTarget) return;
         event.preventDefault();
@@ -413,37 +459,34 @@ export function WorkspaceTreeView({
         });
       }}
     >
-      {tree.files.map((file) => (
-        <WorkspaceFileButton
-          key={file.path}
-          file={file}
-          activePath={activePath}
-          depth={0}
-          onOpenFile={onOpenFile}
-          onOpenContextMenu={openContextMenu}
-        />
-      ))}
-      {tree.folders.map((folder) => (
-        <WorkspaceFolder
-          key={folder.path}
-          folder={folder}
-          depth={0}
-          collapsedFolders={collapsedFolders}
-          onToggleFolder={toggleFolder}
-          activePath={activePath}
-          onOpenFile={onOpenFile}
-          onOpenContextMenu={openContextMenu}
-          onRenameEntry={onRenameEntry}
-          onDeleteEntry={onDeleteEntry}
-          onDuplicateEntry={onDuplicateEntry}
-          onShowDetails={onShowDetails}
-          onRevealEntry={onRevealEntry}
-          onCopyPath={onCopyPath}
-          onCopyRelativePath={onCopyRelativePath}
-          onCopyName={onCopyName}
-          onRefresh={onRefresh}
-        />
-      ))}
+      {rows.slice(treeWindow.start, treeWindow.end).map((row, offset) => {
+        const index = treeWindow.start + offset;
+        return (
+          <div
+            className="workspace-tree-row"
+            key={workspaceTreeRowKey(row)}
+            style={{ top: `${index * WORKSPACE_TREE_ROW_HEIGHT}px` }}
+          >
+            {row.kind === "file" ? (
+              <WorkspaceFileButton
+                file={row.file}
+                activePath={activePath}
+                depth={row.depth}
+                onOpenFile={onOpenFile}
+                onOpenContextMenu={openContextMenu}
+              />
+            ) : (
+              <WorkspaceFolderButton
+                folder={row.folder}
+                depth={row.depth}
+                isOpen={row.expanded}
+                onToggleFolder={toggleFolder}
+                onOpenContextMenu={openContextMenu}
+              />
+            )}
+          </div>
+        );
+      })}
       {contextMenu && canManage && (
         <ContextMenu
           x={contextMenu.x}

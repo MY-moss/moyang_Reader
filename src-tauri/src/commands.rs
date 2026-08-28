@@ -36,6 +36,9 @@ const SEARCH_INDEX_CACHE_VERSION: u32 = 4;
 const MAX_PERSISTED_SEARCH_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PERSISTED_SEARCH_INDEX_FILES: usize = 50_000;
 const MAX_FILE_LIST_CACHE_ENTRIES: usize = 32;
+const MAX_WORKSPACE_FILES: usize = 20_000;
+const MAX_WORKSPACE_DIRECTORIES: usize = 10_000;
+const MAX_WORKSPACE_DEPTH: usize = 32;
 const MAX_PDF_HTML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_APP_SETTINGS_BYTES: usize = 256 * 1024;
 const APP_SETTINGS_FILE_NAME: &str = "settings.json";
@@ -1123,6 +1126,15 @@ pub struct WorkspaceDirectory {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceListing {
+    pub files: Vec<WorkspaceFile>,
+    pub folders: Vec<WorkspaceDirectory>,
+    pub truncated: bool,
+    pub scanned_total: usize,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct WorkspaceSearchResult {
     pub file: WorkspaceFile,
     pub preview: String,
@@ -1145,6 +1157,8 @@ pub struct WorkspaceRefreshResult {
     pub folders: Vec<WorkspaceDirectory>,
     pub files: Vec<WorkspaceFile>,
     pub index: Vec<WorkspaceIndexEntry>,
+    pub truncated: bool,
+    pub scanned_total: usize,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1725,7 +1739,21 @@ pub fn is_supported_document_path(path: &Path) -> bool {
 fn should_skip_directory(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
-        .map(|name| matches!(name, ".git" | ".moyang" | "node_modules" | "target"))
+        .map(|name| {
+            matches!(
+                name.to_ascii_lowercase().as_str(),
+                ".git"
+                    | ".moyang"
+                    | "node_modules"
+                    | "target"
+                    | "dist"
+                    | "build"
+                    | ".venv"
+                    | "__pycache__"
+                    | ".next"
+                    | "coverage"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -1755,31 +1783,6 @@ fn workspace_file(root: &Path, path: &Path) -> Result<WorkspaceFile, String> {
     })
 }
 
-fn collect_workspace_files(
-    root: &Path,
-    directory: &Path,
-    files: &mut Vec<WorkspaceFile>,
-) -> Result<(), String> {
-    for entry in fs::read_dir(directory).map_err(|error| format!("无法读取工作区目录：{error}"))?
-    {
-        let entry = entry.map_err(|error| format!("无法读取工作区条目：{error}"))?;
-        let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|error| format!("无法读取工作区条目类型：{error}"))?;
-
-        if file_type.is_dir() {
-            if !should_skip_directory(&path) {
-                collect_workspace_files(root, &path, files)?;
-            }
-        } else if file_type.is_file() && is_supported_document_path(&path) {
-            files.push(workspace_file(root, &path)?);
-        }
-    }
-
-    Ok(())
-}
-
 fn workspace_directory(root: &Path, path: &Path) -> Result<WorkspaceDirectory, String> {
     let name = path
         .file_name()
@@ -1798,48 +1801,121 @@ fn workspace_directory(root: &Path, path: &Path) -> Result<WorkspaceDirectory, S
     })
 }
 
-fn collect_workspace_directories(
+#[derive(Default)]
+struct WorkspaceScan {
+    files: Vec<WorkspaceFile>,
+    folders: Vec<WorkspaceDirectory>,
+    truncated: bool,
+    stop: bool,
+    scanned_total: usize,
+}
+
+fn workspace_depth(root: &Path, directory: &Path) -> usize {
+    directory
+        .strip_prefix(root)
+        .map(|relative| relative.components().count())
+        .unwrap_or(MAX_WORKSPACE_DEPTH + 1)
+}
+
+fn collect_workspace_entries(
     root: &Path,
     directory: &Path,
-    directories: &mut Vec<WorkspaceDirectory>,
+    depth: usize,
+    scan: &mut WorkspaceScan,
+    include_files: bool,
+    include_directories: bool,
 ) -> Result<(), String> {
-    for entry in fs::read_dir(directory).map_err(|error| format!("无法读取工作区目录：{error}"))?
-    {
-        let entry = entry.map_err(|error| format!("无法读取工作区条目：{error}"))?;
+    if scan.stop {
+        return Ok(());
+    }
+    if depth >= MAX_WORKSPACE_DEPTH {
+        scan.truncated = true;
+        return Ok(());
+    }
+
+    let mut entries = fs::read_dir(directory)
+        .map_err(|error| format!("无法读取工作区目录：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("无法读取工作区条目：{error}"))?;
+    entries.sort_by_key(|entry| entry.file_name().to_string_lossy().to_ascii_lowercase());
+
+    for entry in entries {
+        if scan.stop {
+            break;
+        }
+        scan.scanned_total = scan.scanned_total.saturating_add(1);
         let path = entry.path();
         let file_type = entry
             .file_type()
             .map_err(|error| format!("无法读取工作区条目类型：{error}"))?;
 
-        if file_type.is_dir() && !should_skip_directory(&path) {
-            directories.push(workspace_directory(root, &path)?);
-            collect_workspace_directories(root, &path, directories)?;
+        if file_type.is_dir() {
+            if should_skip_directory(&path) {
+                continue;
+            }
+            if include_directories {
+                if scan.folders.len() >= MAX_WORKSPACE_DIRECTORIES {
+                    scan.truncated = true;
+                    scan.stop = true;
+                    break;
+                }
+                scan.folders.push(workspace_directory(root, &path)?);
+            }
+            collect_workspace_entries(
+                root,
+                &path,
+                depth + 1,
+                scan,
+                include_files,
+                include_directories,
+            )?;
+        } else if include_files && file_type.is_file() && is_supported_document_path(&path) {
+            if scan.files.len() >= MAX_WORKSPACE_FILES {
+                scan.truncated = true;
+                scan.stop = true;
+                break;
+            }
+            scan.files.push(workspace_file(root, &path)?);
         }
     }
 
     Ok(())
 }
 
-fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
+fn scan_workspace(
+    root: &Path,
+    include_files: bool,
+    include_directories: bool,
+) -> Result<WorkspaceScan, String> {
     if !root.is_dir() {
         return Err("请选择一个有效的工作区文件夹。".to_string());
     }
 
-    let mut files = Vec::new();
-    collect_workspace_files(root, root, &mut files)?;
-    files.sort_by_key(|file| file.relative_path.to_ascii_lowercase());
-    Ok(files)
+    let mut scan = WorkspaceScan::default();
+    collect_workspace_entries(root, root, 0, &mut scan, include_files, include_directories)?;
+    scan.files
+        .sort_by_key(|file| file.relative_path.to_ascii_lowercase());
+    scan.folders
+        .sort_by_key(|folder| folder.relative_path.to_ascii_lowercase());
+    Ok(scan)
+}
+
+fn sorted_workspace_files(root: &Path) -> Result<Vec<WorkspaceFile>, String> {
+    Ok(scan_workspace(root, true, false)?.files)
 }
 
 fn sorted_workspace_directories(root: &Path) -> Result<Vec<WorkspaceDirectory>, String> {
-    if !root.is_dir() {
-        return Err("请选择一个有效的工作区文件夹。".to_string());
-    }
+    Ok(scan_workspace(root, false, true)?.folders)
+}
 
-    let mut directories = Vec::new();
-    collect_workspace_directories(root, root, &mut directories)?;
-    directories.sort_by_key(|directory| directory.relative_path.to_ascii_lowercase());
-    Ok(directories)
+fn sorted_workspace_listing(root: &Path) -> Result<WorkspaceListing, String> {
+    let scan = scan_workspace(root, true, true)?;
+    Ok(WorkspaceListing {
+        files: scan.files,
+        folders: scan.folders,
+        truncated: scan.truncated,
+        scanned_total: scan.scanned_total,
+    })
 }
 
 #[tauri::command]
@@ -1858,6 +1934,22 @@ pub async fn list_workspace_files(
 
 fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, String> {
     sorted_workspace_files(&root)
+}
+
+#[tauri::command]
+pub async fn list_workspace_entries(
+    root: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<WorkspaceListing, String> {
+    if !access.is_read_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+    }
+    run_blocking("读取工作区目录", move || {
+        let root = fs::canonicalize(PathBuf::from(root))
+            .map_err(|error| format!("无法确认工作区路径：{error}"))?;
+        sorted_workspace_listing(&root)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -2929,8 +3021,7 @@ fn refresh_workspace_inner(
 
     let mut scope_paths = Vec::new();
     let mut folder_scope_paths = Vec::new();
-    let mut folders = Vec::new();
-    let mut files = Vec::new();
+    let mut scan = WorkspaceScan::default();
     for raw_path in paths {
         let requested = PathBuf::from(raw_path);
         let Ok(scope) = normalize_access_path(&requested) else {
@@ -2970,26 +3061,63 @@ fn refresh_workspace_inner(
             None
         };
         if let Some(folder_scope) = folder_scope {
+            let is_same_directory_scope =
+                scope.is_dir() && access_path_key(&folder_scope) == access_path_key(&scope);
             if !folder_scope_paths.iter().any(|existing| {
                 access_path_key(Path::new(existing)) == access_path_key(&folder_scope)
             }) {
                 folder_scope_paths.push(display_path(&folder_scope));
                 if folder_scope.is_dir() {
                     if folder_scope != root {
-                        folders.push(workspace_directory(&root, &folder_scope)?);
+                        if scan.folders.len() >= MAX_WORKSPACE_DIRECTORIES {
+                            scan.truncated = true;
+                            scan.stop = true;
+                        } else {
+                            scan.folders
+                                .push(workspace_directory(&root, &folder_scope)?);
+                        }
                     }
-                    collect_workspace_directories(&root, &folder_scope, &mut folders)?;
+                    if !is_same_directory_scope {
+                        collect_workspace_entries(
+                            &root,
+                            &folder_scope,
+                            workspace_depth(&root, &folder_scope),
+                            &mut scan,
+                            false,
+                            true,
+                        )?;
+                    }
                 }
             }
         }
 
         if scope.is_dir() {
-            collect_workspace_files(&root, &scope, &mut files)?;
+            collect_workspace_entries(
+                &root,
+                &scope,
+                workspace_depth(&root, &scope),
+                &mut scan,
+                true,
+                true,
+            )?;
         } else if scope.is_file() && is_supported_document_path(&scope) {
-            files.push(workspace_file(&root, &scope)?);
+            if scan.files.len() >= MAX_WORKSPACE_FILES {
+                scan.truncated = true;
+                scan.stop = true;
+            } else {
+                scan.scanned_total = scan.scanned_total.saturating_add(1);
+                scan.files.push(workspace_file(&root, &scope)?);
+            }
         }
     }
 
+    let WorkspaceScan {
+        mut files,
+        mut folders,
+        truncated,
+        scanned_total,
+        ..
+    } = scan;
     files.sort_by_key(|file| file.relative_path.to_ascii_lowercase());
     files.dedup_by(|left, right| {
         access_path_key(Path::new(&left.path)) == access_path_key(Path::new(&right.path))
@@ -3011,6 +3139,8 @@ fn refresh_workspace_inner(
         folders,
         files,
         index,
+        truncated,
+        scanned_total,
     })
 }
 
@@ -3371,12 +3501,12 @@ mod tests {
         prune_search_entries, read_text_file_inner, refresh_workspace_inner,
         rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        sorted_workspace_directories, source_search_tokens, touch_indexed_file,
-        transfer_workspace_entry_inner, write_bytes_file_inner, write_text_file_inner,
-        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
-        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
-        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
-        TEMP_FILE_COUNTER,
+        sorted_workspace_directories, sorted_workspace_listing, source_search_tokens,
+        touch_indexed_file, transfer_workspace_entry_inner, write_bytes_file_inner,
+        write_text_file_inner, AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath,
+        OpenPathKind, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
+        MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE,
+        MAX_SEARCH_INDEX_TOKEN_CHARS, MAX_WORKSPACE_DEPTH, MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -3792,7 +3922,51 @@ mod tests {
     fn skips_generated_and_hidden_directories() {
         assert!(should_skip_directory(Path::new("vault/.git")));
         assert!(should_skip_directory(Path::new("vault/node_modules")));
+        assert!(should_skip_directory(Path::new("vault/DIST")));
+        assert!(should_skip_directory(Path::new("vault/__pycache__")));
         assert!(!should_skip_directory(Path::new("vault/Notes")));
+    }
+
+    #[test]
+    fn bounds_workspace_listing_by_file_count() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-workspace-bounds-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create bounded workspace");
+        for index in 0..(MAX_WORKSPACE_FILES + 1) {
+            fs::write(root.join(format!("note-{index:05}.md")), "# Note")
+                .expect("write bounded workspace note");
+        }
+
+        let listing = sorted_workspace_listing(&root).expect("list bounded workspace");
+        assert_eq!(listing.files.len(), MAX_WORKSPACE_FILES);
+        assert!(listing.truncated);
+        assert!(listing.scanned_total >= MAX_WORKSPACE_FILES);
+
+        fs::remove_dir_all(&root).expect("remove bounded workspace");
+    }
+
+    #[test]
+    fn marks_workspace_listing_truncated_when_depth_is_exceeded() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-workspace-depth-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut nested = root.clone();
+        for index in 0..(MAX_WORKSPACE_DEPTH + 1) {
+            nested = nested.join(format!("l{index}"));
+        }
+        fs::create_dir_all(&nested).expect("create deeply nested workspace");
+        fs::write(nested.join("deep.md"), "# Deep").expect("write deep workspace note");
+
+        let listing = sorted_workspace_listing(&root).expect("list deep workspace");
+        assert!(listing.truncated);
+        assert!(listing.files.is_empty());
+
+        fs::remove_dir_all(&root).expect("remove deep workspace");
     }
 
     #[test]

@@ -115,6 +115,7 @@ pub fn run() {
             commands::reveal_workspace_entry,
             commands::list_workspace_files,
             commands::list_workspace_directories,
+            commands::list_workspace_entries,
             commands::search_workspace,
             commands::index_workspace,
             commands::refresh_workspace

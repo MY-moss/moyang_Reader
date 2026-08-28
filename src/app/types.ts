@@ -51,6 +51,16 @@ export type WorkspaceDirectory = {
   relativePath: string;
 };
 
+export type WorkspaceListingStatus = {
+  truncated: boolean;
+  scannedTotal: number;
+};
+
+export type WorkspaceListing = WorkspaceListingStatus & {
+  files: WorkspaceFile[];
+  folders: WorkspaceDirectory[];
+};
+
 export type WorkspaceEntryDetails = {
   kind: "file" | "folder";
   name: string;
@@ -84,6 +94,8 @@ export type WorkspaceRefreshResult = {
   folders: WorkspaceDirectory[];
   files: WorkspaceFile[];
   index: WorkspaceIndexEntry[];
+  truncated: boolean;
+  scannedTotal: number;
 };
 
 export type RecentFile = {

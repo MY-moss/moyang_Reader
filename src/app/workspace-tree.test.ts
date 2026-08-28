@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWorkspaceTree } from "./workspace-tree";
+import { buildWorkspaceTree, flattenWorkspaceTree, getWorkspaceTreeWindow } from "./workspace-tree";
 import type { WorkspaceDirectory, WorkspaceFile } from "./types";
 
 function file(relativePath: string): WorkspaceFile {
@@ -68,5 +68,24 @@ describe("workspace tree", () => {
     expect(tree.folders[0].name).toBe("Archive");
     expect(tree.folders[0].fileCount).toBe(0);
     expect(tree.folders[0].folders[0].name).toBe("2026");
+  });
+
+  it("flattens only expanded branches while preserving depth", () => {
+    const tree = buildWorkspaceTree([file("notes/today.md"), file("notes/archive/old.md")]);
+    const rows = flattenWorkspaceTree(tree, new Set(["notes/archive"]));
+
+    expect(rows.map((row) => `${row.kind}:${row.kind === "file" ? row.file.name : row.folder.name}`)).toEqual([
+      "folder:notes",
+      "file:today.md",
+      "folder:archive",
+    ]);
+    expect(rows[1]).toMatchObject({ kind: "file", depth: 1 });
+    expect(rows[2]).toMatchObject({ kind: "folder", depth: 1, expanded: false });
+  });
+
+  it("calculates a bounded render window for large trees", () => {
+    expect(getWorkspaceTreeWindow(10_000, 5_000, 600, 42, 8)).toEqual({ start: 111, end: 142 });
+    expect(getWorkspaceTreeWindow(10_000, 0, 600, 42, 8).end).toBeLessThan(40);
+    expect(getWorkspaceTreeWindow(12, 0, 0, 42, 8)).toEqual({ start: 0, end: 12 });
   });
 });

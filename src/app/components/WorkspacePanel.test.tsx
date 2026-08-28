@@ -46,6 +46,7 @@ function renderPanel(
         onSaveExportFailures={vi.fn()}
         workspaceExportNotice={null}
         workspaceIndexLoading={false}
+        workspaceListingStatus={{ truncated: false, scannedTotal: 0 }}
         onOpenFile={vi.fn()}
         onSearchQueryChange={vi.fn()}
         onTagChange={vi.fn()}
