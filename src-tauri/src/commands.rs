@@ -1066,8 +1066,8 @@ fn normalize_access_path(path: &Path) -> Result<PathBuf, String> {
             .ok_or_else(|| "文件路径没有可确认的父目录。".to_string())?;
     }
 
-    let mut normalized = fs::canonicalize(ancestor)
-        .map_err(|error| format!("无法确认文件父目录：{error}"))?;
+    let mut normalized =
+        fs::canonicalize(ancestor).map_err(|error| format!("无法确认文件父目录：{error}"))?;
     for component in missing_components.iter().rev() {
         normalized.push(component);
     }
