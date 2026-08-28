@@ -3367,9 +3367,9 @@ mod tests {
         duplicate_workspace_entry_inner, extract_markdown_links, extract_tags, extract_title,
         extract_wiki_links, has_pdf_header, index_workspace_inner, is_supported_document_path,
         is_supported_text_path, is_write_allowed_for_new_path, list_workspace_files_inner,
-        path_exists_inner, persistent_search_index_path, prune_search_entries,
-        read_text_file_inner, refresh_workspace_inner, rename_workspace_entry_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
+        normalize_access_path, path_exists_inner, persistent_search_index_path,
+        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
+        rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, source_search_tokens, touch_indexed_file,
         transfer_workspace_entry_inner, write_bytes_file_inner, write_text_file_inner,
@@ -4613,12 +4613,15 @@ mod tests {
             vec![removed_file.to_string_lossy().into_owned()],
         )
         .expect("refresh deleted child after parent removal");
+        let expected_removed_directory =
+            normalize_access_path(&removed_directory).expect("normalize removed directory");
 
         assert_eq!(removed.scope_paths.len(), 1);
         assert!(removed
             .folder_scope_paths
             .iter()
-            .any(|path| access_path_key(Path::new(path)) == access_path_key(&removed_directory)));
+            .any(|path| access_path_key(Path::new(path))
+                == access_path_key(&expected_removed_directory)));
         assert!(removed.files.is_empty());
         assert!(removed.folders.is_empty());
 
