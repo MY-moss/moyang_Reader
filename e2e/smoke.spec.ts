@@ -1038,6 +1038,58 @@ test("shows a reading rail with progress and edge navigation", async ({ page }) 
   await expect(page.locator(".outline-list a.active")).toHaveText("Section 10");
 });
 
+test("does not scan every heading on each reading scroll update", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  const sections = Array.from(
+    { length: 120 },
+    (_, index) => `## Performance section ${index + 1}\n\n${"Long reading paragraph ".repeat(12)}\n\n`,
+  );
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "reading-rail-performance.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(`# Performance\n\n${sections.join("")}`),
+  });
+  await switchToRenderedMode(page);
+  await expect(page.locator(".reader-content h1")).toHaveText("Performance");
+
+  await page.evaluate(() => {
+    const metricsWindow = window as Window & {
+      __readingRailMetrics?: { headingQueries: number; headingRects: number };
+    };
+    metricsWindow.__readingRailMetrics = { headingQueries: 0, headingRects: 0 };
+
+    const originalQuerySelectorAll = Element.prototype.querySelectorAll;
+    Element.prototype.querySelectorAll = function (selector: string) {
+      if (selector === "h1, h2, h3, h4") metricsWindow.__readingRailMetrics!.headingQueries += 1;
+      return originalQuerySelectorAll.call(this, selector);
+    };
+
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.matches("h1, h2, h3, h4") && this.closest(".reader-content")) {
+        metricsWindow.__readingRailMetrics!.headingRects += 1;
+      }
+      return originalGetBoundingClientRect.call(this);
+    };
+  });
+
+  const metrics = await page.locator(".content-area").evaluate(async (element) => {
+    for (let index = 0; index < 20; index += 1) {
+      element.scrollTop = (element.scrollHeight - element.clientHeight) * (index / 19);
+      element.dispatchEvent(new Event("scroll"));
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return (window as Window & { __readingRailMetrics?: { headingQueries: number; headingRects: number } })
+      .__readingRailMetrics;
+  });
+
+  expect(metrics?.headingQueries ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(1);
+  expect(metrics?.headingRects ?? Number.POSITIVE_INFINITY).toBeLessThan(500);
+});
+
 test("previews the print layout before exporting a document", async ({ page }) => {
   await page.goto("/");
 

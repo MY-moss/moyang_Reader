@@ -37,6 +37,7 @@ import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsD
 import { UpdateNotice } from "./components/UpdateNotice";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
+import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
 import {
   chooseDocumentPaths,
   chooseSavePath,
@@ -350,18 +351,7 @@ function safeDecode(value: string): string {
   }
 }
 
-type CurrentHeading = {
-  id: string;
-  text: string;
-};
-
-function currentHeadingFromArticle(
-  article: HTMLElement | null,
-  contentArea: HTMLElement | null,
-): CurrentHeading | null {
-  if (!article) return null;
-
-  const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));
+function currentHeadingFromElements(headings: HTMLElement[], contentArea: HTMLElement | null): ReadingHeading | null {
   if (headings.length === 0) return null;
 
   const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
@@ -377,9 +367,7 @@ function currentHeadingFromArticle(
     }
   }
 
-  const heading = currentHeading ?? headings[0];
-  const text = heading.textContent?.trim() ?? "";
-  return text ? { id: heading.id, text } : null;
+  return readingHeadingFromElement(currentHeading ?? headings[0]);
 }
 
 function readSavedTheme(): ThemeMode {
@@ -592,6 +580,9 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
+  const readingHeadingsRef = useRef<HTMLElement[]>([]);
+  const readingHeadingObserverRef = useRef<IntersectionObserver | null>(null);
+  const readingHeadingCandidatesRef = useRef(new Set<HTMLElement>());
   const readingPositionRef = useRef<{ path: string; top: number } | null>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const browserDocumentSequenceRef = useRef(0);
@@ -623,15 +614,35 @@ export function App() {
   const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
 
+  const setReadingHeading = useCallback((heading: ReadingHeading | null) => {
+    const nextHeading = heading?.text ?? null;
+    const nextHeadingId = heading?.id || null;
+    setCurrentHeading((current) => (current === nextHeading ? current : nextHeading));
+    setCurrentHeadingId((current) => (current === nextHeadingId ? current : nextHeadingId));
+  }, []);
+
   const updateReadingRail = useCallback(() => {
     const contentArea = contentAreaRef.current;
     const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
-    const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;
-    setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));
-    const heading = currentHeadingFromArticle(articleRef.current, contentArea);
-    setCurrentHeading((current) => (current === (heading?.text ?? null) ? current : (heading?.text ?? null)));
-    setCurrentHeadingId((current) => (current === (heading?.id || null) ? current : heading?.id || null));
-  }, []);
+    const nextProgress =
+      maxScrollTop > 0 && contentArea ? Math.min(1, Math.max(0, contentArea.scrollTop / maxScrollTop)) : 0;
+    const nextProgressPercent = readingProgressPercent(nextProgress);
+    setReadingProgress((current) => (readingProgressPercent(current) === nextProgressPercent ? current : nextProgress));
+
+    const headings = readingHeadingsRef.current;
+    if (headings.length === 0) {
+      setReadingHeading(null);
+      return;
+    }
+
+    if (!contentArea || contentArea.scrollTop <= 1) {
+      setReadingHeading(readingHeadingFromElement(headings[0]));
+    } else if (contentArea.scrollTop >= maxScrollTop - 2) {
+      setReadingHeading(readingHeadingFromElement(headings[headings.length - 1]));
+    } else if (!readingHeadingObserverRef.current) {
+      setReadingHeading(currentHeadingFromElements(headings, contentArea));
+    }
+  }, [setReadingHeading]);
 
   const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
     const contentArea = contentAreaRef.current;
@@ -1165,6 +1176,75 @@ export function App() {
       tracker.flush();
     };
   }, [documentState?.path]);
+
+  useEffect(() => {
+    const article = articleRef.current;
+    const contentArea = contentAreaRef.current;
+    const candidates = readingHeadingCandidatesRef.current;
+    const canTrackHeadings =
+      mode === "rendered" &&
+      documentState?.kind !== "pdf" &&
+      documentState?.kind !== "image" &&
+      Boolean(article && contentArea);
+
+    readingHeadingObserverRef.current?.disconnect();
+    readingHeadingObserverRef.current = null;
+    candidates.clear();
+    readingHeadingsRef.current = canTrackHeadings
+      ? Array.from(article?.querySelectorAll<HTMLElement>("h1, h2, h3, h4") ?? [])
+      : [];
+
+    const headings = readingHeadingsRef.current;
+    if (!canTrackHeadings || !contentArea || headings.length === 0) {
+      setReadingHeading(null);
+      return;
+    }
+
+    setReadingHeading(readingHeadingFromElement(headings[0]));
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const headingBandHeight = Math.min(72, Math.max(1, contentArea.clientHeight));
+    const bottomMarginPercent = 100 - (headingBandHeight / Math.max(1, contentArea.clientHeight)) * 100;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const currentArea = contentAreaRef.current;
+        const maxScrollTop = currentArea ? Math.max(0, currentArea.scrollHeight - currentArea.clientHeight) : 0;
+        if (currentArea && currentArea.scrollTop <= 1) {
+          setReadingHeading(readingHeadingFromElement(headings[0]));
+          return;
+        }
+        if (currentArea && currentArea.scrollTop >= maxScrollTop - 2) {
+          setReadingHeading(readingHeadingFromElement(headings[headings.length - 1]));
+          return;
+        }
+
+        entries.forEach((entry) => {
+          const heading = entry.target as HTMLElement;
+          if (entry.isIntersecting) candidates.add(heading);
+          else candidates.delete(heading);
+        });
+
+        for (let index = headings.length - 1; index >= 0; index -= 1) {
+          const heading = headings[index];
+          if (candidates.has(heading)) {
+            setReadingHeading(readingHeadingFromElement(heading));
+            return;
+          }
+        }
+
+        setReadingHeading(currentHeadingFromElements(headings, currentArea));
+      },
+      { root: contentArea, rootMargin: `0px 0px -${bottomMarginPercent}% 0px`, threshold: 0 },
+    );
+
+    headings.forEach((heading) => observer.observe(heading));
+    readingHeadingObserverRef.current = observer;
+    return () => {
+      observer.disconnect();
+      candidates.clear();
+      if (readingHeadingObserverRef.current === observer) readingHeadingObserverRef.current = null;
+    };
+  }, [documentState?.kind, documentState?.path, documentState?.rendered.html, mode, setReadingHeading]);
 
   useEffect(() => {
     const contentArea = contentAreaRef.current;
