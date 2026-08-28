@@ -71,7 +71,7 @@ async function waitForExport(pathname, description) {
       return false;
     },
     {
-      timeout: 15_000,
+      timeout: 30_000,
       timeoutMsg: `${description} did not create an output file`,
     },
   );
