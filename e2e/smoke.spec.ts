@@ -550,6 +550,27 @@ test("opens an editor context menu and keeps the selected Markdown formatting", 
   await expect.poll(async () => readEditorText(source)).toContain("**选择这段文字。**");
 });
 
+test("finds selected text from the editor context menu", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "context-menu-find.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Context menu find\n\n在当前文档中查找这句话。\n"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  const paragraph = page.locator(".wysiwyg-editor .editor p").first();
+  await paragraph.selectText();
+  await paragraph.click({ button: "right" });
+
+  const menu = page.getByRole("menu", { name: "正文编辑菜单" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "查找选中文本" }).click();
+
+  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveValue("在当前文档中查找这句话。");
+});
+
 test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
   // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
   // one canonical form. This test pins the exact output so a Milkdown/remark

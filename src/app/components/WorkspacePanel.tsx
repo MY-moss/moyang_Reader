@@ -2,6 +2,7 @@ import type {
   RecentFile,
   RecentWorkspace,
   WorkspaceDirectory,
+  WorkspaceEntryDetails,
   WorkspaceExportFailure,
   WorkspaceFile,
   WorkspaceSearchResult,
@@ -56,6 +57,7 @@ type WorkspacePanelProps = {
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onShowDetails?: (details: WorkspaceEntryDetails) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
   onCopyRelativePath?: (entryPath: string) => void;
@@ -109,6 +111,7 @@ export function WorkspacePanel({
   onRenameEntry,
   onDeleteEntry,
   onDuplicateEntry,
+  onShowDetails,
   onRevealEntry,
   onCopyPath,
   onCopyRelativePath,
@@ -414,6 +417,7 @@ export function WorkspacePanel({
                 onRenameEntry={onRenameEntry}
                 onDeleteEntry={onDeleteEntry}
                 onDuplicateEntry={onDuplicateEntry}
+                onShowDetails={onShowDetails}
                 onRevealEntry={onRevealEntry}
                 onCopyPath={onCopyPath}
                 onCopyRelativePath={onCopyRelativePath}

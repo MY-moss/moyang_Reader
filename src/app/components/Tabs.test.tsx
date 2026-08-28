@@ -14,6 +14,7 @@ function mountTabs() {
   document.body.appendChild(container);
   const root = createRoot(container);
   const onClose = vi.fn();
+  const onCloseMany = vi.fn();
   const onReorder = vi.fn();
 
   act(() => {
@@ -25,12 +26,13 @@ function mountTabs() {
         onShowExternalChange={vi.fn()}
         onSelect={vi.fn()}
         onClose={onClose}
+        onCloseMany={onCloseMany}
         onReorder={onReorder}
       />,
     );
   });
 
-  return { container, root, onClose, onReorder };
+  return { container, root, onClose, onCloseMany, onReorder };
 }
 
 function withDataTransfer(event: Event, dataTransfer: DataTransfer) {
@@ -71,6 +73,21 @@ describe("Tabs", () => {
 
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "C:/one.md");
     expect(onReorder).toHaveBeenCalledWith("C:/one.md", "C:/two.md");
+    cleanup(container, root);
+  });
+
+  it("offers batch tab management from the context menu", () => {
+    const { container, root, onCloseMany } = mountTabs();
+    const tab = container.querySelector<HTMLElement>(".tab-item");
+
+    act(() => tab?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 })));
+    const closeRight = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
+      (button) => button.textContent?.trim() === "关闭右侧标签",
+    );
+    expect(closeRight).toBeTruthy();
+
+    act(() => closeRight?.click());
+    expect(onCloseMany).toHaveBeenCalledWith(["C:/two.md"]);
     cleanup(container, root);
   });
 });

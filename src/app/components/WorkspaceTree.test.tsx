@@ -123,6 +123,7 @@ describe("WorkspaceTreeView", () => {
     const onRenameEntry = vi.fn();
     const onDeleteEntry = vi.fn();
     const onDuplicateEntry = vi.fn();
+    const onShowDetails = vi.fn();
     const onRevealEntry = vi.fn();
     const onCopyPath = vi.fn();
     const onCopyRelativePath = vi.fn();
@@ -136,6 +137,7 @@ describe("WorkspaceTreeView", () => {
           onRenameEntry={onRenameEntry}
           onDeleteEntry={onDeleteEntry}
           onDuplicateEntry={onDuplicateEntry}
+          onShowDetails={onShowDetails}
           onRevealEntry={onRevealEntry}
           onCopyPath={onCopyPath}
           onCopyRelativePath={onCopyRelativePath}
@@ -154,6 +156,7 @@ describe("WorkspaceTreeView", () => {
     expect(menuItems().some((button) => button.textContent?.includes("重命名文件"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("删除文件"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("复制文件"))).toBe(true);
+    expect(menuItems().some((button) => button.textContent?.includes("查看属性"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("复制完整路径"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("复制相对路径"))).toBe(true);
 
@@ -167,6 +170,21 @@ describe("WorkspaceTreeView", () => {
     const duplicate = menuItems().find((button) => button.textContent?.includes("复制文件"));
     act(() => duplicate?.click());
     expect(onDuplicateEntry).toHaveBeenCalledWith("notes/0.md", "file");
+
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const details = menuItems().find((button) => button.textContent?.includes("查看属性"));
+    act(() => details?.click());
+    expect(onShowDetails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "file",
+        name: "0.md",
+        relativePath: "notes/0.md",
+        absolutePath: "C:/vault/notes/0.md",
+        size: 1,
+      }),
+    );
 
     act(() => {
       fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
