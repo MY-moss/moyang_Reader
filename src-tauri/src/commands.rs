@@ -40,6 +40,10 @@ const MAX_WORKSPACE_FILES: usize = 20_000;
 const MAX_WORKSPACE_DIRECTORIES: usize = 10_000;
 const MAX_WORKSPACE_DEPTH: usize = 32;
 const MAX_PDF_HTML_BYTES: usize = 32 * 1024 * 1024;
+#[cfg(windows)]
+const PDF_RENDER_WAIT_ATTEMPTS: usize = 150;
+#[cfg(windows)]
+const PDF_RENDER_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_APP_SETTINGS_BYTES: usize = 256 * 1024;
 const APP_SETTINGS_FILE_NAME: &str = "settings.json";
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -3181,7 +3185,7 @@ pub async fn write_binary_file(
 }
 
 #[tauri::command]
-pub fn export_pdf_file(
+pub async fn export_pdf_file(
     path: String,
     html: String,
     access: State<'_, AccessRegistry>,
@@ -3199,7 +3203,7 @@ pub fn export_pdf_file(
 
     #[cfg(windows)]
     {
-        export_pdf_file_windows(path, &html)
+        run_blocking("生成 PDF", move || export_pdf_file_windows(path, &html)).await
     }
     #[cfg(not(windows))]
     {
@@ -3265,6 +3269,19 @@ fn is_valid_pdf_file(path: &Path) -> bool {
 }
 
 #[cfg(windows)]
+fn wait_for_valid_pdf(path: &Path) -> bool {
+    for attempt in 0..PDF_RENDER_WAIT_ATTEMPTS {
+        if is_valid_pdf_file(path) {
+            return true;
+        }
+        if attempt + 1 < PDF_RENDER_WAIT_ATTEMPTS {
+            std::thread::sleep(PDF_RENDER_POLL_INTERVAL);
+        }
+    }
+    false
+}
+
+#[cfg(windows)]
 fn export_pdf_file_windows(path: PathBuf, html: &str) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
@@ -3323,15 +3340,7 @@ fn export_pdf_file_windows(path: PathBuf, html: &str) -> Result<(), String> {
                     .map_or_else(|| "未知".to_string(), |code| code.to_string())
             ));
         }
-        let mut valid_pdf = false;
-        for _ in 0..50 {
-            if is_valid_pdf_file(&temp_pdf) {
-                valid_pdf = true;
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        if !valid_pdf {
+        if !wait_for_valid_pdf(&temp_pdf) {
             return Err("PDF 渲染器未生成有效文件，请稍后重试。".to_string());
         }
 
