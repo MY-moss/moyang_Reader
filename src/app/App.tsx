@@ -196,7 +196,13 @@ import {
   renderDocx,
   renderSource,
 } from "../lib/document-adapters";
-import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
+import {
+  createBacklinkIndex,
+  createLinkIndex,
+  findBacklinks,
+  findIndexEntry,
+  findLinkedEntry,
+} from "./workspace-index";
 import type { QuickOpenCandidate } from "./quick-open";
 import {
   applyWorkspaceFileDelta,
@@ -613,6 +619,7 @@ export function App() {
   const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
+  const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
 
   const setReadingHeading = useCallback((heading: ReadingHeading | null) => {
     const nextHeading = heading?.text ?? null;
@@ -3870,7 +3877,9 @@ export function App() {
         const target = safeDecode(href.slice("moyang-wiki:".length));
         const [rawPath, rawAnchor] = target.split("#", 2);
         const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
-        const linkedEntry = currentEntry ? findLinkedEntry(workspaceIndex, currentEntry, rawPath) : undefined;
+        const linkedEntry = currentEntry
+          ? findLinkedEntry(workspaceIndex, currentEntry, rawPath, linkIndex)
+          : undefined;
         const path =
           linkedEntry?.file.path ??
           (documentState ? resolveWikiPath(documentState.path, rawPath || documentState.path) : null);
@@ -3921,7 +3930,7 @@ export function App() {
         if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
       });
     },
-    [documentState, handleSelectTab, workspaceIndex],
+    [documentState, handleSelectTab, linkIndex, workspaceIndex],
   );
 
   const handleReaderClick = useCallback(
@@ -4142,15 +4151,26 @@ export function App() {
   }, []);
 
   const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
-  const currentIndexEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
+  const documentPath = documentState?.path;
+  const currentIndexEntry = useMemo(
+    () => (documentPath ? findIndexEntry(workspaceIndex, documentPath) : undefined),
+    [documentPath, workspaceIndex],
+  );
   const backlinkIndex = useMemo(() => createBacklinkIndex(workspaceIndex), [workspaceIndex]);
-  const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry, backlinkIndex) : [];
-  const outgoing = currentIndexEntry
-    ? currentIndexEntry.links.map((target) => ({
-        target,
-        entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),
-      }))
-    : [];
+  const backlinks = useMemo(
+    () => (currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry, backlinkIndex) : []),
+    [backlinkIndex, currentIndexEntry, workspaceIndex],
+  );
+  const outgoing = useMemo(
+    () =>
+      currentIndexEntry
+        ? currentIndexEntry.links.map((target) => ({
+            target,
+            entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target, linkIndex),
+          }))
+        : [],
+    [currentIndexEntry, linkIndex, workspaceIndex],
+  );
   const availableTags = useMemo(
     () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
     [workspaceIndex],
