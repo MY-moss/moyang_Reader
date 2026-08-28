@@ -31,6 +31,12 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 - 在线核验：GitHub Release 和 Cloudflare Pages 的 `latest.json`、Windows x64 安装包及签名均 HTTP 200；两处安装包大小和 SHA-256 一致，manifest 版本均为 `0.10.10`，签名内容一致。
 - 镜像边界：Release workflow 静态镜像子 job [98791213977](https://github.com/MY-moss/moyang_Reader/actions/runs/33153221247/job/98791213977) 失败，当前仓库仍缺少 Cloudflare 部署 Secret；公开 Pages 镜像代理可用，客户端仍保留 GitHub Release 回退。本轮未上传任何凭据。
 
+### #241 当前验证记录
+
+- 在干净 `main@b36619c358b86c9cef950898a1add30fad9d3bab` 上完成真实 Windows Tauri PDF 文件落盘 smoke，目标用例 `1/1` 通过；输出文件存在、可读取，文件头为 `%PDF-` 且包含 `%%EOF`。
+- 本轮未重新执行旧安装版本到 v0.10.10 的检查更新、签名校验、替换和重启；历史 v0.9.3→v0.9.4 实机升级记录仍保留，#241 不因本次 PDF 子场景通过而关闭。
+- 桌面 smoke 构建时必须设置 `VITE_MOYANG_DESKTOP_E2E=1`，否则测试桥接不会被打包进 exe，可能出现启动阶段 `core.invoke not available`，这不是 PDF 文件断言失败。
+
 ## v0.10.7 发布记录（2026-08-28）
 
 - 发布范围：PR [#284](https://github.com/MY-moss/moyang_Reader/pull/284) 修复 Windows Edge headless PDF 异步落盘，确认有效 PDF 后再执行原子替换；版本准备 PR [#285](https://github.com/MY-moss/moyang_Reader/pull/285) 已同步版本号和 CHANGELOG。
