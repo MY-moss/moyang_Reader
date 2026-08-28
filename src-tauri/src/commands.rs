@@ -1050,15 +1050,28 @@ fn normalize_access_path(path: &Path) -> Result<PathBuf, String> {
         return fs::canonicalize(path).map_err(|error| format!("无法确认文件路径：{error}"));
     }
 
-    let parent = path
-        .parent()
-        .ok_or_else(|| "文件路径没有可确认的父目录。".to_string())?;
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| "文件名无法解析。".to_string())?;
-    Ok(fs::canonicalize(parent)
-        .map_err(|error| format!("无法确认文件父目录：{error}"))?
-        .join(file_name))
+    // File-system watchers can report a child path after its parent directory
+    // has already been removed. Walk up to the nearest existing ancestor and
+    // append the missing suffix so deleted entries can still invalidate the
+    // correct workspace scope.
+    let mut missing_components = Vec::new();
+    let mut ancestor = path;
+    while !ancestor.exists() {
+        let component = ancestor
+            .file_name()
+            .ok_or_else(|| "文件名无法解析。".to_string())?;
+        missing_components.push(component.to_os_string());
+        ancestor = ancestor
+            .parent()
+            .ok_or_else(|| "文件路径没有可确认的父目录。".to_string())?;
+    }
+
+    let mut normalized =
+        fs::canonicalize(ancestor).map_err(|error| format!("无法确认文件父目录：{error}"))?;
+    for component in missing_components.iter().rev() {
+        normalized.push(component);
+    }
+    Ok(normalized)
 }
 
 fn access_path_contains(root: &Path, candidate: &Path) -> bool {
@@ -4436,6 +4449,40 @@ mod tests {
         assert!(removed.index.is_empty());
 
         fs::remove_dir_all(root).expect("remove refresh workspace");
+    }
+
+    #[test]
+    fn refreshes_deleted_entries_when_a_watcher_reports_a_child_after_parent_removal() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-refresh-deleted-child-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let removed_directory = root.join("removed");
+        let removed_file = removed_directory.join("nested.md");
+        fs::create_dir_all(&removed_directory).expect("create removable directory");
+        fs::write(&removed_file, "# Removed").expect("write removable document");
+
+        let initial = refresh_workspace_inner(
+            root.clone(),
+            vec![removed_directory.to_string_lossy().into_owned()],
+        )
+        .expect("refresh removable directory before deletion");
+        assert_eq!(initial.folders.len(), 1);
+
+        fs::remove_dir_all(&removed_directory).expect("remove removable directory");
+        let removed = refresh_workspace_inner(
+            root.clone(),
+            vec![removed_file.to_string_lossy().into_owned()],
+        )
+        .expect("refresh deleted child after parent removal");
+
+        assert_eq!(removed.scope_paths.len(), 1);
+        assert_eq!(removed.folder_scope_paths.len(), 1);
+        assert!(removed.files.is_empty());
+        assert!(removed.folders.is_empty());
+
+        fs::remove_dir_all(root).expect("remove deleted-child refresh workspace");
     }
 
     #[test]
