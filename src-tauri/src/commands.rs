@@ -40,6 +40,7 @@ const MAX_WORKSPACE_FILES: usize = 20_000;
 const MAX_WORKSPACE_DIRECTORIES: usize = 10_000;
 const MAX_WORKSPACE_DEPTH: usize = 32;
 const MAX_PDF_HTML_BYTES: usize = 32 * 1024 * 1024;
+const EXPORT_STREAM_TEMP_MARKER: &str = ".moyang-export-part-";
 #[cfg(windows)]
 const PDF_RENDER_WAIT_ATTEMPTS: usize = 150;
 #[cfg(windows)]
@@ -3185,6 +3186,27 @@ pub async fn write_binary_file(
 }
 
 #[tauri::command]
+pub async fn write_binary_file_chunk(
+    path: String,
+    contents: Vec<u8>,
+    append: bool,
+    destination_path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    let destination_path = PathBuf::from(destination_path);
+    validate_export_stream_temp_path(&path)?;
+    validate_export_stream_parent(&path, &destination_path)?;
+    if !is_write_allowed_for_new_path(&access, &destination_path) {
+        return Err("拒绝写入未通过用户文件选择的临时导出文件。请重新选择保存位置。".to_string());
+    }
+    run_blocking("写入二进制导出分块", move || {
+        write_binary_file_chunk_inner(path, &contents, append)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn export_pdf_file(
     path: String,
     html: String,
@@ -3389,6 +3411,96 @@ pub async fn write_binary_file_raw(
     .await
 }
 
+#[tauri::command]
+pub async fn write_binary_file_chunk_raw(
+    request: tauri::ipc::Request<'_>,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let encoded_path = request
+        .headers()
+        .get("path")
+        .ok_or_else(|| "IPC 写入缺少文件路径。".to_string())?;
+    let path = decode_ipc_path(
+        encoded_path
+            .to_str()
+            .map_err(|_| "IPC 写入路径不是有效的请求头。".to_string())?,
+    )?;
+    let encoded_destination = request
+        .headers()
+        .get("destination")
+        .ok_or_else(|| "IPC 写入缺少最终导出路径。".to_string())?;
+    let destination_path = decode_ipc_path(
+        encoded_destination
+            .to_str()
+            .map_err(|_| "IPC 最终导出路径不是有效的请求头。".to_string())?,
+    )?;
+    validate_export_stream_temp_path(&path)?;
+    validate_export_stream_parent(&path, &destination_path)?;
+    if !is_write_allowed_for_new_path(&access, &destination_path) {
+        return Err("拒绝写入未通过用户文件选择的临时导出文件。请重新选择保存位置。".to_string());
+    }
+    let append = request
+        .headers()
+        .get("append")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value == "true")
+        .unwrap_or(false);
+    let contents = match request.body() {
+        tauri::ipc::InvokeBody::Raw(contents) => contents.to_vec(),
+        _ => return Err("IPC 二进制写入需要原始字节请求体。".to_string()),
+    };
+    run_blocking("写入原始二进制导出分块", move || {
+        write_binary_file_chunk_inner(path, &contents, append)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn commit_binary_file(
+    temp_path: String,
+    destination_path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let temp_path = PathBuf::from(temp_path);
+    let destination_path = PathBuf::from(destination_path);
+    validate_export_stream_temp_path(&temp_path)?;
+    validate_export_stream_parent(&temp_path, &destination_path)?;
+    if !temp_path.is_file() {
+        return Err("临时导出文件不存在或已被清理。".to_string());
+    }
+    if !is_write_allowed_for_new_path(&access, &destination_path) {
+        return Err("拒绝提交未通过用户选择的导出路径。请重新选择保存位置。".to_string());
+    }
+    run_blocking("完成二进制导出", move || {
+        replace_file(&temp_path, &destination_path)
+            .map_err(|error| format!("完成导出文件替换失败：{error}"))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn discard_binary_file(
+    path: String,
+    destination_path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    let destination_path = PathBuf::from(destination_path);
+    validate_export_stream_temp_path(&path)?;
+    validate_export_stream_parent(&path, &destination_path)?;
+    if !is_write_allowed_for_new_path(&access, &destination_path) {
+        return Err("拒绝清理未通过用户选择的临时导出文件。".to_string());
+    }
+    run_blocking("清理临时导出文件", move || {
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!("清理临时导出文件失败：{error}")),
+        }
+    })
+    .await
+}
+
 fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
     let mut candidate = path;
     loop {
@@ -3406,6 +3518,64 @@ fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
         }
         candidate = parent;
     }
+}
+
+fn validate_export_stream_temp_path(path: &Path) -> Result<(), String> {
+    let valid = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| {
+            name.starts_with('.')
+                && name.contains(EXPORT_STREAM_TEMP_MARKER)
+                && name.ends_with(".tmp")
+        })
+        .unwrap_or(false);
+    if valid {
+        Ok(())
+    } else {
+        Err("临时导出文件名无效。".to_string())
+    }
+}
+
+fn validate_export_stream_parent(temp_path: &Path, destination_path: &Path) -> Result<(), String> {
+    let temp_parent = temp_path
+        .parent()
+        .ok_or_else(|| "临时导出文件路径没有父目录。".to_string())?;
+    let destination_parent = destination_path
+        .parent()
+        .ok_or_else(|| "导出文件路径没有父目录。".to_string())?;
+    if access_path_key(temp_parent) == access_path_key(destination_parent) {
+        Ok(())
+    } else {
+        Err("临时导出文件必须与最终文件位于同一目录。".to_string())
+    }
+}
+
+fn write_binary_file_chunk_inner(
+    path: PathBuf,
+    contents: &[u8],
+    append: bool,
+) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "临时导出文件路径没有父目录。".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| format!("创建临时导出目录失败：{error}"))?;
+
+    let mut options = OpenOptions::new();
+    options.create(true).write(true);
+    if append {
+        options.append(true);
+    } else {
+        options.truncate(true);
+    }
+    let mut file = options
+        .open(&path)
+        .map_err(|error| format!("打开临时导出文件失败：{error}"))?;
+    file.write_all(contents)
+        .map_err(|error| format!("写入导出分块失败：{error}"))?;
+    file.sync_data()
+        .map_err(|error| format!("刷新导出分块失败：{error}"))?;
+    Ok(())
 }
 
 fn write_bytes_file_inner(
@@ -3511,7 +3681,8 @@ mod tests {
         rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, sorted_workspace_listing, source_search_tokens,
-        touch_indexed_file, transfer_workspace_entry_inner, write_bytes_file_inner,
+        touch_indexed_file, transfer_workspace_entry_inner, validate_export_stream_parent,
+        validate_export_stream_temp_path, write_binary_file_chunk_inner, write_bytes_file_inner,
         write_text_file_inner, AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath,
         OpenPathKind, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
         MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE,
@@ -3732,6 +3903,34 @@ mod tests {
         assert_eq!(fs::read(path).expect("read binary asset"), vec![0, 1, 2, 3]);
 
         fs::remove_dir_all(root).expect("remove binary parent workspace");
+    }
+
+    #[test]
+    fn streams_binary_export_chunks_and_rejects_unmarked_temp_paths() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-stream-export-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let temp = root.join(".reading.moyang-export-part-1.tmp");
+        fs::create_dir_all(&root).expect("create stream export directory");
+
+        assert!(validate_export_stream_temp_path(&temp).is_ok());
+        assert!(validate_export_stream_temp_path(&root.join("reading.docx")).is_err());
+        assert!(validate_export_stream_parent(&temp, &root.join("reading.docx")).is_ok());
+        assert!(
+            validate_export_stream_parent(&temp, &root.join("other").join("reading.docx")).is_err()
+        );
+        write_binary_file_chunk_inner(temp.clone(), &[0, 1], false)
+            .expect("write first stream export chunk");
+        write_binary_file_chunk_inner(temp.clone(), &[2, 3], true)
+            .expect("append second stream export chunk");
+        assert_eq!(
+            fs::read(&temp).expect("read stream export temp"),
+            vec![0, 1, 2, 3]
+        );
+
+        fs::remove_dir_all(root).expect("remove stream export directory");
     }
 
     #[test]
@@ -5026,3 +5225,4 @@ mod tests {
         fs::remove_dir_all(root).expect("remove transfer workspace");
     }
 }
+
