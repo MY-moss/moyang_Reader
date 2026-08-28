@@ -27,10 +27,11 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 - 发布范围：PR [#284](https://github.com/MY-moss/moyang_Reader/pull/284) 修复 Windows Edge headless PDF 异步落盘，确认有效 PDF 后再执行原子替换；版本准备 PR [#285](https://github.com/MY-moss/moyang_Reader/pull/285) 已同步版本号和 CHANGELOG。
 - 发布结果：v0.10.7 tag 指向 main@c1bf7d739afa1bfb31507564af3377e77bb088b5；GitHub Release [v0.10.7](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.7) 已公开。
-- 已核验：Release workflow [33129082220](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220) 的 Windows 构建/发布 job [98714111104](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220/job/98714111104) 成功；安装包 4,901,397 字节，SHA-256 `ae6a803c9b4e8e6c343278e0780eedbaaee9f3ec1a10da135d3169c553637629`；`.sig` 428 字节，SHA-256 `913815eef12d5519b8c1177cd3efa0e8c9b340dcccce0a7b52875364d2e02da4`；latest.json 1,411 字节，SHA-256 `02047ae696f6c207159e9d4971f8c53b982568e691c292af8b4711e5146e2ed7`。
+- 已核验：Release workflow [33129082220](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220) 的 Windows 构建/发布 job [98714111104](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220/job/98714111104) 成功；安装包 4,901,397 字节，SHA-256 ae6a803c9b4e8e6c343278e0780eedbaaee9f3ec1a10da135d3169c553637629；.sig 428 字节，SHA-256 913815eef12d5519b8c1177cd3efa0e8c9b340dcccce0a7b52875364d2e02da4；latest.json 1,411 字节，SHA-256 02047ae696f6c207159e9d4971f8c53b982568e691c292af8b4711e5146e2ed7。
 - 在线核验：GitHub Release 和 Cloudflare 动态镜像的 latest.json、Windows x64 安装包及签名均 HTTP 200；镜像安装包和签名 SHA-256 与 Release 一致；镜像 manifest 版本为 0.10.7，签名、公钥字段一致，并将下载地址重写到 Pages 版本目录。
-- 镜像边界：Release workflow 的静态镜像子 job [98715331213](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220/job/98715331213) 失败，原因是仓库仍未配置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`；本轮未上传任何凭据。动态镜像可用，客户端仍保留 GitHub Release 回退。
+- 镜像边界：Release workflow 的静态镜像子 job [98715331213](https://github.com/MY-moss/moyang_Reader/actions/runs/33129082220/job/98715331213) 失败，原因是仓库仍未配置 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID；本轮未上传任何凭据。动态镜像可用，客户端仍保留 GitHub Release 回退。
 - 未完成：#241 的旧版本自动更新提示、下载、签名校验、替换和重启实机回归仍保持 open；#232 的其余桌面交互待办不在本次补丁内。
+
 ## v0.10.6 发布记录（2026-08-28）
 
 - 发布范围：PR #281 已合并的文件/文件夹右键复制、相对路径复制、文件夹展开/折叠，以及 Markdown/TXT 源文本与 WYSIWYG 的清除格式、任务列表和日期插入。
