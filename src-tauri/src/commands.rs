@@ -1091,12 +1091,16 @@ fn access_path_contains(root: &Path, candidate: &Path) -> bool {
 }
 
 fn access_path_key(path: &Path) -> String {
-    let value = path.to_string_lossy().replace('\\', "/");
+    let mut value = path.to_string_lossy().replace('\\', "/");
     if cfg!(windows) {
-        value.to_ascii_lowercase()
-    } else {
-        value
+        if let Some(rest) = value.strip_prefix("//?/UNC/") {
+            value = format!("//{rest}");
+        } else if let Some(rest) = value.strip_prefix("//?/") {
+            value = rest.to_string();
+        }
+        value.make_ascii_lowercase();
     }
+    value
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -4619,6 +4623,19 @@ mod tests {
         assert!(removed.folders.is_empty());
 
         fs::remove_dir_all(root).expect("remove deleted-child refresh workspace");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalizes_windows_extended_paths_for_scope_comparisons() {
+        assert_eq!(
+            access_path_key(Path::new(r"C:\Vault\Notes")),
+            access_path_key(Path::new(r"\\?\C:\Vault\Notes"))
+        );
+        assert_eq!(
+            access_path_key(Path::new(r"\\server\share\Vault")),
+            access_path_key(Path::new(r"\\?\UNC\server\share\Vault"))
+        );
     }
 
     #[test]
