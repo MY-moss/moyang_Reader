@@ -7,7 +7,7 @@ import type {
   WorkspaceFile,
   WorkspaceSearchResult,
 } from "../types";
-import { WorkspaceTreeView, type WorkspaceEntryKind } from "./WorkspaceTree";
+import { WorkspaceTreeView, type WorkspaceEntryKind, type WorkspaceEntryTransferMode } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
 import { MAX_MOUNTED_WORKSPACES } from "../storage";
@@ -64,6 +64,13 @@ type WorkspacePanelProps = {
   onCopyRelativePath?: (entryPath: string) => void;
   onCopyName?: (entryPath: string) => void;
   onRefresh?: (entryPath: string) => void;
+  onTransferEntry?: (
+    sourcePath: string,
+    destinationParentPath: string,
+    mode: WorkspaceEntryTransferMode,
+    kind: WorkspaceEntryKind,
+  ) => boolean | Promise<boolean>;
+  onStatusMessage?: (message: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
@@ -121,6 +128,8 @@ export function WorkspacePanel({
   onCopyRelativePath,
   onCopyName,
   onRefresh,
+  onTransferEntry,
+  onStatusMessage,
   onSearchQueryChange,
   onTagChange,
   onKindChange,
@@ -430,6 +439,8 @@ export function WorkspacePanel({
                 onCopyRelativePath={onCopyRelativePath}
                 onCopyName={onCopyName}
                 onRefresh={onRefresh}
+                onTransferEntry={onTransferEntry}
+                onStatusMessage={onStatusMessage}
               />
             </div>
           )}

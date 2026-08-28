@@ -134,6 +134,28 @@ export async function duplicateWorkspaceEntry(root: string, entryPath: string, n
   return invoke<string>("duplicate_workspace_entry", { root, entryPath, name });
 }
 
+export async function copyWorkspaceEntry(
+  root: string,
+  entryPath: string,
+  destinationParentPath: string,
+): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能复制工作区内容。");
+  }
+  return invoke<string>("copy_workspace_entry", { root, entryPath, destinationParentPath });
+}
+
+export async function moveWorkspaceEntry(
+  root: string,
+  entryPath: string,
+  destinationParentPath: string,
+): Promise<string> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能移动工作区内容。");
+  }
+  return invoke<string>("move_workspace_entry", { root, entryPath, destinationParentPath });
+}
+
 export async function revealWorkspaceEntry(root: string, entryPath: string): Promise<void> {
   if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式不能打开资源管理器定位本地路径。");
