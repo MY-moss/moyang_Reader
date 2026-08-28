@@ -59,6 +59,8 @@ describe("workspace refresh guards", () => {
       folders: [],
       files: [replacement],
       index: [{ file: replacement, title: "Today", links: [], tags: ["work"] }],
+      truncated: false,
+      scannedTotal: 1,
     };
 
     const refreshedFiles = applyWorkspaceFileDelta([...current], delta);
@@ -83,6 +85,8 @@ describe("workspace refresh guards", () => {
       folders: [],
       files: [],
       index: [],
+      truncated: false,
+      scannedTotal: 0,
     };
 
     expect(applyWorkspaceFileDelta([file], delta)).toEqual([]);
@@ -101,6 +105,8 @@ describe("workspace refresh guards", () => {
       folders: [replacement],
       files: [],
       index: [],
+      truncated: false,
+      scannedTotal: 1,
     };
 
     expect(applyWorkspaceFolderDelta(current, delta)).toEqual([replacement, current[0]]);

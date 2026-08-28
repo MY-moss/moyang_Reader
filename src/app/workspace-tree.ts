@@ -14,6 +14,40 @@ export type WorkspaceTree = {
   folders: WorkspaceTreeFolder[];
 };
 
+export type WorkspaceTreeRow =
+  | { kind: "file"; file: WorkspaceFile; depth: number }
+  | { kind: "folder"; folder: WorkspaceTreeFolder; depth: number; expanded: boolean };
+
+export const WORKSPACE_TREE_ROW_HEIGHT = 42;
+export const WORKSPACE_TREE_OVERSCAN = 8;
+
+export type WorkspaceTreeWindow = {
+  start: number;
+  end: number;
+};
+
+export function getWorkspaceTreeWindow(
+  rowCount: number,
+  scrollTop: number,
+  viewportHeight: number,
+  rowHeight = WORKSPACE_TREE_ROW_HEIGHT,
+  overscan = WORKSPACE_TREE_OVERSCAN,
+): WorkspaceTreeWindow {
+  const total = Math.max(0, Math.floor(rowCount));
+  if (total === 0) return { start: 0, end: 0 };
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return { start: 0, end: total };
+
+  const safeRowHeight = Math.max(1, rowHeight);
+  const safeOverscan = Math.max(0, Math.floor(overscan));
+  const safeScrollTop = Math.max(0, Number.isFinite(scrollTop) ? scrollTop : 0);
+  const start = Math.max(0, Math.floor(safeScrollTop / safeRowHeight) - safeOverscan);
+  const end = Math.min(
+    total,
+    Math.max(start, Math.ceil((safeScrollTop + viewportHeight) / safeRowHeight) + safeOverscan),
+  );
+  return { start, end };
+}
+
 function compareNames(left: { name: string }, right: { name: string }): number {
   return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
 }
@@ -75,4 +109,23 @@ export function buildWorkspaceTree(files: WorkspaceFile[], directories: Workspac
 
   sortFolder(root);
   return { files: root.files, folders: root.folders };
+}
+
+export function flattenWorkspaceTree(
+  tree: WorkspaceTree,
+  collapsedFolders: ReadonlySet<string> = new Set(),
+): WorkspaceTreeRow[] {
+  const rows: WorkspaceTreeRow[] = tree.files.map((file) => ({ kind: "file", file, depth: 0 }));
+
+  const appendFolder = (folder: WorkspaceTreeFolder, depth: number): void => {
+    const expanded = !collapsedFolders.has(folder.path);
+    rows.push({ kind: "folder", folder, depth, expanded });
+    if (!expanded) return;
+
+    rows.push(...folder.files.map((file) => ({ kind: "file" as const, file, depth: depth + 1 })));
+    folder.folders.forEach((child) => appendFolder(child, depth + 1));
+  };
+
+  tree.folders.forEach((folder) => appendFolder(folder, 0));
+  return rows;
 }

@@ -56,8 +56,7 @@ import {
   indexWorkspace,
   initialPaths,
   isTauriRuntime,
-  listWorkspaceDirectories,
-  listWorkspaceFiles,
+  listWorkspaceEntries,
   openExternalUrl,
   renameWorkspaceEntry,
   deleteWorkspaceEntry,
@@ -110,6 +109,7 @@ import type {
   WorkspaceEntryDetails,
   WorkspaceFile,
   WorkspaceIndexEntry,
+  WorkspaceListingStatus,
   WorkspaceSearchResult,
 } from "./types";
 import { DocumentCache } from "./document-cache";
@@ -456,6 +456,7 @@ type CachedWorkspace = {
   files: WorkspaceFile[];
   folders: WorkspaceDirectory[];
   index: WorkspaceIndexEntry[];
+  listingStatus: WorkspaceListingStatus;
   indexReady: boolean;
   revision: number;
   selectedTag: string | null;
@@ -532,6 +533,10 @@ export function App() {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);
+  const [workspaceListingStatus, setWorkspaceListingStatus] = useState<WorkspaceListingStatus>({
+    truncated: false,
+    scannedTotal: 0,
+  });
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
@@ -1509,6 +1514,17 @@ export function App() {
         const delta = await refreshWorkspace(root, paths);
         if (!isActiveWorkspace()) return;
 
+        if (delta.truncated) {
+          setWorkspaceListingStatus((current) => {
+            const next = {
+              truncated: true,
+              scannedTotal: Math.max(current.scannedTotal, delta.scannedTotal),
+            };
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { listingStatus: next });
+            return next;
+          });
+        }
+
         setWorkspaceFiles((current) => {
           const next = applyWorkspaceFileDelta(current, delta);
           updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
@@ -1591,6 +1607,7 @@ export function App() {
         setWorkspacePath(cached.path);
         setWorkspaceFiles(cached.files);
         setWorkspaceFolders(cached.folders);
+        setWorkspaceListingStatus(cached.listingStatus);
         setWorkspaceIndex(cached.index);
         setWorkspaceRevision(cached.revision);
         setWorkspaceQuery(cached.searchQuery);
@@ -1618,10 +1635,8 @@ export function App() {
 
         void (async () => {
           try {
-            const [files, folders] = await Promise.all([
-              listWorkspaceFiles(cached.path),
-              listWorkspaceDirectories(cached.path),
-            ]);
+            const listing = await listWorkspaceEntries(cached.path);
+            const { files, folders } = listing;
             if (
               !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
             ) {
@@ -1629,6 +1644,9 @@ export function App() {
             }
             const filesChanged = !workspaceFilesMatch(cached.files, files);
             const foldersChanged = !workspaceFoldersMatch(cached.folders, folders);
+            const listingStatusChanged =
+              cached.listingStatus.truncated !== listing.truncated ||
+              cached.listingStatus.scannedTotal !== listing.scannedTotal;
             if (filesChanged) {
               setWorkspaceFiles(files);
               updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files });
@@ -1636,6 +1654,14 @@ export function App() {
             if (foldersChanged) {
               setWorkspaceFolders(folders);
               updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { folders });
+            }
+            if (listingStatusChanged) {
+              const listingStatus = {
+                truncated: listing.truncated,
+                scannedTotal: listing.scannedTotal,
+              };
+              setWorkspaceListingStatus(listingStatus);
+              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { listingStatus });
             }
             if (filesChanged || foldersChanged) {
               setWorkspaceRevision((current) => {
@@ -1665,7 +1691,8 @@ export function App() {
         return;
       }
 
-      const [files, folders] = await Promise.all([listWorkspaceFiles(root), listWorkspaceDirectories(root)]);
+      const listing = await listWorkspaceEntries(root);
+      const { files, folders } = listing;
       if (requestId !== workspaceLoadRequestRef.current) return;
 
       const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
@@ -1677,6 +1704,10 @@ export function App() {
         ...workspaceRecord,
         files,
         folders,
+        listingStatus: {
+          truncated: listing.truncated,
+          scannedTotal: listing.scannedTotal,
+        },
         index: [],
         indexReady: false,
         revision: 0,
@@ -1690,6 +1721,7 @@ export function App() {
       setWorkspacePath(root);
       setWorkspaceFiles(files);
       setWorkspaceFolders(folders);
+      setWorkspaceListingStatus({ truncated: listing.truncated, scannedTotal: listing.scannedTotal });
       if (switchedWorkspace || !previousWorkspacePath) {
         setWorkspaceIndex([]);
         setWorkspaceResults([]);
@@ -1737,6 +1769,7 @@ export function App() {
         workspacePathRef.current = null;
         setWorkspaceFiles([]);
         setWorkspaceFolders([]);
+        setWorkspaceListingStatus({ truncated: false, scannedTotal: 0 });
         setWorkspaceIndex([]);
         saveWorkspacePath(null);
         mountedWorkspaceCacheRef.current.delete(comparablePath(root));
@@ -2687,6 +2720,7 @@ export function App() {
             setWorkspacePath(null);
             setWorkspaceFiles([]);
             setWorkspaceFolders([]);
+            setWorkspaceListingStatus({ truncated: false, scannedTotal: 0 });
             setWorkspaceIndex([]);
           }
         }
@@ -4595,6 +4629,7 @@ export function App() {
             onSaveExportFailures={() => void saveWorkspaceExportFailures()}
             workspaceExportNotice={workspaceExportNotice}
             workspaceIndexLoading={workspaceIndexLoading}
+            workspaceListingStatus={workspaceListingStatus}
             workspacePath={workspacePath}
             files={workspaceFiles}
             folders={workspaceFolders}

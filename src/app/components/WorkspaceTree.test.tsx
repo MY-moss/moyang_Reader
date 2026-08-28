@@ -16,7 +16,7 @@ function file(index: number): WorkspaceFile {
 }
 
 describe("WorkspaceTreeView", () => {
-  it("shows the complete tree without an arbitrary display-all gate", () => {
+  it("virtualizes the tree without an arbitrary display-all gate", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -31,9 +31,32 @@ describe("WorkspaceTreeView", () => {
       );
     });
 
-    expect(container.querySelectorAll(".workspace-file")).toHaveLength(81);
+    expect(container.querySelectorAll(".workspace-file").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".workspace-file").length).toBeLessThan(81);
     expect(container.textContent).not.toContain("显示全部");
     expect(container.textContent).not.toContain("收起列表");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the rendered row count bounded for a large tree", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={Array.from({ length: 1_000 }, (_, index) => file(index))}
+          activePath={null}
+          onOpenFile={() => {}}
+        />,
+      );
+    });
+
+    expect(container.querySelectorAll(".workspace-file").length).toBeLessThan(100);
+    expect(container.querySelectorAll(".workspace-tree-row").length).toBeLessThan(100);
 
     act(() => root.unmount());
     container.remove();

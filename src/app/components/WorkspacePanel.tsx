@@ -5,6 +5,7 @@ import type {
   WorkspaceEntryDetails,
   WorkspaceExportFailure,
   WorkspaceFile,
+  WorkspaceListingStatus,
   WorkspaceSearchResult,
 } from "../types";
 import { WorkspaceTreeView, type WorkspaceEntryKind, type WorkspaceEntryTransferMode } from "./WorkspaceTree";
@@ -51,6 +52,7 @@ type WorkspacePanelProps = {
   onSaveExportFailures: () => void;
   workspaceExportNotice: string | null;
   workspaceIndexLoading: boolean;
+  workspaceListingStatus: WorkspaceListingStatus;
   onOpenFile: (path: string) => void;
   onCloseFile?: (path: string) => void;
   onCreateNote?: (parentPath: string) => void;
@@ -115,6 +117,7 @@ export function WorkspacePanel({
   onSaveExportFailures,
   workspaceExportNotice,
   workspaceIndexLoading,
+  workspaceListingStatus,
   onOpenFile,
   onCloseFile,
   onCreateNote,
@@ -329,6 +332,11 @@ export function WorkspacePanel({
       {workspaceIndexLoading && (
         <div className="workspace-index-note" role="status">
           目录已打开，正在整理链接与标签…
+        </div>
+      )}
+      {workspaceListingStatus.truncated && (
+        <div className="workspace-limit-note" role="status">
+          工作区较大，文件树和工作区索引只加载了安全范围内的内容；未加载部分需要缩小工作区后查看。
         </div>
       )}
 

@@ -1784,6 +1784,17 @@ html.pane-resizing * {
   position: relative;
   min-height: 24px;
 }
+.workspace-tree-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 42px;
+}
+.workspace-tree-row > .workspace-file,
+.workspace-tree-row > .workspace-folder {
+  box-sizing: border-box;
+  height: 100%;
+}
 .workspace-subheading {
   padding: 0 7px 5px;
   color: #9a9285;
@@ -1898,6 +1909,16 @@ html.pane-resizing * {
 .workspace-watch-note {
   margin-top: 9px;
   color: #9a6e45;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.workspace-limit-note {
+  margin-top: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-warm) 30%, var(--line));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-warm) 8%, transparent);
+  color: var(--muted);
+  padding: 8px 9px;
   font-size: 10px;
   line-height: 1.5;
 }

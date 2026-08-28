@@ -6,6 +6,7 @@ import type {
   WorkspaceFile,
   WorkspaceDirectory,
   WorkspaceIndexEntry,
+  WorkspaceListing,
   WorkspaceRefreshResult,
   WorkspaceSearchResult,
 } from "./types";
@@ -72,6 +73,11 @@ export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]>
   return invoke<WorkspaceFile[]>("list_workspace_files", { root });
 }
 
+export async function listWorkspaceEntries(root: string): Promise<WorkspaceListing> {
+  if (!isTauriRuntime()) return { files: [], folders: [], truncated: false, scannedTotal: 0 };
+  return invoke<WorkspaceListing>("list_workspace_entries", { root });
+}
+
 export async function listWorkspaceDirectories(root: string): Promise<WorkspaceDirectory[]> {
   if (!isTauriRuntime()) return [];
   return invoke<WorkspaceDirectory[]>("list_workspace_directories", { root });
@@ -88,7 +94,17 @@ export async function indexWorkspace(root: string): Promise<WorkspaceIndexEntry[
 }
 
 export async function refreshWorkspace(root: string, paths: string[]): Promise<WorkspaceRefreshResult> {
-  if (!isTauriRuntime()) return { scopePaths: paths, folderScopePaths: [], folders: [], files: [], index: [] };
+  if (!isTauriRuntime()) {
+    return {
+      scopePaths: paths,
+      folderScopePaths: [],
+      folders: [],
+      files: [],
+      index: [],
+      truncated: false,
+      scannedTotal: 0,
+    };
+  }
   return invoke<WorkspaceRefreshResult>("refresh_workspace", { root, paths });
 }
 
