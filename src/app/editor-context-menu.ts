@@ -5,7 +5,6 @@ export type EditorContextAction =
   | "copy"
   | "paste"
   | "select-all"
-  | "find-selection"
   | "bold"
   | "italic"
   | "strike"
@@ -49,7 +48,6 @@ export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
       { action: "copy", label: "复制", shortcut: "Ctrl C" },
       { action: "paste", label: "粘贴", shortcut: "Ctrl V" },
       { action: "select-all", label: "全选", shortcut: "Ctrl A" },
-      { action: "find-selection", label: "查找选中文本", shortcut: "Ctrl F" },
     ],
   },
   {

@@ -143,7 +143,6 @@ export function applySourceEditorAction(
     case "copy":
     case "paste":
     case "select-all":
-    case "find-selection":
       return null;
     case "bold":
       return wrapSelection(value, selectionStart, selectionEnd, "**");

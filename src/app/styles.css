@@ -974,53 +974,6 @@ a:focus-visible {
 .close-confirm-actions .quiet-button {
   min-height: 32px;
 }
-.workspace-entry-details-backdrop {
-  z-index: 68;
-  align-items: center;
-}
-.workspace-entry-details-dialog {
-  width: min(540px, 100%);
-}
-.workspace-entry-details-body {
-  padding: 0 20px 18px;
-}
-.workspace-entry-details-list {
-  display: grid;
-  gap: 1px;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--line);
-}
-.workspace-entry-details-list > div {
-  display: grid;
-  grid-template-columns: minmax(92px, 0.3fr) minmax(0, 1fr);
-  gap: 14px;
-  min-width: 0;
-  padding: 10px 12px;
-  background: var(--surface);
-}
-.workspace-entry-details-list dt {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-.workspace-entry-details-list dd {
-  min-width: 0;
-  margin: 0;
-  color: var(--ink);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-.workspace-entry-details-path {
-  color: var(--muted) !important;
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 10px !important;
-}
-.workspace-entry-details-footer {
-  justify-content: flex-end;
-}
 @keyframes quick-open-fade {
   from {
     opacity: 0;

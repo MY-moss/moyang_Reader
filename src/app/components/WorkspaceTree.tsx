@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
-import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
+import type { WorkspaceDirectory, WorkspaceFile } from "../types";
 import { buildWorkspaceTree, type WorkspaceTreeFolder } from "../workspace-tree";
 import { ContextMenu } from "./ContextMenu";
 
@@ -13,7 +13,6 @@ type WorkspaceTreeContextTarget = {
   entryPath: string;
   entryKind: "root" | WorkspaceEntryKind;
   filePath?: string;
-  details?: WorkspaceEntryDetails;
 };
 
 type WorkspaceTreeProps = {
@@ -26,7 +25,6 @@ type WorkspaceTreeProps = {
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
-  onShowDetails?: (details: WorkspaceEntryDetails) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
   onCopyRelativePath?: (entryPath: string) => void;
@@ -92,14 +90,6 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContex
           entryPath: file.relativePath,
           entryKind: "file",
           filePath: file.path,
-          details: {
-            kind: "file",
-            name: file.name,
-            relativePath: file.relativePath,
-            absolutePath: file.path,
-            documentKind: file.kind,
-            size: file.size,
-          },
         });
       }}
       onKeyDown={(event) => {
@@ -112,14 +102,6 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContex
             entryPath: file.relativePath,
             entryKind: "file",
             filePath: file.path,
-            details: {
-              kind: "file",
-              name: file.name,
-              relativePath: file.relativePath,
-              absolutePath: file.path,
-              documentKind: file.kind,
-              size: file.size,
-            },
           }),
         );
       }}
@@ -141,7 +123,6 @@ type WorkspaceFolderProps = {
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
   onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
-  onShowDetails?: (details: WorkspaceEntryDetails) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
 };
@@ -157,7 +138,6 @@ function WorkspaceFolder({
   onRenameEntry,
   onDeleteEntry,
   onDuplicateEntry,
-  onShowDetails,
   onRevealEntry,
   onCopyPath,
 }: WorkspaceFolderProps) {
@@ -182,12 +162,6 @@ function WorkspaceFolder({
             label: folderLabel,
             entryPath: folder.path,
             entryKind: "folder",
-            details: {
-              kind: "folder",
-              name: folder.name,
-              relativePath: folder.path,
-              fileCount: folder.fileCount,
-            },
           });
         }}
         onKeyDown={(event) => {
@@ -199,12 +173,6 @@ function WorkspaceFolder({
               label: folderLabel,
               entryPath: folder.path,
               entryKind: "folder",
-              details: {
-                kind: "folder",
-                name: folder.name,
-                relativePath: folder.path,
-                fileCount: folder.fileCount,
-              },
             }),
           );
         }}
@@ -243,7 +211,6 @@ function WorkspaceFolder({
               onRenameEntry={onRenameEntry}
               onDeleteEntry={onDeleteEntry}
               onDuplicateEntry={onDuplicateEntry}
-              onShowDetails={onShowDetails}
               onRevealEntry={onRevealEntry}
               onCopyPath={onCopyPath}
             />
@@ -264,7 +231,6 @@ export function WorkspaceTreeView({
   onRenameEntry,
   onDeleteEntry,
   onDuplicateEntry,
-  onShowDetails,
   onRevealEntry,
   onCopyPath,
   onCopyRelativePath,
@@ -278,7 +244,6 @@ export function WorkspaceTreeView({
     onRenameEntry ||
     onDeleteEntry ||
     onDuplicateEntry ||
-    onShowDetails ||
     onRevealEntry ||
     onCopyPath ||
     onCopyRelativePath,
@@ -337,7 +302,6 @@ export function WorkspaceTreeView({
           onRenameEntry={onRenameEntry}
           onDeleteEntry={onDeleteEntry}
           onDuplicateEntry={onDuplicateEntry}
-          onShowDetails={onShowDetails}
           onRevealEntry={onRevealEntry}
           onCopyPath={onCopyPath}
         />
@@ -435,20 +399,6 @@ export function WorkspaceTreeView({
                             },
                           ]
                         : []),
-                    ],
-                  },
-                ]
-              : []),
-            ...(contextMenu.entryKind !== "root" && contextMenu.details && onShowDetails
-              ? [
-                  {
-                    label: "信息",
-                    items: [
-                      {
-                        id: "show-entry-details",
-                        label: "查看属性",
-                        onSelect: () => onShowDetails(contextMenu.details as WorkspaceEntryDetails),
-                      },
                     ],
                   },
                 ]

@@ -20,7 +20,6 @@ type SourceEditorProps = {
   onInsertLink?: (context: SourceEditorLinkContext) => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
-  onFindText?: (text: string) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
@@ -52,7 +51,6 @@ export function SourceEditor({
   onInsertLink,
   onUndo,
   onRedo,
-  onFindText,
   canUndo = false,
   canRedo = false,
   onStatusMessage,
@@ -67,7 +65,6 @@ export function SourceEditor({
   const onInsertLinkRef = useRef(onInsertLink);
   const onUndoRef = useRef(onUndo);
   const onRedoRef = useRef(onRedo);
-  const onFindTextRef = useRef(onFindText);
   const onStatusMessageRef = useRef(onStatusMessage);
   const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -118,10 +115,6 @@ export function SourceEditor({
   useEffect(() => {
     onRedoRef.current = onRedo;
   }, [onRedo]);
-
-  useEffect(() => {
-    onFindTextRef.current = onFindText;
-  }, [onFindText]);
 
   useEffect(() => {
     onStatusMessageRef.current = onStatusMessage;
@@ -229,14 +222,6 @@ export function SourceEditor({
       return;
     }
 
-    if (action === "find-selection") {
-      const selectedText = currentValue.slice(selectionStart, selectionEnd).trim();
-      if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
-      else onFindTextRef.current?.(selectedText);
-      setContextMenu(null);
-      return;
-    }
-
     if (action === "link") {
       onInsertLinkRef.current?.({
         selectionStart,
@@ -288,7 +273,6 @@ export function SourceEditor({
           (item.action === "undo" && !canUndo) ||
           (item.action === "redo" && !canRedo) ||
           ((item.action === "cut" || item.action === "copy") && !hasSelection) ||
-          (item.action === "find-selection" && !hasSelection) ||
           (item.action === "clear-format" && !hasSelection),
         onSelect: () => applyContextAction(item.action),
       };

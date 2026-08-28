@@ -50,16 +50,6 @@ export type WorkspaceDirectory = {
   relativePath: string;
 };
 
-export type WorkspaceEntryDetails = {
-  kind: "file" | "folder";
-  name: string;
-  relativePath: string;
-  absolutePath?: string;
-  documentKind?: DocumentKind;
-  size?: number;
-  fileCount?: number;
-};
-
 export type WorkspaceSearchResult = {
   file: WorkspaceFile;
   preview: string;
