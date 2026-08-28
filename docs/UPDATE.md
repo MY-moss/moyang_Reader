@@ -31,7 +31,6 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 - 在线核验：GitHub Release 和 Cloudflare Pages 的 `latest.json`、Windows x64 安装包及签名均 HTTP 200；两处安装包大小和 SHA-256 一致，manifest 版本均为 `0.10.10`，签名内容一致。
 - 镜像边界：Release workflow 静态镜像子 job [98791213977](https://github.com/MY-moss/moyang_Reader/actions/runs/33153221247/job/98791213977) 失败，当前仓库仍缺少 Cloudflare 部署 Secret；公开 Pages 镜像代理可用，客户端仍保留 GitHub Release 回退。本轮未上传任何凭据。
 
-
 ## v0.10.7 发布记录（2026-08-28）
 
 - 发布范围：PR [#284](https://github.com/MY-moss/moyang_Reader/pull/284) 修复 Windows Edge headless PDF 异步落盘，确认有效 PDF 后再执行原子替换；版本准备 PR [#285](https://github.com/MY-moss/moyang_Reader/pull/285) 已同步版本号和 CHANGELOG。
