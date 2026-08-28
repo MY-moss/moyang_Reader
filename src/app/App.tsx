@@ -47,6 +47,8 @@ import {
   createWorkspaceFolder,
   createWorkspaceNote,
   duplicateWorkspaceEntry,
+  copyWorkspaceEntry,
+  moveWorkspaceEntry,
   exportPdfFile,
   fileExists,
   fileSize,
@@ -2367,6 +2369,96 @@ export function App() {
     [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
   );
 
+  const handleTransferWorkspaceEntry = useCallback(
+    async (
+      entryPath: string,
+      destinationParentPath: string,
+      mode: "copy" | "move",
+      kind: "file" | "folder",
+    ): Promise<boolean> => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError(`请先添加工作区，再${mode === "move" ? "移动" : "复制"}文件或文件夹。`);
+        return false;
+      }
+
+      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
+      const current = documentStateRef.current;
+      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
+      if (currentIsAffected && current?.modified) {
+        const actionLabel = mode === "move" ? "移动" : "复制";
+        if (!window.confirm(`当前文档有未保存修改，是否先保存后${actionLabel}？`)) return false;
+        if (!(await saveDocument())) return false;
+      }
+
+      try {
+        const transferredPath =
+          mode === "move"
+            ? await moveWorkspaceEntry(root, entryPath, destinationParentPath)
+            : await copyWorkspaceEntry(root, entryPath, destinationParentPath);
+        documentCacheRef.current.invalidate([oldAbsolutePath, transferredPath]);
+
+        let reopenFailed = false;
+        if (mode === "move") {
+          const rebaseTab = (tab: RecentFile): RecentFile => {
+            const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, transferredPath);
+            return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };
+          };
+          const nextTabs = openTabsRef.current.map(rebaseTab);
+          openTabsRef.current = nextTabs;
+          setOpenTabs(nextTabs);
+          saveOpenTabs(nextTabs);
+          setRecentFiles((currentFiles) => {
+            const nextFiles = currentFiles.map(rebaseTab);
+            saveRecentFiles(nextFiles);
+            return nextFiles;
+          });
+
+          const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+          if (cached) {
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+              tabs: nextTabs.filter(
+                (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+              ),
+              activeDocumentPath: cached.activeDocumentPath
+                ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, transferredPath)
+                : null,
+            });
+            persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+          }
+
+          if (currentIsAffected && current) {
+            const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, transferredPath);
+            releaseDocumentResources(current.path);
+            documentStateRef.current = null;
+            setDocumentState(null);
+            setSourceDraft("");
+            sourceDraftRef.current = "";
+            setDraftRecovery(null);
+            setExternalChangePath(null);
+            setMode("rendered");
+            resetEditorHistory("", "");
+            reopenFailed = !(await openPath(nextCurrentPath, true));
+            if (reopenFailed) {
+              setError("内容已移动，但重新打开当前文档失败，请从文件树中再次打开。");
+            }
+          }
+        }
+
+        await refreshWorkspaceChanges(root, [oldAbsolutePath, transferredPath]);
+        setSettingsNotice(
+          `${mode === "move" ? "已移动" : "已复制"}${kind === "folder" ? "文件夹" : "文件"}：${fileNameFromPath(transferredPath)}`,
+        );
+        if (!reopenFailed) setError(null);
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : `${mode === "move" ? "移动" : "复制"}工作区内容失败。`);
+        return false;
+      }
+    },
+    [copyWorkspaceEntry, moveWorkspaceEntry, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+  );
+
   const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {
     const root = workspacePathRef.current;
     if (!root || !isTauriRuntime()) {
@@ -4518,6 +4610,10 @@ export function App() {
             onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}
             onCopyName={(entryPath) => void handleCopyWorkspaceName(entryPath)}
             onRefresh={(entryPath) => void handleRefreshWorkspaceEntry(entryPath)}
+            onTransferEntry={(sourcePath, destinationParentPath, operation, kind) =>
+              handleTransferWorkspaceEntry(sourcePath, destinationParentPath, operation, kind)
+            }
+            onStatusMessage={(message) => setSettingsNotice(message)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}

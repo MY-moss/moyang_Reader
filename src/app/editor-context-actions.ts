@@ -142,6 +142,7 @@ export function applySourceEditorAction(
     case "cut":
     case "copy":
     case "paste":
+    case "paste-plain":
     case "select-all":
     case "find-selection":
       return null;

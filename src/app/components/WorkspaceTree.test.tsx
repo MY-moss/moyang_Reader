@@ -258,6 +258,56 @@ describe("WorkspaceTreeView", () => {
     container.remove();
   });
 
+
+  it("supports cutting and pasting an entry into another folder", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onTransferEntry = vi.fn();
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={[file(0)]}
+          folders={[{ path: "C:/vault/Archive", name: "Archive", relativePath: "Archive" }]}
+          activePath={null}
+          onOpenFile={() => {}}
+          onTransferEntry={onTransferEntry}
+        />,
+      );
+    });
+
+    const fileButton = container.querySelector<HTMLButtonElement>(".workspace-file");
+    expect(fileButton).toBeTruthy();
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const menuItems = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
+    const cut = menuItems().find((button) => button.textContent?.includes("剪切到其他文件夹"));
+    expect(cut).toBeTruthy();
+    act(() => cut?.click());
+
+    const archive = Array.from(container.querySelectorAll<HTMLButtonElement>(".workspace-folder")).find(
+      (button) => button.querySelector(".workspace-folder-name")?.textContent === "Archive",
+    );
+    expect(archive).toBeTruthy();
+    act(() => {
+      archive?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 30, clientY: 40 }));
+    });
+    const paste = menuItems().find((button) => button.textContent?.includes("粘贴到此处"));
+    expect(paste).toBeTruthy();
+    expect(paste?.disabled).toBe(false);
+    await act(async () => {
+      paste?.click();
+      await Promise.resolve();
+    });
+
+    expect(onTransferEntry).toHaveBeenCalledWith("notes/0.md", "Archive", "move", "file");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it("keeps the root context menu available for an empty workspace", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

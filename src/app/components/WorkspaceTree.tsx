@@ -1,9 +1,16 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
 import { buildWorkspaceTree, type WorkspaceTreeFolder } from "../workspace-tree";
 import { ContextMenu } from "./ContextMenu";
 
 export type WorkspaceEntryKind = "file" | "folder";
+export type WorkspaceEntryTransferMode = "copy" | "move";
+export type WorkspaceEntryClipboard = {
+  entryPath: string;
+  kind: WorkspaceEntryKind;
+  mode: WorkspaceEntryTransferMode;
+  label: string;
+};
 
 type WorkspaceTreeContextTarget = {
   x: number;
@@ -33,6 +40,13 @@ type WorkspaceTreeProps = {
   onCopyRelativePath?: (entryPath: string) => void;
   onCopyName?: (entryPath: string) => void;
   onRefresh?: (entryPath: string) => void;
+  onTransferEntry?: (
+    sourcePath: string,
+    destinationParentPath: string,
+    mode: WorkspaceEntryTransferMode,
+    kind: WorkspaceEntryKind,
+  ) => boolean | Promise<boolean>;
+  onStatusMessage?: (message: string) => void;
 };
 
 function formatSize(size: number): string {
@@ -45,6 +59,28 @@ function parentRelativePath(relativePath: string): string {
   const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
   parts.pop();
   return parts.join("/");
+}
+
+
+function normalizeRelativePath(path: string): string {
+  return path.replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "").toLowerCase();
+}
+
+function isRelativePathWithin(parentPath: string, candidatePath: string): boolean {
+  const parent = normalizeRelativePath(parentPath);
+  const candidate = normalizeRelativePath(candidatePath);
+  return Boolean(parent) && (candidate === parent || candidate.startsWith(`${parent}/`));
+}
+
+function canPasteClipboard(clipboard: WorkspaceEntryClipboard, destinationParentPath: string): boolean {
+  const source = normalizeRelativePath(clipboard.entryPath);
+  const destination = normalizeRelativePath(destinationParentPath);
+  const sourceParent = normalizeRelativePath(parentRelativePath(clipboard.entryPath));
+  if (!source || sourceParent === destination) return false;
+  if (clipboard.kind === "folder" && (source === destination || isRelativePathWithin(source, destination))) {
+    return false;
+  }
+  return true;
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {
@@ -283,10 +319,23 @@ export function WorkspaceTreeView({
   onCopyRelativePath,
   onCopyName,
   onRefresh,
+  onTransferEntry,
+  onStatusMessage,
 }: WorkspaceTreeProps) {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);
+  const [clipboard, setClipboard] = useState<WorkspaceEntryClipboard | null>(null);
   const tree = useMemo(() => buildWorkspaceTree(files, folders), [files, folders]);
+
+  useEffect(() => {
+    if (!clipboard) return;
+    const normalizedPath = normalizeRelativePath(clipboard.entryPath);
+    const exists =
+      clipboard.kind === "folder"
+        ? folders.some((folder) => normalizeRelativePath(folder.relativePath) === normalizedPath)
+        : files.some((file) => normalizeRelativePath(file.relativePath) === normalizedPath);
+    if (!exists) setClipboard(null);
+  }, [clipboard, files, folders]);
   const canManage = Boolean(
     onCreateNote ||
     onCreateFolder ||
@@ -298,7 +347,8 @@ export function WorkspaceTreeView({
     onCopyPath ||
     onCopyRelativePath ||
     onCopyName ||
-    onRefresh,
+    onRefresh ||
+    onTransferEntry,
   );
 
   const toggleFolder = (path: string) => {
@@ -313,6 +363,35 @@ export function WorkspaceTreeView({
   const openContextMenu = (target: WorkspaceTreeContextTarget) => {
     if (!canManage) return;
     setContextMenu(target);
+  };
+
+  const setEntryClipboard = (mode: WorkspaceEntryTransferMode) => {
+    if (!contextMenu || !isWorkspaceEntryKind(contextMenu.entryKind)) return;
+    setClipboard({
+      entryPath: contextMenu.entryPath,
+      kind: contextMenu.entryKind,
+      mode,
+      label: contextMenu.label,
+    });
+    onStatusMessage?.(
+      `已${mode === "move" ? "剪切" : "复制"}${contextMenu.entryKind === "folder" ? "文件夹" : "文件"}，请在目标文件夹上右键粘贴。`,
+    );
+  };
+
+  const pasteClipboard = async (destinationParentPath: string) => {
+    const pending = clipboard;
+    if (!pending || !onTransferEntry || !canPasteClipboard(pending, destinationParentPath)) return;
+    setContextMenu(null);
+    let completed = false;
+    try {
+      completed = (await onTransferEntry(pending.entryPath, destinationParentPath, pending.mode, pending.kind)) !== false;
+    } catch {
+      onStatusMessage?.("粘贴失败，请检查目标文件夹后重试。");
+    }
+    if (completed) {
+      setClipboard(null);
+      onStatusMessage?.(`${pending.mode === "move" ? "移动" : "复制"}完成：${pending.label}`);
+    }
   };
 
   return (
@@ -369,6 +448,22 @@ export function WorkspaceTreeView({
           title={contextMenu.entryKind === "root" ? "阅读库根目录" : contextMenu.label}
           ariaLabel="工作区管理菜单"
           groups={[
+            ...(contextMenu.entryKind !== "file" && clipboard && onTransferEntry
+              ? [
+                  {
+                    label: "剪贴板",
+                    items: [
+                      {
+                        id: "paste-entry",
+                        label: "粘贴到此处",
+                        shortcut: "Ctrl V",
+                        disabled: !canPasteClipboard(clipboard, contextMenu.entryPath),
+                        onSelect: () => void pasteClipboard(contextMenu.entryPath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
             ...(contextMenu.entryKind === "file"
               ? [
                   {
@@ -424,11 +519,28 @@ export function WorkspaceTreeView({
                   },
                 ]
               : []),
-            ...(contextMenu.entryKind !== "root" && (onRenameEntry || onDeleteEntry || onDuplicateEntry)
+            ...(contextMenu.entryKind !== "root" &&
+            (onRenameEntry || onDeleteEntry || onDuplicateEntry || onTransferEntry)
               ? [
                   {
                     label: "管理",
                     items: [
+                      ...(onTransferEntry
+                        ? [
+                            {
+                              id: "cut-entry",
+                              label: "剪切到其他文件夹",
+                              shortcut: "Ctrl X",
+                              onSelect: () => setEntryClipboard("move"),
+                            },
+                            {
+                              id: "copy-entry-to-folder",
+                              label: "复制到其他文件夹",
+                              shortcut: "Ctrl C",
+                              onSelect: () => setEntryClipboard("copy"),
+                            },
+                          ]
+                        : []),
                       ...(onDuplicateEntry
                         ? [
                             {

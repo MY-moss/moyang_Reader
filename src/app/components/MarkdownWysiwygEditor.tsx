@@ -384,7 +384,7 @@ function MilkdownSurface({
         return;
       }
 
-      if (action === "paste") {
+      if (action === "paste" || action === "paste-plain") {
         const clipboard = navigator.clipboard;
         if (!clipboard?.readText) {
           onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
