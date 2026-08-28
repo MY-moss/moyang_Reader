@@ -8,7 +8,7 @@ const { invoke, listen } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
-import { fileMetadata, writeBinaryFile } from "./bridge";
+import { commitBinaryFile, discardBinaryFile, fileMetadata, writeBinaryFile, writeBinaryFileChunk } from "./bridge";
 
 describe("binary bridge", () => {
   beforeEach(() => {
@@ -54,4 +54,54 @@ describe("binary bridge", () => {
     });
     expect(invoke).toHaveBeenCalledWith("file_metadata", { path: "C:\\Notes\\Today.md" });
   });
+
+  it("streams export chunks with append metadata and commits the temporary file", async () => {
+    const contents = Uint8Array.from([1, 2, 3]);
+    const tempPath = "C:\\Notes\\.阅读库.moyang-export-part-1.tmp";
+
+    await writeBinaryFileChunk(tempPath, contents, false, "C:\\Notes\\阅读库.docx");
+    await writeBinaryFileChunk(tempPath, Uint8Array.from([4]), true, "C:\\Notes\\阅读库.docx");
+    await commitBinaryFile(tempPath, "C:\\Notes\\阅读库.docx");
+    await discardBinaryFile(tempPath, "C:\\Notes\\阅读库.docx");
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "write_binary_file_chunk_raw", expect.any(ArrayBuffer), {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        path: "C%3A%5CNotes%5C.%E9%98%85%E8%AF%BB%E5%BA%93.moyang-export-part-1.tmp",
+        append: "false",
+        destination: "C%3A%5CNotes%5C%E9%98%85%E8%AF%BB%E5%BA%93.docx",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "write_binary_file_chunk_raw", expect.any(ArrayBuffer), {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        path: "C%3A%5CNotes%5C.%E9%98%85%E8%AF%BB%E5%BA%93.moyang-export-part-1.tmp",
+        append: "true",
+        destination: "C%3A%5CNotes%5C%E9%98%85%E8%AF%BB%E5%BA%93.docx",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(3, "commit_binary_file", {
+      tempPath,
+      destinationPath: "C:\\Notes\\阅读库.docx",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(4, "discard_binary_file", {
+      path: tempPath,
+      destinationPath: "C:\\Notes\\阅读库.docx",
+    });
+  });
+
+  it("falls back to JSON chunks when raw chunk IPC is unavailable", async () => {
+    const contents = Uint8Array.from([9, 8, 7]);
+    invoke.mockRejectedValueOnce("IPC 二进制写入需要原始字节请求体。");
+
+    await writeBinaryFileChunk("C:\\Notes\\.export.moyang-export-part-2.tmp", contents, true, "C:\\Notes\\阅读库.docx");
+
+    expect(invoke).toHaveBeenNthCalledWith(2, "write_binary_file_chunk", {
+      path: "C:\\Notes\\.export.moyang-export-part-2.tmp",
+      contents: [9, 8, 7],
+      append: true,
+      destinationPath: "C:\\Notes\\阅读库.docx",
+    });
+  });
 });
+
