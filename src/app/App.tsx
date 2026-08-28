@@ -1,1 +1,4843 @@
-import {\n  lazy,\n  Suspense,\n  useCallback,\n  useEffect,\n  useMemo,\n  useRef,\n  useState,\n  type CSSProperties,\n  type DragEvent,\n  type MouseEvent,\n  type WheelEvent as ReactWheelEvent,\n} from "react";\nimport { EmptyState } from "./components/EmptyState";\nimport { CommandPalette, type ReaderCommand } from "./components/CommandPalette";\nimport { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";\nimport { ContextPanel } from "./components/ContextPanel";\nimport { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";\nimport { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";\nimport { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";\nimport { ExternalChangeNotice } from "./components/ExternalChangeNotice";\nimport { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";\nimport { GettingStartedDialog } from "./components/GettingStartedDialog";\nimport { ImagePreview } from "./components/ImagePreview";\nimport { PdfPreview } from "./components/PdfPreview";\nimport { PaneResizeHandle } from "./components/PaneResizeHandle";\nimport { PrintPreview } from "./components/PrintPreview";\nimport { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";\nimport { QuickOpenPalette } from "./components/QuickOpenPalette";\nimport { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";\nimport { RelationGraph } from "./components/RelationGraph";\nimport { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteContext } from "./components/SourceEditor";\nimport { Tabs } from "./components/Tabs";\nimport { TopBar } from "./components/TopBar";\nimport { WorkspacePanel } from "./components/WorkspacePanel";\nimport { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsDialog";\nimport { UpdateNotice } from "./components/UpdateNotice";\nimport { scheduleSourceRender } from "./source-render-scheduler";\nimport { createReadingPositionTracker } from "./reading-position";\nimport {\n  chooseDocumentPaths,\n  chooseSavePath,\n  chooseWorkspacePath,\n  authorizeStoredPath,\n  closeWindow,\n  createMarkdownFile,\n  createWorkspaceFolder,\n  createWorkspaceNote,\n  duplicateWorkspaceEntry,\n  exportPdfFile,\n  fileExists,\n  fileSize,\n  fileMetadata,\n  indexWorkspace,\n  initialPaths,\n  isTauriRuntime,\n  listWorkspaceDirectories,\n  listWorkspaceFiles,\n  openExternalUrl,\n  renameWorkspaceEntry,\n  deleteWorkspaceEntry,\n  revealWorkspaceEntry,\n  readBinaryFile,\n  readAppSettings,\n  readTextFile,\n  refreshWorkspace,\n  resolveOpenPaths,\n  searchWorkspace,\n  subscribeToFileDrop,\n  subscribeToWorkspaceChanges,\n  subscribeToCloseRequest,\n  subscribeToOpenPaths,\n  writeBinaryFile,\n  writeAppSettings,\n  writeTextFile,\n} from "./bridge";\nimport type { Update } from "@tauri-apps/plugin-updater";\nimport {\n  checkForAppUpdate,\n  describeUpdateError,\n  getCurrentAppVersion,\n  installAppUpdate,\n  relaunchApp,\n  type UpdateStatus,\n} from "./updater";\nimport {\n  clearUpdateRecovery,\n  formatUpdateRecoveryNotice,\n  loadUpdateRecovery,\n  saveUpdateRecovery,\n} from "./update-recovery";\nimport type {\n  DocumentKind,\n  ContextPanelTab,\n  ExportMargin,\n  ExportOrientation,\n  ExportPaper,\n  FileStamp,\n  OpenPath,\n  OpenDocument,\n  ReaderMode,\n  RecentFile,\n  RecentWorkspace,\n  ThemeMode,\n  TocItem,\n  WorkspaceExportFailure,\n  WorkspaceDirectory,\n  WorkspaceEntryDetails,\n  WorkspaceFile,\n  WorkspaceIndexEntry,\n  WorkspaceSearchResult,\n} from "./types";\nimport { DocumentCache } from "./document-cache";\nimport { nextReaderModeAfterOpen } from "./reader-mode";\nimport {\n  READING_ZOOM_DEFAULT,\n  READING_ZOOM_STEP,\n  normalizeReadingZoom,\n  readingScaleFromZoom,\n  stepReadingZoom,\n} from "./reading-zoom";\nimport { reorderTabs } from "./tab-order";\nimport { checkMarkdownEditorSafety } from "./markdown-editor-support";\nimport { buildWikiLinkCandidates } from "./wiki-link-completion";\nimport {\n  BATCH_EXPORT_CHUNK_SIZE,\n  BATCH_EXPORT_MAX_ESTIMATED_BYTES,\n  buildBatchDocxExport,\n  buildBatchHtmlExport,\n  buildDocxExport,\n  buildHtmlExport,\n  copyRichText,\n  formatExportFailureReport,\n  formatExportCancellationNotice,\n  fileNameWithExtension,\n  inlineLocalImages,\n  pathWithExtension,\n  pathWithNameSuffix,\n  printHtmlDocument,\n  summarizeExportFailures,\n  shouldFlushBatchExport,\n} from "./export";\nimport {\n  loadRecentFiles,\n  MAX_MOUNTED_WORKSPACES,\n  loadMountedWorkspaces,\n  loadRecentWorkspaces,\n  loadWorkspaceSessions,\n  loadLastDocumentPath,\n  loadOpenTabs,\n  loadReadingPosition,\n  loadSidebarCollapsed,\n  loadContextPanelOpen,\n  loadContextPanelTab,\n  loadPaneWidths,\n  loadWorkspacePath,\n  rememberRecentFile,\n  rememberMountedWorkspace,\n  rememberRecentWorkspace,\n  saveRecentFiles,\n  saveLastDocumentPath,\n  saveOpenTabs,\n  saveReadingPosition,\n  saveSidebarCollapsed,\n  saveContextPanelOpen,\n  saveContextPanelTab,\n  savePaneWidths,\n  saveMountedWorkspaces,\n  saveWorkspaceSession,\n  saveWorkspaceSessions,\n  forgetWorkspaceSession,\n  saveWorkspacePath,\n} from "./storage";\nimport { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";\nimport { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";\nimport { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";\nimport { loadLocale, saveLocale, type Locale } from "./i18n";\nimport {\n  createAppSettingsSnapshot,\n  loadAppSettingsSnapshot,\n  parseAppSettings,\n  saveAppSettingsSnapshot,\n  serializeAppSettings,\n  type AppSettingsSnapshot,\n  type SettingsPersistenceStatus,\n} from "./app-settings";\nimport { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";\nimport {\n  documentKindFromPath,\n  emptyRenderedDocument,\n  imageMimeType,\n  isEditableDocument,\n  renderDocx,\n  renderSource,\n} from "../lib/document-adapters";\nimport { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";\nimport type { QuickOpenCandidate } from "./quick-open";\nimport {\n  applyWorkspaceFileDelta,\n  applyWorkspaceFolderDelta,\n  applyWorkspaceIndexDelta,\n  isCurrentWorkspaceLoad,\n} from "./workspace-refresh";\nimport { resolveExternalChangeAction } from "./external-change";\nimport { normalizePathKey } from "./path-key";\nimport { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";\nimport { scrollHeadingInContainer } from "./heading-navigation";\nimport { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";\nimport {\n  formatTransitionConfirmation,\n  isSameDocumentPath,\n  shouldConfirmDocumentReplacement,\n  shouldConfirmWorkspaceSwitch,\n} from "./document-transition";\nimport {\n  clipboardAssetFileName,\n  clipboardAssetPath,\n  clipboardAssetReference,\n  clipboardImageToPng,\n  findClipboardImage,\n  insertTextAtSelection,\n  MAX_CLIPBOARD_IMAGE_BYTES,\n} from "./clipboard-image";\nimport {\n  clearAllDraftSnapshots,\n  clearDraftSnapshot,\n  findDraftSnapshot,\n  loadDraftSnapshots,\n  saveDraftSnapshot,\n  type DraftSnapshot,\n  type DraftSaveResult,\n} from "./draft-recovery";\nimport {\n  canRedoEditorChange,\n  canUndoEditorChange,\n  createEditorHistory,\n  redoEditorChange,\n  recordEditorChange,\n  undoEditorChange,\n  type EditorHistoryState,\n} from "./editor-history";\nimport { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";\n\nfunction fileNameFromPath(path: string): string {\n  return path.split(/[\\/]/).pop() || path;\n}\n\nfunction duplicateEntryName(path: string, kind: "file" | "folder"): string {\n  const name = fileNameFromPath(path);\n  if (kind === "folder") return `${name} 副本`;\n  const extensionIndex = name.lastIndexOf(".");\n  if (extensionIndex > 0) return `${name.slice(0, extensionIndex)} 副本${name.slice(extensionIndex)}`;\n  return `${name} 副本`;\n}\n\nfunction focusEditorSurface(surface: Element | null): void {\n  if (!surface) return;\n  const target = surface.matches('textarea, [contenteditable="true"], .cm-content')\n    ? surface\n    : surface.querySelector<HTMLElement>('.cm-content, [contenteditable="true"], textarea');\n  if (target instanceof HTMLElement) target.focus();\n}\n\nasync function copyPlainText(text: string): Promise<void> {\n  if (navigator.clipboard?.writeText) {\n    await navigator.clipboard.writeText(text);\n    return;\n  }\n\n  const textarea = document.createElement("textarea");\n  textarea.value = text;\n  textarea.setAttribute("readonly", "true");\n  textarea.style.position = "fixed";\n  textarea.style.opacity = "0";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    if (!document.execCommand("copy")) throw new Error("当前环境不支持访问剪贴板。");\n  } finally {\n    textarea.remove();\n  }\n}\n\nconst LazyMarkdownWysiwygEditor = lazy(() =>\n  import("./components/MarkdownWysiwygEditor").then(({ MarkdownWysiwygEditor }) => ({\n    default: MarkdownWysiwygEditor,\n  })),\n);\n\nfunction fileTypeLabel(kind: DocumentKind): string {\n  return kind === "markdown" ? "MD" : kind === "image" ? "IMG" : kind.toUpperCase();\n}\n\nfunction startsWithHeading(html: string): boolean {\n  return /^\s*<h1(?:\s[^>]*)?>/i.test(html);\n}\n\nfunction comparablePath(path: string): string {\n  return normalizePathKey(path);\n}\n\nfunction pathBelongsToWorkspace(path: string, workspacePath: string): boolean {\n  const candidate = comparablePath(path);\n  const root = comparablePath(workspacePath);\n  return candidate === root || candidate.startsWith(`${root}\\`);\n}\n\nfunction resolveRelativePath(basePath: string, target: string): string | null {\n  if (basePath.startsWith("browser://")) return null;\n\n  const cleanTarget = target.split(/[?#]/, 1)[0].trim();\n  if (!cleanTarget) return null;\n\n  const normalizedTarget = cleanTarget.replace(/[\\/]+/g, "\\");\n  const isAbsolute = /^[A-Za-z]:\\/.test(normalizedTarget) || normalizedTarget.startsWith("\\\\");\n  const baseDirectory = basePath.replace(/[\\/][^\\/]*$/, "");\n  return isAbsolute ? normalizedTarget : `${baseDirectory}\\${normalizedTarget}`;\n}\n\nfunction resolveWikiPath(basePath: string, target: string): string | null {\n  const resolved = resolveRelativePath(basePath, target);\n  if (!resolved) return null;\n\n  return /\.[A-Za-z0-9]+$/.test(resolved) ? resolved : `${resolved}.md`;\n}\n\nfunction scrollToHeading(anchor: string, contentArea: HTMLElement | null, article: HTMLElement | null): void {\n  let attempts = 0;\n  const attempt = () => {\n    if (scrollHeadingInContainer(anchor, contentArea, article)) return;\n    if (attempts >= 4) return;\n    attempts += 1;\n    window.requestAnimationFrame(attempt);\n  };\n\n  window.requestAnimationFrame(() => {\n    window.requestAnimationFrame(attempt);\n  });\n}\n\nfunction safeDecode(value: string): string {\n  try {\n    return decodeURIComponent(value);\n  } catch {\n    return value;\n  }\n}\n\ntype CurrentHeading = {\n  id: string;\n  text: string;\n};\n\nfunction currentHeadingFromArticle(\n  article: HTMLElement | null,\n  contentArea: HTMLElement | null,\n): CurrentHeading | null {\n  if (!article) return null;\n\n  const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));\n  if (headings.length === 0) return null;\n\n  const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;\n  const isAtBottom = Boolean(contentArea && contentArea.scrollTop >= maxScrollTop - 2);\n  let currentHeading: HTMLElement | undefined;\n  if (isAtBottom) {\n    currentHeading = headings[headings.length - 1];\n  } else {\n    const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;\n    for (const heading of headings) {\n      if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;\n      else break;\n    }\n  }\n\n  const heading = currentHeading ?? headings[0];\n  const text = heading.textContent?.trim() ?? "";\n  return text ? { id: heading.id, text } : null;\n}\n\nfunction readSavedTheme(): ThemeMode {\n  try {\n    const saved = localStorage.getItem("moyang-reader-theme");\n    return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";\n  } catch {\n    return "system";\n  }\n}\n\nfunction downloadText(name: string, contents: string, mimeType = "text/markdown"): void {\n  const blob = new Blob([contents], { type: mimeType + ";charset=utf-8" });\n  const url = URL.createObjectURL(blob);\n  const anchor = document.createElement("a");\n  anchor.href = url;\n  anchor.download = name;\n  anchor.click();\n  URL.revokeObjectURL(url);\n}\n\nfunction downloadBytes(name: string, contents: Uint8Array, mimeType: string): void {\n  const buffer = contents.buffer.slice(contents.byteOffset, contents.byteOffset + contents.byteLength) as ArrayBuffer;\n  const blob = new Blob([buffer], { type: mimeType });\n  const url = URL.createObjectURL(blob);\n  const anchor = document.createElement("a");\n  anchor.href = url;\n  anchor.download = name;\n  anchor.click();\n  URL.revokeObjectURL(url);\n}\n\ntype BrowserDocument = {\n  kind: DocumentKind;\n  source?: string;\n  bytes?: Uint8Array;\n  previewUrl?: string;\n};\n\ntype PrintPreviewState = {\n  title: string;\n  html: string;\n  defaultPath?: string;\n  actionLabel?: string;\n  actionHint?: string;\n  paper: ExportPaper;\n  orientation: ExportOrientation;\n  margin: ExportMargin;\n};\n\ntype WorkspaceExportProgress = {\n  current: number;\n  total: number;\n  fileName: string;\n};\n\ntype PdfBatchExportState = {\n  files: WorkspaceFile[];\n  nextIndex: number;\n  volumeNumber: number;\n  exported: number;\n  skippedFiles: WorkspaceExportFailure[];\n  title: string;\n  options: {\n    paper: ExportPaper;\n    orientation: ExportOrientation;\n    margin: ExportMargin;\n  };\n};\n\ntype CachedWorkspace = {\n  path: string;\n  name: string;\n  files: WorkspaceFile[];\n  folders: WorkspaceDirectory[];\n  index: WorkspaceIndexEntry[];\n  revision: number;\n  selectedTag: string | null;\n  selectedFileKind: WorkspaceKindFilter;\n  searchQuery: string;\n  tabs: RecentFile[];\n  activeDocumentPath: string | null;\n};\n\ntype DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";\n\ntype PendingAppSettingsWrite = {\n  snapshot: AppSettingsSnapshot;\n  localSaved: boolean;\n};\n\nfunction updateCachedWorkspace(\n  cache: Map<string, CachedWorkspace>,\n  root: string,\n  changes: Partial<Omit<CachedWorkspace, "path">>,\n): void {\n  const key = comparablePath(root);\n  const current = cache.get(key);\n  if (!current) return;\n  cache.set(key, { ...current, ...changes });\n}\n\nfunction persistCachedWorkspaceSession(cache: Map<string, CachedWorkspace>, root: string): void {\n  const cached = cache.get(comparablePath(root));\n  if (!cached) return;\n  saveWorkspaceSession({\n    path: cached.path,\n    tabs: cached.tabs,\n    activeDocumentPath: cached.activeDocumentPath,\n  });\n}\n\nfunction pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: RecentWorkspace[]): void {\n  const mountedKeys = new Set(mounted.map((workspace) => comparablePath(workspace.path)));\n  for (const key of cache.keys()) {\n    if (!mountedKeys.has(key)) cache.delete(key);\n  }\n}\n\nexport function App() {\n  const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());\n  const [documentState, setDocumentState] = useState<OpenDocument | null>(null);\n  const [mode, setMode] = useState<ReaderMode>("rendered");\n  const [sourceDraft, setSourceDraft] = useState("");\n  const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));\n  const [loading, setLoading] = useState(false);\n  const [error, setError] = useState<string | null>(null);\n  const [searchOpen, setSearchOpen] = useState(false);\n  const [searchQuery, setSearchQuery] = useState("");\n  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");\n  const [searchResultCount, setSearchResultCount] = useState(0);\n  const [searchResultIndex, setSearchResultIndex] = useState(0);\n  const [theme, setTheme] = useState<ThemeMode>(() => storedAppSettings?.theme ?? readSavedTheme());\n  const [locale, setLocale] = useState<Locale>(() => storedAppSettings?.locale ?? loadLocale());\n  const [focusMode, setFocusMode] = useState(false);\n  const [sidebarCollapsed, setSidebarCollapsed] = useState(\n    () => storedAppSettings?.sidebarCollapsed ?? loadSidebarCollapsed(),\n  );\n  const [rightPanelOpen, setRightPanelOpen] = useState(\n    () => storedAppSettings?.rightPanelOpen ?? loadContextPanelOpen(),\n  );\n  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(\n    () => storedAppSettings?.activeContextTab ?? loadContextPanelTab(),\n  );\n  const [paneWidths, setPaneWidths] = useState(() => storedAppSettings?.paneWidths ?? loadPaneWidths());\n  const [preferences, setPreferences] = useState<ReaderPreferences>(\n    () => storedAppSettings?.preferences ?? loadReaderPreferences(),\n  );\n  const [workspacePath, setWorkspacePath] = useState<string | null>(null);\n  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);\n  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);\n  const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);\n  const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);\n  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);\n  const [mountedWorkspaces, setMountedWorkspaces] = useState<RecentWorkspace[]>(loadMountedWorkspaces);\n  const [workspaceQuery, setWorkspaceQuery] = useState("");\n  const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);\n  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);\n  const [workspaceExporting, setWorkspaceExporting] = useState(false);\n  const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);\n  const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);\n  const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);\n  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);\n  const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");\n  const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());\n  const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());\n  const [copyFeedback, setCopyFeedback] = useState(false);\n  const [currentVersion, setCurrentVersion] = useState<string | null>(null);\n  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");\n  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);\n  const [updateProgress, setUpdateProgress] = useState<number | null>(null);\n  const [updateError, setUpdateError] = useState<string | null>(null);\n  const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);\n  const updateRef = useRef<Update | null>(null);\n  const updateCheckInFlightRef = useRef(false);\n  const initialStartupUpdateCheckRef = useRef(preferences.startupUpdateCheck);\n  const workspaceExportAbortRef = useRef<AbortController | null>(null);\n  const pdfBatchExportRef = useRef<PdfBatchExportState | null>(null);\n  const [workspaceLoading, setWorkspaceLoading] = useState(false);\n  const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);\n  const [workspaceRevision, setWorkspaceRevision] = useState(0);\n  const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);\n  const [externalChangePath, setExternalChangePath] = useState<string | null>(null);\n  const [externalOverwriteConfirmationOpen, setExternalOverwriteConfirmationOpen] = useState(false);\n  const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);\n  const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);\n  const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);\n  const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);\n  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);\n  const [selectedTag, setSelectedTag] = useState<string | null>(null);\n  const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");\n  const [graphOpen, setGraphOpen] = useState(false);\n  const [quickOpen, setQuickOpen] = useState(false);\n  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);\n  const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);\n  const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);\n  const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);\n  const [readingProgress, setReadingProgress] = useState(0);\n  const [currentHeading, setCurrentHeading] = useState<string | null>(null);\n  const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);\n  const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);\n  const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);\n  const [tabSessionReady, setTabSessionReady] = useState(false);\n  const inputRef = useRef<HTMLInputElement>(null);\n  const contentAreaRef = useRef<HTMLElement>(null);\n  const articleRef = useRef<HTMLElement>(null);\n  const readingPositionRef = useRef<{ path: string; top: number } | null>(null);\n  const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());\n  const browserDocumentSequenceRef = useRef(0);\n  const previewUrlsRef = useRef(new Map<string, string>());\n  const documentStateRef = useRef<OpenDocument | null>(null);\n  const closeConfirmationOpenRef = useRef(false);\n  const sourceDraftRef = useRef(sourceDraft);\n  const editorHistoryRef = useRef(editorHistory);\n  const preferencesRef = useRef<ReaderPreferences>(preferences);\n  const workspacePathRef = useRef<string | null>(workspacePath);\n  const openTabsRef = useRef<RecentFile[]>(openTabs);\n  const readingZoomNoticeTimerRef = useRef<number | null>(null);\n  const workspaceRestorePendingRef = useRef(false);\n  const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());\n  const documentCacheRef = useRef(new DocumentCache());\n  const pendingWorkspaceMountsRef = useRef(new Set<string>());\n  const workspaceLoadRequestRef = useRef(0);\n  const workspaceRefreshRequestRef = useRef(0);\n  const workspaceReloadTimerRef = useRef<number | null>(null);\n  const pendingWorkspacePathsRef = useRef(new Set<string>());\n  const selfWritingPathsRef = useRef(new Set<string>());\n  const selfWrittenPathsRef = useRef(new Map<string, number>());\n  const sourceRenderRequestRef = useRef(0);\n  const pendingHeadingRef = useRef<string | null>(null);\n  const nativeSettingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());\n  const pendingAppSettingsWriteRef = useRef<PendingAppSettingsWrite | null>(null);\n  const appSettingsFlushTimerRef = useRef<number | null>(null);\n  const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));\n  const settingsWriteRevisionRef = useRef(0);\n  const settingsCloseInFlightRef = useRef(false);\n\n  const updateReadingRail = useCallback(() => {\n    const contentArea = contentAreaRef.current;\n    const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;\n    const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;\n    setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));\n    const heading = currentHeadingFromArticle(articleRef.current, contentArea);\n    setCurrentHeading((current) => (current === (heading?.text ?? null) ? current : (heading?.text ?? null)));\n    setCurrentHeadingId((current) => (current === (heading?.id || null) ? current : heading?.id || null));\n  }, []);\n\n  const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {\n    const contentArea = contentAreaRef.current;\n    if (!contentArea) return;\n    contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });\n  }, []);\n\n  const resizePane = useCallback((side: PaneSide, delta: number) => {\n    setPaneWidths((current) => {\n      const nextWidth = clampPaneWidth(side, current[side] + delta);\n      if (nextWidth === current[side]) return current;\n      return { ...current, [side]: nextWidth };\n    });\n  }, []);\n\n  const resetPane = useCallback((side: PaneSide) => {\n    setPaneWidths((current) => ({\n      ...current,\n      [side]: DEFAULT_PANE_WIDTHS[side],\n    }));\n  }, []);\n\n  const enqueueNativeSettingsWrite = useCallback((pending: PendingAppSettingsWrite): Promise<boolean> => {\n    const revision = ++settingsWriteRevisionRef.current;\n    const nativeWrite = nativeSettingsWriteQueueRef.current\n      .catch(() => undefined)\n      .then(() => writeAppSettings(serializeAppSettings(pending.snapshot)));\n    const result = nativeWrite.then(\n      () => {\n        if (revision === settingsWriteRevisionRef.current) {\n          setSettingsPersistenceStatus(pending.localSaved ? "saved" : "fallback");\n        }\n        return true;\n      },\n      () => {\n        if (revision === settingsWriteRevisionRef.current) {\n          setSettingsPersistenceStatus(pending.localSaved ? "fallback" : "error");\n        }\n        return false;\n      },\n    );\n    nativeSettingsWriteQueueRef.current = result.then(() => undefined);\n    lastNativeSettingsWriteRef.current = result;\n    return result;\n  }, []);\n\n  const flushAppSettings = useCallback(async (): Promise<boolean> => {\n    if (!isTauriRuntime()) return true;\n\n    const timer = appSettingsFlushTimerRef.current;\n    if (timer !== null) {\n      window.clearTimeout(timer);\n      appSettingsFlushTimerRef.current = null;\n    }\n\n    const pending = pendingAppSettingsWriteRef.current;\n    if (pending) {\n      pendingAppSettingsWriteRef.current = null;\n      return enqueueNativeSettingsWrite(pending);\n    }\n    return lastNativeSettingsWriteRef.current;\n  }, [enqueueNativeSettingsWrite]);\n\n  const navigateToHeading = useCallback(\n    (item: TocItem) => {\n      pendingHeadingRef.current = item.id;\n      if (mode !== "rendered") {\n        setMode("rendered");\n        return;\n      }\n      pendingHeadingRef.current = null;\n      scrollToHeading(item.id, contentAreaRef.current, articleRef.current);\n    },\n    [mode],\n  );\n\n  const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {\n    const next = { ...preferencesRef.current, ...changes };\n    preferencesRef.current = next;\n    saveReaderPreferences(next);\n    setPreferences(next);\n  }, []);\n\n  const announceReadingZoom = useCallback((zoom: number) => {\n    setReadingZoomNotice(zoom);\n    if (readingZoomNoticeTimerRef.current !== null) {\n      window.clearTimeout(readingZoomNoticeTimerRef.current);\n    }\n    readingZoomNoticeTimerRef.current = window.setTimeout(() => {\n      readingZoomNoticeTimerRef.current = null;\n      setReadingZoomNotice(null);\n    }, 1_200);\n  }, []);\n\n  const setReadingZoom = useCallback(\n    (value: number) => {\n      const nextZoom = normalizeReadingZoom(value);\n      setReaderPreferences({ readingZoom: nextZoom, readingScale: readingScaleFromZoom(nextZoom) });\n      announceReadingZoom(nextZoom);\n    },\n    [announceReadingZoom, setReaderPreferences],\n  );\n\n  const handleReaderWheel = useCallback(\n    (event: ReactWheelEvent<HTMLElement>) => {\n      if (!event.ctrlKey || event.altKey || mode !== "rendered") return;\n      const kind = documentStateRef.current?.kind;\n      if (!kind || kind === "pdf" || kind === "image") return;\n      const target = event.target instanceof Element ? event.target.closest(".reader-content") : null;\n      if (!target) return;\n\n      event.preventDefault();\n      setReadingZoom(preferencesRef.current.readingZoom + (event.deltaY < 0 ? READING_ZOOM_STEP : -READING_ZOOM_STEP));\n    },\n    [mode, setReadingZoom],\n  );\n\n  useEffect(\n    () => () => {\n      if (readingZoomNoticeTimerRef.current !== null) window.clearTimeout(readingZoomNoticeTimerRef.current);\n    },\n    [],\n  );\n\n  const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {\n    if (!result.ok) {\n      setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");\n      return false;\n    }\n\n    const snapshots = loadDraftSnapshots();\n    setDraftSnapshots(snapshots);\n    if (result.prunedCount > 0) {\n      setSettingsNotice(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`);\n    }\n    return true;\n  }, []);\n\n  const resetEditorHistory = useCallback((documentKey: string, source: string) => {\n    const nextHistory = createEditorHistory(documentKey, source);\n    editorHistoryRef.current = nextHistory;\n    setEditorHistory(nextHistory);\n  }, []);\n\n  const applyEditorHistoryState = useCallback((nextHistory: EditorHistoryState, focusTarget?: Element | null) => {\n    const activeEditor =\n      focusTarget?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??\n      (typeof document !== "undefined"\n        ? (document.activeElement?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??\n          document.querySelector<HTMLElement>(".source-editor, .wysiwyg-editor"))\n        : null);\n    const viewport = captureEditorViewport(contentAreaRef.current, activeEditor);\n    const historyDocumentKey = nextHistory.documentKey;\n    editorHistoryRef.current = nextHistory;\n    setEditorHistory(nextHistory);\n    sourceDraftRef.current = nextHistory.present;\n    setSourceDraft(nextHistory.present);\n    setDocumentState((current) =>\n      current && isSameDocumentPath(current.path, nextHistory.documentKey)\n        ? { ...current, modified: nextHistory.present !== current.source }\n        : current,\n    );\n    const restoreViewport = () => {\n      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;\n      restoreEditorViewport(viewport);\n    };\n    window.requestAnimationFrame(() => {\n      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;\n      if (activeEditor) focusEditorSurface(activeEditor);\n      restoreViewport();\n      // Milkdown may rebuild its ProseMirror state in a passive effect after\n      // the first frame; restore once more after that DOM update.\n      window.requestAnimationFrame(() => {\n        restoreViewport();\n      });\n    });\n  }, []);\n\n  const undoEditor = useCallback(\n    (focusTarget?: Element | null) => {\n      const current = documentStateRef.current;\n      const history = editorHistoryRef.current;\n      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))\n        return;\n\n      const nextHistory = undoEditorChange(history);\n      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);\n    },\n    [applyEditorHistoryState],\n  );\n\n  const redoEditor = useCallback(\n    (focusTarget?: Element | null) => {\n      const current = documentStateRef.current;\n      const history = editorHistoryRef.current;\n      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))\n        return;\n\n      const nextHistory = redoEditorChange(history);\n      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);\n    },\n    [applyEditorHistoryState],\n  );\n\n  const flushCurrentDraft = useCallback((): DraftFlushOutcome => {\n    const current = documentStateRef.current;\n    if (!current?.modified || !isEditableDocument(current.kind)) return "not-needed";\n    if (current.path.startsWith("browser://")) return "unavailable";\n\n    const result = saveDraftSnapshot({\n      path: current.path,\n      draft: sourceDraftRef.current,\n      baseSource: current.source,\n      savedAt: Date.now(),\n    });\n    return handleDraftSaveResult(result) ? "saved" : "failed";\n  }, [handleDraftSaveResult]);\n\n  const confirmDocumentReplacement = useCallback(\n    (nextPaths: readonly string[], action: string) => {\n      if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;\n      const outcome = flushCurrentDraft();\n      if (outcome === "failed") return false;\n      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));\n    },\n    [flushCurrentDraft],\n  );\n\n  const confirmWorkspaceSwitch = useCallback(\n    (nextWorkspacePath: string, action: string) => {\n      const currentDocument = documentStateRef.current;\n      if (\n        !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)\n      ) {\n        return true;\n      }\n      const outcome = flushCurrentDraft();\n      if (outcome === "failed") return false;\n      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));\n    },\n    [flushCurrentDraft],\n  );\n\n  const cancelCloseConfirmation = useCallback(() => {\n    closeConfirmationOpenRef.current = false;\n    settingsCloseInFlightRef.current = false;\n    setCloseConfirmationOpen(false);\n  }, []);\n\n  const confirmClose = useCallback(() => {\n    closeConfirmationOpenRef.current = false;\n    setCloseConfirmationOpen(false);\n    settingsCloseInFlightRef.current = true;\n    void (async () => {\n      try {\n        if (!(await flushAppSettings())) {\n          setError("设置尚未成功写入本机，请稍后重试关闭窗口。");\n          return;\n        }\n        await closeWindow();\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "关闭窗口失败。");\n      } finally {\n        settingsCloseInFlightRef.current = false;\n      }\n    })();\n  }, [flushAppSettings]);\n\n  const exportPortableSettings = useCallback(async () => {\n    try {\n      const serialized = serializePortableSettings(\n        createPortableSettingsBundle({\n          preferences,\n          locale,\n          theme,\n          workspacePath,\n          lastDocumentPath: loadLastDocumentPath(),\n          mountedWorkspaces,\n          workspaceSessions: loadWorkspaceSessions(),\n          openTabs,\n        }),\n      );\n      if (isTauriRuntime()) {\n        const targetPath = await chooseSavePath("Moyang Reader - settings.json", "json");\n        if (!targetPath) return;\n        await writeTextFile(targetPath, serialized);\n        setSettingsNotice(`设置备份已保存：${fileNameFromPath(targetPath)}`);\n      } else {\n        downloadText("Moyang Reader - settings.json", serialized, "application/json");\n        setSettingsNotice("设置备份已下载，不包含文档正文或私钥。");\n      }\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "设置备份导出失败。");\n    }\n  }, [locale, mountedWorkspaces, openTabs, preferences, theme, workspacePath]);\n\n  const importPortableSettings = useCallback(() => {\n    const input = document.createElement("input");\n    input.type = "file";\n    input.accept = ".json,application/json";\n    input.onchange = () => {\n      const file = input.files?.[0];\n      if (!file) return;\n\n      void file\n        .text()\n        .then((serialized) => {\n          const bundle = parsePortableSettings(serialized);\n          saveReaderPreferences(bundle.preferences);\n          saveWorkspaceSessions([...bundle.workspaceSessions]);\n          saveOpenTabs([...bundle.openTabs]);\n          saveMountedWorkspaces([...bundle.mountedWorkspaces]);\n          saveWorkspacePath(bundle.workspacePath);\n          saveLastDocumentPath(bundle.lastDocumentPath);\n          preferencesRef.current = bundle.preferences;\n          setPreferences(bundle.preferences);\n          setLocale(bundle.locale);\n          saveLocale(bundle.locale);\n          setTheme(bundle.theme);\n          setMountedWorkspaces([...bundle.mountedWorkspaces]);\n          setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");\n        })\n        .catch((cause: unknown) => {\n          setError(cause instanceof Error ? cause.message : "设置备份导入失败。");\n        });\n    };\n    input.click();\n  }, []);\n\n  useEffect(() => {\n    documentStateRef.current = documentState;\n  }, [documentState]);\n\n  useEffect(() => {\n    sourceDraftRef.current = sourceDraft;\n  }, [sourceDraft]);\n\n  useEffect(() => {\n    preferencesRef.current = preferences;\n  }, [preferences]);\n\n  useEffect(() => {\n    if (!isTauriRuntime()) return;\n\n    let active = true;\n    void readAppSettings()\n      .then((serialized) => {\n        if (!active) return;\n        const nativeSnapshot = serialized ? parseAppSettings(serialized) : null;\n        if (nativeSnapshot && (!storedAppSettings || nativeSnapshot.savedAt > storedAppSettings.savedAt)) {\n          preferencesRef.current = nativeSnapshot.preferences;\n          setPreferences(nativeSnapshot.preferences);\n          setTheme(nativeSnapshot.theme);\n          setLocale(nativeSnapshot.locale);\n          setSidebarCollapsed(nativeSnapshot.sidebarCollapsed);\n          setRightPanelOpen(nativeSnapshot.rightPanelOpen);\n          setActiveContextTab(nativeSnapshot.activeContextTab);\n          setPaneWidths(nativeSnapshot.paneWidths);\n        }\n        setNativeSettingsReady(true);\n      })\n      .catch(() => {\n        // Older installations may not have a native settings file yet. Legacy local storage remains usable.\n        if (active) setNativeSettingsReady(true);\n      });\n\n    return () => {\n      active = false;\n    };\n  }, [storedAppSettings]);\n\n  useEffect(() => {\n    if (!nativeSettingsReady) return;\n\n    const snapshot = createAppSettingsSnapshot({\n      preferences,\n      theme,\n      locale,\n      sidebarCollapsed,\n      rightPanelOpen,\n      activeContextTab,\n      paneWidths,\n    });\n    const localResult = saveAppSettingsSnapshot(\n      {\n        preferences,\n        theme,\n        locale,\n        sidebarCollapsed,\n        rightPanelOpen,\n        activeContextTab,\n        paneWidths,\n      },\n      snapshot.savedAt,\n    );\n\n    if (!isTauriRuntime()) {\n      setSettingsPersistenceStatus(localResult.ok ? "saved" : "error");\n      return;\n    }\n\n    pendingAppSettingsWriteRef.current = { snapshot, localSaved: localResult.ok };\n    const timer = window.setTimeout(\n      () => {\n        appSettingsFlushTimerRef.current = null;\n        const pending = pendingAppSettingsWriteRef.current;\n        pendingAppSettingsWriteRef.current = null;\n        if (pending) void enqueueNativeSettingsWrite(pending);\n      },\n      localResult.ok ? 220 : 0,\n    );\n    appSettingsFlushTimerRef.current = timer;\n    setSettingsPersistenceStatus("saving");\n\n    return () => {\n      window.clearTimeout(timer);\n      if (appSettingsFlushTimerRef.current === timer) appSettingsFlushTimerRef.current = null;\n    };\n  }, [\n    activeContextTab,\n    enqueueNativeSettingsWrite,\n    locale,\n    nativeSettingsReady,\n    paneWidths,\n    preferences,\n    rightPanelOpen,\n    sidebarCollapsed,\n    theme,\n  ]);\n\n  useEffect(() => {\n    documentCacheRef.current.clear();\n  }, [preferences.allowRemoteResources]);\n\n  useEffect(() => {\n    if (!settingsNotice) return;\n    const timer = window.setTimeout(() => setSettingsNotice(null), 6000);\n    return () => window.clearTimeout(timer);\n  }, [settingsNotice]);\n\n  useEffect(() => {\n    if (tabSessionReady) saveOpenTabs(openTabs);\n  }, [openTabs, tabSessionReady]);\n\n  useEffect(() => {\n    saveSidebarCollapsed(sidebarCollapsed);\n  }, [sidebarCollapsed]);\n\n  useEffect(() => {\n    saveContextPanelOpen(rightPanelOpen);\n  }, [rightPanelOpen]);\n\n  useEffect(() => {\n    saveContextPanelTab(activeContextTab);\n  }, [activeContextTab]);\n\n  useEffect(() => {\n    savePaneWidths(paneWidths);\n  }, [paneWidths]);\n\n  useEffect(() => {\n    setWorkspaceExportFailures([]);\n    setWorkspaceExportNotice(null);\n  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);\n\n  useEffect(() => {\n    const path = documentState?.path;\n    if (!path || path.startsWith("browser://") || mode !== "rendered") return;\n\n    let frame: number | null = null;\n    let attempts = 0;\n    const maxRestoreAttempts = 60;\n    const retryRestore = () => {\n      if (attempts >= maxRestoreAttempts) return;\n      attempts += 1;\n      frame = window.requestAnimationFrame(() => {\n        frame = null;\n        restorePosition();\n      });\n    };\n    const restorePosition = () => {\n      const contentArea = contentAreaRef.current;\n      if (!contentArea) return;\n      const storedTop = loadReadingPosition(path);\n      const maxScrollTop = Math.max(0, contentArea.scrollHeight - contentArea.clientHeight);\n      if (storedTop > 0 && maxScrollTop === 0) {\n        retryRestore();\n        return;\n      }\n      contentArea.scrollTop = Math.min(storedTop, maxScrollTop);\n      readingPositionRef.current = { path, top: contentArea.scrollTop };\n      if (storedTop > 0 && contentArea.scrollTop === 0) retryRestore();\n    };\n    const timer = window.setTimeout(restorePosition, 0);\n    return () => {\n      window.clearTimeout(timer);\n      if (frame !== null) window.cancelAnimationFrame(frame);\n    };\n  }, [documentState?.path, documentState?.rendered.html, mode]);\n\n  useEffect(() => {\n    const path = documentState?.path;\n    const contentArea = contentAreaRef.current;\n    if (!path || path.startsWith("browser://") || !contentArea) return;\n\n    let timer: number | null = null;\n    const initialTop =\n      readingPositionRef.current?.path === path ? readingPositionRef.current.top : contentArea.scrollTop;\n    const tracker = createReadingPositionTracker(path, initialTop, (trackedPath, top) => {\n      readingPositionRef.current = { path: trackedPath, top };\n      saveReadingPosition(trackedPath, top);\n    });\n    const persistPosition = () => {\n      const top = contentArea.scrollTop;\n      tracker.update(top);\n      readingPositionRef.current = { path, top: tracker.current() };\n      if (timer !== null) window.clearTimeout(timer);\n      timer = window.setTimeout(() => {\n        timer = null;\n        tracker.flush();\n      }, 180);\n    };\n\n    contentArea.addEventListener("scroll", persistPosition, { passive: true });\n    return () => {\n      contentArea.removeEventListener("scroll", persistPosition);\n      if (timer !== null) window.clearTimeout(timer);\n      const latestKnownTop =\n        readingPositionRef.current?.path === path ? readingPositionRef.current.top : tracker.current();\n      tracker.update(latestKnownTop);\n      tracker.flush();\n    };\n  }, [documentState?.path]);\n\n  useEffect(() => {\n    const contentArea = contentAreaRef.current;\n    if (!contentArea) return;\n\n    let frame: number | null = null;\n    const update = () => {\n      if (frame !== null) return;\n      frame = window.requestAnimationFrame(() => {\n        frame = null;\n        updateReadingRail();\n      });\n    };\n\n    contentArea.addEventListener("scroll", update, { passive: true });\n    updateReadingRail();\n    return () => {\n      contentArea.removeEventListener("scroll", update);\n      if (frame !== null) window.cancelAnimationFrame(frame);\n    };\n  }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);\n\n  useEffect(() => {\n    if (mode !== "rendered") return;\n    const pendingHeading = pendingHeadingRef.current;\n    if (!pendingHeading) return;\n\n    pendingHeadingRef.current = null;\n    scrollToHeading(pendingHeading, contentAreaRef.current, articleRef.current);\n  }, [documentState?.path, documentState?.rendered.html, mode]);\n\n  useEffect(() => {\n    if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;\n    setReadingProgress(0);\n    setCurrentHeading(null);\n    setCurrentHeadingId(null);\n  }, [documentState, mode]);\n\n  useEffect(() => {\n    const handleBeforeUnload = (event: BeforeUnloadEvent) => {\n      const current = documentStateRef.current;\n      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {\n        const result = saveDraftSnapshot({\n          path: current.path,\n          draft: sourceDraftRef.current,\n          baseSource: current.source,\n          savedAt: Date.now(),\n        });\n        handleDraftSaveResult(result);\n      }\n      if (isTauriRuntime() || !documentStateRef.current?.modified) return;\n      event.preventDefault();\n      event.returnValue = "";\n    };\n    window.addEventListener("beforeunload", handleBeforeUnload);\n    return () => window.removeEventListener("beforeunload", handleBeforeUnload);\n  }, [handleDraftSaveResult]);\n\n  useEffect(() => {\n    if (!isTauriRuntime()) return;\n\n    let active = true;\n    let unlisten: (() => void) | null = null;\n    const handleCloseRequest = () => {\n      if (closeConfirmationOpenRef.current || settingsCloseInFlightRef.current) return;\n      const current = documentStateRef.current;\n      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {\n        const result = saveDraftSnapshot({\n          path: current.path,\n          draft: sourceDraftRef.current,\n          baseSource: current.source,\n          savedAt: Date.now(),\n        });\n        if (!handleDraftSaveResult(result)) return;\n      }\n      if (current?.modified) {\n        closeConfirmationOpenRef.current = true;\n        setCloseConfirmationOpen(true);\n        return;\n      }\n      settingsCloseInFlightRef.current = true;\n      void (async () => {\n        try {\n          if (!(await flushAppSettings())) {\n            if (active) setError("设置尚未成功写入本机，请稍后重试关闭窗口。");\n            return;\n          }\n          await closeWindow();\n        } catch (cause) {\n          if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");\n        } finally {\n          settingsCloseInFlightRef.current = false;\n        }\n      })();\n    };\n\n    void subscribeToCloseRequest(handleCloseRequest).then((dispose) => {\n      if (!active) {\n        dispose?.();\n        return;\n      }\n      unlisten = dispose;\n    });\n\n    return () => {\n      active = false;\n      unlisten?.();\n    };\n  }, [flushAppSettings, handleDraftSaveResult]);\n\n  useEffect(() => {\n    workspacePathRef.current = workspacePath;\n  }, [workspacePath]);\n\n  useEffect(() => {\n    openTabsRef.current = openTabs;\n  }, [openTabs]);\n\n  useEffect(() => {\n    if (!workspacePath) return;\n    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {\n      selectedTag,\n      selectedFileKind,\n      searchQuery: workspaceQuery,\n    });\n  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);\n\n  useEffect(() => {\n    if (!workspacePath) return;\n    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {\n      tabs: openTabsRef.current.filter(\n        (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, workspacePath),\n      ),\n    });\n  }, [openTabs, workspacePath]);\n\n  useEffect(() => {\n    if (!workspacePath || !documentState?.path || !pathBelongsToWorkspace(documentState.path, workspacePath)) return;\n    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {\n      activeDocumentPath: documentState.path,\n    });\n  }, [documentState?.path, workspacePath]);\n\n  useEffect(() => {\n    if (!workspacePath) return;\n    persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);\n  }, [documentState?.path, openTabs, workspacePath]);\n\n  useEffect(\n    () => () => {\n      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));\n      previewUrlsRef.current.clear();\n      browserDocumentsRef.current.clear();\n      documentCacheRef.current.clear();\n    },\n    [],\n  );\n\n  const releaseDocumentResources = useCallback((path: string) => {\n    documentCacheRef.current.remove(path);\n    const cached = browserDocumentsRef.current.get(path);\n    const previewUrl = previewUrlsRef.current.get(path) ?? cached?.previewUrl;\n    if (previewUrl) {\n      URL.revokeObjectURL(previewUrl);\n      previewUrlsRef.current.delete(path);\n    }\n    browserDocumentsRef.current.delete(path);\n  }, []);\n\n  const closePendingUpdate = useCallback(async () => {\n    const pending = updateRef.current;\n    updateRef.current = null;\n    setAvailableUpdate(null);\n    if (pending) await pending.close().catch(() => undefined);\n  }, []);\n\n  const checkForUpdates = useCallback(\n    async (manual = true) => {\n      if (!isTauriRuntime()) {\n        if (manual) {\n          setUpdateStatus("error");\n          setUpdateError("浏览器预览模式不支持应用更新。");\n          setUpdateNoticeVisible(true);\n        }\n        return;\n      }\n\n      if (updateCheckInFlightRef.current) return;\n      updateCheckInFlightRef.current = true;\n      setUpdateStatus("checking");\n      setUpdateError(null);\n      setUpdateProgress(null);\n      if (manual) setUpdateNoticeVisible(false);\n\n      try {\n        const version = await getCurrentAppVersion();\n        if (version) setCurrentVersion(version);\n        await closePendingUpdate();\n\n        const found = await checkForAppUpdate();\n        if (!found) {\n          setUpdateStatus(manual ? "up-to-date" : "idle");\n          setUpdateNoticeVisible(manual);\n          return;\n        }\n\n        updateRef.current = found;\n        setAvailableUpdate(found);\n        setUpdateStatus("available");\n        setUpdateNoticeVisible(true);\n      } catch (cause) {\n        if (manual) {\n          setUpdateStatus("error");\n          setUpdateError(describeUpdateError(cause));\n          setUpdateNoticeVisible(true);\n        } else {\n          setUpdateStatus("idle");\n          setUpdateError(null);\n          setUpdateNoticeVisible(false);\n        }\n      } finally {\n        updateCheckInFlightRef.current = false;\n      }\n    },\n    [closePendingUpdate],\n  );\n\n  const installUpdate = useCallback(async () => {\n    const pending = updateRef.current;\n    if (!pending) return;\n\n    setUpdateStatus("downloading");\n    setUpdateNoticeVisible(true);\n    setUpdateError(null);\n    setUpdateProgress(0);\n\n    let downloaded = 0;\n    let contentLength: number | undefined;\n    try {\n      await installAppUpdate(pending, (event) => {\n        if (event.event === "Started") {\n          contentLength = event.data.contentLength;\n          setUpdateProgress(contentLength ? 0 : null);\n        } else if (event.event === "Progress") {\n          downloaded += event.data.chunkLength;\n          if (contentLength) {\n            setUpdateProgress(Math.min(1, downloaded / contentLength));\n          }\n        } else {\n          setUpdateProgress(1);\n        }\n      });\n\n      updateRef.current = null;\n      setAvailableUpdate(null);\n      await pending.close().catch(() => undefined);\n      setUpdateStatus("ready");\n      try {\n        await relaunchApp();\n      } catch {\n        setUpdateError("更新已安装，但应用没有自动重启，请点击“重启应用”。");\n      }\n    } catch (cause) {\n      setUpdateStatus("error");\n      const reason = describeUpdateError(cause);\n      const recovery = {\n        attemptedVersion: pending.version,\n        currentVersion,\n        failedAt: Date.now(),\n        reason,\n      };\n      saveUpdateRecovery(recovery);\n      setUpdateError(reason);\n      setUpdateNoticeVisible(true);\n    }\n  }, [currentVersion]);\n\n  const relaunchUpdatedApp = useCallback(async () => {\n    try {\n      await relaunchApp();\n    } catch (cause) {\n      setUpdateStatus("error");\n      setUpdateError(describeUpdateError(cause));\n      setUpdateNoticeVisible(true);\n    }\n  }, []);\n\n  const dismissUpdateNotice = useCallback(() => {\n    setUpdateNoticeVisible(false);\n    void closePendingUpdate();\n  }, [closePendingUpdate]);\n\n  useEffect(\n    () => () => {\n      const pending = updateRef.current;\n      updateRef.current = null;\n      if (pending) void pending.close().catch(() => undefined);\n    },\n    [],\n  );\n\n  useEffect(() => {\n    if (!isTauriRuntime()) return;\n\n    let active = true;\n    void getCurrentAppVersion()\n      .then((version) => {\n        if (!active || !version) return;\n        setCurrentVersion(version);\n        const recovery = loadUpdateRecovery();\n        if (!recovery) return;\n        if (recovery.attemptedVersion.replace(/^v/i, "") === version.replace(/^v/i, "")) {\n          clearUpdateRecovery();\n          return;\n        }\n        setUpdateStatus("error");\n        setUpdateError(formatUpdateRecoveryNotice(recovery));\n        setUpdateNoticeVisible(true);\n      })\n      .catch(() => undefined);\n\n    const timer = initialStartupUpdateCheckRef.current\n      ? window.setTimeout(() => {\n          if (active) void checkForUpdates(false);\n        }, 1_200)\n      : null;\n\n    return () => {\n      active = false;\n      if (timer !== null) window.clearTimeout(timer);\n    };\n  }, [checkForUpdates]);\n\n  const refreshWorkspaceChanges = useCallback(async (root: string, paths: string[]) => {\n    if (!isTauriRuntime() || paths.length === 0) return;\n\n    const requestId = ++workspaceRefreshRequestRef.current;\n    setWorkspaceIndexLoading(true);\n    try {\n      const delta = await refreshWorkspace(root, paths);\n      if (\n        requestId !== workspaceRefreshRequestRef.current ||\n        comparablePath(workspacePathRef.current ?? "") !== comparablePath(root)\n      ) {\n        return;\n      }\n      setWorkspaceFiles((current) => {\n        const next = applyWorkspaceFileDelta(current, delta);\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });\n        return next;\n      });\n      setWorkspaceFolders((current) => {\n        const next = applyWorkspaceFolderDelta(current, delta);\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });\n        return next;\n      });\n      setWorkspaceIndex((current) => {\n        const next = applyWorkspaceIndexDelta(current, delta);\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });\n        return next;\n      });\n      setWorkspaceRevision((current) => {\n        const next = current + 1;\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });\n        return next;\n      });\n    } catch {\n      if (requestId === workspaceRefreshRequestRef.current) {\n        setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");\n      }\n    } finally {\n      if (requestId === workspaceRefreshRequestRef.current) setWorkspaceIndexLoading(false);\n    }\n  }, []);\n\n  const loadWorkspace = useCallback(async (root: string, silent = false) => {\n    if (!isTauriRuntime()) return;\n\n    const mounted = loadMountedWorkspaces();\n    const rootKey = comparablePath(root);\n    const alreadyMounted = mounted.some((workspace) => comparablePath(workspace.path) === rootKey);\n    const alreadyPending = pendingWorkspaceMountsRef.current.has(rootKey);\n    if (\n      !alreadyMounted &&\n      !alreadyPending &&\n      mounted.length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES\n    ) {\n      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);\n      return;\n    }\n    const ownsPendingMount = !alreadyMounted && !alreadyPending;\n    if (ownsPendingMount) pendingWorkspaceMountsRef.current.add(rootKey);\n\n    const previousWorkspacePath = workspacePathRef.current;\n    const storedSession = loadWorkspaceSessions().find(\n      (session) => comparablePath(session.path) === comparablePath(root),\n    );\n    const switchedWorkspace =\n      comparablePath(previousWorkspacePath ?? "") !== comparablePath(root) && Boolean(previousWorkspacePath);\n    if (switchedWorkspace || (storedSession && !previousWorkspacePath)) {\n      workspaceRestorePendingRef.current = true;\n    }\n    if (switchedWorkspace && previousWorkspacePath) {\n      const currentDocument = documentStateRef.current;\n      updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {\n        tabs: openTabsRef.current.filter(\n          (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, previousWorkspacePath),\n        ),\n        activeDocumentPath:\n          currentDocument && pathBelongsToWorkspace(currentDocument.path, previousWorkspacePath)\n            ? currentDocument.path\n            : null,\n      });\n      persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, previousWorkspacePath);\n    }\n\n    const requestId = ++workspaceLoadRequestRef.current;\n    workspaceRefreshRequestRef.current += 1;\n    setWorkspaceLoading(true);\n    setWorkspaceIndexLoading(true);\n    try {\n      const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));\n      if (cached) {\n        const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(cached.path);\n        workspacePathRef.current = cached.path;\n        setWorkspacePath(cached.path);\n        setWorkspaceFiles(cached.files);\n        setWorkspaceFolders(cached.folders);\n        setWorkspaceIndex(cached.index);\n        setWorkspaceRevision(cached.revision);\n        setWorkspaceQuery(cached.searchQuery);\n        setSelectedTag(cached.selectedTag);\n        setSelectedFileKind(cached.selectedFileKind);\n        if (switchedWorkspace) {\n          setWorkspaceResults([]);\n          setOpenTabs(cached.tabs ?? []);\n        }\n        saveWorkspacePath(cached.path);\n        setRecentWorkspaces(\n          rememberRecentWorkspace({\n            path: cached.path,\n            name: cached.name,\n          }),\n        );\n        const nextMountedWorkspaces = rememberMountedWorkspace({\n          path: cached.path,\n          name: cached.name,\n        });\n        pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);\n        setMountedWorkspaces(nextMountedWorkspaces);\n        if (!silent) setError(null);\n        setWorkspaceLoading(false);\n\n        void (async () => {\n          try {\n            const [files, folders] = await Promise.all([\n              listWorkspaceFiles(cached.path),\n              listWorkspaceDirectories(cached.path),\n            ]);\n            if (\n              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)\n            ) {\n              return;\n            }\n            setWorkspaceFiles(files);\n            setWorkspaceFolders(folders);\n            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files, folders });\n            setWorkspaceRevision((current) => {\n              const next = current + 1;\n              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });\n              return next;\n            });\n            const index = await indexWorkspace(cached.path);\n            if (\n              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)\n            ) {\n              return;\n            }\n            setWorkspaceIndex(index);\n            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index });\n          } catch (cause) {\n            if (requestId === workspaceLoadRequestRef.current && !silent) {\n              setError(cause instanceof Error ? cause.message : "工作区刷新失败。");\n            }\n          } finally {\n            if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);\n          }\n        })();\n        return;\n      }\n\n      const [files, folders] = await Promise.all([listWorkspaceFiles(root), listWorkspaceDirectories(root)]);\n      if (requestId !== workspaceLoadRequestRef.current) return;\n\n      const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);\n      const workspaceRecord = {\n        path: root,\n        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,\n      };\n      mountedWorkspaceCacheRef.current.set(comparablePath(root), {\n        ...workspaceRecord,\n        files,\n        folders,\n        index: [],\n        revision: 0,\n        selectedTag: null,\n        selectedFileKind: "all",\n        searchQuery: "",\n        tabs: storedSession?.tabs ?? [],\n        activeDocumentPath: storedSession?.activeDocumentPath ?? null,\n      });\n      workspacePathRef.current = root;\n      setWorkspacePath(root);\n      setWorkspaceFiles(files);\n      setWorkspaceFolders(folders);\n      if (switchedWorkspace || !previousWorkspacePath) {\n        setWorkspaceIndex([]);\n        setWorkspaceResults([]);\n        setWorkspaceQuery("");\n        setSelectedTag(null);\n        setSelectedFileKind("all");\n        setOpenTabs(storedSession?.tabs ?? []);\n      }\n      setWorkspaceRevision((current) => {\n        const next = current + 1;\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });\n        return next;\n      });\n      saveWorkspacePath(root);\n      setRecentWorkspaces(rememberRecentWorkspace(workspaceRecord));\n      const nextMountedWorkspaces = rememberMountedWorkspace(workspaceRecord);\n      pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);\n      setMountedWorkspaces(nextMountedWorkspaces);\n      if (!silent) setError(null);\n      setWorkspaceLoading(false);\n\n      void indexWorkspace(root)\n        .then((index) => {\n          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))\n            return;\n          setWorkspaceIndex(index);\n          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index });\n        })\n        .catch((cause) => {\n          if (requestId !== workspaceLoadRequestRef.current) return;\n          setWorkspaceIndex([]);\n          if (!silent) {\n            setError(cause instanceof Error ? cause.message : "工作区索引失败。");\n          }\n        })\n        .finally(() => {\n          if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);\n        });\n    } catch (cause) {\n      if (requestId !== workspaceLoadRequestRef.current) return;\n      setWorkspaceLoading(false);\n      setWorkspaceIndexLoading(false);\n      if (silent) {\n        setWorkspacePath(null);\n        workspacePathRef.current = null;\n        setWorkspaceFiles([]);\n        setWorkspaceFolders([]);\n        setWorkspaceIndex([]);\n        saveWorkspacePath(null);\n        mountedWorkspaceCacheRef.current.delete(comparablePath(root));\n        forgetWorkspaceSession(root);\n        setMountedWorkspaces((current) => {\n          const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(root));\n          saveMountedWorkspaces(next);\n          return next;\n        });\n      } else {\n        setError(cause instanceof Error ? cause.message : "工作区读取失败。");\n      }\n    } finally {\n      if (ownsPendingMount) pendingWorkspaceMountsRef.current.delete(rootKey);\n    }\n  }, []);\n\n  const handleChooseWorkspace = useCallback(async () => {\n    if (loadMountedWorkspaces().length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES) {\n      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);\n      return;\n    }\n    const selected = await chooseWorkspacePath();\n    if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {\n      await loadWorkspace(selected);\n    }\n  }, [confirmWorkspaceSwitch, loadWorkspace]);\n\n  const handleOpenRecentWorkspace = useCallback(\n    async (path: string) => {\n      try {\n        const authorizedPath = await authorizeStoredPath(path, true);\n        if (!confirmWorkspaceSwitch(authorizedPath, "切换阅读库")) {\n          return;\n        }\n        await loadWorkspace(authorizedPath);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "最近阅读库无法打开，请重新选择文件夹。");\n      }\n    },\n    [confirmWorkspaceSwitch, loadWorkspace],\n  );\n\n  const handleRemoveMountedWorkspace = useCallback((path: string) => {\n    if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;\n    mountedWorkspaceCacheRef.current.delete(comparablePath(path));\n    documentCacheRef.current.invalidate([path]);\n    forgetWorkspaceSession(path);\n    setMountedWorkspaces((current) => {\n      const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));\n      saveMountedWorkspaces(next);\n      return next;\n    });\n  }, []);\n\n  const openSource = useCallback(\n    async (\n      path: string,\n      source: string,\n      preserveMode = false,\n      stamp?: FileStamp,\n      renderedOverride?: OpenDocument["rendered"],\n    ): Promise<boolean> => {\n      setLoading(true);\n      setError(null);\n\n      try {\n        const kind = documentKindFromPath(path);\n        if (!kind || (kind !== "markdown" && kind !== "text")) {\n          throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");\n        }\n        const editorSafety = kind === "markdown" ? checkMarkdownEditorSafety(source) : { safe: false };\n        const rendered =\n          renderedOverride ??\n          (await renderSource(path, source, {\n            allowRemoteResources: preferencesRef.current.allowRemoteResources,\n          }));\n        releaseDocumentResources(path);\n        if (path.startsWith("browser://")) {\n          browserDocumentsRef.current.set(path, { kind, source });\n        }\n        setDocumentState({\n          path,\n          name: fileNameFromPath(path),\n          kind,\n          source,\n          rendered,\n          modified: false,\n          externallyModified: false,\n        });\n        setExternalChangePath(null);\n        setSourceDraft(source);\n        sourceDraftRef.current = source;\n        resetEditorHistory(path, source);\n        setDraftRecovery(findDraftSnapshot(path, source));\n        setDraftSnapshots(loadDraftSnapshots());\n        setOpenTabs((current) =>\n          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],\n        );\n        if (!path.startsWith("browser://")) {\n          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));\n          saveLastDocumentPath(path);\n        }\n        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe));\n        if (kind === "markdown" && !editorSafety.safe) {\n          setSettingsNotice(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`);\n        }\n        if (stamp && !path.startsWith("browser://")) {\n          documentCacheRef.current.set({\n            path,\n            name: fileNameFromPath(path),\n            kind,\n            source,\n            rendered,\n            stamp,\n          });\n        }\n        return true;\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "文档渲染失败。");\n        return false;\n      } finally {\n        setLoading(false);\n      }\n    },\n    [releaseDocumentResources, resetEditorHistory],\n  );\n\n  const openBinary = useCallback(\n    async (\n      path: string,\n      bytes: Uint8Array,\n      preserveMode = false,\n      stamp?: FileStamp,\n      renderedOverride?: OpenDocument["rendered"],\n    ): Promise<boolean> => {\n      const kind = documentKindFromPath(path);\n      if (kind !== "docx" && kind !== "pdf" && kind !== "image") {\n        throw new Error("当前文件不是可预览的文档。");\n      }\n\n      setLoading(true);\n      setError(null);\n\n      try {\n        const rendered =\n          renderedOverride ??\n          (kind === "docx"\n            ? await renderDocx(bytes, { allowRemoteResources: preferencesRef.current.allowRemoteResources })\n            : emptyRenderedDocument());\n        let previewUrl: string | undefined;\n        if (kind === "pdf" || kind === "image") {\n          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;\n          previewUrl = URL.createObjectURL(\n            new Blob([binary], {\n              type: kind === "pdf" ? "application/pdf" : imageMimeType(path),\n            }),\n          );\n        }\n\n        releaseDocumentResources(path);\n        if (previewUrl) previewUrlsRef.current.set(path, previewUrl);\n        if (path.startsWith("browser://")) {\n          browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });\n        }\n\n        setDocumentState({\n          path,\n          name: fileNameFromPath(path),\n          kind,\n          source: "",\n          rendered,\n          previewUrl,\n          modified: false,\n          externallyModified: false,\n        });\n        setExternalChangePath(null);\n        setSourceDraft("");\n        sourceDraftRef.current = "";\n        resetEditorHistory(path, "");\n        setDraftRecovery(null);\n        setDraftSnapshots(loadDraftSnapshots());\n        setOpenTabs((current) =>\n          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],\n        );\n        if (!path.startsWith("browser://")) {\n          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));\n          saveLastDocumentPath(path);\n        }\n        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind));\n        if (stamp && !path.startsWith("browser://")) {\n          documentCacheRef.current.set({\n            path,\n            name: fileNameFromPath(path),\n            kind,\n            source: "",\n            rendered,\n            stamp,\n            bytes,\n          });\n        }\n        return true;\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "文档预览失败。");\n        return false;\n      } finally {\n        setLoading(false);\n      }\n    },\n    [releaseDocumentResources, resetEditorHistory],\n  );\n\n  const openPath = useCallback(\n    async (path: string, preserveMode = false): Promise<boolean> => {\n      try {\n        if (path.startsWith("browser://")) {\n          const cached = browserDocumentsRef.current.get(path);\n          if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");\n          if (cached.bytes) {\n            return await openBinary(path, cached.bytes, preserveMode);\n          } else if (cached.source !== undefined) {\n            return await openSource(path, cached.source, preserveMode);\n          }\n          return false;\n        }\n\n        const kind = documentKindFromPath(path);\n        if (!kind) {\n          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");\n        }\n        const stamp = await fileMetadata(path);\n        const cached = documentCacheRef.current.get(path, stamp);\n        if (kind === "docx" || kind === "pdf" || kind === "image") {\n          if (cached?.kind === kind && cached.bytes) {\n            return await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);\n          }\n          return await openBinary(path, await readBinaryFile(path), preserveMode, stamp);\n        }\n\n        if (cached?.kind === kind) {\n          return await openSource(path, cached.source, preserveMode, stamp, cached.rendered);\n        }\n        const source = await readTextFile(path);\n        return await openSource(path, source, preserveMode, stamp);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "文件打开失败。");\n        return false;\n      }\n    },\n    [openBinary, openSource],\n  );\n\n  const reloadExternalChange = useCallback(async () => {\n    const current = documentStateRef.current;\n    if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;\n\n    if (current.modified) {\n      const draftResult = saveDraftSnapshot({\n        path: current.path,\n        draft: sourceDraftRef.current,\n        baseSource: current.source,\n        savedAt: Date.now(),\n      });\n      if (!handleDraftSaveResult(draftResult)) return;\n      if (!window.confirm("重新载入会覆盖当前未保存修改，已先保留一份草稿恢复副本。继续吗？")) return;\n    }\n\n    setExternalChangePath(null);\n    const opened = await openPath(current.path, true);\n    if (!opened && documentStateRef.current?.path === current.path) {\n      setExternalChangePath(current.path);\n    }\n  }, [externalChangePath, handleDraftSaveResult, openPath]);\n\n  useEffect(() => {\n    if (!workspacePath || !isTauriRuntime()) return;\n    if (!workspaceRestorePendingRef.current) return;\n    workspaceRestorePendingRef.current = false;\n\n    const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));\n    const targetPath = cached?.activeDocumentPath ?? null;\n    const currentPath = documentStateRef.current?.path ?? null;\n    const currentBelongs = currentPath ? pathBelongsToWorkspace(currentPath, workspacePath) : false;\n    const targetBelongs = targetPath ? pathBelongsToWorkspace(targetPath, workspacePath) : false;\n\n    if (currentPath && !currentBelongs) {\n      releaseDocumentResources(currentPath);\n      setDocumentState(null);\n      setSourceDraft("");\n      sourceDraftRef.current = "";\n      setDraftRecovery(null);\n      setExternalChangePath(null);\n      setMode("rendered");\n      setSearchQuery("");\n      saveLastDocumentPath(null);\n    }\n\n    if (!targetPath || !targetBelongs || targetPath === currentPath) return;\n\n    let active = true;\n    void openPath(targetPath).then((opened) => {\n      if (active && !opened) {\n        updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });\n        persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);\n      }\n    });\n    return () => {\n      active = false;\n    };\n  }, [openPath, releaseDocumentResources, workspacePath]);\n\n  const handleOpenPaths = useCallback(\n    async (paths: OpenPath[]) => {\n      const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);\n      const workspacePathToConfirm = workspacePaths.find((path) =>\n        shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),\n      );\n      if (workspacePathToConfirm && !confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {\n        return;\n      }\n\n      const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;\n      const pathsToProcess = currentModifiedPath\n        ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(currentModifiedPath, entry.path))\n        : paths;\n      const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);\n      if (!confirmDocumentReplacement(documentPaths, "打开新文档")) {\n        return;\n      }\n\n      const seen = new Set<string>();\n      for (const entry of pathsToProcess) {\n        const key = `${entry.kind}:${normalizePathKey(entry.path)}`;\n        if (seen.has(key)) continue;\n        seen.add(key);\n\n        try {\n          const authorizedPath = isTauriRuntime()\n            ? await authorizeStoredPath(entry.path, entry.kind === "workspace")\n            : entry.path;\n          if (entry.kind === "workspace") {\n            await loadWorkspace(authorizedPath);\n          } else {\n            await openPath(authorizedPath);\n          }\n        } catch (cause) {\n          setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");\n        }\n      }\n    },\n    [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],\n  );\n\n  const saveDocument = useCallback(async (allowExternalOverwrite = false): Promise<boolean> => {\n    const current = documentStateRef.current;\n    const draft = sourceDraftRef.current;\n    if (!current || !current.modified || !isEditableDocument(current.kind)) return false;\n\n    if (current.externallyModified && !allowExternalOverwrite) {\n      setExternalChangePath(current.path);\n      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");\n      return false;\n    }\n\n    const path = current.path;\n    const pathKey = comparablePath(path);\n    let writeCompleted = false;\n    try {\n      if (isTauriRuntime()) {\n        if (!allowExternalOverwrite) {\n          const diskSource = await readTextFile(path);\n          if (diskSource !== current.source) {\n            setDocumentState((latest) =>\n              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,\n            );\n            setExternalChangePath(path);\n            setError("文件在保存前已被其他程序修改，请先选择处理方式。");\n            return false;\n          }\n        }\n        selfWritingPathsRef.current.add(pathKey);\n        try {\n          await writeTextFile(path, draft);\n        } finally {\n          selfWritingPathsRef.current.delete(pathKey);\n        }\n        writeCompleted = true;\n        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);\n        documentCacheRef.current.remove(path);\n      } else {\n        downloadText(current.name, draft);\n      }\n\n      const rendered = await renderSource(path, draft, {\n        allowRemoteResources: preferencesRef.current.allowRemoteResources,\n      });\n      setDocumentState((latest) =>\n        latest && isSameDocumentPath(latest.path, path)\n          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }\n          : latest,\n      );\n      clearDraftSnapshot(path);\n      setDraftSnapshots(loadDraftSnapshots());\n      setDraftRecovery(null);\n      setExternalChangePath(null);\n      setError(null);\n      return true;\n    } catch (cause) {\n      selfWritingPathsRef.current.delete(pathKey);\n      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);\n      setError(cause instanceof Error ? cause.message : "保存失败。");\n      return false;\n    }\n  }, []);\n\n  const handleCreateNote = useCallback(\n    async (target: string) => {\n      if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {\n        setError("请先添加一个工作区文件夹，再创建未解析链接。");\n        return;\n      }\n      const draftOutcome = documentState.modified ? flushCurrentDraft() : "not-needed";\n      if (\n        documentState.modified &&\n        (draftOutcome === "failed" ||\n          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))\n      )\n        return;\n\n      try {\n        const path = await createMarkdownFile(workspacePath, documentState.path, target);\n        await loadWorkspace(workspacePath, true);\n        await openPath(path);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法创建新文档。");\n      }\n    },\n    [documentState, flushCurrentDraft, loadWorkspace, openPath, workspacePath],\n  );\n\n  const handleCreateWorkspaceNote = useCallback(\n    async (parentPath: string) => {\n      if (!workspacePath || !isTauriRuntime()) {\n        setError("请先添加一个工作区文件夹，再新建笔记。");\n        return;\n      }\n      const name = window.prompt("新建笔记", "未命名笔记")?.trim();\n      if (!name) return;\n\n      const currentDocument = documentStateRef.current;\n      const draftOutcome = currentDocument?.modified ? flushCurrentDraft() : "not-needed";\n      if (\n        currentDocument?.modified &&\n        (draftOutcome === "failed" ||\n          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))\n      ) {\n        return;\n      }\n\n      try {\n        const path = await createWorkspaceNote(workspacePath, parentPath, name);\n        await refreshWorkspaceChanges(workspacePath, [path]);\n        await openPath(path);\n        setError(null);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法创建新笔记。");\n      }\n    },\n    [flushCurrentDraft, openPath, refreshWorkspaceChanges, workspacePath],\n  );\n\n  const handleCreateWorkspaceFolder = useCallback(\n    async (parentPath: string) => {\n      if (!workspacePath || !isTauriRuntime()) {\n        setError("请先添加一个工作区文件夹，再新建文件夹。");\n        return;\n      }\n      const name = window.prompt("新建文件夹", "新建文件夹")?.trim();\n      if (!name) return;\n\n      try {\n        const path = await createWorkspaceFolder(workspacePath, parentPath, name);\n        await refreshWorkspaceChanges(workspacePath, [path]);\n        setError(null);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法创建新文件夹。");\n      }\n    },\n    [refreshWorkspaceChanges, workspacePath],\n  );\n\n  const handleRenameWorkspaceEntry = useCallback(\n    async (entryPath: string, kind: "file" | "folder") => {\n      const root = workspacePathRef.current;\n      if (!root || !isTauriRuntime() || !entryPath.trim()) {\n        setError("请先添加工作区，再重命名文件或文件夹。");\n        return;\n      }\n\n      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);\n      const oldName = fileNameFromPath(entryPath);\n      const name = window.prompt(kind === "folder" ? "重命名文件夹" : "重命名文件", oldName)?.trim();\n      if (!name || name === oldName) return;\n\n      const current = documentStateRef.current;\n      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));\n      if (currentIsAffected && current?.modified) {\n        if (!window.confirm("当前文档有未保存修改，是否先保存后重命名？")) return;\n        if (!(await saveDocument())) return;\n      }\n\n      try {\n        const renamedPath = await renameWorkspaceEntry(root, entryPath, name);\n        documentCacheRef.current.invalidate([oldAbsolutePath, renamedPath]);\n\n        const rebaseTab = (tab: RecentFile): RecentFile => {\n          const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, renamedPath);\n          return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };\n        };\n        const nextTabs = openTabsRef.current.map(rebaseTab);\n        openTabsRef.current = nextTabs;\n        setOpenTabs(nextTabs);\n        saveOpenTabs(nextTabs);\n        setRecentFiles((currentFiles) => {\n          const nextFiles = currentFiles.map(rebaseTab);\n          saveRecentFiles(nextFiles);\n          return nextFiles;\n        });\n\n        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));\n        if (cached) {\n          const cachedTabs = nextTabs.filter(\n            (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),\n          );\n          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {\n            tabs: cachedTabs,\n            activeDocumentPath: cached.activeDocumentPath\n              ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, renamedPath)\n              : null,\n          });\n          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);\n        }\n\n        let reopenFailed = false;\n        if (currentIsAffected && current) {\n          const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, renamedPath);\n          releaseDocumentResources(current.path);\n          documentStateRef.current = null;\n          setDocumentState(null);\n          setSourceDraft("");\n          sourceDraftRef.current = "";\n          setDraftRecovery(null);\n          setExternalChangePath(null);\n          setMode("rendered");\n          resetEditorHistory("", "");\n          reopenFailed = !(await openPath(nextCurrentPath, true));\n          if (reopenFailed) {\n            setError("文件已重命名，但重新打开失败，请从文件树中再次打开。");\n          }\n        }\n\n        await refreshWorkspaceChanges(root, [oldAbsolutePath, renamedPath]);\n        setSettingsNotice(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);\n        if (!reopenFailed) setError(null);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");\n      }\n    },\n    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],\n  );\n\n  const handleDeleteWorkspaceEntry = useCallback(\n    async (entryPath: string, kind: "file" | "folder") => {\n      const root = workspacePathRef.current;\n      if (!root || !isTauriRuntime() || !entryPath.trim()) {\n        setError("请先添加工作区，再删除文件或文件夹。");\n        return;\n      }\n\n      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);\n      const label = fileNameFromPath(entryPath);\n      const message =\n        kind === "folder"\n          ? `确定删除文件夹“${label}”及其中的全部内容吗？此操作无法撤销。`\n          : `确定删除文件“${label}”吗？此操作无法撤销。`;\n      if (!window.confirm(message)) return;\n\n      const current = documentStateRef.current;\n      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));\n      if (currentIsAffected && current?.modified) {\n        if (!window.confirm("当前文档有未保存修改，是否先保存后删除？")) return;\n        if (!(await saveDocument())) return;\n      }\n\n      try {\n        const currentIndex = current\n          ? openTabsRef.current.findIndex((tab) => isSameDocumentPath(tab.path, current.path))\n          : -1;\n        const nextTabs = openTabsRef.current.filter((tab) => !isPathWithinEntry(tab.path, oldAbsolutePath));\n        const affectedTabs = openTabsRef.current.filter((tab) => isPathWithinEntry(tab.path, oldAbsolutePath));\n        for (const tab of affectedTabs) releaseDocumentResources(tab.path);\n        documentCacheRef.current.invalidate([oldAbsolutePath]);\n        await deleteWorkspaceEntry(root, entryPath);\n\n        openTabsRef.current = nextTabs;\n        setOpenTabs(nextTabs);\n        saveOpenTabs(nextTabs);\n        setRecentFiles((currentFiles) => {\n          const nextFiles = currentFiles.filter((file) => !isPathWithinEntry(file.path, oldAbsolutePath));\n          saveRecentFiles(nextFiles);\n          return nextFiles;\n        });\n\n        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));\n        if (cached) {\n          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {\n            tabs: nextTabs.filter(\n              (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),\n            ),\n            activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,\n          });\n          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);\n        }\n\n        let nextTabFailed = false;\n        if (currentIsAffected) {\n          setDocumentState(null);\n          documentStateRef.current = null;\n          setSourceDraft("");\n          sourceDraftRef.current = "";\n          setDraftRecovery(null);\n          setExternalChangePath(null);\n          setMode("rendered");\n          resetEditorHistory("", "");\n          saveLastDocumentPath(null);\n\n          const nextTab = nextTabs[currentIndex] ?? nextTabs[currentIndex - 1];\n          if (nextTab) nextTabFailed = !(await openPath(nextTab.path, true));\n        }\n\n        await refreshWorkspaceChanges(root, [oldAbsolutePath]);\n        setSettingsNotice(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);\n        if (!nextTabFailed) setError(null);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");\n      }\n    },\n    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],\n  );\n\n  const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {\n    const root = workspacePathRef.current;\n    if (!root || !isTauriRuntime()) {\n      setError("当前没有可复制的工作区路径。");\n      return;\n    }\n\n    try {\n      const path = workspaceEntryAbsolutePath(root, entryPath);\n      await copyPlainText(path);\n      setSettingsNotice("完整路径已复制到剪贴板。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制路径失败。");\n    }\n  }, []);\n\n  const handleCopyWorkspaceRelativePath = useCallback(async (entryPath: string) => {\n    const relativePath = entryPath.replace(/[\\/]+/g, "\\").replace(/^\\+|\\+$/g, "");\n    if (!relativePath) {\n      setError("当前条目没有可复制的相对路径。");\n      return;\n    }\n\n    try {\n      await copyPlainText(relativePath);\n      setSettingsNotice("相对路径已复制到剪贴板。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制相对路径失败。");\n    }\n  }, []);\n\n  const handleShowWorkspaceDetails = useCallback((details: WorkspaceEntryDetails) => {\n    const root = workspacePathRef.current;\n    const absolutePath =\n      details.absolutePath ?? (root ? workspaceEntryAbsolutePath(root, details.relativePath) : details.relativePath);\n    setWorkspaceEntryDetails({ ...details, absolutePath });\n    setError(null);\n  }, []);\n\n  const handleDuplicateWorkspaceEntry = useCallback(\n    async (entryPath: string, kind: "file" | "folder") => {\n      const root = workspacePathRef.current;\n      if (!root || !isTauriRuntime() || !entryPath.trim()) {\n        setError("请先添加工作区，再复制文件或文件夹。");\n        return;\n      }\n\n      const defaultName = duplicateEntryName(entryPath, kind);\n      const name = window.prompt(kind === "folder" ? "复制文件夹" : "复制文件", defaultName)?.trim();\n      if (!name) return;\n\n      try {\n        const duplicatedPath = await duplicateWorkspaceEntry(root, entryPath, name);\n        await refreshWorkspaceChanges(root, [duplicatedPath]);\n        setSettingsNotice(`已创建副本：${fileNameFromPath(duplicatedPath)}`);\n        setError(null);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "无法创建工作区副本。");\n      }\n    },\n    [refreshWorkspaceChanges],\n  );\n\n  const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {\n    const root = workspacePathRef.current;\n    if (!root || !isTauriRuntime()) {\n      setError("请先添加工作区，再打开资源管理器。");\n      return;\n    }\n\n    try {\n      await revealWorkspaceEntry(root, entryPath);\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "无法打开资源管理器。");\n    }\n  }, []);\n\n  const handleCopyWorkspaceName = useCallback(async (entryPath: string) => {\n    const name = fileNameFromPath(entryPath.replace(/[\\/]+$/, ""));\n    if (!name) {\n      setError("当前条目没有可复制的名称。");\n      return;\n    }\n\n    try {\n      await copyPlainText(name);\n      setSettingsNotice("名称已复制到剪贴板。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制名称失败。");\n    }\n  }, []);\n\n  const handleRefreshWorkspaceEntry = useCallback(\n    async (entryPath: string) => {\n      const root = workspacePathRef.current;\n      if (!root || !isTauriRuntime()) {\n        setError("请先添加工作区，再刷新文件树。");\n        return;\n      }\n\n      setSettingsNotice("正在刷新文件树…");\n      if (entryPath.trim()) {\n        await refreshWorkspaceChanges(root, [workspaceEntryAbsolutePath(root, entryPath)]);\n      } else {\n        await loadWorkspace(root, true);\n      }\n      setSettingsNotice("文件树已刷新。");\n      setError(null);\n    },\n    [loadWorkspace, refreshWorkspaceChanges],\n  );\n\n  const openSelectedFile = useCallback(async () => {\n    const nativePaths = await chooseDocumentPaths();\n    if (isTauriRuntime()) {\n      if (nativePaths.length > 0) {\n        await handleOpenPaths(nativePaths.map((path) => ({ path, kind: "document" as const })));\n      }\n      return;\n    }\n    inputRef.current?.click();\n  }, [handleOpenPaths]);\n\n  const closeGettingStarted = useCallback(() => {\n    markGettingStartedSeen();\n    setGuideOpen(false);\n  }, []);\n\n  const openDocumentFromGuide = useCallback(() => {\n    closeGettingStarted();\n    void openSelectedFile();\n  }, [closeGettingStarted, openSelectedFile]);\n\n  const addWorkspaceFromGuide = useCallback(() => {\n    closeGettingStarted();\n    void handleChooseWorkspace();\n  }, [closeGettingStarted, handleChooseWorkspace]);\n\n  const overwriteExternalChange = useCallback(() => {\n    const current = documentStateRef.current;\n    if (!current?.externallyModified) return;\n    setExternalOverwriteConfirmationOpen(true);\n  }, []);\n\n  const cancelExternalOverwrite = useCallback(() => {\n    setExternalOverwriteConfirmationOpen(false);\n  }, []);\n\n  const confirmExternalOverwrite = useCallback(() => {\n    setExternalOverwriteConfirmationOpen(false);\n    void saveDocument(true);\n  }, [saveDocument]);\n\n  useEffect(() => {\n    let unlisten: (() => void) | null = null;\n    let active = true;\n\n    void (async () => {\n      const paths = await initialPaths();\n      if (isTauriRuntime()) {\n        const hasStartupWorkspace = paths.some((entry) => entry.kind === "workspace");\n        const savedWorkspace = loadWorkspacePath();\n        if (!hasStartupWorkspace) {\n          const candidates = [\n            ...(savedWorkspace\n              ? [\n                  {\n                    path: savedWorkspace,\n                    name: fileNameFromPath(savedWorkspace.replace(/[\\/]+$/, "")) || savedWorkspace,\n                  },\n                ]\n              : []),\n            ...loadMountedWorkspaces(),\n          ];\n          const authorizedMounts: RecentWorkspace[] = [];\n          const seen = new Set<string>();\n          for (const candidate of candidates) {\n            const candidateKey = comparablePath(candidate.path);\n            if (!candidateKey || seen.has(candidateKey)) continue;\n            seen.add(candidateKey);\n            try {\n              const authorizedWorkspace = await authorizeStoredPath(candidate.path, true);\n              if (!active) return;\n              authorizedMounts.push({\n                path: authorizedWorkspace,\n                name: fileNameFromPath(authorizedWorkspace.replace(/[\\/]+$/, "")) || candidate.name,\n              });\n            } catch {\n              // Stale mounted workspaces are discarded without blocking launch.\n            }\n          }\n          if (!active) return;\n          setMountedWorkspaces(authorizedMounts);\n          saveMountedWorkspaces(authorizedMounts);\n          const activeWorkspace =\n            authorizedMounts.find(\n              (workspace) => comparablePath(workspace.path) === comparablePath(savedWorkspace ?? ""),\n            ) ?? authorizedMounts[0];\n          if (activeWorkspace) {\n            await loadWorkspace(activeWorkspace.path, true);\n          } else if (candidates.length > 0) {\n            saveWorkspacePath(null);\n            workspacePathRef.current = null;\n            setWorkspacePath(null);\n            setWorkspaceFiles([]);\n            setWorkspaceFolders([]);\n            setWorkspaceIndex([]);\n          }\n        }\n\n        if (paths.length === 0) {\n          const activeWorkspacePath = loadWorkspacePath();\n          const workspaceSession = activeWorkspacePath\n            ? loadWorkspaceSessions().find(\n                (session) => comparablePath(session.path) === comparablePath(activeWorkspacePath),\n              )\n            : undefined;\n          const restoredTabs: RecentFile[] = [];\n          for (const tab of workspaceSession?.tabs ?? loadOpenTabs()) {\n            try {\n              const authorizedDocument = await authorizeStoredPath(tab.path, false);\n              if (!active) return;\n              restoredTabs.push({ path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });\n            } catch {\n              // Stale tabs are discarded without blocking the next launch.\n            }\n          }\n          if (!active) return;\n          setOpenTabs(restoredTabs);\n\n          if (!workspaceSession) {\n            const lastDocument = loadLastDocumentPath();\n            const activeTab =\n              restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??\n              restoredTabs[restoredTabs.length - 1];\n            if (activeTab) {\n              await openPath(activeTab.path);\n            } else if (lastDocument) {\n              try {\n                const authorizedDocument = await authorizeStoredPath(lastDocument, false);\n                if (!active) return;\n                await openPath(authorizedDocument);\n              } catch {\n                if (active) saveLastDocumentPath(null);\n              }\n            }\n          }\n        }\n      }\n\n      if (active) await handleOpenPaths(paths);\n      if (active) setTabSessionReady(true);\n      const dispose = await subscribeToOpenPaths((nextPaths) => void handleOpenPaths(nextPaths));\n      if (active) unlisten = dispose;\n      else dispose?.();\n    })();\n\n    return () => {\n      active = false;\n      unlisten?.();\n    };\n  }, [handleOpenPaths, loadWorkspace, openPath]);\n\n  useEffect(() => {\n    if (!isTauriRuntime()) return;\n\n    let active = true;\n    let unlisten: (() => void) | null = null;\n    void subscribeToFileDrop((paths) => {\n      if (!active) return;\n      void resolveOpenPaths(paths)\n        .then((entries) => {\n          if (active) return handleOpenPaths(entries);\n          return undefined;\n        })\n        .catch((cause) => {\n          if (active) setError(cause instanceof Error ? cause.message : "无法打开拖入的路径。");\n        });\n    }).then((dispose) => {\n      if (active) unlisten = dispose;\n      else dispose?.();\n    });\n\n    return () => {\n      active = false;\n      unlisten?.();\n    };\n  }, [handleOpenPaths]);\n\n  useEffect(() => {\n    if (!workspacePath || !isTauriRuntime()) return;\n\n    let active = true;\n    let unwatch: (() => void) | null = null;\n    const pendingWorkspacePaths = pendingWorkspacePathsRef.current;\n    setWorkspaceWatchError(null);\n\n    void subscribeToWorkspaceChanges(workspacePath, (paths) => {\n      if (!active) return;\n\n      documentCacheRef.current.invalidate(paths);\n      for (const path of paths) pendingWorkspacePaths.add(path);\n      if (workspaceReloadTimerRef.current !== null) {\n        window.clearTimeout(workspaceReloadTimerRef.current);\n      }\n      workspaceReloadTimerRef.current = window.setTimeout(() => {\n        workspaceReloadTimerRef.current = null;\n        const changedPaths = [...pendingWorkspacePaths];\n        pendingWorkspacePaths.clear();\n        void refreshWorkspaceChanges(workspacePath, changedPaths);\n      }, 280);\n\n      const current = documentStateRef.current;\n      if (!current || current.path.startsWith("browser://")) return;\n\n      const currentPath = comparablePath(current.path);\n      const writtenUntil = selfWrittenPathsRef.current.get(currentPath);\n      const action = resolveExternalChangeAction({\n        changedPaths: paths,\n        currentPath: current.path,\n        modified: current.modified,\n        selfWriting: selfWritingPathsRef.current.has(currentPath),\n        selfWrittenUntil: writtenUntil,\n        now: Date.now(),\n      });\n      if (action === "ignore") return;\n      if (writtenUntil !== undefined) {\n        selfWrittenPathsRef.current.delete(currentPath);\n      }\n\n      if (action === "notify") {\n        setExternalChangePath(current.path);\n        setDocumentState((latest) =>\n          latest && isSameDocumentPath(latest.path, current.path) ? { ...latest, externallyModified: true } : latest,\n        );\n      } else {\n        void openPath(current.path, true);\n      }\n    })\n      .then((dispose) => {\n        if (!active) {\n          dispose?.();\n        } else {\n          unwatch = dispose;\n        }\n      })\n      .catch(() => {\n        if (active) setWorkspaceWatchError("文件监听不可用，目录仍可手动刷新。");\n      });\n\n    return () => {\n      active = false;\n      if (workspaceReloadTimerRef.current !== null) {\n        window.clearTimeout(workspaceReloadTimerRef.current);\n        workspaceReloadTimerRef.current = null;\n      }\n      pendingWorkspacePaths.clear();\n      unwatch?.();\n    };\n  }, [openPath, refreshWorkspaceChanges, workspacePath]);\n\n  useEffect(() => {\n    const query = workspaceQuery.trim();\n    if (!workspacePath || !isTauriRuntime() || query.length < 2) {\n      setWorkspaceResults([]);\n      setWorkspaceSearchLoading(false);\n      return;\n    }\n\n    let active = true;\n    setWorkspaceSearchLoading(true);\n    const timer = window.setTimeout(() => {\n      void searchWorkspace(workspacePath, query)\n        .then((results) => {\n          if (active) setWorkspaceResults(results);\n        })\n        .catch((cause) => {\n          if (active) {\n            setWorkspaceResults([]);\n            setError(cause instanceof Error ? cause.message : "工作区搜索失败。");\n          }\n        })\n        .finally(() => {\n          if (active) setWorkspaceSearchLoading(false);\n        });\n    }, 180);\n\n    return () => {\n      active = false;\n      window.clearTimeout(timer);\n    };\n  }, [workspacePath, workspaceQuery, workspaceRevision]);\n\n  const handleInsertLink = useCallback((context?: SourceEditorLinkContext) => {\n    const url = window.prompt("输入链接地址", "https://");\n    if (!url?.trim()) return;\n\n    if (context) {\n      const selectedText = context.value.slice(context.selectionStart, context.selectionEnd).trim() || "链接文字";\n      context.replace(`[${selectedText}](${url.trim()})`);\n      return;\n    }\n\n    const selection = window.getSelection();\n    if (selection && selection.toString().trim()) {\n      document.execCommand("createLink", false, url.trim());\n    } else {\n      setSettingsNotice("请先在所见即所得编辑器中选择链接文字，再按 Ctrl+K。");\n    }\n  }, []);\n\n  // Keep the mode transition in one place so toolbar and keyboard shortcuts cannot drift apart.\n  const toggleDocumentMode = useCallback(() => {\n    const currentDocument = documentStateRef.current;\n    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;\n\n    if (currentDocument.kind === "markdown" && !checkMarkdownEditorSafety(sourceDraftRef.current).safe) {\n      setSettingsNotice("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。");\n    }\n\n    setMode((current) => {\n      if (currentDocument.kind !== "markdown") return current === "source" ? "rendered" : "source";\n      if (current === "rendered") {\n        return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";\n      }\n      if (current === "wysiwyg") return "source";\n      return "rendered";\n    });\n  }, []);\n\n  const toggleReadingEditing = useCallback(() => {\n    const currentDocument = documentStateRef.current;\n    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;\n\n    setMode((current) => {\n      if (current !== "rendered") return "rendered";\n      if (currentDocument.kind !== "markdown") return "source";\n      return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";\n    });\n  }, []);\n\n  const handleFindEditorText = useCallback((text: string) => {\n    const query = text.trim();\n    if (!query) return;\n    setSearchOpen(true);\n    setSearchQuery(query);\n    setSearchResultIndex(0);\n  }, []);\n\n  useEffect(() => {\n    const handleShortcut = (event: KeyboardEvent) => {\n      const eventTarget = event.target instanceof HTMLElement ? event.target : null;\n      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;\n      const isCodeMirrorEditor = Boolean(eventTarget?.closest(".cm-editor") ?? activeElement?.closest(".cm-editor"));\n      const isTextEntry = Boolean(\n        eventTarget?.closest('input, textarea, [contenteditable="true"], .cm-editor') ??\n        activeElement?.closest('input, textarea, [contenteditable="true"], .cm-editor'),\n      );\n      const zoomKey = event.key;\n      const isZoomShortcut =\n        (event.ctrlKey || event.metaKey) &&\n        !event.altKey &&\n        !event.isComposing &&\n        !isTextEntry &&\n        mode === "rendered" &&\n        ["markdown", "text", "docx"].includes(documentStateRef.current?.kind ?? "") &&\n        (event.code === "Equal" ||\n          event.code === "NumpadAdd" ||\n          event.code === "Minus" ||\n          event.code === "NumpadSubtract" ||\n          event.code === "Digit0" ||\n          event.code === "Numpad0" ||\n          zoomKey === "+" ||\n          zoomKey === "=" ||\n          zoomKey === "-" ||\n          zoomKey === "0");\n      if (isZoomShortcut) {\n        event.preventDefault();\n        if (event.code === "Digit0" || event.code === "Numpad0" || zoomKey === "0") {\n          setReadingZoom(READING_ZOOM_DEFAULT);\n        } else {\n          setReadingZoom(\n            stepReadingZoom(\n              preferencesRef.current.readingZoom,\n              event.code === "Minus" || event.code === "NumpadSubtract" || zoomKey === "-" ? "out" : "in",\n            ),\n          );\n        }\n        return;\n      }\n      if (\n        (event.ctrlKey || event.metaKey) &&\n        event.key.toLowerCase() === "f" &&\n        (event.defaultPrevented || isCodeMirrorEditor)\n      ) {\n        return;\n      }\n\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") {\n        event.preventDefault();\n        if (event.shiftKey) {\n          void handleChooseWorkspace();\n          return;\n        }\n        void openSelectedFile();\n      }\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {\n        event.preventDefault();\n        void saveDocument();\n      }\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {\n        event.preventDefault();\n        toggleReadingEditing();\n      }\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {\n        if (mode === "wysiwyg") {\n          event.preventDefault();\n          handleInsertLink();\n        }\n      }\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {\n        event.preventDefault();\n        setSearchOpen(true);\n      }\n      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {\n        event.preventDefault();\n        setCommandPaletteOpen(true);\n        return;\n      }\n      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {\n        event.preventDefault();\n        setQuickOpen(true);\n      }\n      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {\n        event.preventDefault();\n        setSidebarCollapsed((current) => !current);\n      }\n      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "r") {\n        event.preventDefault();\n        setRightPanelOpen((current) => !current);\n      }\n      if (event.key === "Escape" && focusMode) {\n        event.preventDefault();\n        setFocusMode(false);\n      }\n      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === "Enter" && documentStateRef.current) {\n        event.preventDefault();\n        setFocusMode((current) => !current);\n      }\n    };\n\n    window.addEventListener("keydown", handleShortcut);\n    return () => window.removeEventListener("keydown", handleShortcut);\n  }, [\n    focusMode,\n    handleChooseWorkspace,\n    handleInsertLink,\n    mode,\n    openSelectedFile,\n    saveDocument,\n    setReadingZoom,\n    toggleReadingEditing,\n  ]);\n\n  useEffect(() => {\n    const handleEditorHistoryShortcut = (event: KeyboardEvent) => {\n      if (event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return;\n      if (mode !== "source" && mode !== "wysiwyg") return;\n\n      const target = event.target instanceof Element ? event.target : null;\n      const editorSurface = target?.closest(".source-editor, .wysiwyg-editor");\n      const activeElement = document.activeElement;\n      const focusIsDocument = activeElement === document.body || activeElement === document.documentElement;\n      if (!editorSurface && !focusIsDocument) return;\n\n      const key = event.key.toLowerCase();\n      const isUndo = key === "z" && !event.shiftKey;\n      const isRedo = key === "y" || (key === "z" && event.shiftKey);\n      if (!isUndo && !isRedo) return;\n\n      event.preventDefault();\n      event.stopPropagation();\n      if (isUndo) undoEditor(editorSurface);\n      else redoEditor(editorSurface);\n    };\n\n    window.addEventListener("keydown", handleEditorHistoryShortcut, true);\n    return () => window.removeEventListener("keydown", handleEditorHistoryShortcut, true);\n  }, [mode, redoEditor, undoEditor]);\n\n  useEffect(() => {\n    const path = documentState?.path;\n    const kind = documentState?.kind;\n    const requestId = ++sourceRenderRequestRef.current;\n    if (mode !== "source" || !path || !kind || !isEditableDocument(kind)) return;\n\n    const nextSource = sourceDraft;\n    const cancel = scheduleSourceRender(() => {\n      void renderSource(path, nextSource, {\n        allowRemoteResources: preferences.allowRemoteResources,\n      })\n        .then((rendered) => {\n          if (requestId !== sourceRenderRequestRef.current) return;\n          setDocumentState((current) => (current?.path === path ? { ...current, rendered } : current));\n        })\n        .catch((cause) => {\n          if (requestId === sourceRenderRequestRef.current) {\n            setError(cause instanceof Error ? cause.message : "文档渲染失败。");\n          }\n        });\n    });\n\n    return cancel;\n  }, [documentState?.kind, documentState?.path, mode, preferences.allowRemoteResources, sourceDraft]);\n\n  useEffect(() => {\n    const current = documentStateRef.current;\n    if ((mode !== "rendered" && mode !== "wysiwyg") || !current || !isEditableDocument(current.kind)) return;\n\n    const requestId = ++sourceRenderRequestRef.current;\n    const path = current.path;\n    const cancel = scheduleSourceRender(() => {\n      void renderSource(path, sourceDraft, {\n        allowRemoteResources: preferences.allowRemoteResources,\n      })\n        .then((rendered) => {\n          if (requestId !== sourceRenderRequestRef.current) return;\n          setDocumentState((latest) => (latest?.path === path ? { ...latest, rendered } : latest));\n        })\n        .catch((cause) => {\n          if (requestId === sourceRenderRequestRef.current) {\n            setError(cause instanceof Error ? cause.message : "文档渲染失败。");\n          }\n        });\n    });\n\n    return cancel;\n  }, [mode, preferences.allowRemoteResources, sourceDraft]);\n\n  const updateSource = useCallback((nextSource: string) => {\n    const current = documentStateRef.current;\n    if (!current || !isEditableDocument(current.kind)) return;\n\n    const history = editorHistoryRef.current;\n    const nextHistory = isSameDocumentPath(history.documentKey, current.path)\n      ? recordEditorChange(history, nextSource)\n      : createEditorHistory(current.path, nextSource);\n    if (nextHistory !== history) {\n      editorHistoryRef.current = nextHistory;\n      setEditorHistory(nextHistory);\n    }\n    sourceDraftRef.current = nextSource;\n    setSourceDraft(nextSource);\n    setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));\n  }, []);\n\n  useEffect(() => {\n    const current = documentState;\n    if (!current || !current.modified || !isEditableDocument(current.kind) || current.path.startsWith("browser://")) {\n      return;\n    }\n\n    const timer = window.setTimeout(() => {\n      const result = saveDraftSnapshot({\n        path: current.path,\n        draft: sourceDraft,\n        baseSource: current.source,\n        savedAt: Date.now(),\n      });\n      handleDraftSaveResult(result);\n    }, 1_500);\n    return () => window.clearTimeout(timer);\n  }, [\n    documentState,\n    documentState?.kind,\n    documentState?.modified,\n    documentState?.path,\n    documentState?.source,\n    sourceDraft,\n    handleDraftSaveResult,\n  ]);\n\n  const recoverDraft = useCallback(() => {\n    if (!draftRecovery || !isSameDocumentPath(documentStateRef.current?.path ?? "", draftRecovery.path)) return;\n    updateSource(draftRecovery.draft);\n    setDraftRecovery(null);\n    setMode("source");\n  }, [draftRecovery, updateSource]);\n\n  const discardDraft = useCallback(() => {\n    if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });\n  }, [draftRecovery]);\n\n  const deferDraftRecovery = useCallback(() => {\n    setDraftRecovery(null);\n  }, []);\n\n  const openDraftSnapshot = useCallback(\n    async (path: string) => {\n      try {\n        const authorizedPath = await authorizeStoredPath(path, false);\n        if (!confirmDocumentReplacement([authorizedPath], "打开另一个草稿")) {\n          return;\n        }\n        const opened = await openPath(authorizedPath);\n        if (opened) setDraftRecoveryOpen(false);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "草稿对应的文档无法打开，请确认文件仍然存在。");\n      }\n    },\n    [confirmDocumentReplacement, openPath],\n  );\n\n  const requestDraftDiscardByPath = useCallback((path: string) => {\n    setDraftRecoveryOpen(false);\n    setDraftDiscardRequest({ path, fromCenter: true });\n  }, []);\n\n  const cancelDraftDiscard = useCallback(() => {\n    const request = draftDiscardRequest;\n    setDraftDiscardRequest(null);\n    if (request?.fromCenter) setDraftRecoveryOpen(true);\n  }, [draftDiscardRequest]);\n\n  const confirmDraftDiscard = useCallback(() => {\n    const request = draftDiscardRequest;\n    if (!request) return;\n\n    clearDraftSnapshot(request.path);\n    const remaining = loadDraftSnapshots();\n    setDraftSnapshots(remaining);\n    if (isSameDocumentPath(draftRecovery?.path ?? "", request.path)) setDraftRecovery(null);\n    setDraftDiscardRequest(null);\n    if (request.fromCenter) setDraftRecoveryOpen(remaining.length > 0);\n  }, [draftDiscardRequest, draftRecovery?.path]);\n\n  const clearAllDrafts = useCallback(() => {\n    if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;\n    clearAllDraftSnapshots();\n    setDraftSnapshots([]);\n    setDraftRecovery(null);\n  }, [draftSnapshots.length]);\n\n  const handleSourcePaste = useCallback(\n    (context: SourceEditorPasteContext) => {\n      const image = findClipboardImage(context.clipboardData);\n      if (!image) return false;\n\n      context.preventDefault();\n      const current = documentStateRef.current;\n      if (!isTauriRuntime()) {\n        setError("浏览器预览模式不能保存剪贴板图片，请使用桌面版 Moyang Reader。");\n        return true;\n      }\n      if (!current || current.kind !== "markdown") {\n        setError("剪贴板图片只能粘贴到 Markdown 源码文档中。");\n        return true;\n      }\n      if (!workspacePathRef.current || current.path.startsWith("browser://")) {\n        setError("请先添加文档所在的文件夹，再粘贴剪贴板图片。");\n        return true;\n      }\n      if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {\n        setError("剪贴板图片不能超过 10 MB。");\n        return true;\n      }\n\n      const initialStart = context.selectionStart;\n      const initialEnd = context.selectionEnd;\n      const initialValue = context.value;\n      const path = current.path;\n\n      void (async () => {\n        try {\n          const bytes = await clipboardImageToPng(image);\n          if (bytes.byteLength > MAX_CLIPBOARD_IMAGE_BYTES) {\n            throw new Error("转换后的剪贴板图片不能超过 10 MB。");\n          }\n          if (documentStateRef.current?.path !== path) {\n            throw new Error("文档已切换，未插入剪贴板图片。");\n          }\n\n          const baseName = clipboardAssetFileName(bytes);\n          let assetName = baseName;\n          let assetPath = clipboardAssetPath(path, assetName);\n          for (let suffix = 2; suffix <= 100 && (await fileExists(assetPath)); suffix += 1) {\n            assetName = baseName.replace(/\.png$/i, `-${suffix}.png`);\n            assetPath = clipboardAssetPath(path, assetName);\n          }\n          if (await fileExists(assetPath)) throw new Error("无法为剪贴板图片生成不重复的文件名。");\n\n          await writeBinaryFile(assetPath, bytes);\n          if (documentStateRef.current?.path !== path) {\n            throw new Error("文档已切换，图片已保存但未插入引用。");\n          }\n\n          if (sourceDraftRef.current !== initialValue) {\n            throw new Error("文档内容已变化，未插入剪贴板图片。");\n          }\n\n          const start = initialStart;\n          const end = initialEnd;\n          updateSource(insertTextAtSelection(initialValue, start, end, clipboardAssetReference(assetName)));\n          setError(null);\n        } catch (cause) {\n          setError(cause instanceof Error ? cause.message : "无法保存剪贴板图片。");\n        }\n      })();\n      return true;\n    },\n    [updateSource],\n  );\n\n  const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {\n    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;\n\n    const body = isTauriRuntime()\n      ? await inlineLocalImages(\n          documentState.rendered.html,\n          (source) => {\n            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;\n            return resolveRelativePath(documentState.path, safeDecode(target));\n          },\n          readBinaryFile,\n          imageMimeType,\n          fileSize,\n        )\n      : documentState.rendered.html;\n\n    return buildHtmlExport(\n      documentState.name,\n      body,\n      {\n        paper: preferences.exportPaper,\n        orientation: preferences.exportOrientation,\n        margin: preferences.exportMargin,\n      },\n      documentState.rendered.toc,\n    );\n  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);\n\n  const savePdfDocument = useCallback(async (html: string, defaultPath: string): Promise<boolean> => {\n    if (!isTauriRuntime()) {\n      await printHtmlDocument(html);\n      return true;\n    }\n\n    const path = await chooseSavePath(defaultPath, "pdf");\n    if (!path) return false;\n    await exportPdfFile(path, html);\n    setSettingsNotice(`已保存 PDF：${fileNameFromPath(path)}。`);\n    return true;\n  }, []);\n\n  const handleExport = useCallback(async () => {\n    if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {\n      const anchor = document.createElement("a");\n      anchor.href = documentState.previewUrl;\n      anchor.target = "_blank";\n      anchor.rel = "noreferrer";\n      anchor.click();\n      return;\n    }\n    if (!documentState) return;\n\n    try {\n      const html = await buildCurrentExportHtml();\n      if (!html) return;\n      const saved = await savePdfDocument(html, pathWithExtension(documentState.path, "pdf"));\n      if (!saved) return;\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");\n    }\n  }, [buildCurrentExportHtml, documentState, savePdfDocument]);\n\n  const handlePreviewPrint = useCallback(async () => {\n    if (!documentState) return;\n\n    try {\n      const html = await buildCurrentExportHtml();\n      if (!html) return;\n      setPrintPreview({\n        title: documentState.name,\n        html,\n        defaultPath: pathWithExtension(documentState.path, "pdf"),\n        actionLabel: isTauriRuntime() ? "保存 PDF" : "打印 / 保存 PDF",\n        actionHint: isTauriRuntime()\n          ? "Windows 桌面版会将 PDF 保存到所选位置 · 预览内容不会修改原文"\n          : "预计页数以系统打印对话框为准 · 预览内容不会修改原文",\n        paper: preferences.exportPaper,\n        orientation: preferences.exportOrientation,\n        margin: preferences.exportMargin,\n      });\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "生成打印版式预览失败。");\n    }\n  }, [\n    buildCurrentExportHtml,\n    documentState,\n    preferences.exportMargin,\n    preferences.exportOrientation,\n    preferences.exportPaper,\n  ]);\n\n  const finishPdfBatch = useCallback((cancelled: boolean) => {\n    const batch = pdfBatchExportRef.current;\n    if (!batch) return;\n\n    const failureSummary = summarizeExportFailures(\n      batch.skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),\n    );\n    const suffix = failureSummary ? `，跳过 ${batch.skippedFiles.length} 个：${failureSummary}` : "";\n    setWorkspaceExportNotice(\n      cancelled\n        ? `已取消批量打印，已整理 ${batch.exported} 篇文档${suffix}。`\n        : `已完成批量打印，共 ${batch.exported} 篇文档${suffix}。`,\n    );\n    pdfBatchExportRef.current = null;\n    workspaceExportAbortRef.current = null;\n    setWorkspaceExporting(false);\n    setWorkspaceExportProgress(null);\n    setPrintPreview(null);\n  }, []);\n\n  const prepareNextPdfBatch = useCallback(async () => {\n    const batch = pdfBatchExportRef.current;\n    const controller = workspaceExportAbortRef.current;\n    if (!batch || !controller) return;\n\n    const documents: Array<{ title: string; body: string }> = [];\n    while (batch.nextIndex < batch.files.length && documents.length < BATCH_EXPORT_CHUNK_SIZE) {\n      if (controller.signal.aborted) {\n        finishPdfBatch(true);\n        return;\n      }\n\n      const file = batch.files[batch.nextIndex];\n      batch.nextIndex += 1;\n      setWorkspaceExportProgress({ current: batch.nextIndex, total: batch.files.length, fileName: file.relativePath });\n      try {\n        const rendered =\n          file.kind === "docx"\n            ? await renderDocx(await readBinaryFile(file.path), {\n                allowRemoteResources: preferencesRef.current.allowRemoteResources,\n              })\n            : await renderSource(\n                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",\n                await readTextFile(file.path),\n                {\n                  allowRemoteResources: preferencesRef.current.allowRemoteResources,\n                },\n              );\n        const body = await inlineLocalImages(\n          rendered.html,\n          (source) => {\n            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;\n            return resolveRelativePath(file.path, safeDecode(target));\n          },\n          readBinaryFile,\n          imageMimeType,\n          fileSize,\n        );\n        documents.push({ title: file.relativePath, body });\n        batch.exported += 1;\n      } catch {\n        batch.skippedFiles.push({ fileName: file.relativePath, reason: "读取失败" });\n        setWorkspaceExportFailures([...batch.skippedFiles]);\n      }\n    }\n\n    if (controller.signal.aborted) {\n      finishPdfBatch(true);\n      return;\n    }\n    if (documents.length === 0) {\n      finishPdfBatch(false);\n      if (batch.exported === 0) setError("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");\n      return;\n    }\n\n    batch.volumeNumber += 1;\n    setPrintPreview({\n      title: `${batch.title} · 第 ${batch.volumeNumber} 卷`,\n      html: buildBatchHtmlExport(`${batch.title} · 第 ${batch.volumeNumber} 卷`, documents, batch.options),\n      paper: batch.options.paper,\n      orientation: batch.options.orientation,\n      margin: batch.options.margin,\n    });\n    setWorkspaceExportNotice(`第 ${batch.volumeNumber} 卷已准备，打印后自动继续。`);\n    setWorkspaceExporting(false);\n    setWorkspaceExportProgress(null);\n  }, [finishPdfBatch]);\n\n  const handlePrintPreview = useCallback(async () => {\n    if (!printPreview) return;\n\n    try {\n      const batch = pdfBatchExportRef.current;\n      if (batch) {\n        await printHtmlDocument(printPreview.html);\n        if (batch.nextIndex < batch.files.length) {\n          await prepareNextPdfBatch();\n        } else {\n          finishPdfBatch(false);\n        }\n      } else {\n        if (!documentState) return;\n        const saved = await savePdfDocument(\n          printPreview.html,\n          printPreview.defaultPath ?? pathWithExtension(documentState.path, "pdf"),\n        );\n        if (!saved) return;\n        setPrintPreview(null);\n      }\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");\n    }\n  }, [documentState, finishPdfBatch, prepareNextPdfBatch, printPreview, savePdfDocument]);\n\n  const handleClosePrintPreview = useCallback(() => {\n    if (pdfBatchExportRef.current) finishPdfBatch(true);\n    else setPrintPreview(null);\n  }, [finishPdfBatch]);\n\n  const handleCopy = useCallback(async () => {\n    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;\n\n    try {\n      await copyRichText(documentState.rendered.html);\n      setCopyFeedback(true);\n      window.setTimeout(() => setCopyFeedback(false), 1_600);\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制文档失败。");\n    }\n  }, [documentState]);\n\n  const handleExportMarkdown = useCallback(async () => {\n    if (!documentState || !isEditableDocument(documentState.kind)) return;\n\n    const extension = documentState.kind === "text" ? "txt" : "md";\n    const contents = sourceDraft;\n    try {\n      if (isTauriRuntime()) {\n        const path = await chooseSavePath(pathWithExtension(documentState.path, extension), "markdown");\n        if (!path) return;\n        await writeTextFile(path, contents);\n      } else {\n        downloadText(fileNameWithExtension(documentState.name, extension), contents);\n      }\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "导出 Markdown 失败。");\n    }\n  }, [documentState, sourceDraft]);\n\n  const handleExportHtml = useCallback(async () => {\n    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;\n\n    const body = isTauriRuntime()\n      ? await inlineLocalImages(\n          documentState.rendered.html,\n          (source) => {\n            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;\n            return resolveRelativePath(documentState.path, safeDecode(target));\n          },\n          readBinaryFile,\n          imageMimeType,\n          fileSize,\n        )\n      : documentState.rendered.html;\n    const contents = buildHtmlExport(\n      documentState.name,\n      body,\n      {\n        paper: preferences.exportPaper,\n        orientation: preferences.exportOrientation,\n        margin: preferences.exportMargin,\n      },\n      documentState.rendered.toc,\n    );\n    try {\n      if (isTauriRuntime()) {\n        const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");\n        if (!path) return;\n        await writeTextFile(path, contents);\n      } else {\n        downloadText(fileNameWithExtension(documentState.name, "html"), contents, "text/html");\n      }\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");\n    }\n  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);\n\n  const handleExportDocx = useCallback(async () => {\n    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;\n\n    try {\n      const body = isTauriRuntime()\n        ? await inlineLocalImages(\n            documentState.rendered.html,\n            (source) => {\n              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;\n              return resolveRelativePath(documentState.path, safeDecode(target));\n            },\n            readBinaryFile,\n            imageMimeType,\n            fileSize,\n          )\n        : documentState.rendered.html;\n      const contents = await buildDocxExport(documentState.name, body, {\n        paper: preferences.exportPaper,\n        orientation: preferences.exportOrientation,\n        margin: preferences.exportMargin,\n      });\n\n      if (isTauriRuntime()) {\n        const defaultPath =\n          documentState.kind === "docx"\n            ? pathWithNameSuffix(documentState.path, " - 导出", "docx")\n            : pathWithExtension(documentState.path, "docx");\n        const path = await chooseSavePath(defaultPath, "docx");\n        if (!path) return;\n        await writeBinaryFile(path, contents);\n      } else {\n        downloadBytes(\n          fileNameWithExtension(documentState.name, "docx"),\n          contents,\n          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",\n        );\n      }\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "导出 Word 失败。");\n    }\n  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);\n\n  const handleBrowserFiles = useCallback(\n    async (files: FileList | File[] | null | undefined) => {\n      const selectedFiles = Array.from(files ?? []);\n      if (selectedFiles.length === 0) return;\n      const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];\n      const unsupportedNames: string[] = [];\n      for (const file of selectedFiles) {\n        const kind = documentKindFromPath(file.name);\n        if (!kind) {\n          unsupportedNames.push(file.name);\n          continue;\n        }\n        supportedFiles.push({\n          file,\n          kind,\n          path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,\n        });\n      }\n      const unsupportedNotice =\n        unsupportedNames.length > 0\n          ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`\n          : null;\n      if (supportedFiles.length === 0) {\n        if (unsupportedNotice) setError(unsupportedNotice);\n        return;\n      }\n      const nextPaths = supportedFiles.map((entry) => entry.path);\n      if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {\n        return;\n      }\n\n      for (const { file, kind, path } of supportedFiles) {\n        if (kind === "docx" || kind === "pdf" || kind === "image") {\n          await openBinary(path, new Uint8Array(await file.arrayBuffer()));\n        } else {\n          await openSource(path, await file.text());\n        }\n      }\n      if (unsupportedNotice) {\n        setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));\n      }\n    },\n    [confirmDocumentReplacement, openBinary, openSource],\n  );\n\n  const handleSelectTab = useCallback(\n    async (path: string) => {\n      if (path === documentState?.path) return;\n      if (!confirmDocumentReplacement([path], "切换文档")) return;\n      try {\n        const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);\n        await openPath(authorizedPath);\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");\n      }\n    },\n    [confirmDocumentReplacement, documentState, openPath],\n  );\n\n  const handleCloseTabs = useCallback(\n    async (paths: readonly string[]) => {\n      const currentTabs = openTabsRef.current;\n      const targetTabs = currentTabs.filter((tab) => paths.some((path) => isSameDocumentPath(path, tab.path)));\n      if (targetTabs.length === 0) return;\n\n      const current = documentStateRef.current;\n      const activeIndex = current ? currentTabs.findIndex((tab) => isSameDocumentPath(tab.path, current.path)) : -1;\n      const closesActive = Boolean(current && targetTabs.some((tab) => isSameDocumentPath(tab.path, current.path)));\n      if (closesActive && current?.modified) {\n        const draftOutcome = flushCurrentDraft();\n        if (\n          draftOutcome === "failed" ||\n          !window.confirm(formatTransitionConfirmation("关闭标签", draftOutcome === "saved"))\n        ) {\n          return;\n        }\n      }\n\n      const nextTabs = currentTabs.filter(\n        (tab) => !targetTabs.some((target) => isSameDocumentPath(target.path, tab.path)),\n      );\n      targetTabs.forEach((tab) => releaseDocumentResources(tab.path));\n      openTabsRef.current = nextTabs;\n      setOpenTabs(nextTabs);\n      saveOpenTabs(nextTabs);\n      if (!closesActive) return;\n\n      const nextTab = nextTabs[activeIndex] ?? nextTabs[activeIndex - 1];\n      if (nextTab) {\n        await openPath(nextTab.path);\n      } else {\n        setDocumentState(null);\n        setSourceDraft("");\n        setMode("rendered");\n        setSearchQuery("");\n        setError(null);\n        saveLastDocumentPath(null);\n        if (workspacePath) {\n          updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });\n        }\n      }\n    },\n    [flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],\n  );\n\n  const handleCloseTab = useCallback(\n    (path: string) => {\n      void handleCloseTabs([path]);\n    },\n    [handleCloseTabs],\n  );\n\n  const handleReorderTabs = useCallback((sourcePath: string, targetPath: string) => {\n    setOpenTabs((current) => reorderTabs(current, sourcePath, targetPath));\n  }, []);\n\n  const handleDrop = useCallback(\n    (event: DragEvent<HTMLDivElement>) => {\n      event.preventDefault();\n      void handleBrowserFiles(event.dataTransfer.files);\n    },\n    [handleBrowserFiles],\n  );\n\n  const handleOpenReaderLink = useCallback(\n    (href: string) => {\n      if (href.startsWith("moyang-wiki:")) {\n        const target = safeDecode(href.slice("moyang-wiki:".length));\n        const [rawPath, rawAnchor] = target.split("#", 2);\n        const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;\n        const linkedEntry = currentEntry ? findLinkedEntry(workspaceIndex, currentEntry, rawPath) : undefined;\n        const path =\n          linkedEntry?.file.path ??\n          (documentState ? resolveWikiPath(documentState.path, rawPath || documentState.path) : null);\n        if (!path) {\n          setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");\n          return;\n        }\n        void handleSelectTab(path).then(() => {\n          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);\n        });\n        return;\n      }\n\n      const target = safeDecode(href);\n      if (target.startsWith("#")) {\n        scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current);\n        return;\n      }\n\n      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {\n        const normalized = target.startsWith("//") ? `https:${target}` : target;\n        try {\n          const externalUrl = new URL(normalized, window.location.href);\n          if (!["http:", "https:", "mailto:", "tel:"].includes(externalUrl.protocol)) {\n            setError("已阻止不受支持的外部链接协议。");\n            return;\n          }\n          void openExternalUrl(externalUrl.toString()).catch((cause) => {\n            setError(cause instanceof Error ? cause.message : "无法打开外部链接。");\n          });\n        } catch {\n          setError("无法解析这个外部链接。");\n        }\n        return;\n      }\n      if (!documentState || documentState.path.startsWith("browser://")) {\n        setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");\n        return;\n      }\n\n      const [rawPath, rawAnchor] = target.split("#", 2);\n      const path = resolveRelativePath(documentState.path, rawPath);\n      if (!path) {\n        setError("无法解析这个本地文档链接。");\n        return;\n      }\n      void handleSelectTab(path).then(() => {\n        if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);\n      });\n    },\n    [documentState, handleSelectTab, workspaceIndex],\n  );\n\n  const handleReaderClick = useCallback(\n    (event: MouseEvent<HTMLElement>) => {\n      const anchor = (event.target as HTMLElement).closest("a");\n      const href = anchor?.getAttribute("href");\n      if (!anchor || !href) return;\n\n      event.preventDefault();\n      handleOpenReaderLink(href);\n    },\n    [handleOpenReaderLink],\n  );\n\n  const handleReaderContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {\n    event.preventDefault();\n    const anchor = (event.target as HTMLElement).closest("a");\n    setReaderContextMenu({\n      x: event.clientX,\n      y: event.clientY,\n      selectedText: window.getSelection()?.toString() ?? "",\n      linkHref: anchor?.getAttribute("href") ?? null,\n    });\n  }, []);\n\n  const handleCopyReaderText = useCallback(async (text: string) => {\n    const value = text.trim();\n    if (!value) return;\n\n    try {\n      await copyPlainText(value);\n      setSettingsNotice("选中文本已复制。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制选中文本失败。");\n    }\n  }, []);\n\n  const handleCopyReaderLink = useCallback(async (href: string) => {\n    try {\n      await copyPlainText(href);\n      setSettingsNotice("链接地址已复制。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制链接地址失败。");\n    }\n  }, []);\n\n  const handleCopyReaderDocumentPath = useCallback(async () => {\n    const path = documentStateRef.current?.path;\n    if (!path || path.startsWith("browser://")) {\n      setError("当前文档没有可复制的本地路径。");\n      return;\n    }\n\n    try {\n      await copyPlainText(path);\n      setSettingsNotice("文档路径已复制。");\n      setError(null);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制文档路径失败。");\n    }\n  }, []);\n\n  useEffect(() => {\n    setReaderContextMenu(null);\n  }, [documentState?.path, mode]);\n\n  useEffect(() => {\n    const root = document.documentElement;\n    if (theme === "system") {\n      delete root.dataset.theme;\n    } else {\n      root.dataset.theme = theme;\n    }\n\n    try {\n      localStorage.setItem("moyang-reader-theme", theme);\n    } catch {\n      // Local storage may be unavailable in a restricted browser preview.\n    }\n  }, [theme]);\n\n  useEffect(() => {\n    document.documentElement.lang = locale === "en-US" ? "en" : "zh-CN";\n    saveLocale(locale);\n  }, [locale]);\n\n  useEffect(() => {\n    if (!selectedTag || !workspacePath || workspaceIndex.some((entry) => entry.tags.includes(selectedTag))) return;\n    setSelectedTag(null);\n  }, [selectedTag, workspaceIndex, workspacePath]);\n\n  useEffect(() => {\n    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 160);\n    return () => window.clearTimeout(timer);\n  }, [searchQuery]);\n\n  useEffect(() => {\n    const root = articleRef.current;\n    if (!root || mode !== "rendered") {\n      setSearchResultCount(0);\n      setSearchResultIndex(0);\n      return;\n    }\n\n    root.querySelectorAll("mark.moyang-search-hit").forEach((mark) => {\n      const parent = mark.parentNode;\n      if (!parent) return;\n      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);\n      parent.removeChild(mark);\n      parent.normalize();\n    });\n\n    const query = debouncedSearchQuery.trim().toLocaleLowerCase();\n    if (!query) {\n      setSearchResultCount(0);\n      setSearchResultIndex(0);\n      return;\n    }\n\n    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);\n    const textNodes: Text[] = [];\n    let currentNode = walker.nextNode();\n    while (currentNode) {\n      if (currentNode.parentElement?.tagName !== "SCRIPT" && currentNode.parentElement?.tagName !== "STYLE") {\n        textNodes.push(currentNode as Text);\n      }\n      currentNode = walker.nextNode();\n    }\n\n    for (const textNode of textNodes) {\n      const value = textNode.nodeValue ?? "";\n      const lowerValue = value.toLocaleLowerCase();\n      const positions: number[] = [];\n      let cursor = 0;\n      while (true) {\n        const position = lowerValue.indexOf(query, cursor);\n        if (position < 0) break;\n        positions.push(position);\n        cursor = position + query.length;\n      }\n\n      for (const position of positions.reverse()) {\n        const range = document.createRange();\n        range.setStart(textNode, position);\n        range.setEnd(textNode, position + query.length);\n        const mark = document.createElement("mark");\n        mark.className = "moyang-search-hit";\n        range.surroundContents(mark);\n      }\n    }\n\n    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));\n    setSearchResultCount(hits.length);\n    setSearchResultIndex((current) => (hits.length ? Math.min(current, hits.length - 1) : 0));\n  }, [debouncedSearchQuery, documentState?.rendered.html, mode]);\n\n  useEffect(() => {\n    const root = articleRef.current;\n    if (!root || mode !== "rendered") return;\n\n    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));\n    const nextIndex = hits.length ? Math.min(searchResultIndex, hits.length - 1) : 0;\n    hits.forEach((hit, index) => hit.classList.toggle("active", index === nextIndex));\n    hits[nextIndex]?.scrollIntoView({ block: "center" });\n  }, [debouncedSearchQuery, documentState?.rendered.html, mode, searchResultIndex]);\n\n  useEffect(() => {\n    const root = articleRef.current;\n    const currentPath = documentState?.path;\n    if (!root || mode !== "rendered" || !currentPath || !isTauriRuntime()) return;\n\n    let active = true;\n    const objectUrls = new Set<string>();\n    void (async () => {\n      const images = Array.from(root.querySelectorAll<HTMLImageElement>("img[src]"));\n      for (const image of images) {\n        const source = image.getAttribute("src") ?? "";\n        const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n        if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue;\n        const localPath = resolveRelativePath(currentPath, safeDecode(target));\n        if (!localPath) continue;\n\n        try {\n          const bytes = await readBinaryFile(localPath);\n          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;\n          const objectUrl = URL.createObjectURL(new Blob([binary], { type: imageMimeType(localPath) }));\n          if (!active) {\n            URL.revokeObjectURL(objectUrl);\n            continue;\n          }\n          objectUrls.add(objectUrl);\n          image.src = objectUrl;\n        } catch {\n          // Keep the original source when a relative attachment is unavailable or unauthorized.\n        }\n      }\n    })();\n\n    return () => {\n      active = false;\n      objectUrls.forEach((url) => URL.revokeObjectURL(url));\n      objectUrls.clear();\n    };\n  }, [documentState?.path, documentState?.rendered.html, mode]);\n\n  const moveSearchResult = useCallback(\n    (step: number) => {\n      if (!searchResultCount) return;\n      setSearchResultIndex((current) => (current + step + searchResultCount) % searchResultCount);\n    },\n    [searchResultCount],\n  );\n\n  const cycleTheme = useCallback(() => {\n    setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));\n  }, []);\n\n  const canEdit = documentState ? isEditableDocument(documentState.kind) : false;\n  const currentIndexEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;\n  const backlinkIndex = useMemo(() => createBacklinkIndex(workspaceIndex), [workspaceIndex]);\n  const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry, backlinkIndex) : [];\n  const outgoing = currentIndexEntry\n    ? currentIndexEntry.links.map((target) => ({\n        target,\n        entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),\n      }))\n    : [];\n  const availableTags = useMemo(\n    () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),\n    [workspaceIndex],\n  );\n  const taggedFilePaths = useMemo(\n    () =>\n      new Set(workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path)),\n    [selectedTag, workspaceIndex],\n  );\n  const visibleWorkspaceFiles = useMemo(\n    () => workspaceFiles.filter((file) => matchesWorkspaceFilter(file, selectedFileKind, selectedTag, taggedFilePaths)),\n    [selectedFileKind, selectedTag, taggedFilePaths, workspaceFiles],\n  );\n  const visibleWorkspaceResults = useMemo(\n    () =>\n      workspaceResults.filter((result) =>\n        matchesWorkspaceFilter(result.file, selectedFileKind, selectedTag, taggedFilePaths),\n      ),\n    [selectedFileKind, selectedTag, taggedFilePaths, workspaceResults],\n  );\n  const workspaceExportFiles = useMemo(() => {\n    const query = workspaceQuery.trim();\n    if (!query) return visibleWorkspaceFiles;\n    if (query.length < 2 || workspaceSearchLoading) return [];\n    return visibleWorkspaceResults.map((result) => result.file);\n  }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);\n  const wikiLinkCandidates = useMemo(\n    () => buildWikiLinkCandidates(workspaceFiles, documentState?.path),\n    [workspaceFiles, documentState?.path],\n  );\n  const executeCommand = useCallback(\n    (commandId: string) => {\n      switch (commandId) {\n        case "open":\n          void openSelectedFile();\n          break;\n        case "workspace":\n          void handleChooseWorkspace();\n          break;\n        case "quick-open":\n          setQuickOpen(true);\n          break;\n        case "toggle-mode":\n          toggleReadingEditing();\n          break;\n        case "save":\n          void saveDocument();\n          break;\n        case "undo":\n          undoEditor();\n          break;\n        case "redo":\n          redoEditor();\n          break;\n        case "link":\n          handleInsertLink();\n          break;\n        case "context":\n          setRightPanelOpen((current) => !current);\n          break;\n        case "focus":\n          setFocusMode((current) => !current);\n          break;\n      }\n    },\n    [\n      handleChooseWorkspace,\n      handleInsertLink,\n      openSelectedFile,\n      redoEditor,\n      saveDocument,\n      toggleReadingEditing,\n      undoEditor,\n    ],\n  );\n  const canEditHistory = canEdit && mode !== "rendered";\n  const canUndo = canEditHistory && canUndoEditorChange(editorHistory);\n  const canRedo = canEditHistory && canRedoEditorChange(editorHistory);\n  const commandItems = useMemo<ReaderCommand[]>(\n    () => [\n      {\n        id: "open",\n        label: "打开文档",\n        shortcut: "Ctrl O",\n      },\n      {\n        id: "workspace",\n        label: "添加整个文件夹",\n        shortcut: "Ctrl ⇧ O",\n      },\n      {\n        id: "quick-open",\n        label: "快速打开",\n        shortcut: "Ctrl P",\n      },\n      {\n        id: "toggle-mode",\n        label: mode === "rendered" ? "进入编辑模式" : "切换到阅读模式",\n        shortcut: "Ctrl E",\n        disabled: !canEdit,\n      },\n      {\n        id: "save",\n        label: "保存当前文档",\n        shortcut: "Ctrl S",\n        disabled: !documentState?.modified,\n      },\n      {\n        id: "undo",\n        label: "撤销上一次编辑",\n        shortcut: "Ctrl Z",\n        disabled: !canUndo,\n      },\n      {\n        id: "redo",\n        label: "重做上一次编辑",\n        shortcut: "Ctrl Y",\n        disabled: !canRedo,\n      },\n      {\n        id: "link",\n        label: "插入 Markdown 链接",\n        shortcut: "Ctrl K",\n        disabled: !canEdit,\n      },\n      {\n        id: "context",\n        label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",\n        shortcut: "Ctrl ⇧ R",\n      },\n      {\n        id: "focus",\n        label: focusMode ? "退出专注阅读" : "进入专注阅读",\n        shortcut: "Ctrl ⇧ Enter",\n        disabled: !documentState,\n      },\n    ],\n    [canEdit, canRedo, canUndo, focusMode, mode, rightPanelOpen, documentState],\n  );\n  const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {\n    const items = new Map<string, QuickOpenCandidate>();\n    const add = (candidate: QuickOpenCandidate) => {\n      const key = comparablePath(candidate.path);\n      const existing = items.get(key);\n      items.set(key, existing ? { ...existing, isRecent: existing.isRecent || candidate.isRecent } : candidate);\n    };\n\n    workspaceFiles.forEach((file) => add(file));\n    openTabs.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));\n    recentFiles.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));\n\n    return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));\n  }, [openTabs, recentFiles, workspaceFiles]);\n\n  const handleCancelWorkspaceExport = useCallback(() => {\n    workspaceExportAbortRef.current?.abort();\n    if (pdfBatchExportRef.current) finishPdfBatch(true);\n  }, [finishPdfBatch]);\n\n  const copyWorkspaceExportFailures = useCallback(async () => {\n    if (workspaceExportFailures.length === 0) return;\n\n    try {\n      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持复制到剪贴板。");\n      await navigator.clipboard.writeText(formatExportFailureReport(workspaceExportFailures));\n      setWorkspaceExportNotice(`已复制 ${workspaceExportFailures.length} 个失败项清单。`);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "复制导出失败清单失败。");\n    }\n  }, [workspaceExportFailures]);\n\n  const saveWorkspaceExportFailures = useCallback(async () => {\n    if (workspaceExportFailures.length === 0) return;\n\n    const report = formatExportFailureReport(workspaceExportFailures);\n    try {\n      if (isTauriRuntime()) {\n        const workspaceName = fileNameFromPath(workspacePath?.replace(/[\\/]+$/, "") ?? "") || "阅读库";\n        const defaultPath = pathWithExtension(`${workspacePath ?? ""}\\${workspaceName} - 导出失败清单.md`, "md");\n        const path = await chooseSavePath(defaultPath, "markdown");\n        if (!path) return;\n        await writeTextFile(path, report);\n      } else {\n        downloadText("moyang-reader-export-failures.md", report);\n      }\n      setWorkspaceExportNotice(`已保存 ${workspaceExportFailures.length} 个失败项清单。`);\n    } catch (cause) {\n      setError(cause instanceof Error ? cause.message : "保存导出失败清单失败。");\n    }\n  }, [workspaceExportFailures, workspacePath]);\n\n  const handleExportWorkspace = useCallback(\n    async (format: "html" | "docx" | "pdf") => {\n      if (!workspacePath || workspaceExportFiles.length === 0 || !isTauriRuntime()) return;\n\n      const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";\n      let savePath: string | null = null;\n      try {\n        if (format !== "pdf") {\n          savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);\n        }\n      } catch (cause) {\n        setError(cause instanceof Error ? cause.message : "打开导出保存位置失败。");\n        return;\n      }\n      if (format !== "pdf" && !savePath) return;\n\n      const controller = new AbortController();\n      workspaceExportAbortRef.current = controller;\n      setWorkspaceExporting(true);\n      setWorkspaceExportProgress({ current: 0, total: workspaceExportFiles.length, fileName: "准备导出…" });\n      setWorkspaceExportFailures([]);\n      setWorkspaceExportNotice(null);\n      setError(null);\n\n      if (format === "pdf") {\n        const files = workspaceExportFiles.filter(\n          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",\n        );\n        if (files.length === 0) {\n          workspaceExportAbortRef.current = null;\n          setWorkspaceExporting(false);\n          setWorkspaceExportProgress(null);\n          setWorkspaceExportNotice("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");\n          return;\n        }\n\n        pdfBatchExportRef.current = {\n          files,\n          nextIndex: 0,\n          volumeNumber: 0,\n          exported: 0,\n          skippedFiles: [],\n          title: `${workspaceName} 阅读库`,\n          options: {\n            paper: preferences.exportPaper,\n            orientation: preferences.exportOrientation,\n            margin: preferences.exportMargin,\n          },\n        };\n        try {\n          await prepareNextPdfBatch();\n        } catch (cause) {\n          finishPdfBatch(true);\n          setError(cause instanceof Error ? cause.message : "批量打印准备失败。");\n        }\n        return;\n      }\n\n      let exported = 0;\n      let writtenVolumes = 0;\n      const skippedFiles: WorkspaceExportFailure[] = [];\n      const recordSkippedFile = (fileName: string, reason: string) => {\n        skippedFiles.push({ fileName, reason });\n        setWorkspaceExportFailures([...skippedFiles]);\n      };\n      try {\n        const exportTitle = `${workspaceName} 阅读库`;\n        const exportOptions = {\n          paper: preferences.exportPaper,\n          orientation: preferences.exportOrientation,\n          margin: preferences.exportMargin,\n        };\n        const exportableFileCount = workspaceExportFiles.filter(\n          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",\n        ).length;\n        const estimatedExportBytes = workspaceExportFiles\n          .filter((file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text")\n          .reduce((total, file) => total + file.size, 0);\n        const expectedVolumeCount = Math.max(\n          1,\n          Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE),\n          Math.ceil(estimatedExportBytes / BATCH_EXPORT_MAX_ESTIMATED_BYTES),\n        );\n        let documents: { title: string; body: string }[] = [];\n        let estimatedDocumentBytes = 0;\n        const flushDocuments = async () => {\n          if (documents.length === 0) return;\n          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");\n\n          const batch = documents;\n          documents = [];\n          estimatedDocumentBytes = 0;\n          const volumeNumber = writtenVolumes + 1;\n          const volumeTitle = expectedVolumeCount > 1 ? `${exportTitle} · 第 ${volumeNumber} 卷` : exportTitle;\n          if (format === "html") {\n            if (!savePath) throw new Error("没有选择 HTML 保存位置。");\n            const targetPath =\n              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "html") : savePath;\n            await writeTextFile(targetPath, buildBatchHtmlExport(volumeTitle, batch, exportOptions));\n          } else {\n            if (!savePath) throw new Error("没有选择 Word 保存位置。");\n            const targetPath =\n              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "docx") : savePath;\n            await writeBinaryFile(\n              targetPath,\n              await buildBatchDocxExport(volumeTitle, batch, exportOptions, controller.signal),\n            );\n          }\n          writtenVolumes = volumeNumber;\n          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");\n        };\n\n        for (const [index, file] of workspaceExportFiles.entries()) {\n          if (controller.signal.aborted) {\n            setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));\n            return;\n          }\n          setWorkspaceExportProgress({\n            current: index + 1,\n            total: workspaceExportFiles.length,\n            fileName: file.relativePath,\n          });\n          try {\n            let rendered;\n            if (file.kind === "docx") {\n              rendered = await renderDocx(await readBinaryFile(file.path), {\n                allowRemoteResources: preferences.allowRemoteResources,\n              });\n            } else if (file.kind === "markdown" || file.kind === "text") {\n              rendered = await renderSource(\n                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",\n                await readTextFile(file.path),\n                {\n                  allowRemoteResources: preferences.allowRemoteResources,\n                },\n              );\n            } else {\n              recordSkippedFile(file.relativePath, "类型不支持");\n              continue;\n            }\n\n            const body = await inlineLocalImages(\n              rendered.html,\n              (source) => {\n                const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;\n                if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;\n                return resolveRelativePath(file.path, safeDecode(target));\n              },\n              readBinaryFile,\n              imageMimeType,\n              fileSize,\n            );\n            documents.push({ title: file.relativePath, body });\n            estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;\n            exported += 1;\n            if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();\n          } catch (cause) {\n            recordSkippedFile(file.relativePath, cause instanceof Error ? cause.message : "读取失败");\n          }\n        }\n\n        if (controller.signal.aborted) {\n          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));\n          return;\n        }\n\n        if (exported === 0) {\n          const failureSummary = summarizeExportFailures(\n            skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),\n          );\n          throw new Error(\n            failureSummary\n              ? `当前筛选中没有可导出的文档。跳过 ${skippedFiles.length} 个：${failureSummary}`\n              : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",\n          );\n        }\n        await flushDocuments();\n        const formatLabel = format === "html" ? "HTML" : "Word";\n        const failureSummary = summarizeExportFailures(\n          skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),\n        );\n        const volumeNotice = writtenVolumes > 1 ? `，已分卷为 ${writtenVolumes} 个文件` : "";\n        const destinationNotice = savePath ? `（${fileNameFromPath(savePath)}）` : "";\n        setWorkspaceExportNotice(\n          `已导出 ${exported} 篇文档为 ${formatLabel}${destinationNotice}${volumeNotice}${\n            failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""\n          }。`,\n        );\n      } catch (cause) {\n        if (controller.signal.aborted) {\n          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));\n        } else {\n          setError(cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "批量导出失败。");\n        }\n      } finally {\n        if (workspaceExportAbortRef.current === controller) workspaceExportAbortRef.current = null;\n        setWorkspaceExporting(false);\n        setWorkspaceExportProgress(null);\n      }\n    },\n    [\n      preferences.allowRemoteResources,\n      preferences.exportMargin,\n      preferences.exportOrientation,\n      preferences.exportPaper,\n      finishPdfBatch,\n      prepareNextPdfBatch,\n      workspaceExportFiles,\n      workspacePath,\n    ],\n  );\n\n  return (\n    <div\n      className={`app-shell reading-width-${preferences.readingWidth}${\n        focusMode ? " focus-mode" : ""\n      }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}\n      style={\n        {\n          "--sidebar-width": `${paneWidths.sidebar}px`,\n          "--context-width": `${paneWidths.context}px`,\n          "--reading-zoom": `${preferences.readingZoom / 100}`,\n        } as CSSProperties\n      }\n      onDragOver={(event) => event.preventDefault()}\n      onDrop={handleDrop}\n    >\n      <TopBar\n        fileName={documentState?.name ?? null}\n        mode={mode}\n        documentKind={documentState?.kind ?? null}\n        canEdit={canEdit}\n        modified={documentState?.modified ?? false}\n        externallyModified={documentState?.externallyModified ?? false}\n        onShowExternalChange={() => {\n          if (documentState?.path) setExternalChangePath(documentState.path);\n        }}\n        searchOpen={searchOpen}\n        searchQuery={searchQuery}\n        searchResultCount={searchResultCount}\n        searchResultIndex={searchResultIndex}\n        theme={theme}\n        locale={locale}\n        readingZoom={preferences.readingZoom}\n        readingWidth={preferences.readingWidth}\n        exportPaper={preferences.exportPaper}\n        exportOrientation={preferences.exportOrientation}\n        exportMargin={preferences.exportMargin}\n        onReadingZoomChange={setReadingZoom}\n        onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}\n        onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}\n        onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}\n        onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}\n        allowRemoteResources={preferences.allowRemoteResources}\n        startupUpdateCheck={preferences.startupUpdateCheck}\n        onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}\n        onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}\n        onExportSettings={() => void exportPortableSettings()}\n        onImportSettings={importPortableSettings}\n        onOpenGuide={() => setGuideOpen(true)}\n        settingsPersistenceStatus={settingsPersistenceStatus}\n        onOpen={() => void openSelectedFile()}\n        onAddWorkspace={() => void handleChooseWorkspace()}\n        workspaceOpen={Boolean(workspacePath)}\n        workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}\n        onQuickOpen={() => setQuickOpen(true)}\n        draftCount={draftSnapshots.length}\n        onOpenRecovery={() => setDraftRecoveryOpen(true)}\n        sidebarCollapsed={sidebarCollapsed}\n        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}\n        focusMode={focusMode}\n        onToggleFocusMode={() => setFocusMode((current) => !current)}\n        onToggleMode={toggleReadingEditing}\n        onCycleMode={toggleDocumentMode}\n        canUndo={canUndo}\n        canRedo={canRedo}\n        onUndo={undoEditor}\n        onRedo={redoEditor}\n        rightPanelOpen={rightPanelOpen}\n        onToggleRightPanel={() => setRightPanelOpen((current) => !current)}\n        onOpenCommandPalette={() => setCommandPaletteOpen(true)}\n        onSave={() => void saveDocument()}\n        onCopy={() => void handleCopy()}\n        copyFeedback={copyFeedback}\n        onExport={() => void handleExport()}\n        exportLabel={\n          documentState?.kind === "pdf"\n            ? "打开 PDF"\n            : documentState?.kind === "image"\n              ? "打开图片"\n              : isTauriRuntime()\n                ? "保存 PDF"\n                : "打印 / PDF"\n        }\n        canPreviewPrint={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}\n        onPreviewPrint={() => void handlePreviewPrint()}\n        canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}\n        canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}\n        canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}\n        canCopy={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}\n        onExportMarkdown={() => void handleExportMarkdown()}\n        onExportHtml={() => void handleExportHtml()}\n        onExportDocx={() => void handleExportDocx()}\n        onToggleSearch={() => setSearchOpen((current) => !current)}\n        updateStatus={updateStatus}\n        updateVersion={availableUpdate?.version ?? null}\n        onCheckUpdates={() => {\n          if (updateStatus === "downloading") setUpdateNoticeVisible(true);\n          else void checkForUpdates(true);\n        }}\n        onSearchQueryChange={(query) => {\n          setSearchQuery(query);\n          setSearchResultIndex(0);\n        }}\n        onSearchPrevious={() => moveSearchResult(-1)}\n        onSearchNext={() => moveSearchResult(1)}\n        onCloseSearch={() => {\n          setSearchOpen(false);\n          setSearchQuery("");\n        }}\n        onCycleTheme={cycleTheme}\n        onLocaleChange={setLocale}\n      />\n      <div className="navigation-strip">\n        {settingsNotice && (\n          <div className="settings-notice" role="status">\n            {settingsNotice}\n          </div>\n        )}\n        {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (\n          <UpdateNotice\n            status={updateStatus}\n            version={availableUpdate?.version ?? null}\n            notes={availableUpdate?.body?.trim() || null}\n            progress={updateProgress}\n            error={updateError}\n            onInstall={() => void installUpdate()}\n            onRelaunch={() => void relaunchUpdatedApp()}\n            onHide={() => setUpdateNoticeVisible(false)}\n            onDismiss={dismissUpdateNotice}\n          />\n        )}\n        <Tabs\n          tabs={openTabs}\n          activePath={documentState?.path ?? null}\n          externallyModified={documentState?.externallyModified ?? false}\n          onShowExternalChange={() => {\n            if (documentState?.path) setExternalChangePath(documentState.path);\n          }}\n          onSelect={(path) => void handleSelectTab(path)}\n          onClose={(path) => void handleCloseTab(path)}\n          onCloseMany={(paths) => void handleCloseTabs(paths)}\n          onReorder={handleReorderTabs}\n        />\n      </div>\n      <div className="workspace-grid">\n        <aside className="sidebar">\n          <WorkspacePanel\n            onExportWorkspace={(format) => void handleExportWorkspace(format)}\n            onCancelWorkspaceExport={handleCancelWorkspaceExport}\n            workspaceExporting={workspaceExporting}\n            workspaceExportProgress={workspaceExportProgress}\n            workspaceExportFailures={workspaceExportFailures}\n            onCopyExportFailures={() => void copyWorkspaceExportFailures()}\n            onSaveExportFailures={() => void saveWorkspaceExportFailures()}\n            workspaceExportNotice={workspaceExportNotice}\n            workspaceIndexLoading={workspaceIndexLoading}\n            workspacePath={workspacePath}\n            files={workspaceFiles}\n            folders={workspaceFolders}\n            visibleFiles={visibleWorkspaceFiles}\n            visibleResultCount={visibleWorkspaceResults.length}\n            exportableFiles={workspaceExportFiles}\n            recentFiles={recentFiles}\n            recentWorkspaces={recentWorkspaces}\n            mountedWorkspaces={mountedWorkspaces}\n            activePath={documentState?.path ?? null}\n            searchQuery={workspaceQuery}\n            searchResults={visibleWorkspaceResults}\n            searchLoading={workspaceSearchLoading}\n            tagOptions={availableTags}\n            selectedTag={selectedTag}\n            selectedKind={selectedFileKind}\n            onAddWorkspace={() => void handleChooseWorkspace()}\n            workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}\n            onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}\n            onRemoveWorkspace={handleRemoveMountedWorkspace}\n            onOpenFile={(path) => void handleSelectTab(path)}\n            onCloseFile={(path) => void handleCloseTab(path)}\n            onCreateNote={(parentPath) => void handleCreateWorkspaceNote(parentPath)}\n            onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}\n            onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}\n            onDeleteEntry={(entryPath, kind) => void handleDeleteWorkspaceEntry(entryPath, kind)}\n            onDuplicateEntry={(entryPath, kind) => void handleDuplicateWorkspaceEntry(entryPath, kind)}\n            onShowDetails={handleShowWorkspaceDetails}\n            onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}\n            onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}\n            onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}\n            onCopyName={(entryPath) => void handleCopyWorkspaceName(entryPath)}\n            onRefresh={(entryPath) => void handleRefreshWorkspaceEntry(entryPath)}\n            onSearchQueryChange={setWorkspaceQuery}\n            onTagChange={setSelectedTag}\n            onKindChange={setSelectedFileKind}\n            onClearFilters={() => {\n              setSelectedTag(null);\n              setSelectedFileKind("all");\n            }}\n          />\n          {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}\n          {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}\n          {documentState ? (\n            <div className="sidebar-note">\n              <div className="panel-kicker">READING DESK</div>\n              <p>文件树负责找到内容，右侧上下文面板负责理解当前文档。</p>\n            </div>\n          ) : (\n            <div className="sidebar-note">\n              <div className="panel-kicker">MOMENT</div>\n              <p>一个轻量的本地入口，先让内容抵达你面前。</p>\n            </div>\n          )}\n        </aside>\n        {!sidebarCollapsed && !focusMode && (\n          <PaneResizeHandle\n            side="sidebar"\n            value={paneWidths.sidebar}\n            min={PANE_WIDTH_LIMITS.sidebar.min}\n            max={PANE_WIDTH_LIMITS.sidebar.max}\n            onResizeBy={(delta) => resizePane("sidebar", delta)}\n            onReset={() => resetPane("sidebar")}\n          />\n        )}\n\n        <main ref={contentAreaRef} className="content-area" aria-live="polite" onWheel={handleReaderWheel}>\n          {readingZoomNotice !== null && (\n            <div className="reading-zoom-hud" role="status" aria-live="polite">\n              阅读缩放 {readingZoomNotice}%\n            </div>\n          )}\n          {sidebarCollapsed && !focusMode && (\n            <button\n              type="button"\n              className="sidebar-restore"\n              onClick={() => setSidebarCollapsed(false)}\n              title="显示侧栏 (Ctrl+Shift+B)"\n            >\n              显示侧栏 <span>Ctrl+Shift+B</span>\n            </button>\n          )}\n          {focusMode && (\n            <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>\n              退出专注 <span>Esc</span>\n            </button>\n          )}\n          {loading && <div className="loading-state">正在打开文档…</div>}\n          {externalChangePath && documentState?.path === externalChangePath && (\n            <ExternalChangeNotice\n              fileName={documentState.name}\n              onReload={() => void reloadExternalChange()}\n              onOverwrite={overwriteExternalChange}\n              onSaveAs={() => void handleExportMarkdown()}\n              onDismiss={() => setExternalChangePath(null)}\n            />\n          )}\n          {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (\n            <DraftRecoveryNotice\n              snapshot={draftRecovery}\n              onRecover={recoverDraft}\n              onLater={deferDraftRecovery}\n              onDiscard={discardDraft}\n            />\n          )}\n          {error && (\n            <div className="error-state" role="alert">\n              {error}\n            </div>\n          )}\n          {!loading && !documentState && (\n            <EmptyState\n              onOpen={() => void openSelectedFile()}\n              onChooseWorkspace={() => void handleChooseWorkspace()}\n              onOpenGuide={() => setGuideOpen(true)}\n              hasWorkspace={Boolean(workspacePath)}\n              showWorkspaceAction={!workspacePath && !sidebarCollapsed}\n            />\n          )}\n          {!loading && documentState && documentState.kind === "pdf" && mode === "rendered" && (\n            <PdfPreview name={documentState.name} src={documentState.previewUrl} />\n          )}\n          {!loading && documentState && documentState.kind === "image" && mode === "rendered" && (\n            <ImagePreview name={documentState.name} src={documentState.previewUrl} />\n          )}\n          {!loading &&\n            documentState &&\n            documentState.kind !== "pdf" &&\n            documentState.kind !== "image" &&\n            mode === "rendered" && (\n              <div className="reader-stage">\n                <article\n                  ref={articleRef}\n                  className="reader-content markdown-body"\n                  onClick={handleReaderClick}\n                  onContextMenu={handleReaderContextMenu}\n                >\n                  <div className="reader-meta" aria-label="文档信息">\n                    <span className="reader-meta-kicker">DOCUMENT</span>\n                    <span>\n                      {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")}{" "}\n                      字 · {documentState.rendered.readingMinutes} 分钟阅读\n                    </span>\n                    {documentState.externallyModified && (\n                      <button\n                        type="button"\n                        className="reader-external-change"\n                        onClick={() => setExternalChangePath(documentState.path)}\n                      >\n                        文件已被外部修改 · 处理\n                      </button>\n                    )}\n                  </div>\n                  {!startsWithHeading(documentState.rendered.html) && (\n                    <header className="print-document-header" aria-hidden="true">\n                      <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>\n                      <div className="print-document-title">{documentState.name}</div>\n                    </header>\n                  )}\n                  <ProgressiveReaderContent html={documentState.rendered.html} />\n                </article>\n              </div>\n            )}\n          {!loading && documentState && documentState.kind === "markdown" && mode === "wysiwyg" && (\n            <Suspense fallback={<div className="wysiwyg-loading-state">正在准备所见即所得编辑器…</div>}>\n              <LazyMarkdownWysiwygEditor\n                source={sourceDraft}\n                documentKey={documentState.path}\n                ariaLabel="Markdown 所见即所得编辑器"\n                onChange={(value) => void updateSource(value)}\n                onInsertLink={() => handleInsertLink()}\n                onFindText={handleFindEditorText}\n                canUndo={canUndo}\n                canRedo={canRedo}\n                onUndo={(target) => undoEditor(target)}\n                onRedo={(target) => redoEditor(target)}\n                onStatusMessage={(message) => setSettingsNotice(message)}\n                wikiCandidates={wikiLinkCandidates}\n              />\n            </Suspense>\n          )}\n          {!loading && documentState && canEdit && mode === "source" && (\n            <SourceEditor\n              value={sourceDraft}\n              ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}\n              onChange={(value) => void updateSource(value)}\n              onPaste={handleSourcePaste}\n              onInsertLink={handleInsertLink}\n              onFindText={handleFindEditorText}\n              canUndo={canUndo}\n              canRedo={canRedo}\n              onUndo={(target) => undoEditor(target)}\n              onRedo={(target) => redoEditor(target)}\n              onStatusMessage={(message) => setSettingsNotice(message)}\n              wikiCompletions={wikiLinkCandidates}\n            />\n          )}\n          {readerContextMenu && documentState && mode === "rendered" && (\n            <ReaderContextMenu\n              target={readerContextMenu}\n              documentPath={documentState.path.startsWith("browser://") ? null : documentState.path}\n              canEdit={canEdit}\n              editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}\n              onCopySelection={(text) => void handleCopyReaderText(text)}\n              onFindSelection={(text) => handleFindEditorText(text)}\n              onCopyLink={(href) => void handleCopyReaderLink(href)}\n              onOpenLink={handleOpenReaderLink}\n              onEdit={toggleReadingEditing}\n              onCopyDocumentPath={() => void handleCopyReaderDocumentPath()}\n              onClose={() => setReaderContextMenu(null)}\n            />\n          )}\n        </main>\n        {rightPanelOpen && !focusMode && (\n          <PaneResizeHandle\n            side="context"\n            value={paneWidths.context}\n            min={PANE_WIDTH_LIMITS.context.min}\n            max={PANE_WIDTH_LIMITS.context.max}\n            onResizeBy={(delta) => resizePane("context", delta)}\n            onReset={() => resetPane("context")}\n          />\n        )}\n        {rightPanelOpen && !focusMode && (\n          <ContextPanel\n            documentState={documentState}\n            entry={currentIndexEntry}\n            backlinks={backlinks}\n            outgoing={outgoing}\n            canCreateNote={Boolean(workspacePath && isTauriRuntime())}\n            selectedTag={selectedTag}\n            toc={documentState?.rendered.toc ?? []}\n            activeHeadingId={currentHeadingId}\n            currentHeading={currentHeading}\n            readingProgress={readingProgress}\n            mode={mode}\n            activeTab={activeContextTab}\n            onTabChange={setActiveContextTab}\n            onClose={() => setRightPanelOpen(false)}\n            onOpenFile={(path) => void handleSelectTab(path)}\n            onCreateNote={(target) => void handleCreateNote(target)}\n            onOpenGraph={() => setGraphOpen(true)}\n            onSelectTag={setSelectedTag}\n            onScrollToTop={() => scrollToReaderEdge("top")}\n            onScrollToBottom={() => scrollToReaderEdge("bottom")}\n            onNavigateHeading={navigateToHeading}\n          />\n        )}\n      </div>\n\n      <footer className="statusbar">\n        <span>{documentState?.path ?? "等待打开文件"}</span>\n        {documentState && (\n          <span>\n            {documentState.kind === "pdf"\n              ? "PDF"\n              : documentState.kind === "image"\n                ? "图片"\n                : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}\n          </span>\n        )}\n        {documentState?.externallyModified && (\n          <button\n            type="button"\n            className="statusbar-external-change"\n            onClick={() => setExternalChangePath(documentState.path)}\n          >\n            外部修改待处理\n          </button>\n        )}\n        <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>\n      </footer>\n\n      <input\n        ref={inputRef}\n        type="file"\n        multiple\n        accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.docx,.pdf,.avif,.gif,.jpeg,.jpg,.png,.svg,.webp,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,image/*"\n        hidden\n        onChange={(event) => {\n          void handleBrowserFiles(event.target.files);\n          event.currentTarget.value = "";\n        }}\n      />\n      {graphOpen && (\n        <RelationGraph\n          current={currentIndexEntry}\n          entries={workspaceIndex}\n          onClose={() => setGraphOpen(false)}\n          onOpenFile={(path) => void handleSelectTab(path)}\n        />\n      )}\n      {workspaceEntryDetails && (\n        <WorkspaceEntryDetailsDialog details={workspaceEntryDetails} onClose={() => setWorkspaceEntryDetails(null)} />\n      )}\n      {printPreview && (\n        <PrintPreview\n          title={printPreview.title}\n          html={printPreview.html}\n          actionLabel={printPreview.actionLabel}\n          actionHint={printPreview.actionHint}\n          paper={printPreview.paper}\n          orientation={printPreview.orientation}\n          margin={printPreview.margin}\n          onPrint={handlePrintPreview}\n          onClose={handleClosePrintPreview}\n        />\n      )}\n      {quickOpen && (\n        <QuickOpenPalette\n          items={quickOpenItems}\n          onClose={() => setQuickOpen(false)}\n          onOpenFile={(path) => {\n            setQuickOpen(false);\n            void handleSelectTab(path);\n          }}\n        />\n      )}\n      {commandPaletteOpen && (\n        <CommandPalette\n          commands={commandItems}\n          onClose={() => setCommandPaletteOpen(false)}\n          onExecute={executeCommand}\n        />\n      )}\n      {draftRecoveryOpen && draftSnapshots.length > 0 && (\n        <DraftRecoveryCenter\n          snapshots={draftSnapshots}\n          onOpen={(path) => void openDraftSnapshot(path)}\n          onDiscard={requestDraftDiscardByPath}\n          onClearAll={clearAllDrafts}\n          onClose={() => setDraftRecoveryOpen(false)}\n        />\n      )}\n      {draftDiscardRequest && (\n        <DraftDiscardConfirmationDialog\n          path={draftDiscardRequest.path}\n          onCancel={cancelDraftDiscard}\n          onConfirm={confirmDraftDiscard}\n        />\n      )}\n      {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}\n      {externalOverwriteConfirmationOpen && (\n        <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />\n      )}\n      {guideOpen && (\n        <GettingStartedDialog\n          locale={locale}\n          onClose={closeGettingStarted}\n          onOpenDocument={openDocumentFromGuide}\n          onAddWorkspace={addWorkspaceFromGuide}\n        />\n      )}\n    </div>\n  );\n}\n
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type MouseEvent,
+  type WheelEvent as ReactWheelEvent,
+} from "react";
+import { EmptyState } from "./components/EmptyState";
+import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
+import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
+import { ContextPanel } from "./components/ContextPanel";
+import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
+import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
+import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
+import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
+import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
+import { GettingStartedDialog } from "./components/GettingStartedDialog";
+import { ImagePreview } from "./components/ImagePreview";
+import { PdfPreview } from "./components/PdfPreview";
+import { PaneResizeHandle } from "./components/PaneResizeHandle";
+import { PrintPreview } from "./components/PrintPreview";
+import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
+import { QuickOpenPalette } from "./components/QuickOpenPalette";
+import { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";
+import { RelationGraph } from "./components/RelationGraph";
+import { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteContext } from "./components/SourceEditor";
+import { Tabs } from "./components/Tabs";
+import { TopBar } from "./components/TopBar";
+import { WorkspacePanel } from "./components/WorkspacePanel";
+import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsDialog";
+import { UpdateNotice } from "./components/UpdateNotice";
+import { scheduleSourceRender } from "./source-render-scheduler";
+import { createReadingPositionTracker } from "./reading-position";
+import {
+  chooseDocumentPaths,
+  chooseSavePath,
+  chooseWorkspacePath,
+  authorizeStoredPath,
+  closeWindow,
+  createMarkdownFile,
+  createWorkspaceFolder,
+  createWorkspaceNote,
+  duplicateWorkspaceEntry,
+  exportPdfFile,
+  fileExists,
+  fileSize,
+  fileMetadata,
+  indexWorkspace,
+  initialPaths,
+  isTauriRuntime,
+  listWorkspaceDirectories,
+  listWorkspaceFiles,
+  openExternalUrl,
+  renameWorkspaceEntry,
+  deleteWorkspaceEntry,
+  revealWorkspaceEntry,
+  readBinaryFile,
+  readAppSettings,
+  readTextFile,
+  refreshWorkspace,
+  resolveOpenPaths,
+  searchWorkspace,
+  subscribeToFileDrop,
+  subscribeToWorkspaceChanges,
+  subscribeToCloseRequest,
+  subscribeToOpenPaths,
+  writeBinaryFile,
+  writeAppSettings,
+  writeTextFile,
+} from "./bridge";
+import type { Update } from "@tauri-apps/plugin-updater";
+import {
+  checkForAppUpdate,
+  describeUpdateError,
+  getCurrentAppVersion,
+  installAppUpdate,
+  relaunchApp,
+  type UpdateStatus,
+} from "./updater";
+import {
+  clearUpdateRecovery,
+  formatUpdateRecoveryNotice,
+  loadUpdateRecovery,
+  saveUpdateRecovery,
+} from "./update-recovery";
+import type {
+  DocumentKind,
+  ContextPanelTab,
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
+  FileStamp,
+  OpenPath,
+  OpenDocument,
+  ReaderMode,
+  RecentFile,
+  RecentWorkspace,
+  ThemeMode,
+  TocItem,
+  WorkspaceExportFailure,
+  WorkspaceDirectory,
+  WorkspaceEntryDetails,
+  WorkspaceFile,
+  WorkspaceIndexEntry,
+  WorkspaceSearchResult,
+} from "./types";
+import { DocumentCache } from "./document-cache";
+import { nextReaderModeAfterOpen } from "./reader-mode";
+import {
+  READING_ZOOM_DEFAULT,
+  READING_ZOOM_STEP,
+  normalizeReadingZoom,
+  readingScaleFromZoom,
+  stepReadingZoom,
+} from "./reading-zoom";
+import { reorderTabs } from "./tab-order";
+import { checkMarkdownEditorSafety } from "./markdown-editor-support";
+import { buildWikiLinkCandidates } from "./wiki-link-completion";
+import {
+  BATCH_EXPORT_CHUNK_SIZE,
+  BATCH_EXPORT_MAX_ESTIMATED_BYTES,
+  buildBatchDocxExport,
+  buildBatchHtmlExport,
+  buildDocxExport,
+  buildHtmlExport,
+  copyRichText,
+  formatExportFailureReport,
+  formatExportCancellationNotice,
+  fileNameWithExtension,
+  inlineLocalImages,
+  pathWithExtension,
+  pathWithNameSuffix,
+  printHtmlDocument,
+  summarizeExportFailures,
+  shouldFlushBatchExport,
+} from "./export";
+import {
+  loadRecentFiles,
+  MAX_MOUNTED_WORKSPACES,
+  loadMountedWorkspaces,
+  loadRecentWorkspaces,
+  loadWorkspaceSessions,
+  loadLastDocumentPath,
+  loadOpenTabs,
+  loadReadingPosition,
+  loadSidebarCollapsed,
+  loadContextPanelOpen,
+  loadContextPanelTab,
+  loadPaneWidths,
+  loadWorkspacePath,
+  rememberRecentFile,
+  rememberMountedWorkspace,
+  rememberRecentWorkspace,
+  saveRecentFiles,
+  saveLastDocumentPath,
+  saveOpenTabs,
+  saveReadingPosition,
+  saveSidebarCollapsed,
+  saveContextPanelOpen,
+  saveContextPanelTab,
+  savePaneWidths,
+  saveMountedWorkspaces,
+  saveWorkspaceSession,
+  saveWorkspaceSessions,
+  forgetWorkspaceSession,
+  saveWorkspacePath,
+} from "./storage";
+import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
+import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
+import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
+import { loadLocale, saveLocale, type Locale } from "./i18n";
+import {
+  createAppSettingsSnapshot,
+  loadAppSettingsSnapshot,
+  parseAppSettings,
+  saveAppSettingsSnapshot,
+  serializeAppSettings,
+  type AppSettingsSnapshot,
+  type SettingsPersistenceStatus,
+} from "./app-settings";
+import { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";
+import {
+  documentKindFromPath,
+  emptyRenderedDocument,
+  imageMimeType,
+  isEditableDocument,
+  renderDocx,
+  renderSource,
+} from "../lib/document-adapters";
+import { createBacklinkIndex, findBacklinks, findIndexEntry, findLinkedEntry } from "./workspace-index";
+import type { QuickOpenCandidate } from "./quick-open";
+import {
+  applyWorkspaceFileDelta,
+  applyWorkspaceFolderDelta,
+  applyWorkspaceIndexDelta,
+  isCurrentWorkspaceLoad,
+} from "./workspace-refresh";
+import { resolveExternalChangeAction } from "./external-change";
+import { normalizePathKey } from "./path-key";
+import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
+import { scrollHeadingInContainer } from "./heading-navigation";
+import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
+import {
+  formatTransitionConfirmation,
+  isSameDocumentPath,
+  shouldConfirmDocumentReplacement,
+  shouldConfirmWorkspaceSwitch,
+} from "./document-transition";
+import {
+  clipboardAssetFileName,
+  clipboardAssetPath,
+  clipboardAssetReference,
+  clipboardImageToPng,
+  findClipboardImage,
+  insertTextAtSelection,
+  MAX_CLIPBOARD_IMAGE_BYTES,
+} from "./clipboard-image";
+import {
+  clearAllDraftSnapshots,
+  clearDraftSnapshot,
+  findDraftSnapshot,
+  loadDraftSnapshots,
+  saveDraftSnapshot,
+  type DraftSnapshot,
+  type DraftSaveResult,
+} from "./draft-recovery";
+import {
+  canRedoEditorChange,
+  canUndoEditorChange,
+  createEditorHistory,
+  redoEditorChange,
+  recordEditorChange,
+  undoEditorChange,
+  type EditorHistoryState,
+} from "./editor-history";
+import { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";
+
+function fileNameFromPath(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
+
+function duplicateEntryName(path: string, kind: "file" | "folder"): string {
+  const name = fileNameFromPath(path);
+  if (kind === "folder") return `${name} 副本`;
+  const extensionIndex = name.lastIndexOf(".");
+  if (extensionIndex > 0) return `${name.slice(0, extensionIndex)} 副本${name.slice(extensionIndex)}`;
+  return `${name} 副本`;
+}
+
+function focusEditorSurface(surface: Element | null): void {
+  if (!surface) return;
+  const target = surface.matches('textarea, [contenteditable="true"], .cm-content')
+    ? surface
+    : surface.querySelector<HTMLElement>('.cm-content, [contenteditable="true"], textarea');
+  if (target instanceof HTMLElement) target.focus();
+}
+
+async function copyPlainText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("当前环境不支持访问剪贴板。");
+  } finally {
+    textarea.remove();
+  }
+}
+
+const LazyMarkdownWysiwygEditor = lazy(() =>
+  import("./components/MarkdownWysiwygEditor").then(({ MarkdownWysiwygEditor }) => ({
+    default: MarkdownWysiwygEditor,
+  })),
+);
+
+function fileTypeLabel(kind: DocumentKind): string {
+  return kind === "markdown" ? "MD" : kind === "image" ? "IMG" : kind.toUpperCase();
+}
+
+function startsWithHeading(html: string): boolean {
+  return /^\s*<h1(?:\s[^>]*)?>/i.test(html);
+}
+
+function comparablePath(path: string): string {
+  return normalizePathKey(path);
+}
+
+function pathBelongsToWorkspace(path: string, workspacePath: string): boolean {
+  const candidate = comparablePath(path);
+  const root = comparablePath(workspacePath);
+  return candidate === root || candidate.startsWith(`${root}\\`);
+}
+
+function resolveRelativePath(basePath: string, target: string): string | null {
+  if (basePath.startsWith("browser://")) return null;
+
+  const cleanTarget = target.split(/[?#]/, 1)[0].trim();
+  if (!cleanTarget) return null;
+
+  const normalizedTarget = cleanTarget.replace(/[\\/]+/g, "\\");
+  const isAbsolute = /^[A-Za-z]:\\/.test(normalizedTarget) || normalizedTarget.startsWith("\\\\");
+  const baseDirectory = basePath.replace(/[\\/][^\\/]*$/, "");
+  return isAbsolute ? normalizedTarget : `${baseDirectory}\\${normalizedTarget}`;
+}
+
+function resolveWikiPath(basePath: string, target: string): string | null {
+  const resolved = resolveRelativePath(basePath, target);
+  if (!resolved) return null;
+
+  return /\.[A-Za-z0-9]+$/.test(resolved) ? resolved : `${resolved}.md`;
+}
+
+function scrollToHeading(anchor: string, contentArea: HTMLElement | null, article: HTMLElement | null): void {
+  let attempts = 0;
+  const attempt = () => {
+    if (scrollHeadingInContainer(anchor, contentArea, article)) return;
+    if (attempts >= 4) return;
+    attempts += 1;
+    window.requestAnimationFrame(attempt);
+  };
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(attempt);
+  });
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+type CurrentHeading = {
+  id: string;
+  text: string;
+};
+
+function currentHeadingFromArticle(
+  article: HTMLElement | null,
+  contentArea: HTMLElement | null,
+): CurrentHeading | null {
+  if (!article) return null;
+
+  const headings = Array.from(article.querySelectorAll<HTMLElement>("h1, h2, h3, h4"));
+  if (headings.length === 0) return null;
+
+  const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+  const isAtBottom = Boolean(contentArea && contentArea.scrollTop >= maxScrollTop - 2);
+  let currentHeading: HTMLElement | undefined;
+  if (isAtBottom) {
+    currentHeading = headings[headings.length - 1];
+  } else {
+    const threshold = (contentArea?.getBoundingClientRect().top ?? 0) + 72;
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top <= threshold) currentHeading = heading;
+      else break;
+    }
+  }
+
+  const heading = currentHeading ?? headings[0];
+  const text = heading.textContent?.trim() ?? "";
+  return text ? { id: heading.id, text } : null;
+}
+
+function readSavedTheme(): ThemeMode {
+  try {
+    const saved = localStorage.getItem("moyang-reader-theme");
+    return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function downloadText(name: string, contents: string, mimeType = "text/markdown"): void {
+  const blob = new Blob([contents], { type: mimeType + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadBytes(name: string, contents: Uint8Array, mimeType: string): void {
+  const buffer = contents.buffer.slice(contents.byteOffset, contents.byteOffset + contents.byteLength) as ArrayBuffer;
+  const blob = new Blob([buffer], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+type BrowserDocument = {
+  kind: DocumentKind;
+  source?: string;
+  bytes?: Uint8Array;
+  previewUrl?: string;
+};
+
+type PrintPreviewState = {
+  title: string;
+  html: string;
+  defaultPath?: string;
+  actionLabel?: string;
+  actionHint?: string;
+  paper: ExportPaper;
+  orientation: ExportOrientation;
+  margin: ExportMargin;
+};
+
+type WorkspaceExportProgress = {
+  current: number;
+  total: number;
+  fileName: string;
+};
+
+type PdfBatchExportState = {
+  files: WorkspaceFile[];
+  nextIndex: number;
+  volumeNumber: number;
+  exported: number;
+  skippedFiles: WorkspaceExportFailure[];
+  title: string;
+  options: {
+    paper: ExportPaper;
+    orientation: ExportOrientation;
+    margin: ExportMargin;
+  };
+};
+
+type CachedWorkspace = {
+  path: string;
+  name: string;
+  files: WorkspaceFile[];
+  folders: WorkspaceDirectory[];
+  index: WorkspaceIndexEntry[];
+  revision: number;
+  selectedTag: string | null;
+  selectedFileKind: WorkspaceKindFilter;
+  searchQuery: string;
+  tabs: RecentFile[];
+  activeDocumentPath: string | null;
+};
+
+type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
+
+type PendingAppSettingsWrite = {
+  snapshot: AppSettingsSnapshot;
+  localSaved: boolean;
+};
+
+function updateCachedWorkspace(
+  cache: Map<string, CachedWorkspace>,
+  root: string,
+  changes: Partial<Omit<CachedWorkspace, "path">>,
+): void {
+  const key = comparablePath(root);
+  const current = cache.get(key);
+  if (!current) return;
+  cache.set(key, { ...current, ...changes });
+}
+
+function persistCachedWorkspaceSession(cache: Map<string, CachedWorkspace>, root: string): void {
+  const cached = cache.get(comparablePath(root));
+  if (!cached) return;
+  saveWorkspaceSession({
+    path: cached.path,
+    tabs: cached.tabs,
+    activeDocumentPath: cached.activeDocumentPath,
+  });
+}
+
+function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: RecentWorkspace[]): void {
+  const mountedKeys = new Set(mounted.map((workspace) => comparablePath(workspace.path)));
+  for (const key of cache.keys()) {
+    if (!mountedKeys.has(key)) cache.delete(key);
+  }
+}
+
+export function App() {
+  const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());
+  const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
+  const [mode, setMode] = useState<ReaderMode>("rendered");
+  const [sourceDraft, setSourceDraft] = useState("");
+  const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [searchResultCount, setSearchResultCount] = useState(0);
+  const [searchResultIndex, setSearchResultIndex] = useState(0);
+  const [theme, setTheme] = useState<ThemeMode>(() => storedAppSettings?.theme ?? readSavedTheme());
+  const [locale, setLocale] = useState<Locale>(() => storedAppSettings?.locale ?? loadLocale());
+  const [focusMode, setFocusMode] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => storedAppSettings?.sidebarCollapsed ?? loadSidebarCollapsed(),
+  );
+  const [rightPanelOpen, setRightPanelOpen] = useState(
+    () => storedAppSettings?.rightPanelOpen ?? loadContextPanelOpen(),
+  );
+  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(
+    () => storedAppSettings?.activeContextTab ?? loadContextPanelTab(),
+  );
+  const [paneWidths, setPaneWidths] = useState(() => storedAppSettings?.paneWidths ?? loadPaneWidths());
+  const [preferences, setPreferences] = useState<ReaderPreferences>(
+    () => storedAppSettings?.preferences ?? loadReaderPreferences(),
+  );
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
+  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);
+  const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
+  const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
+  const [mountedWorkspaces, setMountedWorkspaces] = useState<RecentWorkspace[]>(loadMountedWorkspaces);
+  const [workspaceQuery, setWorkspaceQuery] = useState("");
+  const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
+  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
+  const [workspaceExporting, setWorkspaceExporting] = useState(false);
+  const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
+  const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
+  const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
+  const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
+  const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateNoticeVisible, setUpdateNoticeVisible] = useState(false);
+  const updateRef = useRef<Update | null>(null);
+  const updateCheckInFlightRef = useRef(false);
+  const initialStartupUpdateCheckRef = useRef(preferences.startupUpdateCheck);
+  const workspaceExportAbortRef = useRef<AbortController | null>(null);
+  const pdfBatchExportRef = useRef<PdfBatchExportState | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
+  const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
+  const [externalOverwriteConfirmationOpen, setExternalOverwriteConfirmationOpen] = useState(false);
+  const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
+  const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
+  const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
+  const [graphOpen, setGraphOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
+  const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);
+  const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [currentHeading, setCurrentHeading] = useState<string | null>(null);
+  const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);
+  const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
+  const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
+  const [tabSessionReady, setTabSessionReady] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const contentAreaRef = useRef<HTMLElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
+  const readingPositionRef = useRef<{ path: string; top: number } | null>(null);
+  const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
+  const browserDocumentSequenceRef = useRef(0);
+  const previewUrlsRef = useRef(new Map<string, string>());
+  const documentStateRef = useRef<OpenDocument | null>(null);
+  const closeConfirmationOpenRef = useRef(false);
+  const sourceDraftRef = useRef(sourceDraft);
+  const editorHistoryRef = useRef(editorHistory);
+  const preferencesRef = useRef<ReaderPreferences>(preferences);
+  const workspacePathRef = useRef<string | null>(workspacePath);
+  const openTabsRef = useRef<RecentFile[]>(openTabs);
+  const readingZoomNoticeTimerRef = useRef<number | null>(null);
+  const workspaceRestorePendingRef = useRef(false);
+  const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
+  const documentCacheRef = useRef(new DocumentCache());
+  const pendingWorkspaceMountsRef = useRef(new Set<string>());
+  const workspaceLoadRequestRef = useRef(0);
+  const workspaceRefreshRequestRef = useRef(0);
+  const workspaceReloadTimerRef = useRef<number | null>(null);
+  const pendingWorkspacePathsRef = useRef(new Set<string>());
+  const selfWritingPathsRef = useRef(new Set<string>());
+  const selfWrittenPathsRef = useRef(new Map<string, number>());
+  const sourceRenderRequestRef = useRef(0);
+  const pendingHeadingRef = useRef<string | null>(null);
+  const nativeSettingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingAppSettingsWriteRef = useRef<PendingAppSettingsWrite | null>(null);
+  const appSettingsFlushTimerRef = useRef<number | null>(null);
+  const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const settingsWriteRevisionRef = useRef(0);
+  const settingsCloseInFlightRef = useRef(false);
+
+  const updateReadingRail = useCallback(() => {
+    const contentArea = contentAreaRef.current;
+    const maxScrollTop = contentArea ? Math.max(0, contentArea.scrollHeight - contentArea.clientHeight) : 0;
+    const nextProgress = maxScrollTop > 0 ? Math.min(1, Math.max(0, contentArea!.scrollTop / maxScrollTop)) : 0;
+    setReadingProgress((current) => (Math.abs(current - nextProgress) < 0.001 ? current : nextProgress));
+    const heading = currentHeadingFromArticle(articleRef.current, contentArea);
+    setCurrentHeading((current) => (current === (heading?.text ?? null) ? current : (heading?.text ?? null)));
+    setCurrentHeadingId((current) => (current === (heading?.id || null) ? current : heading?.id || null));
+  }, []);
+
+  const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+    contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });
+  }, []);
+
+  const resizePane = useCallback((side: PaneSide, delta: number) => {
+    setPaneWidths((current) => {
+      const nextWidth = clampPaneWidth(side, current[side] + delta);
+      if (nextWidth === current[side]) return current;
+      return { ...current, [side]: nextWidth };
+    });
+  }, []);
+
+  const resetPane = useCallback((side: PaneSide) => {
+    setPaneWidths((current) => ({
+      ...current,
+      [side]: DEFAULT_PANE_WIDTHS[side],
+    }));
+  }, []);
+
+  const enqueueNativeSettingsWrite = useCallback((pending: PendingAppSettingsWrite): Promise<boolean> => {
+    const revision = ++settingsWriteRevisionRef.current;
+    const nativeWrite = nativeSettingsWriteQueueRef.current
+      .catch(() => undefined)
+      .then(() => writeAppSettings(serializeAppSettings(pending.snapshot)));
+    const result = nativeWrite.then(
+      () => {
+        if (revision === settingsWriteRevisionRef.current) {
+          setSettingsPersistenceStatus(pending.localSaved ? "saved" : "fallback");
+        }
+        return true;
+      },
+      () => {
+        if (revision === settingsWriteRevisionRef.current) {
+          setSettingsPersistenceStatus(pending.localSaved ? "fallback" : "error");
+        }
+        return false;
+      },
+    );
+    nativeSettingsWriteQueueRef.current = result.then(() => undefined);
+    lastNativeSettingsWriteRef.current = result;
+    return result;
+  }, []);
+
+  const flushAppSettings = useCallback(async (): Promise<boolean> => {
+    if (!isTauriRuntime()) return true;
+
+    const timer = appSettingsFlushTimerRef.current;
+    if (timer !== null) {
+      window.clearTimeout(timer);
+      appSettingsFlushTimerRef.current = null;
+    }
+
+    const pending = pendingAppSettingsWriteRef.current;
+    if (pending) {
+      pendingAppSettingsWriteRef.current = null;
+      return enqueueNativeSettingsWrite(pending);
+    }
+    return lastNativeSettingsWriteRef.current;
+  }, [enqueueNativeSettingsWrite]);
+
+  const navigateToHeading = useCallback(
+    (item: TocItem) => {
+      pendingHeadingRef.current = item.id;
+      if (mode !== "rendered") {
+        setMode("rendered");
+        return;
+      }
+      pendingHeadingRef.current = null;
+      scrollToHeading(item.id, contentAreaRef.current, articleRef.current);
+    },
+    [mode],
+  );
+
+  const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
+    const next = { ...preferencesRef.current, ...changes };
+    preferencesRef.current = next;
+    saveReaderPreferences(next);
+    setPreferences(next);
+  }, []);
+
+  const announceReadingZoom = useCallback((zoom: number) => {
+    setReadingZoomNotice(zoom);
+    if (readingZoomNoticeTimerRef.current !== null) {
+      window.clearTimeout(readingZoomNoticeTimerRef.current);
+    }
+    readingZoomNoticeTimerRef.current = window.setTimeout(() => {
+      readingZoomNoticeTimerRef.current = null;
+      setReadingZoomNotice(null);
+    }, 1_200);
+  }, []);
+
+  const setReadingZoom = useCallback(
+    (value: number) => {
+      const nextZoom = normalizeReadingZoom(value);
+      setReaderPreferences({ readingZoom: nextZoom, readingScale: readingScaleFromZoom(nextZoom) });
+      announceReadingZoom(nextZoom);
+    },
+    [announceReadingZoom, setReaderPreferences],
+  );
+
+  const handleReaderWheel = useCallback(
+    (event: ReactWheelEvent<HTMLElement>) => {
+      if (!event.ctrlKey || event.altKey || mode !== "rendered") return;
+      const kind = documentStateRef.current?.kind;
+      if (!kind || kind === "pdf" || kind === "image") return;
+      const target = event.target instanceof Element ? event.target.closest(".reader-content") : null;
+      if (!target) return;
+
+      event.preventDefault();
+      setReadingZoom(preferencesRef.current.readingZoom + (event.deltaY < 0 ? READING_ZOOM_STEP : -READING_ZOOM_STEP));
+    },
+    [mode, setReadingZoom],
+  );
+
+  useEffect(
+    () => () => {
+      if (readingZoomNoticeTimerRef.current !== null) window.clearTimeout(readingZoomNoticeTimerRef.current);
+    },
+    [],
+  );
+
+  const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {
+    if (!result.ok) {
+      setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");
+      return false;
+    }
+
+    const snapshots = loadDraftSnapshots();
+    setDraftSnapshots(snapshots);
+    if (result.prunedCount > 0) {
+      setSettingsNotice(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`);
+    }
+    return true;
+  }, []);
+
+  const resetEditorHistory = useCallback((documentKey: string, source: string) => {
+    const nextHistory = createEditorHistory(documentKey, source);
+    editorHistoryRef.current = nextHistory;
+    setEditorHistory(nextHistory);
+  }, []);
+
+  const applyEditorHistoryState = useCallback((nextHistory: EditorHistoryState, focusTarget?: Element | null) => {
+    const activeEditor =
+      focusTarget?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??
+      (typeof document !== "undefined"
+        ? (document.activeElement?.closest<HTMLElement>(".source-editor, .wysiwyg-editor") ??
+          document.querySelector<HTMLElement>(".source-editor, .wysiwyg-editor"))
+        : null);
+    const viewport = captureEditorViewport(contentAreaRef.current, activeEditor);
+    const historyDocumentKey = nextHistory.documentKey;
+    editorHistoryRef.current = nextHistory;
+    setEditorHistory(nextHistory);
+    sourceDraftRef.current = nextHistory.present;
+    setSourceDraft(nextHistory.present);
+    setDocumentState((current) =>
+      current && isSameDocumentPath(current.path, nextHistory.documentKey)
+        ? { ...current, modified: nextHistory.present !== current.source }
+        : current,
+    );
+    const restoreViewport = () => {
+      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;
+      restoreEditorViewport(viewport);
+    };
+    window.requestAnimationFrame(() => {
+      if (!isSameDocumentPath(documentStateRef.current?.path ?? "", historyDocumentKey)) return;
+      if (activeEditor) focusEditorSurface(activeEditor);
+      restoreViewport();
+      // Milkdown may rebuild its ProseMirror state in a passive effect after
+      // the first frame; restore once more after that DOM update.
+      window.requestAnimationFrame(() => {
+        restoreViewport();
+      });
+    });
+  }, []);
+
+  const undoEditor = useCallback(
+    (focusTarget?: Element | null) => {
+      const current = documentStateRef.current;
+      const history = editorHistoryRef.current;
+      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))
+        return;
+
+      const nextHistory = undoEditorChange(history);
+      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);
+    },
+    [applyEditorHistoryState],
+  );
+
+  const redoEditor = useCallback(
+    (focusTarget?: Element | null) => {
+      const current = documentStateRef.current;
+      const history = editorHistoryRef.current;
+      if (!current || !isEditableDocument(current.kind) || !isSameDocumentPath(history.documentKey, current.path))
+        return;
+
+      const nextHistory = redoEditorChange(history);
+      if (nextHistory !== history) applyEditorHistoryState(nextHistory, focusTarget);
+    },
+    [applyEditorHistoryState],
+  );
+
+  const flushCurrentDraft = useCallback((): DraftFlushOutcome => {
+    const current = documentStateRef.current;
+    if (!current?.modified || !isEditableDocument(current.kind)) return "not-needed";
+    if (current.path.startsWith("browser://")) return "unavailable";
+
+    const result = saveDraftSnapshot({
+      path: current.path,
+      draft: sourceDraftRef.current,
+      baseSource: current.source,
+      savedAt: Date.now(),
+    });
+    return handleDraftSaveResult(result) ? "saved" : "failed";
+  }, [handleDraftSaveResult]);
+
+  const confirmDocumentReplacement = useCallback(
+    (nextPaths: readonly string[], action: string) => {
+      if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;
+      const outcome = flushCurrentDraft();
+      if (outcome === "failed") return false;
+      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));
+    },
+    [flushCurrentDraft],
+  );
+
+  const confirmWorkspaceSwitch = useCallback(
+    (nextWorkspacePath: string, action: string) => {
+      const currentDocument = documentStateRef.current;
+      if (
+        !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)
+      ) {
+        return true;
+      }
+      const outcome = flushCurrentDraft();
+      if (outcome === "failed") return false;
+      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));
+    },
+    [flushCurrentDraft],
+  );
+
+  const cancelCloseConfirmation = useCallback(() => {
+    closeConfirmationOpenRef.current = false;
+    settingsCloseInFlightRef.current = false;
+    setCloseConfirmationOpen(false);
+  }, []);
+
+  const confirmClose = useCallback(() => {
+    closeConfirmationOpenRef.current = false;
+    setCloseConfirmationOpen(false);
+    settingsCloseInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (!(await flushAppSettings())) {
+          setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+          return;
+        }
+        await closeWindow();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+      } finally {
+        settingsCloseInFlightRef.current = false;
+      }
+    })();
+  }, [flushAppSettings]);
+
+  const exportPortableSettings = useCallback(async () => {
+    try {
+      const serialized = serializePortableSettings(
+        createPortableSettingsBundle({
+          preferences,
+          locale,
+          theme,
+          workspacePath,
+          lastDocumentPath: loadLastDocumentPath(),
+          mountedWorkspaces,
+          workspaceSessions: loadWorkspaceSessions(),
+          openTabs,
+        }),
+      );
+      if (isTauriRuntime()) {
+        const targetPath = await chooseSavePath("Moyang Reader - settings.json", "json");
+        if (!targetPath) return;
+        await writeTextFile(targetPath, serialized);
+        setSettingsNotice(`设置备份已保存：${fileNameFromPath(targetPath)}`);
+      } else {
+        downloadText("Moyang Reader - settings.json", serialized, "application/json");
+        setSettingsNotice("设置备份已下载，不包含文档正文或私钥。");
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "设置备份导出失败。");
+    }
+  }, [locale, mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
+
+  const importPortableSettings = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      void file
+        .text()
+        .then((serialized) => {
+          const bundle = parsePortableSettings(serialized);
+          saveReaderPreferences(bundle.preferences);
+          saveWorkspaceSessions([...bundle.workspaceSessions]);
+          saveOpenTabs([...bundle.openTabs]);
+          saveMountedWorkspaces([...bundle.mountedWorkspaces]);
+          saveWorkspacePath(bundle.workspacePath);
+          saveLastDocumentPath(bundle.lastDocumentPath);
+          preferencesRef.current = bundle.preferences;
+          setPreferences(bundle.preferences);
+          setLocale(bundle.locale);
+          saveLocale(bundle.locale);
+          setTheme(bundle.theme);
+          setMountedWorkspaces([...bundle.mountedWorkspaces]);
+          setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
+        })
+        .catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : "设置备份导入失败。");
+        });
+    };
+    input.click();
+  }, []);
+
+  useEffect(() => {
+    documentStateRef.current = documentState;
+  }, [documentState]);
+
+  useEffect(() => {
+    sourceDraftRef.current = sourceDraft;
+  }, [sourceDraft]);
+
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    void readAppSettings()
+      .then((serialized) => {
+        if (!active) return;
+        const nativeSnapshot = serialized ? parseAppSettings(serialized) : null;
+        if (nativeSnapshot && (!storedAppSettings || nativeSnapshot.savedAt > storedAppSettings.savedAt)) {
+          preferencesRef.current = nativeSnapshot.preferences;
+          setPreferences(nativeSnapshot.preferences);
+          setTheme(nativeSnapshot.theme);
+          setLocale(nativeSnapshot.locale);
+          setSidebarCollapsed(nativeSnapshot.sidebarCollapsed);
+          setRightPanelOpen(nativeSnapshot.rightPanelOpen);
+          setActiveContextTab(nativeSnapshot.activeContextTab);
+          setPaneWidths(nativeSnapshot.paneWidths);
+        }
+        setNativeSettingsReady(true);
+      })
+      .catch(() => {
+        // Older installations may not have a native settings file yet. Legacy local storage remains usable.
+        if (active) setNativeSettingsReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [storedAppSettings]);
+
+  useEffect(() => {
+    if (!nativeSettingsReady) return;
+
+    const snapshot = createAppSettingsSnapshot({
+      preferences,
+      theme,
+      locale,
+      sidebarCollapsed,
+      rightPanelOpen,
+      activeContextTab,
+      paneWidths,
+    });
+    const localResult = saveAppSettingsSnapshot(
+      {
+        preferences,
+        theme,
+        locale,
+        sidebarCollapsed,
+        rightPanelOpen,
+        activeContextTab,
+        paneWidths,
+      },
+      snapshot.savedAt,
+    );
+
+    if (!isTauriRuntime()) {
+      setSettingsPersistenceStatus(localResult.ok ? "saved" : "error");
+      return;
+    }
+
+    pendingAppSettingsWriteRef.current = { snapshot, localSaved: localResult.ok };
+    const timer = window.setTimeout(
+      () => {
+        appSettingsFlushTimerRef.current = null;
+        const pending = pendingAppSettingsWriteRef.current;
+        pendingAppSettingsWriteRef.current = null;
+        if (pending) void enqueueNativeSettingsWrite(pending);
+      },
+      localResult.ok ? 220 : 0,
+    );
+    appSettingsFlushTimerRef.current = timer;
+    setSettingsPersistenceStatus("saving");
+
+    return () => {
+      window.clearTimeout(timer);
+      if (appSettingsFlushTimerRef.current === timer) appSettingsFlushTimerRef.current = null;
+    };
+  }, [
+    activeContextTab,
+    enqueueNativeSettingsWrite,
+    locale,
+    nativeSettingsReady,
+    paneWidths,
+    preferences,
+    rightPanelOpen,
+    sidebarCollapsed,
+    theme,
+  ]);
+
+  useEffect(() => {
+    documentCacheRef.current.clear();
+  }, [preferences.allowRemoteResources]);
+
+  useEffect(() => {
+    if (!settingsNotice) return;
+    const timer = window.setTimeout(() => setSettingsNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [settingsNotice]);
+
+  useEffect(() => {
+    if (tabSessionReady) saveOpenTabs(openTabs);
+  }, [openTabs, tabSessionReady]);
+
+  useEffect(() => {
+    saveSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    saveContextPanelOpen(rightPanelOpen);
+  }, [rightPanelOpen]);
+
+  useEffect(() => {
+    saveContextPanelTab(activeContextTab);
+  }, [activeContextTab]);
+
+  useEffect(() => {
+    savePaneWidths(paneWidths);
+  }, [paneWidths]);
+
+  useEffect(() => {
+    setWorkspaceExportFailures([]);
+    setWorkspaceExportNotice(null);
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    if (!path || path.startsWith("browser://") || mode !== "rendered") return;
+
+    let frame: number | null = null;
+    let attempts = 0;
+    const maxRestoreAttempts = 60;
+    const retryRestore = () => {
+      if (attempts >= maxRestoreAttempts) return;
+      attempts += 1;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        restorePosition();
+      });
+    };
+    const restorePosition = () => {
+      const contentArea = contentAreaRef.current;
+      if (!contentArea) return;
+      const storedTop = loadReadingPosition(path);
+      const maxScrollTop = Math.max(0, contentArea.scrollHeight - contentArea.clientHeight);
+      if (storedTop > 0 && maxScrollTop === 0) {
+        retryRestore();
+        return;
+      }
+      contentArea.scrollTop = Math.min(storedTop, maxScrollTop);
+      readingPositionRef.current = { path, top: contentArea.scrollTop };
+      if (storedTop > 0 && contentArea.scrollTop === 0) retryRestore();
+    };
+    const timer = window.setTimeout(restorePosition, 0);
+    return () => {
+      window.clearTimeout(timer);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [documentState?.path, documentState?.rendered.html, mode]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    const contentArea = contentAreaRef.current;
+    if (!path || path.startsWith("browser://") || !contentArea) return;
+
+    let timer: number | null = null;
+    const initialTop =
+      readingPositionRef.current?.path === path ? readingPositionRef.current.top : contentArea.scrollTop;
+    const tracker = createReadingPositionTracker(path, initialTop, (trackedPath, top) => {
+      readingPositionRef.current = { path: trackedPath, top };
+      saveReadingPosition(trackedPath, top);
+    });
+    const persistPosition = () => {
+      const top = contentArea.scrollTop;
+      tracker.update(top);
+      readingPositionRef.current = { path, top: tracker.current() };
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        tracker.flush();
+      }, 180);
+    };
+
+    contentArea.addEventListener("scroll", persistPosition, { passive: true });
+    return () => {
+      contentArea.removeEventListener("scroll", persistPosition);
+      if (timer !== null) window.clearTimeout(timer);
+      const latestKnownTop =
+        readingPositionRef.current?.path === path ? readingPositionRef.current.top : tracker.current();
+      tracker.update(latestKnownTop);
+      tracker.flush();
+    };
+  }, [documentState?.path]);
+
+  useEffect(() => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    let frame: number | null = null;
+    const update = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        updateReadingRail();
+      });
+    };
+
+    contentArea.addEventListener("scroll", update, { passive: true });
+    updateReadingRail();
+    return () => {
+      contentArea.removeEventListener("scroll", update);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);
+
+  useEffect(() => {
+    if (mode !== "rendered") return;
+    const pendingHeading = pendingHeadingRef.current;
+    if (!pendingHeading) return;
+
+    pendingHeadingRef.current = null;
+    scrollToHeading(pendingHeading, contentAreaRef.current, articleRef.current);
+  }, [documentState?.path, documentState?.rendered.html, mode]);
+
+  useEffect(() => {
+    if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
+    setReadingProgress(0);
+    setCurrentHeading(null);
+    setCurrentHeadingId(null);
+  }, [documentState, mode]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const current = documentStateRef.current;
+      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
+        const result = saveDraftSnapshot({
+          path: current.path,
+          draft: sourceDraftRef.current,
+          baseSource: current.source,
+          savedAt: Date.now(),
+        });
+        handleDraftSaveResult(result);
+      }
+      if (isTauriRuntime() || !documentStateRef.current?.modified) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [handleDraftSaveResult]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    const handleCloseRequest = () => {
+      if (closeConfirmationOpenRef.current || settingsCloseInFlightRef.current) return;
+      const current = documentStateRef.current;
+      if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
+        const result = saveDraftSnapshot({
+          path: current.path,
+          draft: sourceDraftRef.current,
+          baseSource: current.source,
+          savedAt: Date.now(),
+        });
+        if (!handleDraftSaveResult(result)) return;
+      }
+      if (current?.modified) {
+        closeConfirmationOpenRef.current = true;
+        setCloseConfirmationOpen(true);
+        return;
+      }
+      settingsCloseInFlightRef.current = true;
+      void (async () => {
+        try {
+          if (!(await flushAppSettings())) {
+            if (active) setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+            return;
+          }
+          await closeWindow();
+        } catch (cause) {
+          if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+        } finally {
+          settingsCloseInFlightRef.current = false;
+        }
+      })();
+    };
+
+    void subscribeToCloseRequest(handleCloseRequest).then((dispose) => {
+      if (!active) {
+        dispose?.();
+        return;
+      }
+      unlisten = dispose;
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [flushAppSettings, handleDraftSaveResult]);
+
+  useEffect(() => {
+    workspacePathRef.current = workspacePath;
+  }, [workspacePath]);
+
+  useEffect(() => {
+    openTabsRef.current = openTabs;
+  }, [openTabs]);
+
+  useEffect(() => {
+    if (!workspacePath) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      selectedTag,
+      selectedFileKind,
+      searchQuery: workspaceQuery,
+    });
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
+
+  useEffect(() => {
+    if (!workspacePath) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      tabs: openTabsRef.current.filter(
+        (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, workspacePath),
+      ),
+    });
+  }, [openTabs, workspacePath]);
+
+  useEffect(() => {
+    if (!workspacePath || !documentState?.path || !pathBelongsToWorkspace(documentState.path, workspacePath)) return;
+    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+      activeDocumentPath: documentState.path,
+    });
+  }, [documentState?.path, workspacePath]);
+
+  useEffect(() => {
+    if (!workspacePath) return;
+    persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
+  }, [documentState?.path, openTabs, workspacePath]);
+
+  useEffect(
+    () => () => {
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.clear();
+      browserDocumentsRef.current.clear();
+      documentCacheRef.current.clear();
+    },
+    [],
+  );
+
+  const releaseDocumentResources = useCallback((path: string) => {
+    documentCacheRef.current.remove(path);
+    const cached = browserDocumentsRef.current.get(path);
+    const previewUrl = previewUrlsRef.current.get(path) ?? cached?.previewUrl;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrlsRef.current.delete(path);
+    }
+    browserDocumentsRef.current.delete(path);
+  }, []);
+
+  const closePendingUpdate = useCallback(async () => {
+    const pending = updateRef.current;
+    updateRef.current = null;
+    setAvailableUpdate(null);
+    if (pending) await pending.close().catch(() => undefined);
+  }, []);
+
+  const checkForUpdates = useCallback(
+    async (manual = true) => {
+      if (!isTauriRuntime()) {
+        if (manual) {
+          setUpdateStatus("error");
+          setUpdateError("浏览器预览模式不支持应用更新。");
+          setUpdateNoticeVisible(true);
+        }
+        return;
+      }
+
+      if (updateCheckInFlightRef.current) return;
+      updateCheckInFlightRef.current = true;
+      setUpdateStatus("checking");
+      setUpdateError(null);
+      setUpdateProgress(null);
+      if (manual) setUpdateNoticeVisible(false);
+
+      try {
+        const version = await getCurrentAppVersion();
+        if (version) setCurrentVersion(version);
+        await closePendingUpdate();
+
+        const found = await checkForAppUpdate();
+        if (!found) {
+          setUpdateStatus(manual ? "up-to-date" : "idle");
+          setUpdateNoticeVisible(manual);
+          return;
+        }
+
+        updateRef.current = found;
+        setAvailableUpdate(found);
+        setUpdateStatus("available");
+        setUpdateNoticeVisible(true);
+      } catch (cause) {
+        if (manual) {
+          setUpdateStatus("error");
+          setUpdateError(describeUpdateError(cause));
+          setUpdateNoticeVisible(true);
+        } else {
+          setUpdateStatus("idle");
+          setUpdateError(null);
+          setUpdateNoticeVisible(false);
+        }
+      } finally {
+        updateCheckInFlightRef.current = false;
+      }
+    },
+    [closePendingUpdate],
+  );
+
+  const installUpdate = useCallback(async () => {
+    const pending = updateRef.current;
+    if (!pending) return;
+
+    setUpdateStatus("downloading");
+    setUpdateNoticeVisible(true);
+    setUpdateError(null);
+    setUpdateProgress(0);
+
+    let downloaded = 0;
+    let contentLength: number | undefined;
+    try {
+      await installAppUpdate(pending, (event) => {
+        if (event.event === "Started") {
+          contentLength = event.data.contentLength;
+          setUpdateProgress(contentLength ? 0 : null);
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          if (contentLength) {
+            setUpdateProgress(Math.min(1, downloaded / contentLength));
+          }
+        } else {
+          setUpdateProgress(1);
+        }
+      });
+
+      updateRef.current = null;
+      setAvailableUpdate(null);
+      await pending.close().catch(() => undefined);
+      setUpdateStatus("ready");
+      try {
+        await relaunchApp();
+      } catch {
+        setUpdateError("更新已安装，但应用没有自动重启，请点击“重启应用”。");
+      }
+    } catch (cause) {
+      setUpdateStatus("error");
+      const reason = describeUpdateError(cause);
+      const recovery = {
+        attemptedVersion: pending.version,
+        currentVersion,
+        failedAt: Date.now(),
+        reason,
+      };
+      saveUpdateRecovery(recovery);
+      setUpdateError(reason);
+      setUpdateNoticeVisible(true);
+    }
+  }, [currentVersion]);
+
+  const relaunchUpdatedApp = useCallback(async () => {
+    try {
+      await relaunchApp();
+    } catch (cause) {
+      setUpdateStatus("error");
+      setUpdateError(describeUpdateError(cause));
+      setUpdateNoticeVisible(true);
+    }
+  }, []);
+
+  const dismissUpdateNotice = useCallback(() => {
+    setUpdateNoticeVisible(false);
+    void closePendingUpdate();
+  }, [closePendingUpdate]);
+
+  useEffect(
+    () => () => {
+      const pending = updateRef.current;
+      updateRef.current = null;
+      if (pending) void pending.close().catch(() => undefined);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    void getCurrentAppVersion()
+      .then((version) => {
+        if (!active || !version) return;
+        setCurrentVersion(version);
+        const recovery = loadUpdateRecovery();
+        if (!recovery) return;
+        if (recovery.attemptedVersion.replace(/^v/i, "") === version.replace(/^v/i, "")) {
+          clearUpdateRecovery();
+          return;
+        }
+        setUpdateStatus("error");
+        setUpdateError(formatUpdateRecoveryNotice(recovery));
+        setUpdateNoticeVisible(true);
+      })
+      .catch(() => undefined);
+
+    const timer = initialStartupUpdateCheckRef.current
+      ? window.setTimeout(() => {
+          if (active) void checkForUpdates(false);
+        }, 1_200)
+      : null;
+
+    return () => {
+      active = false;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [checkForUpdates]);
+
+  const refreshWorkspaceChanges = useCallback(async (root: string, paths: string[]) => {
+    if (!isTauriRuntime() || paths.length === 0) return;
+
+    const requestId = ++workspaceRefreshRequestRef.current;
+    setWorkspaceIndexLoading(true);
+    try {
+      const delta = await refreshWorkspace(root, paths);
+      if (
+        requestId !== workspaceRefreshRequestRef.current ||
+        comparablePath(workspacePathRef.current ?? "") !== comparablePath(root)
+      ) {
+        return;
+      }
+      setWorkspaceFiles((current) => {
+        const next = applyWorkspaceFileDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
+        return next;
+      });
+      setWorkspaceFolders((current) => {
+        const next = applyWorkspaceFolderDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });
+        return next;
+      });
+      setWorkspaceIndex((current) => {
+        const next = applyWorkspaceIndexDelta(current, delta);
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
+        return next;
+      });
+      setWorkspaceRevision((current) => {
+        const next = current + 1;
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
+        return next;
+      });
+    } catch {
+      if (requestId === workspaceRefreshRequestRef.current) {
+        setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
+      }
+    } finally {
+      if (requestId === workspaceRefreshRequestRef.current) setWorkspaceIndexLoading(false);
+    }
+  }, []);
+
+  const loadWorkspace = useCallback(async (root: string, silent = false) => {
+    if (!isTauriRuntime()) return;
+
+    const mounted = loadMountedWorkspaces();
+    const rootKey = comparablePath(root);
+    const alreadyMounted = mounted.some((workspace) => comparablePath(workspace.path) === rootKey);
+    const alreadyPending = pendingWorkspaceMountsRef.current.has(rootKey);
+    if (
+      !alreadyMounted &&
+      !alreadyPending &&
+      mounted.length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES
+    ) {
+      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
+      return;
+    }
+    const ownsPendingMount = !alreadyMounted && !alreadyPending;
+    if (ownsPendingMount) pendingWorkspaceMountsRef.current.add(rootKey);
+
+    const previousWorkspacePath = workspacePathRef.current;
+    const storedSession = loadWorkspaceSessions().find(
+      (session) => comparablePath(session.path) === comparablePath(root),
+    );
+    const switchedWorkspace =
+      comparablePath(previousWorkspacePath ?? "") !== comparablePath(root) && Boolean(previousWorkspacePath);
+    if (switchedWorkspace || (storedSession && !previousWorkspacePath)) {
+      workspaceRestorePendingRef.current = true;
+    }
+    if (switchedWorkspace && previousWorkspacePath) {
+      const currentDocument = documentStateRef.current;
+      updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {
+        tabs: openTabsRef.current.filter(
+          (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, previousWorkspacePath),
+        ),
+        activeDocumentPath:
+          currentDocument && pathBelongsToWorkspace(currentDocument.path, previousWorkspacePath)
+            ? currentDocument.path
+            : null,
+      });
+      persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, previousWorkspacePath);
+    }
+
+    const requestId = ++workspaceLoadRequestRef.current;
+    workspaceRefreshRequestRef.current += 1;
+    setWorkspaceLoading(true);
+    setWorkspaceIndexLoading(true);
+    try {
+      const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+      if (cached) {
+        const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(cached.path);
+        workspacePathRef.current = cached.path;
+        setWorkspacePath(cached.path);
+        setWorkspaceFiles(cached.files);
+        setWorkspaceFolders(cached.folders);
+        setWorkspaceIndex(cached.index);
+        setWorkspaceRevision(cached.revision);
+        setWorkspaceQuery(cached.searchQuery);
+        setSelectedTag(cached.selectedTag);
+        setSelectedFileKind(cached.selectedFileKind);
+        if (switchedWorkspace) {
+          setWorkspaceResults([]);
+          setOpenTabs(cached.tabs ?? []);
+        }
+        saveWorkspacePath(cached.path);
+        setRecentWorkspaces(
+          rememberRecentWorkspace({
+            path: cached.path,
+            name: cached.name,
+          }),
+        );
+        const nextMountedWorkspaces = rememberMountedWorkspace({
+          path: cached.path,
+          name: cached.name,
+        });
+        pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
+        setMountedWorkspaces(nextMountedWorkspaces);
+        if (!silent) setError(null);
+        setWorkspaceLoading(false);
+
+        void (async () => {
+          try {
+            const [files, folders] = await Promise.all([
+              listWorkspaceFiles(cached.path),
+              listWorkspaceDirectories(cached.path),
+            ]);
+            if (
+              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
+            ) {
+              return;
+            }
+            setWorkspaceFiles(files);
+            setWorkspaceFolders(folders);
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files, folders });
+            setWorkspaceRevision((current) => {
+              const next = current + 1;
+              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
+              return next;
+            });
+            const index = await indexWorkspace(cached.path);
+            if (
+              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
+            ) {
+              return;
+            }
+            setWorkspaceIndex(index);
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index });
+          } catch (cause) {
+            if (requestId === workspaceLoadRequestRef.current && !silent) {
+              setError(cause instanceof Error ? cause.message : "工作区刷新失败。");
+            }
+          } finally {
+            if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
+          }
+        })();
+        return;
+      }
+
+      const [files, folders] = await Promise.all([listWorkspaceFiles(root), listWorkspaceDirectories(root)]);
+      if (requestId !== workspaceLoadRequestRef.current) return;
+
+      const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
+      const workspaceRecord = {
+        path: root,
+        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
+      };
+      mountedWorkspaceCacheRef.current.set(comparablePath(root), {
+        ...workspaceRecord,
+        files,
+        folders,
+        index: [],
+        revision: 0,
+        selectedTag: null,
+        selectedFileKind: "all",
+        searchQuery: "",
+        tabs: storedSession?.tabs ?? [],
+        activeDocumentPath: storedSession?.activeDocumentPath ?? null,
+      });
+      workspacePathRef.current = root;
+      setWorkspacePath(root);
+      setWorkspaceFiles(files);
+      setWorkspaceFolders(folders);
+      if (switchedWorkspace || !previousWorkspacePath) {
+        setWorkspaceIndex([]);
+        setWorkspaceResults([]);
+        setWorkspaceQuery("");
+        setSelectedTag(null);
+        setSelectedFileKind("all");
+        setOpenTabs(storedSession?.tabs ?? []);
+      }
+      setWorkspaceRevision((current) => {
+        const next = current + 1;
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
+        return next;
+      });
+      saveWorkspacePath(root);
+      setRecentWorkspaces(rememberRecentWorkspace(workspaceRecord));
+      const nextMountedWorkspaces = rememberMountedWorkspace(workspaceRecord);
+      pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
+      setMountedWorkspaces(nextMountedWorkspaces);
+      if (!silent) setError(null);
+      setWorkspaceLoading(false);
+
+      void indexWorkspace(root)
+        .then((index) => {
+          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))
+            return;
+          setWorkspaceIndex(index);
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index });
+        })
+        .catch((cause) => {
+          if (requestId !== workspaceLoadRequestRef.current) return;
+          setWorkspaceIndex([]);
+          if (!silent) {
+            setError(cause instanceof Error ? cause.message : "工作区索引失败。");
+          }
+        })
+        .finally(() => {
+          if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
+        });
+    } catch (cause) {
+      if (requestId !== workspaceLoadRequestRef.current) return;
+      setWorkspaceLoading(false);
+      setWorkspaceIndexLoading(false);
+      if (silent) {
+        setWorkspacePath(null);
+        workspacePathRef.current = null;
+        setWorkspaceFiles([]);
+        setWorkspaceFolders([]);
+        setWorkspaceIndex([]);
+        saveWorkspacePath(null);
+        mountedWorkspaceCacheRef.current.delete(comparablePath(root));
+        forgetWorkspaceSession(root);
+        setMountedWorkspaces((current) => {
+          const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(root));
+          saveMountedWorkspaces(next);
+          return next;
+        });
+      } else {
+        setError(cause instanceof Error ? cause.message : "工作区读取失败。");
+      }
+    } finally {
+      if (ownsPendingMount) pendingWorkspaceMountsRef.current.delete(rootKey);
+    }
+  }, []);
+
+  const handleChooseWorkspace = useCallback(async () => {
+    if (loadMountedWorkspaces().length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES) {
+      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
+      return;
+    }
+    const selected = await chooseWorkspacePath();
+    if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {
+      await loadWorkspace(selected);
+    }
+  }, [confirmWorkspaceSwitch, loadWorkspace]);
+
+  const handleOpenRecentWorkspace = useCallback(
+    async (path: string) => {
+      try {
+        const authorizedPath = await authorizeStoredPath(path, true);
+        if (!confirmWorkspaceSwitch(authorizedPath, "切换阅读库")) {
+          return;
+        }
+        await loadWorkspace(authorizedPath);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "最近阅读库无法打开，请重新选择文件夹。");
+      }
+    },
+    [confirmWorkspaceSwitch, loadWorkspace],
+  );
+
+  const handleRemoveMountedWorkspace = useCallback((path: string) => {
+    if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;
+    mountedWorkspaceCacheRef.current.delete(comparablePath(path));
+    documentCacheRef.current.invalidate([path]);
+    forgetWorkspaceSession(path);
+    setMountedWorkspaces((current) => {
+      const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));
+      saveMountedWorkspaces(next);
+      return next;
+    });
+  }, []);
+
+  const openSource = useCallback(
+    async (
+      path: string,
+      source: string,
+      preserveMode = false,
+      stamp?: FileStamp,
+      renderedOverride?: OpenDocument["rendered"],
+    ): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const kind = documentKindFromPath(path);
+        if (!kind || (kind !== "markdown" && kind !== "text")) {
+          throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
+        }
+        const editorSafety = kind === "markdown" ? checkMarkdownEditorSafety(source) : { safe: false };
+        const rendered =
+          renderedOverride ??
+          (await renderSource(path, source, {
+            allowRemoteResources: preferencesRef.current.allowRemoteResources,
+          }));
+        releaseDocumentResources(path);
+        if (path.startsWith("browser://")) {
+          browserDocumentsRef.current.set(path, { kind, source });
+        }
+        setDocumentState({
+          path,
+          name: fileNameFromPath(path),
+          kind,
+          source,
+          rendered,
+          modified: false,
+          externallyModified: false,
+        });
+        setExternalChangePath(null);
+        setSourceDraft(source);
+        sourceDraftRef.current = source;
+        resetEditorHistory(path, source);
+        setDraftRecovery(findDraftSnapshot(path, source));
+        setDraftSnapshots(loadDraftSnapshots());
+        setOpenTabs((current) =>
+          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
+        );
+        if (!path.startsWith("browser://")) {
+          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+          saveLastDocumentPath(path);
+        }
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe));
+        if (kind === "markdown" && !editorSafety.safe) {
+          setSettingsNotice(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`);
+        }
+        if (stamp && !path.startsWith("browser://")) {
+          documentCacheRef.current.set({
+            path,
+            name: fileNameFromPath(path),
+            kind,
+            source,
+            rendered,
+            stamp,
+          });
+        }
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [releaseDocumentResources, resetEditorHistory],
+  );
+
+  const openBinary = useCallback(
+    async (
+      path: string,
+      bytes: Uint8Array,
+      preserveMode = false,
+      stamp?: FileStamp,
+      renderedOverride?: OpenDocument["rendered"],
+    ): Promise<boolean> => {
+      const kind = documentKindFromPath(path);
+      if (kind !== "docx" && kind !== "pdf" && kind !== "image") {
+        throw new Error("当前文件不是可预览的文档。");
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const rendered =
+          renderedOverride ??
+          (kind === "docx"
+            ? await renderDocx(bytes, { allowRemoteResources: preferencesRef.current.allowRemoteResources })
+            : emptyRenderedDocument());
+        let previewUrl: string | undefined;
+        if (kind === "pdf" || kind === "image") {
+          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          previewUrl = URL.createObjectURL(
+            new Blob([binary], {
+              type: kind === "pdf" ? "application/pdf" : imageMimeType(path),
+            }),
+          );
+        }
+
+        releaseDocumentResources(path);
+        if (previewUrl) previewUrlsRef.current.set(path, previewUrl);
+        if (path.startsWith("browser://")) {
+          browserDocumentsRef.current.set(path, { kind, bytes, previewUrl });
+        }
+
+        setDocumentState({
+          path,
+          name: fileNameFromPath(path),
+          kind,
+          source: "",
+          rendered,
+          previewUrl,
+          modified: false,
+          externallyModified: false,
+        });
+        setExternalChangePath(null);
+        setSourceDraft("");
+        sourceDraftRef.current = "";
+        resetEditorHistory(path, "");
+        setDraftRecovery(null);
+        setDraftSnapshots(loadDraftSnapshots());
+        setOpenTabs((current) =>
+          current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
+        );
+        if (!path.startsWith("browser://")) {
+          setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
+          saveLastDocumentPath(path);
+        }
+        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind));
+        if (stamp && !path.startsWith("browser://")) {
+          documentCacheRef.current.set({
+            path,
+            name: fileNameFromPath(path),
+            kind,
+            source: "",
+            rendered,
+            stamp,
+            bytes,
+          });
+        }
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文档预览失败。");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [releaseDocumentResources, resetEditorHistory],
+  );
+
+  const openPath = useCallback(
+    async (path: string, preserveMode = false): Promise<boolean> => {
+      try {
+        if (path.startsWith("browser://")) {
+          const cached = browserDocumentsRef.current.get(path);
+          if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
+          if (cached.bytes) {
+            return await openBinary(path, cached.bytes, preserveMode);
+          } else if (cached.source !== undefined) {
+            return await openSource(path, cached.source, preserveMode);
+          }
+          return false;
+        }
+
+        const kind = documentKindFromPath(path);
+        if (!kind) {
+          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
+        }
+        const stamp = await fileMetadata(path);
+        const cached = documentCacheRef.current.get(path, stamp);
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          if (cached?.kind === kind && cached.bytes) {
+            return await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
+          }
+          return await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
+        }
+
+        if (cached?.kind === kind) {
+          return await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
+        }
+        const source = await readTextFile(path);
+        return await openSource(path, source, preserveMode, stamp);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "文件打开失败。");
+        return false;
+      }
+    },
+    [openBinary, openSource],
+  );
+
+  const reloadExternalChange = useCallback(async () => {
+    const current = documentStateRef.current;
+    if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;
+
+    if (current.modified) {
+      const draftResult = saveDraftSnapshot({
+        path: current.path,
+        draft: sourceDraftRef.current,
+        baseSource: current.source,
+        savedAt: Date.now(),
+      });
+      if (!handleDraftSaveResult(draftResult)) return;
+      if (!window.confirm("重新载入会覆盖当前未保存修改，已先保留一份草稿恢复副本。继续吗？")) return;
+    }
+
+    setExternalChangePath(null);
+    const opened = await openPath(current.path, true);
+    if (!opened && documentStateRef.current?.path === current.path) {
+      setExternalChangePath(current.path);
+    }
+  }, [externalChangePath, handleDraftSaveResult, openPath]);
+
+  useEffect(() => {
+    if (!workspacePath || !isTauriRuntime()) return;
+    if (!workspaceRestorePendingRef.current) return;
+    workspaceRestorePendingRef.current = false;
+
+    const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));
+    const targetPath = cached?.activeDocumentPath ?? null;
+    const currentPath = documentStateRef.current?.path ?? null;
+    const currentBelongs = currentPath ? pathBelongsToWorkspace(currentPath, workspacePath) : false;
+    const targetBelongs = targetPath ? pathBelongsToWorkspace(targetPath, workspacePath) : false;
+
+    if (currentPath && !currentBelongs) {
+      releaseDocumentResources(currentPath);
+      setDocumentState(null);
+      setSourceDraft("");
+      sourceDraftRef.current = "";
+      setDraftRecovery(null);
+      setExternalChangePath(null);
+      setMode("rendered");
+      setSearchQuery("");
+      saveLastDocumentPath(null);
+    }
+
+    if (!targetPath || !targetBelongs || targetPath === currentPath) return;
+
+    let active = true;
+    void openPath(targetPath).then((opened) => {
+      if (active && !opened) {
+        updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+        persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [openPath, releaseDocumentResources, workspacePath]);
+
+  const handleOpenPaths = useCallback(
+    async (paths: OpenPath[]) => {
+      const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);
+      const workspacePathToConfirm = workspacePaths.find((path) =>
+        shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
+      );
+      if (workspacePathToConfirm && !confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {
+        return;
+      }
+
+      const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
+      const pathsToProcess = currentModifiedPath
+        ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(currentModifiedPath, entry.path))
+        : paths;
+      const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
+      if (!confirmDocumentReplacement(documentPaths, "打开新文档")) {
+        return;
+      }
+
+      const seen = new Set<string>();
+      for (const entry of pathsToProcess) {
+        const key = `${entry.kind}:${normalizePathKey(entry.path)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        try {
+          const authorizedPath = isTauriRuntime()
+            ? await authorizeStoredPath(entry.path, entry.kind === "workspace")
+            : entry.path;
+          if (entry.kind === "workspace") {
+            await loadWorkspace(authorizedPath);
+          } else {
+            await openPath(authorizedPath);
+          }
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");
+        }
+      }
+    },
+    [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
+  );
+
+  const saveDocument = useCallback(async (allowExternalOverwrite = false): Promise<boolean> => {
+    const current = documentStateRef.current;
+    const draft = sourceDraftRef.current;
+    if (!current || !current.modified || !isEditableDocument(current.kind)) return false;
+
+    if (current.externallyModified && !allowExternalOverwrite) {
+      setExternalChangePath(current.path);
+      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
+      return false;
+    }
+
+    const path = current.path;
+    const pathKey = comparablePath(path);
+    let writeCompleted = false;
+    try {
+      if (isTauriRuntime()) {
+        if (!allowExternalOverwrite) {
+          const diskSource = await readTextFile(path);
+          if (diskSource !== current.source) {
+            setDocumentState((latest) =>
+              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
+            );
+            setExternalChangePath(path);
+            setError("文件在保存前已被其他程序修改，请先选择处理方式。");
+            return false;
+          }
+        }
+        selfWritingPathsRef.current.add(pathKey);
+        try {
+          await writeTextFile(path, draft);
+        } finally {
+          selfWritingPathsRef.current.delete(pathKey);
+        }
+        writeCompleted = true;
+        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
+        documentCacheRef.current.remove(path);
+      } else {
+        downloadText(current.name, draft);
+      }
+
+      const rendered = await renderSource(path, draft, {
+        allowRemoteResources: preferencesRef.current.allowRemoteResources,
+      });
+      setDocumentState((latest) =>
+        latest && isSameDocumentPath(latest.path, path)
+          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
+          : latest,
+      );
+      clearDraftSnapshot(path);
+      setDraftSnapshots(loadDraftSnapshots());
+      setDraftRecovery(null);
+      setExternalChangePath(null);
+      setError(null);
+      return true;
+    } catch (cause) {
+      selfWritingPathsRef.current.delete(pathKey);
+      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);
+      setError(cause instanceof Error ? cause.message : "保存失败。");
+      return false;
+    }
+  }, []);
+
+  const handleCreateNote = useCallback(
+    async (target: string) => {
+      if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
+        setError("请先添加一个工作区文件夹，再创建未解析链接。");
+        return;
+      }
+      const draftOutcome = documentState.modified ? flushCurrentDraft() : "not-needed";
+      if (
+        documentState.modified &&
+        (draftOutcome === "failed" ||
+          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))
+      )
+        return;
+
+      try {
+        const path = await createMarkdownFile(workspacePath, documentState.path, target);
+        await loadWorkspace(workspacePath, true);
+        await openPath(path);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新文档。");
+      }
+    },
+    [documentState, flushCurrentDraft, loadWorkspace, openPath, workspacePath],
+  );
+
+  const handleCreateWorkspaceNote = useCallback(
+    async (parentPath: string) => {
+      if (!workspacePath || !isTauriRuntime()) {
+        setError("请先添加一个工作区文件夹，再新建笔记。");
+        return;
+      }
+      const name = window.prompt("新建笔记", "未命名笔记")?.trim();
+      if (!name) return;
+
+      const currentDocument = documentStateRef.current;
+      const draftOutcome = currentDocument?.modified ? flushCurrentDraft() : "not-needed";
+      if (
+        currentDocument?.modified &&
+        (draftOutcome === "failed" ||
+          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))
+      ) {
+        return;
+      }
+
+      try {
+        const path = await createWorkspaceNote(workspacePath, parentPath, name);
+        await refreshWorkspaceChanges(workspacePath, [path]);
+        await openPath(path);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新笔记。");
+      }
+    },
+    [flushCurrentDraft, openPath, refreshWorkspaceChanges, workspacePath],
+  );
+
+  const handleCreateWorkspaceFolder = useCallback(
+    async (parentPath: string) => {
+      if (!workspacePath || !isTauriRuntime()) {
+        setError("请先添加一个工作区文件夹，再新建文件夹。");
+        return;
+      }
+      const name = window.prompt("新建文件夹", "新建文件夹")?.trim();
+      if (!name) return;
+
+      try {
+        const path = await createWorkspaceFolder(workspacePath, parentPath, name);
+        await refreshWorkspaceChanges(workspacePath, [path]);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建新文件夹。");
+      }
+    },
+    [refreshWorkspaceChanges, workspacePath],
+  );
+
+  const handleRenameWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再重命名文件或文件夹。");
+        return;
+      }
+
+      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
+      const oldName = fileNameFromPath(entryPath);
+      const name = window.prompt(kind === "folder" ? "重命名文件夹" : "重命名文件", oldName)?.trim();
+      if (!name || name === oldName) return;
+
+      const current = documentStateRef.current;
+      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
+      if (currentIsAffected && current?.modified) {
+        if (!window.confirm("当前文档有未保存修改，是否先保存后重命名？")) return;
+        if (!(await saveDocument())) return;
+      }
+
+      try {
+        const renamedPath = await renameWorkspaceEntry(root, entryPath, name);
+        documentCacheRef.current.invalidate([oldAbsolutePath, renamedPath]);
+
+        const rebaseTab = (tab: RecentFile): RecentFile => {
+          const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, renamedPath);
+          return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };
+        };
+        const nextTabs = openTabsRef.current.map(rebaseTab);
+        openTabsRef.current = nextTabs;
+        setOpenTabs(nextTabs);
+        saveOpenTabs(nextTabs);
+        setRecentFiles((currentFiles) => {
+          const nextFiles = currentFiles.map(rebaseTab);
+          saveRecentFiles(nextFiles);
+          return nextFiles;
+        });
+
+        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        if (cached) {
+          const cachedTabs = nextTabs.filter(
+            (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+          );
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+            tabs: cachedTabs,
+            activeDocumentPath: cached.activeDocumentPath
+              ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, renamedPath)
+              : null,
+          });
+          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+        }
+
+        let reopenFailed = false;
+        if (currentIsAffected && current) {
+          const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, renamedPath);
+          releaseDocumentResources(current.path);
+          documentStateRef.current = null;
+          setDocumentState(null);
+          setSourceDraft("");
+          sourceDraftRef.current = "";
+          setDraftRecovery(null);
+          setExternalChangePath(null);
+          setMode("rendered");
+          resetEditorHistory("", "");
+          reopenFailed = !(await openPath(nextCurrentPath, true));
+          if (reopenFailed) {
+            setError("文件已重命名，但重新打开失败，请从文件树中再次打开。");
+          }
+        }
+
+        await refreshWorkspaceChanges(root, [oldAbsolutePath, renamedPath]);
+        setSettingsNotice(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);
+        if (!reopenFailed) setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");
+      }
+    },
+    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+  );
+
+  const handleDeleteWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再删除文件或文件夹。");
+        return;
+      }
+
+      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
+      const label = fileNameFromPath(entryPath);
+      const message =
+        kind === "folder"
+          ? `确定删除文件夹“${label}”及其中的全部内容吗？此操作无法撤销。`
+          : `确定删除文件“${label}”吗？此操作无法撤销。`;
+      if (!window.confirm(message)) return;
+
+      const current = documentStateRef.current;
+      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
+      if (currentIsAffected && current?.modified) {
+        if (!window.confirm("当前文档有未保存修改，是否先保存后删除？")) return;
+        if (!(await saveDocument())) return;
+      }
+
+      try {
+        const currentIndex = current
+          ? openTabsRef.current.findIndex((tab) => isSameDocumentPath(tab.path, current.path))
+          : -1;
+        const nextTabs = openTabsRef.current.filter((tab) => !isPathWithinEntry(tab.path, oldAbsolutePath));
+        const affectedTabs = openTabsRef.current.filter((tab) => isPathWithinEntry(tab.path, oldAbsolutePath));
+        for (const tab of affectedTabs) releaseDocumentResources(tab.path);
+        documentCacheRef.current.invalidate([oldAbsolutePath]);
+        await deleteWorkspaceEntry(root, entryPath);
+
+        openTabsRef.current = nextTabs;
+        setOpenTabs(nextTabs);
+        saveOpenTabs(nextTabs);
+        setRecentFiles((currentFiles) => {
+          const nextFiles = currentFiles.filter((file) => !isPathWithinEntry(file.path, oldAbsolutePath));
+          saveRecentFiles(nextFiles);
+          return nextFiles;
+        });
+
+        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        if (cached) {
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+            tabs: nextTabs.filter(
+              (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+            ),
+            activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,
+          });
+          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+        }
+
+        let nextTabFailed = false;
+        if (currentIsAffected) {
+          setDocumentState(null);
+          documentStateRef.current = null;
+          setSourceDraft("");
+          sourceDraftRef.current = "";
+          setDraftRecovery(null);
+          setExternalChangePath(null);
+          setMode("rendered");
+          resetEditorHistory("", "");
+          saveLastDocumentPath(null);
+
+          const nextTab = nextTabs[currentIndex] ?? nextTabs[currentIndex - 1];
+          if (nextTab) nextTabFailed = !(await openPath(nextTab.path, true));
+        }
+
+        await refreshWorkspaceChanges(root, [oldAbsolutePath]);
+        setSettingsNotice(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);
+        if (!nextTabFailed) setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
+      }
+    },
+    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+  );
+
+  const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {
+    const root = workspacePathRef.current;
+    if (!root || !isTauriRuntime()) {
+      setError("当前没有可复制的工作区路径。");
+      return;
+    }
+
+    try {
+      const path = workspaceEntryAbsolutePath(root, entryPath);
+      await copyPlainText(path);
+      setSettingsNotice("完整路径已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制路径失败。");
+    }
+  }, []);
+
+  const handleCopyWorkspaceRelativePath = useCallback(async (entryPath: string) => {
+    const relativePath = entryPath.replace(/[\\/]+/g, "\\").replace(/^\\+|\\+$/g, "");
+    if (!relativePath) {
+      setError("当前条目没有可复制的相对路径。");
+      return;
+    }
+
+    try {
+      await copyPlainText(relativePath);
+      setSettingsNotice("相对路径已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制相对路径失败。");
+    }
+  }, []);
+
+  const handleShowWorkspaceDetails = useCallback((details: WorkspaceEntryDetails) => {
+    const root = workspacePathRef.current;
+    const absolutePath =
+      details.absolutePath ?? (root ? workspaceEntryAbsolutePath(root, details.relativePath) : details.relativePath);
+    setWorkspaceEntryDetails({ ...details, absolutePath });
+    setError(null);
+  }, []);
+
+  const handleDuplicateWorkspaceEntry = useCallback(
+    async (entryPath: string, kind: "file" | "folder") => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime() || !entryPath.trim()) {
+        setError("请先添加工作区，再复制文件或文件夹。");
+        return;
+      }
+
+      const defaultName = duplicateEntryName(entryPath, kind);
+      const name = window.prompt(kind === "folder" ? "复制文件夹" : "复制文件", defaultName)?.trim();
+      if (!name) return;
+
+      try {
+        const duplicatedPath = await duplicateWorkspaceEntry(root, entryPath, name);
+        await refreshWorkspaceChanges(root, [duplicatedPath]);
+        setSettingsNotice(`已创建副本：${fileNameFromPath(duplicatedPath)}`);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建工作区副本。");
+      }
+    },
+    [refreshWorkspaceChanges],
+  );
+
+  const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {
+    const root = workspacePathRef.current;
+    if (!root || !isTauriRuntime()) {
+      setError("请先添加工作区，再打开资源管理器。");
+      return;
+    }
+
+    try {
+      await revealWorkspaceEntry(root, entryPath);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法打开资源管理器。");
+    }
+  }, []);
+
+  const handleCopyWorkspaceName = useCallback(async (entryPath: string) => {
+    const name = fileNameFromPath(entryPath.replace(/[\\/]+$/, ""));
+    if (!name) {
+      setError("当前条目没有可复制的名称。");
+      return;
+    }
+
+    try {
+      await copyPlainText(name);
+      setSettingsNotice("名称已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制名称失败。");
+    }
+  }, []);
+
+  const handleRefreshWorkspaceEntry = useCallback(
+    async (entryPath: string) => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime()) {
+        setError("请先添加工作区，再刷新文件树。");
+        return;
+      }
+
+      setSettingsNotice("正在刷新文件树…");
+      if (entryPath.trim()) {
+        await refreshWorkspaceChanges(root, [workspaceEntryAbsolutePath(root, entryPath)]);
+      } else {
+        await loadWorkspace(root, true);
+      }
+      setSettingsNotice("文件树已刷新。");
+      setError(null);
+    },
+    [loadWorkspace, refreshWorkspaceChanges],
+  );
+
+  const openSelectedFile = useCallback(async () => {
+    const nativePaths = await chooseDocumentPaths();
+    if (isTauriRuntime()) {
+      if (nativePaths.length > 0) {
+        await handleOpenPaths(nativePaths.map((path) => ({ path, kind: "document" as const })));
+      }
+      return;
+    }
+    inputRef.current?.click();
+  }, [handleOpenPaths]);
+
+  const closeGettingStarted = useCallback(() => {
+    markGettingStartedSeen();
+    setGuideOpen(false);
+  }, []);
+
+  const openDocumentFromGuide = useCallback(() => {
+    closeGettingStarted();
+    void openSelectedFile();
+  }, [closeGettingStarted, openSelectedFile]);
+
+  const addWorkspaceFromGuide = useCallback(() => {
+    closeGettingStarted();
+    void handleChooseWorkspace();
+  }, [closeGettingStarted, handleChooseWorkspace]);
+
+  const overwriteExternalChange = useCallback(() => {
+    const current = documentStateRef.current;
+    if (!current?.externallyModified) return;
+    setExternalOverwriteConfirmationOpen(true);
+  }, []);
+
+  const cancelExternalOverwrite = useCallback(() => {
+    setExternalOverwriteConfirmationOpen(false);
+  }, []);
+
+  const confirmExternalOverwrite = useCallback(() => {
+    setExternalOverwriteConfirmationOpen(false);
+    void saveDocument(true);
+  }, [saveDocument]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let active = true;
+
+    void (async () => {
+      const paths = await initialPaths();
+      if (isTauriRuntime()) {
+        const hasStartupWorkspace = paths.some((entry) => entry.kind === "workspace");
+        const savedWorkspace = loadWorkspacePath();
+        if (!hasStartupWorkspace) {
+          const candidates = [
+            ...(savedWorkspace
+              ? [
+                  {
+                    path: savedWorkspace,
+                    name: fileNameFromPath(savedWorkspace.replace(/[\\/]+$/, "")) || savedWorkspace,
+                  },
+                ]
+              : []),
+            ...loadMountedWorkspaces(),
+          ];
+          const authorizedMounts: RecentWorkspace[] = [];
+          const seen = new Set<string>();
+          for (const candidate of candidates) {
+            const candidateKey = comparablePath(candidate.path);
+            if (!candidateKey || seen.has(candidateKey)) continue;
+            seen.add(candidateKey);
+            try {
+              const authorizedWorkspace = await authorizeStoredPath(candidate.path, true);
+              if (!active) return;
+              authorizedMounts.push({
+                path: authorizedWorkspace,
+                name: fileNameFromPath(authorizedWorkspace.replace(/[\\/]+$/, "")) || candidate.name,
+              });
+            } catch {
+              // Stale mounted workspaces are discarded without blocking launch.
+            }
+          }
+          if (!active) return;
+          setMountedWorkspaces(authorizedMounts);
+          saveMountedWorkspaces(authorizedMounts);
+          const activeWorkspace =
+            authorizedMounts.find(
+              (workspace) => comparablePath(workspace.path) === comparablePath(savedWorkspace ?? ""),
+            ) ?? authorizedMounts[0];
+          if (activeWorkspace) {
+            await loadWorkspace(activeWorkspace.path, true);
+          } else if (candidates.length > 0) {
+            saveWorkspacePath(null);
+            workspacePathRef.current = null;
+            setWorkspacePath(null);
+            setWorkspaceFiles([]);
+            setWorkspaceFolders([]);
+            setWorkspaceIndex([]);
+          }
+        }
+
+        if (paths.length === 0) {
+          const activeWorkspacePath = loadWorkspacePath();
+          const workspaceSession = activeWorkspacePath
+            ? loadWorkspaceSessions().find(
+                (session) => comparablePath(session.path) === comparablePath(activeWorkspacePath),
+              )
+            : undefined;
+          const restoredTabs: RecentFile[] = [];
+          for (const tab of workspaceSession?.tabs ?? loadOpenTabs()) {
+            try {
+              const authorizedDocument = await authorizeStoredPath(tab.path, false);
+              if (!active) return;
+              restoredTabs.push({ path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });
+            } catch {
+              // Stale tabs are discarded without blocking the next launch.
+            }
+          }
+          if (!active) return;
+          setOpenTabs(restoredTabs);
+
+          if (!workspaceSession) {
+            const lastDocument = loadLastDocumentPath();
+            const activeTab =
+              restoredTabs.find((tab) => comparablePath(tab.path) === comparablePath(lastDocument ?? "")) ??
+              restoredTabs[restoredTabs.length - 1];
+            if (activeTab) {
+              await openPath(activeTab.path);
+            } else if (lastDocument) {
+              try {
+                const authorizedDocument = await authorizeStoredPath(lastDocument, false);
+                if (!active) return;
+                await openPath(authorizedDocument);
+              } catch {
+                if (active) saveLastDocumentPath(null);
+              }
+            }
+          }
+        }
+      }
+
+      if (active) await handleOpenPaths(paths);
+      if (active) setTabSessionReady(true);
+      const dispose = await subscribeToOpenPaths((nextPaths) => void handleOpenPaths(nextPaths));
+      if (active) unlisten = dispose;
+      else dispose?.();
+    })();
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleOpenPaths, loadWorkspace, openPath]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    void subscribeToFileDrop((paths) => {
+      if (!active) return;
+      void resolveOpenPaths(paths)
+        .then((entries) => {
+          if (active) return handleOpenPaths(entries);
+          return undefined;
+        })
+        .catch((cause) => {
+          if (active) setError(cause instanceof Error ? cause.message : "无法打开拖入的路径。");
+        });
+    }).then((dispose) => {
+      if (active) unlisten = dispose;
+      else dispose?.();
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleOpenPaths]);
+
+  useEffect(() => {
+    if (!workspacePath || !isTauriRuntime()) return;
+
+    let active = true;
+    let unwatch: (() => void) | null = null;
+    const pendingWorkspacePaths = pendingWorkspacePathsRef.current;
+    setWorkspaceWatchError(null);
+
+    void subscribeToWorkspaceChanges(workspacePath, (paths) => {
+      if (!active) return;
+
+      documentCacheRef.current.invalidate(paths);
+      for (const path of paths) pendingWorkspacePaths.add(path);
+      if (workspaceReloadTimerRef.current !== null) {
+        window.clearTimeout(workspaceReloadTimerRef.current);
+      }
+      workspaceReloadTimerRef.current = window.setTimeout(() => {
+        workspaceReloadTimerRef.current = null;
+        const changedPaths = [...pendingWorkspacePaths];
+        pendingWorkspacePaths.clear();
+        void refreshWorkspaceChanges(workspacePath, changedPaths);
+      }, 280);
+
+      const current = documentStateRef.current;
+      if (!current || current.path.startsWith("browser://")) return;
+
+      const currentPath = comparablePath(current.path);
+      const writtenUntil = selfWrittenPathsRef.current.get(currentPath);
+      const action = resolveExternalChangeAction({
+        changedPaths: paths,
+        currentPath: current.path,
+        modified: current.modified,
+        selfWriting: selfWritingPathsRef.current.has(currentPath),
+        selfWrittenUntil: writtenUntil,
+        now: Date.now(),
+      });
+      if (action === "ignore") return;
+      if (writtenUntil !== undefined) {
+        selfWrittenPathsRef.current.delete(currentPath);
+      }
+
+      if (action === "notify") {
+        setExternalChangePath(current.path);
+        setDocumentState((latest) =>
+          latest && isSameDocumentPath(latest.path, current.path) ? { ...latest, externallyModified: true } : latest,
+        );
+      } else {
+        void openPath(current.path, true);
+      }
+    })
+      .then((dispose) => {
+        if (!active) {
+          dispose?.();
+        } else {
+          unwatch = dispose;
+        }
+      })
+      .catch(() => {
+        if (active) setWorkspaceWatchError("文件监听不可用，目录仍可手动刷新。");
+      });
+
+    return () => {
+      active = false;
+      if (workspaceReloadTimerRef.current !== null) {
+        window.clearTimeout(workspaceReloadTimerRef.current);
+        workspaceReloadTimerRef.current = null;
+      }
+      pendingWorkspacePaths.clear();
+      unwatch?.();
+    };
+  }, [openPath, refreshWorkspaceChanges, workspacePath]);
+
+  useEffect(() => {
+    const query = workspaceQuery.trim();
+    if (!workspacePath || !isTauriRuntime() || query.length < 2) {
+      setWorkspaceResults([]);
+      setWorkspaceSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    setWorkspaceSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void searchWorkspace(workspacePath, query)
+        .then((results) => {
+          if (active) setWorkspaceResults(results);
+        })
+        .catch((cause) => {
+          if (active) {
+            setWorkspaceResults([]);
+            setError(cause instanceof Error ? cause.message : "工作区搜索失败。");
+          }
+        })
+        .finally(() => {
+          if (active) setWorkspaceSearchLoading(false);
+        });
+    }, 180);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [workspacePath, workspaceQuery, workspaceRevision]);
+
+  const handleInsertLink = useCallback((context?: SourceEditorLinkContext) => {
+    const url = window.prompt("输入链接地址", "https://");
+    if (!url?.trim()) return;
+
+    if (context) {
+      const selectedText = context.value.slice(context.selectionStart, context.selectionEnd).trim() || "链接文字";
+      context.replace(`[${selectedText}](${url.trim()})`);
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) {
+      document.execCommand("createLink", false, url.trim());
+    } else {
+      setSettingsNotice("请先在所见即所得编辑器中选择链接文字，再按 Ctrl+K。");
+    }
+  }, []);
+
+  // Keep the mode transition in one place so toolbar and keyboard shortcuts cannot drift apart.
+  const toggleDocumentMode = useCallback(() => {
+    const currentDocument = documentStateRef.current;
+    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+
+    if (currentDocument.kind === "markdown" && !checkMarkdownEditorSafety(sourceDraftRef.current).safe) {
+      setSettingsNotice("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。");
+    }
+
+    setMode((current) => {
+      if (currentDocument.kind !== "markdown") return current === "source" ? "rendered" : "source";
+      if (current === "rendered") {
+        return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
+      }
+      if (current === "wysiwyg") return "source";
+      return "rendered";
+    });
+  }, []);
+
+  const toggleReadingEditing = useCallback(() => {
+    const currentDocument = documentStateRef.current;
+    if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+
+    setMode((current) => {
+      if (current !== "rendered") return "rendered";
+      if (currentDocument.kind !== "markdown") return "source";
+      return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
+    });
+  }, []);
+
+  const handleFindEditorText = useCallback((text: string) => {
+    const query = text.trim();
+    if (!query) return;
+    setSearchOpen(true);
+    setSearchQuery(query);
+    setSearchResultIndex(0);
+  }, []);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const eventTarget = event.target instanceof HTMLElement ? event.target : null;
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const isCodeMirrorEditor = Boolean(eventTarget?.closest(".cm-editor") ?? activeElement?.closest(".cm-editor"));
+      const isTextEntry = Boolean(
+        eventTarget?.closest('input, textarea, [contenteditable="true"], .cm-editor') ??
+        activeElement?.closest('input, textarea, [contenteditable="true"], .cm-editor'),
+      );
+      const zoomKey = event.key;
+      const isZoomShortcut =
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.isComposing &&
+        !isTextEntry &&
+        mode === "rendered" &&
+        ["markdown", "text", "docx"].includes(documentStateRef.current?.kind ?? "") &&
+        (event.code === "Equal" ||
+          event.code === "NumpadAdd" ||
+          event.code === "Minus" ||
+          event.code === "NumpadSubtract" ||
+          event.code === "Digit0" ||
+          event.code === "Numpad0" ||
+          zoomKey === "+" ||
+          zoomKey === "=" ||
+          zoomKey === "-" ||
+          zoomKey === "0");
+      if (isZoomShortcut) {
+        event.preventDefault();
+        if (event.code === "Digit0" || event.code === "Numpad0" || zoomKey === "0") {
+          setReadingZoom(READING_ZOOM_DEFAULT);
+        } else {
+          setReadingZoom(
+            stepReadingZoom(
+              preferencesRef.current.readingZoom,
+              event.code === "Minus" || event.code === "NumpadSubtract" || zoomKey === "-" ? "out" : "in",
+            ),
+          );
+        }
+        return;
+      }
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "f" &&
+        (event.defaultPrevented || isCodeMirrorEditor)
+      ) {
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          void handleChooseWorkspace();
+          return;
+        }
+        void openSelectedFile();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveDocument();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        toggleReadingEditing();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {
+        if (mode === "wysiwyg") {
+          event.preventDefault();
+          handleInsertLink();
+        }
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setQuickOpen(true);
+      }
+      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setSidebarCollapsed((current) => !current);
+      }
+      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        setRightPanelOpen((current) => !current);
+      }
+      if (event.key === "Escape" && focusMode) {
+        event.preventDefault();
+        setFocusMode(false);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === "Enter" && documentStateRef.current) {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [
+    focusMode,
+    handleChooseWorkspace,
+    handleInsertLink,
+    mode,
+    openSelectedFile,
+    saveDocument,
+    setReadingZoom,
+    toggleReadingEditing,
+  ]);
+
+  useEffect(() => {
+    const handleEditorHistoryShortcut = (event: KeyboardEvent) => {
+      if (event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (mode !== "source" && mode !== "wysiwyg") return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      const editorSurface = target?.closest(".source-editor, .wysiwyg-editor");
+      const activeElement = document.activeElement;
+      const focusIsDocument = activeElement === document.body || activeElement === document.documentElement;
+      if (!editorSurface && !focusIsDocument) return;
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = key === "y" || (key === "z" && event.shiftKey);
+      if (!isUndo && !isRedo) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      if (isUndo) undoEditor(editorSurface);
+      else redoEditor(editorSurface);
+    };
+
+    window.addEventListener("keydown", handleEditorHistoryShortcut, true);
+    return () => window.removeEventListener("keydown", handleEditorHistoryShortcut, true);
+  }, [mode, redoEditor, undoEditor]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    const kind = documentState?.kind;
+    const requestId = ++sourceRenderRequestRef.current;
+    if (mode !== "source" || !path || !kind || !isEditableDocument(kind)) return;
+
+    const nextSource = sourceDraft;
+    const cancel = scheduleSourceRender(() => {
+      void renderSource(path, nextSource, {
+        allowRemoteResources: preferences.allowRemoteResources,
+      })
+        .then((rendered) => {
+          if (requestId !== sourceRenderRequestRef.current) return;
+          setDocumentState((current) => (current?.path === path ? { ...current, rendered } : current));
+        })
+        .catch((cause) => {
+          if (requestId === sourceRenderRequestRef.current) {
+            setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+          }
+        });
+    });
+
+    return cancel;
+  }, [documentState?.kind, documentState?.path, mode, preferences.allowRemoteResources, sourceDraft]);
+
+  useEffect(() => {
+    const current = documentStateRef.current;
+    if ((mode !== "rendered" && mode !== "wysiwyg") || !current || !isEditableDocument(current.kind)) return;
+
+    const requestId = ++sourceRenderRequestRef.current;
+    const path = current.path;
+    const cancel = scheduleSourceRender(() => {
+      void renderSource(path, sourceDraft, {
+        allowRemoteResources: preferences.allowRemoteResources,
+      })
+        .then((rendered) => {
+          if (requestId !== sourceRenderRequestRef.current) return;
+          setDocumentState((latest) => (latest?.path === path ? { ...latest, rendered } : latest));
+        })
+        .catch((cause) => {
+          if (requestId === sourceRenderRequestRef.current) {
+            setError(cause instanceof Error ? cause.message : "文档渲染失败。");
+          }
+        });
+    });
+
+    return cancel;
+  }, [mode, preferences.allowRemoteResources, sourceDraft]);
+
+  const updateSource = useCallback((nextSource: string) => {
+    const current = documentStateRef.current;
+    if (!current || !isEditableDocument(current.kind)) return;
+
+    const history = editorHistoryRef.current;
+    const nextHistory = isSameDocumentPath(history.documentKey, current.path)
+      ? recordEditorChange(history, nextSource)
+      : createEditorHistory(current.path, nextSource);
+    if (nextHistory !== history) {
+      editorHistoryRef.current = nextHistory;
+      setEditorHistory(nextHistory);
+    }
+    sourceDraftRef.current = nextSource;
+    setSourceDraft(nextSource);
+    setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
+  }, []);
+
+  useEffect(() => {
+    const current = documentState;
+    if (!current || !current.modified || !isEditableDocument(current.kind) || current.path.startsWith("browser://")) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const result = saveDraftSnapshot({
+        path: current.path,
+        draft: sourceDraft,
+        baseSource: current.source,
+        savedAt: Date.now(),
+      });
+      handleDraftSaveResult(result);
+    }, 1_500);
+    return () => window.clearTimeout(timer);
+  }, [
+    documentState,
+    documentState?.kind,
+    documentState?.modified,
+    documentState?.path,
+    documentState?.source,
+    sourceDraft,
+    handleDraftSaveResult,
+  ]);
+
+  const recoverDraft = useCallback(() => {
+    if (!draftRecovery || !isSameDocumentPath(documentStateRef.current?.path ?? "", draftRecovery.path)) return;
+    updateSource(draftRecovery.draft);
+    setDraftRecovery(null);
+    setMode("source");
+  }, [draftRecovery, updateSource]);
+
+  const discardDraft = useCallback(() => {
+    if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });
+  }, [draftRecovery]);
+
+  const deferDraftRecovery = useCallback(() => {
+    setDraftRecovery(null);
+  }, []);
+
+  const openDraftSnapshot = useCallback(
+    async (path: string) => {
+      try {
+        const authorizedPath = await authorizeStoredPath(path, false);
+        if (!confirmDocumentReplacement([authorizedPath], "打开另一个草稿")) {
+          return;
+        }
+        const opened = await openPath(authorizedPath);
+        if (opened) setDraftRecoveryOpen(false);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "草稿对应的文档无法打开，请确认文件仍然存在。");
+      }
+    },
+    [confirmDocumentReplacement, openPath],
+  );
+
+  const requestDraftDiscardByPath = useCallback((path: string) => {
+    setDraftRecoveryOpen(false);
+    setDraftDiscardRequest({ path, fromCenter: true });
+  }, []);
+
+  const cancelDraftDiscard = useCallback(() => {
+    const request = draftDiscardRequest;
+    setDraftDiscardRequest(null);
+    if (request?.fromCenter) setDraftRecoveryOpen(true);
+  }, [draftDiscardRequest]);
+
+  const confirmDraftDiscard = useCallback(() => {
+    const request = draftDiscardRequest;
+    if (!request) return;
+
+    clearDraftSnapshot(request.path);
+    const remaining = loadDraftSnapshots();
+    setDraftSnapshots(remaining);
+    if (isSameDocumentPath(draftRecovery?.path ?? "", request.path)) setDraftRecovery(null);
+    setDraftDiscardRequest(null);
+    if (request.fromCenter) setDraftRecoveryOpen(remaining.length > 0);
+  }, [draftDiscardRequest, draftRecovery?.path]);
+
+  const clearAllDrafts = useCallback(() => {
+    if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
+    clearAllDraftSnapshots();
+    setDraftSnapshots([]);
+    setDraftRecovery(null);
+  }, [draftSnapshots.length]);
+
+  const handleSourcePaste = useCallback(
+    (context: SourceEditorPasteContext) => {
+      const image = findClipboardImage(context.clipboardData);
+      if (!image) return false;
+
+      context.preventDefault();
+      const current = documentStateRef.current;
+      if (!isTauriRuntime()) {
+        setError("浏览器预览模式不能保存剪贴板图片，请使用桌面版 Moyang Reader。");
+        return true;
+      }
+      if (!current || current.kind !== "markdown") {
+        setError("剪贴板图片只能粘贴到 Markdown 源码文档中。");
+        return true;
+      }
+      if (!workspacePathRef.current || current.path.startsWith("browser://")) {
+        setError("请先添加文档所在的文件夹，再粘贴剪贴板图片。");
+        return true;
+      }
+      if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {
+        setError("剪贴板图片不能超过 10 MB。");
+        return true;
+      }
+
+      const initialStart = context.selectionStart;
+      const initialEnd = context.selectionEnd;
+      const initialValue = context.value;
+      const path = current.path;
+
+      void (async () => {
+        try {
+          const bytes = await clipboardImageToPng(image);
+          if (bytes.byteLength > MAX_CLIPBOARD_IMAGE_BYTES) {
+            throw new Error("转换后的剪贴板图片不能超过 10 MB。");
+          }
+          if (documentStateRef.current?.path !== path) {
+            throw new Error("文档已切换，未插入剪贴板图片。");
+          }
+
+          const baseName = clipboardAssetFileName(bytes);
+          let assetName = baseName;
+          let assetPath = clipboardAssetPath(path, assetName);
+          for (let suffix = 2; suffix <= 100 && (await fileExists(assetPath)); suffix += 1) {
+            assetName = baseName.replace(/\.png$/i, `-${suffix}.png`);
+            assetPath = clipboardAssetPath(path, assetName);
+          }
+          if (await fileExists(assetPath)) throw new Error("无法为剪贴板图片生成不重复的文件名。");
+
+          await writeBinaryFile(assetPath, bytes);
+          if (documentStateRef.current?.path !== path) {
+            throw new Error("文档已切换，图片已保存但未插入引用。");
+          }
+
+          if (sourceDraftRef.current !== initialValue) {
+            throw new Error("文档内容已变化，未插入剪贴板图片。");
+          }
+
+          const start = initialStart;
+          const end = initialEnd;
+          updateSource(insertTextAtSelection(initialValue, start, end, clipboardAssetReference(assetName)));
+          setError(null);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "无法保存剪贴板图片。");
+        }
+      })();
+      return true;
+    },
+    [updateSource],
+  );
+
+  const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
+
+    const body = isTauriRuntime()
+      ? await inlineLocalImages(
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        )
+      : documentState.rendered.html;
+
+    return buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+
+  const savePdfDocument = useCallback(async (html: string, defaultPath: string): Promise<boolean> => {
+    if (!isTauriRuntime()) {
+      await printHtmlDocument(html);
+      return true;
+    }
+
+    const path = await chooseSavePath(defaultPath, "pdf");
+    if (!path) return false;
+    await exportPdfFile(path, html);
+    setSettingsNotice(`已保存 PDF：${fileNameFromPath(path)}。`);
+    return true;
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
+      const anchor = document.createElement("a");
+      anchor.href = documentState.previewUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noreferrer";
+      anchor.click();
+      return;
+    }
+    if (!documentState) return;
+
+    try {
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      const saved = await savePdfDocument(html, pathWithExtension(documentState.path, "pdf"));
+      if (!saved) return;
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");
+    }
+  }, [buildCurrentExportHtml, documentState, savePdfDocument]);
+
+  const handlePreviewPrint = useCallback(async () => {
+    if (!documentState) return;
+
+    try {
+      const html = await buildCurrentExportHtml();
+      if (!html) return;
+      setPrintPreview({
+        title: documentState.name,
+        html,
+        defaultPath: pathWithExtension(documentState.path, "pdf"),
+        actionLabel: isTauriRuntime() ? "保存 PDF" : "打印 / 保存 PDF",
+        actionHint: isTauriRuntime()
+          ? "Windows 桌面版会将 PDF 保存到所选位置 · 预览内容不会修改原文"
+          : "预计页数以系统打印对话框为准 · 预览内容不会修改原文",
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "生成打印版式预览失败。");
+    }
+  }, [
+    buildCurrentExportHtml,
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+  ]);
+
+  const finishPdfBatch = useCallback((cancelled: boolean) => {
+    const batch = pdfBatchExportRef.current;
+    if (!batch) return;
+
+    const failureSummary = summarizeExportFailures(
+      batch.skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+    );
+    const suffix = failureSummary ? `，跳过 ${batch.skippedFiles.length} 个：${failureSummary}` : "";
+    setWorkspaceExportNotice(
+      cancelled
+        ? `已取消批量打印，已整理 ${batch.exported} 篇文档${suffix}。`
+        : `已完成批量打印，共 ${batch.exported} 篇文档${suffix}。`,
+    );
+    pdfBatchExportRef.current = null;
+    workspaceExportAbortRef.current = null;
+    setWorkspaceExporting(false);
+    setWorkspaceExportProgress(null);
+    setPrintPreview(null);
+  }, []);
+
+  const prepareNextPdfBatch = useCallback(async () => {
+    const batch = pdfBatchExportRef.current;
+    const controller = workspaceExportAbortRef.current;
+    if (!batch || !controller) return;
+
+    const documents: Array<{ title: string; body: string }> = [];
+    while (batch.nextIndex < batch.files.length && documents.length < BATCH_EXPORT_CHUNK_SIZE) {
+      if (controller.signal.aborted) {
+        finishPdfBatch(true);
+        return;
+      }
+
+      const file = batch.files[batch.nextIndex];
+      batch.nextIndex += 1;
+      setWorkspaceExportProgress({ current: batch.nextIndex, total: batch.files.length, fileName: file.relativePath });
+      try {
+        const rendered =
+          file.kind === "docx"
+            ? await renderDocx(await readBinaryFile(file.path), {
+                allowRemoteResources: preferencesRef.current.allowRemoteResources,
+              })
+            : await renderSource(
+                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",
+                await readTextFile(file.path),
+                {
+                  allowRemoteResources: preferencesRef.current.allowRemoteResources,
+                },
+              );
+        const body = await inlineLocalImages(
+          rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(file.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        );
+        documents.push({ title: file.relativePath, body });
+        batch.exported += 1;
+      } catch {
+        batch.skippedFiles.push({ fileName: file.relativePath, reason: "读取失败" });
+        setWorkspaceExportFailures([...batch.skippedFiles]);
+      }
+    }
+
+    if (controller.signal.aborted) {
+      finishPdfBatch(true);
+      return;
+    }
+    if (documents.length === 0) {
+      finishPdfBatch(false);
+      if (batch.exported === 0) setError("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");
+      return;
+    }
+
+    batch.volumeNumber += 1;
+    setPrintPreview({
+      title: `${batch.title} · 第 ${batch.volumeNumber} 卷`,
+      html: buildBatchHtmlExport(`${batch.title} · 第 ${batch.volumeNumber} 卷`, documents, batch.options),
+      paper: batch.options.paper,
+      orientation: batch.options.orientation,
+      margin: batch.options.margin,
+    });
+    setWorkspaceExportNotice(`第 ${batch.volumeNumber} 卷已准备，打印后自动继续。`);
+    setWorkspaceExporting(false);
+    setWorkspaceExportProgress(null);
+  }, [finishPdfBatch]);
+
+  const handlePrintPreview = useCallback(async () => {
+    if (!printPreview) return;
+
+    try {
+      const batch = pdfBatchExportRef.current;
+      if (batch) {
+        await printHtmlDocument(printPreview.html);
+        if (batch.nextIndex < batch.files.length) {
+          await prepareNextPdfBatch();
+        } else {
+          finishPdfBatch(false);
+        }
+      } else {
+        if (!documentState) return;
+        const saved = await savePdfDocument(
+          printPreview.html,
+          printPreview.defaultPath ?? pathWithExtension(documentState.path, "pdf"),
+        );
+        if (!saved) return;
+        setPrintPreview(null);
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "保存 PDF 失败。");
+    }
+  }, [documentState, finishPdfBatch, prepareNextPdfBatch, printPreview, savePdfDocument]);
+
+  const handleClosePrintPreview = useCallback(() => {
+    if (pdfBatchExportRef.current) finishPdfBatch(true);
+    else setPrintPreview(null);
+  }, [finishPdfBatch]);
+
+  const handleCopy = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    try {
+      await copyRichText(documentState.rendered.html);
+      setCopyFeedback(true);
+      window.setTimeout(() => setCopyFeedback(false), 1_600);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制文档失败。");
+    }
+  }, [documentState]);
+
+  const handleExportMarkdown = useCallback(async () => {
+    if (!documentState || !isEditableDocument(documentState.kind)) return;
+
+    const extension = documentState.kind === "text" ? "txt" : "md";
+    const contents = sourceDraft;
+    try {
+      if (isTauriRuntime()) {
+        const path = await chooseSavePath(pathWithExtension(documentState.path, extension), "markdown");
+        if (!path) return;
+        await writeTextFile(path, contents);
+      } else {
+        downloadText(fileNameWithExtension(documentState.name, extension), contents);
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 Markdown 失败。");
+    }
+  }, [documentState, sourceDraft]);
+
+  const handleExportHtml = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    const body = isTauriRuntime()
+      ? await inlineLocalImages(
+          documentState.rendered.html,
+          (source) => {
+            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+            return resolveRelativePath(documentState.path, safeDecode(target));
+          },
+          readBinaryFile,
+          imageMimeType,
+          fileSize,
+        )
+      : documentState.rendered.html;
+    const contents = buildHtmlExport(
+      documentState.name,
+      body,
+      {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      },
+      documentState.rendered.toc,
+    );
+    try {
+      if (isTauriRuntime()) {
+        const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");
+        if (!path) return;
+        await writeTextFile(path, contents);
+      } else {
+        downloadText(fileNameWithExtension(documentState.name, "html"), contents, "text/html");
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");
+    }
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+
+  const handleExportDocx = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
+
+    try {
+      const body = isTauriRuntime()
+        ? await inlineLocalImages(
+            documentState.rendered.html,
+            (source) => {
+              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+              return resolveRelativePath(documentState.path, safeDecode(target));
+            },
+            readBinaryFile,
+            imageMimeType,
+            fileSize,
+          )
+        : documentState.rendered.html;
+      const contents = await buildDocxExport(documentState.name, body, {
+        paper: preferences.exportPaper,
+        orientation: preferences.exportOrientation,
+        margin: preferences.exportMargin,
+      });
+
+      if (isTauriRuntime()) {
+        const defaultPath =
+          documentState.kind === "docx"
+            ? pathWithNameSuffix(documentState.path, " - 导出", "docx")
+            : pathWithExtension(documentState.path, "docx");
+        const path = await chooseSavePath(defaultPath, "docx");
+        if (!path) return;
+        await writeBinaryFile(path, contents);
+      } else {
+        downloadBytes(
+          fileNameWithExtension(documentState.name, "docx"),
+          contents,
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        );
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "导出 Word 失败。");
+    }
+  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+
+  const handleBrowserFiles = useCallback(
+    async (files: FileList | File[] | null | undefined) => {
+      const selectedFiles = Array.from(files ?? []);
+      if (selectedFiles.length === 0) return;
+      const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];
+      const unsupportedNames: string[] = [];
+      for (const file of selectedFiles) {
+        const kind = documentKindFromPath(file.name);
+        if (!kind) {
+          unsupportedNames.push(file.name);
+          continue;
+        }
+        supportedFiles.push({
+          file,
+          kind,
+          path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,
+        });
+      }
+      const unsupportedNotice =
+        unsupportedNames.length > 0
+          ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
+          : null;
+      if (supportedFiles.length === 0) {
+        if (unsupportedNotice) setError(unsupportedNotice);
+        return;
+      }
+      const nextPaths = supportedFiles.map((entry) => entry.path);
+      if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {
+        return;
+      }
+
+      for (const { file, kind, path } of supportedFiles) {
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          await openBinary(path, new Uint8Array(await file.arrayBuffer()));
+        } else {
+          await openSource(path, await file.text());
+        }
+      }
+      if (unsupportedNotice) {
+        setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));
+      }
+    },
+    [confirmDocumentReplacement, openBinary, openSource],
+  );
+
+  const handleSelectTab = useCallback(
+    async (path: string) => {
+      if (path === documentState?.path) return;
+      if (!confirmDocumentReplacement([path], "切换文档")) return;
+      try {
+        const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
+        await openPath(authorizedPath);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");
+      }
+    },
+    [confirmDocumentReplacement, documentState, openPath],
+  );
+
+  const handleCloseTabs = useCallback(
+    async (paths: readonly string[]) => {
+      const currentTabs = openTabsRef.current;
+      const targetTabs = currentTabs.filter((tab) => paths.some((path) => isSameDocumentPath(path, tab.path)));
+      if (targetTabs.length === 0) return;
+
+      const current = documentStateRef.current;
+      const activeIndex = current ? currentTabs.findIndex((tab) => isSameDocumentPath(tab.path, current.path)) : -1;
+      const closesActive = Boolean(current && targetTabs.some((tab) => isSameDocumentPath(tab.path, current.path)));
+      if (closesActive && current?.modified) {
+        const draftOutcome = flushCurrentDraft();
+        if (
+          draftOutcome === "failed" ||
+          !window.confirm(formatTransitionConfirmation("关闭标签", draftOutcome === "saved"))
+        ) {
+          return;
+        }
+      }
+
+      const nextTabs = currentTabs.filter(
+        (tab) => !targetTabs.some((target) => isSameDocumentPath(target.path, tab.path)),
+      );
+      targetTabs.forEach((tab) => releaseDocumentResources(tab.path));
+      openTabsRef.current = nextTabs;
+      setOpenTabs(nextTabs);
+      saveOpenTabs(nextTabs);
+      if (!closesActive) return;
+
+      const nextTab = nextTabs[activeIndex] ?? nextTabs[activeIndex - 1];
+      if (nextTab) {
+        await openPath(nextTab.path);
+      } else {
+        setDocumentState(null);
+        setSourceDraft("");
+        setMode("rendered");
+        setSearchQuery("");
+        setError(null);
+        saveLastDocumentPath(null);
+        if (workspacePath) {
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+        }
+      }
+    },
+    [flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],
+  );
+
+  const handleCloseTab = useCallback(
+    (path: string) => {
+      void handleCloseTabs([path]);
+    },
+    [handleCloseTabs],
+  );
+
+  const handleReorderTabs = useCallback((sourcePath: string, targetPath: string) => {
+    setOpenTabs((current) => reorderTabs(current, sourcePath, targetPath));
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      void handleBrowserFiles(event.dataTransfer.files);
+    },
+    [handleBrowserFiles],
+  );
+
+  const handleOpenReaderLink = useCallback(
+    (href: string) => {
+      if (href.startsWith("moyang-wiki:")) {
+        const target = safeDecode(href.slice("moyang-wiki:".length));
+        const [rawPath, rawAnchor] = target.split("#", 2);
+        const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
+        const linkedEntry = currentEntry ? findLinkedEntry(workspaceIndex, currentEntry, rawPath) : undefined;
+        const path =
+          linkedEntry?.file.path ??
+          (documentState ? resolveWikiPath(documentState.path, rawPath || documentState.path) : null);
+        if (!path) {
+          setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
+          return;
+        }
+        void handleSelectTab(path).then(() => {
+          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
+        });
+        return;
+      }
+
+      const target = safeDecode(href);
+      if (target.startsWith("#")) {
+        scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current);
+        return;
+      }
+
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {
+        const normalized = target.startsWith("//") ? `https:${target}` : target;
+        try {
+          const externalUrl = new URL(normalized, window.location.href);
+          if (!["http:", "https:", "mailto:", "tel:"].includes(externalUrl.protocol)) {
+            setError("已阻止不受支持的外部链接协议。");
+            return;
+          }
+          void openExternalUrl(externalUrl.toString()).catch((cause) => {
+            setError(cause instanceof Error ? cause.message : "无法打开外部链接。");
+          });
+        } catch {
+          setError("无法解析这个外部链接。");
+        }
+        return;
+      }
+      if (!documentState || documentState.path.startsWith("browser://")) {
+        setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");
+        return;
+      }
+
+      const [rawPath, rawAnchor] = target.split("#", 2);
+      const path = resolveRelativePath(documentState.path, rawPath);
+      if (!path) {
+        setError("无法解析这个本地文档链接。");
+        return;
+      }
+      void handleSelectTab(path).then(() => {
+        if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
+      });
+    },
+    [documentState, handleSelectTab, workspaceIndex],
+  );
+
+  const handleReaderClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const anchor = (event.target as HTMLElement).closest("a");
+      const href = anchor?.getAttribute("href");
+      if (!anchor || !href) return;
+
+      event.preventDefault();
+      handleOpenReaderLink(href);
+    },
+    [handleOpenReaderLink],
+  );
+
+  const handleReaderContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    const anchor = (event.target as HTMLElement).closest("a");
+    setReaderContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      selectedText: window.getSelection()?.toString() ?? "",
+      linkHref: anchor?.getAttribute("href") ?? null,
+    });
+  }, []);
+
+  const handleCopyReaderText = useCallback(async (text: string) => {
+    const value = text.trim();
+    if (!value) return;
+
+    try {
+      await copyPlainText(value);
+      setSettingsNotice("选中文本已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制选中文本失败。");
+    }
+  }, []);
+
+  const handleCopyReaderLink = useCallback(async (href: string) => {
+    try {
+      await copyPlainText(href);
+      setSettingsNotice("链接地址已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制链接地址失败。");
+    }
+  }, []);
+
+  const handleCopyReaderDocumentPath = useCallback(async () => {
+    const path = documentStateRef.current?.path;
+    if (!path || path.startsWith("browser://")) {
+      setError("当前文档没有可复制的本地路径。");
+      return;
+    }
+
+    try {
+      await copyPlainText(path);
+      setSettingsNotice("文档路径已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制文档路径失败。");
+    }
+  }, []);
+
+  useEffect(() => {
+    setReaderContextMenu(null);
+  }, [documentState?.path, mode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") {
+      delete root.dataset.theme;
+    } else {
+      root.dataset.theme = theme;
+    }
+
+    try {
+      localStorage.setItem("moyang-reader-theme", theme);
+    } catch {
+      // Local storage may be unavailable in a restricted browser preview.
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "en-US" ? "en" : "zh-CN";
+    saveLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    if (!selectedTag || !workspacePath || workspaceIndex.some((entry) => entry.tags.includes(selectedTag))) return;
+    setSelectedTag(null);
+  }, [selectedTag, workspaceIndex, workspacePath]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 160);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const root = articleRef.current;
+    if (!root || mode !== "rendered") {
+      setSearchResultCount(0);
+      setSearchResultIndex(0);
+      return;
+    }
+
+    root.querySelectorAll("mark.moyang-search-hit").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+      parent.normalize();
+    });
+
+    const query = debouncedSearchQuery.trim().toLocaleLowerCase();
+    if (!query) {
+      setSearchResultCount(0);
+      setSearchResultIndex(0);
+      return;
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      if (currentNode.parentElement?.tagName !== "SCRIPT" && currentNode.parentElement?.tagName !== "STYLE") {
+        textNodes.push(currentNode as Text);
+      }
+      currentNode = walker.nextNode();
+    }
+
+    for (const textNode of textNodes) {
+      const value = textNode.nodeValue ?? "";
+      const lowerValue = value.toLocaleLowerCase();
+      const positions: number[] = [];
+      let cursor = 0;
+      while (true) {
+        const position = lowerValue.indexOf(query, cursor);
+        if (position < 0) break;
+        positions.push(position);
+        cursor = position + query.length;
+      }
+
+      for (const position of positions.reverse()) {
+        const range = document.createRange();
+        range.setStart(textNode, position);
+        range.setEnd(textNode, position + query.length);
+        const mark = document.createElement("mark");
+        mark.className = "moyang-search-hit";
+        range.surroundContents(mark);
+      }
+    }
+
+    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
+    setSearchResultCount(hits.length);
+    setSearchResultIndex((current) => (hits.length ? Math.min(current, hits.length - 1) : 0));
+  }, [debouncedSearchQuery, documentState?.rendered.html, mode]);
+
+  useEffect(() => {
+    const root = articleRef.current;
+    if (!root || mode !== "rendered") return;
+
+    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
+    const nextIndex = hits.length ? Math.min(searchResultIndex, hits.length - 1) : 0;
+    hits.forEach((hit, index) => hit.classList.toggle("active", index === nextIndex));
+    hits[nextIndex]?.scrollIntoView({ block: "center" });
+  }, [debouncedSearchQuery, documentState?.rendered.html, mode, searchResultIndex]);
+
+  useEffect(() => {
+    const root = articleRef.current;
+    const currentPath = documentState?.path;
+    if (!root || mode !== "rendered" || !currentPath || !isTauriRuntime()) return;
+
+    let active = true;
+    const objectUrls = new Set<string>();
+    void (async () => {
+      const images = Array.from(root.querySelectorAll<HTMLImageElement>("img[src]"));
+      for (const image of images) {
+        const source = image.getAttribute("src") ?? "";
+        const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+        if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) continue;
+        const localPath = resolveRelativePath(currentPath, safeDecode(target));
+        if (!localPath) continue;
+
+        try {
+          const bytes = await readBinaryFile(localPath);
+          const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          const objectUrl = URL.createObjectURL(new Blob([binary], { type: imageMimeType(localPath) }));
+          if (!active) {
+            URL.revokeObjectURL(objectUrl);
+            continue;
+          }
+          objectUrls.add(objectUrl);
+          image.src = objectUrl;
+        } catch {
+          // Keep the original source when a relative attachment is unavailable or unauthorized.
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
+    };
+  }, [documentState?.path, documentState?.rendered.html, mode]);
+
+  const moveSearchResult = useCallback(
+    (step: number) => {
+      if (!searchResultCount) return;
+      setSearchResultIndex((current) => (current + step + searchResultCount) % searchResultCount);
+    },
+    [searchResultCount],
+  );
+
+  const cycleTheme = useCallback(() => {
+    setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));
+  }, []);
+
+  const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
+  const currentIndexEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
+  const backlinkIndex = useMemo(() => createBacklinkIndex(workspaceIndex), [workspaceIndex]);
+  const backlinks = currentIndexEntry ? findBacklinks(workspaceIndex, currentIndexEntry, backlinkIndex) : [];
+  const outgoing = currentIndexEntry
+    ? currentIndexEntry.links.map((target) => ({
+        target,
+        entry: findLinkedEntry(workspaceIndex, currentIndexEntry, target),
+      }))
+    : [];
+  const availableTags = useMemo(
+    () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
+    [workspaceIndex],
+  );
+  const taggedFilePaths = useMemo(
+    () =>
+      new Set(workspaceIndex.filter((entry) => entry.tags.includes(selectedTag ?? "")).map((entry) => entry.file.path)),
+    [selectedTag, workspaceIndex],
+  );
+  const visibleWorkspaceFiles = useMemo(
+    () => workspaceFiles.filter((file) => matchesWorkspaceFilter(file, selectedFileKind, selectedTag, taggedFilePaths)),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceFiles],
+  );
+  const visibleWorkspaceResults = useMemo(
+    () =>
+      workspaceResults.filter((result) =>
+        matchesWorkspaceFilter(result.file, selectedFileKind, selectedTag, taggedFilePaths),
+      ),
+    [selectedFileKind, selectedTag, taggedFilePaths, workspaceResults],
+  );
+  const workspaceExportFiles = useMemo(() => {
+    const query = workspaceQuery.trim();
+    if (!query) return visibleWorkspaceFiles;
+    if (query.length < 2 || workspaceSearchLoading) return [];
+    return visibleWorkspaceResults.map((result) => result.file);
+  }, [visibleWorkspaceFiles, visibleWorkspaceResults, workspaceQuery, workspaceSearchLoading]);
+  const wikiLinkCandidates = useMemo(
+    () => buildWikiLinkCandidates(workspaceFiles, documentState?.path),
+    [workspaceFiles, documentState?.path],
+  );
+  const executeCommand = useCallback(
+    (commandId: string) => {
+      switch (commandId) {
+        case "open":
+          void openSelectedFile();
+          break;
+        case "workspace":
+          void handleChooseWorkspace();
+          break;
+        case "quick-open":
+          setQuickOpen(true);
+          break;
+        case "toggle-mode":
+          toggleReadingEditing();
+          break;
+        case "save":
+          void saveDocument();
+          break;
+        case "undo":
+          undoEditor();
+          break;
+        case "redo":
+          redoEditor();
+          break;
+        case "link":
+          handleInsertLink();
+          break;
+        case "context":
+          setRightPanelOpen((current) => !current);
+          break;
+        case "focus":
+          setFocusMode((current) => !current);
+          break;
+      }
+    },
+    [
+      handleChooseWorkspace,
+      handleInsertLink,
+      openSelectedFile,
+      redoEditor,
+      saveDocument,
+      toggleReadingEditing,
+      undoEditor,
+    ],
+  );
+  const canEditHistory = canEdit && mode !== "rendered";
+  const canUndo = canEditHistory && canUndoEditorChange(editorHistory);
+  const canRedo = canEditHistory && canRedoEditorChange(editorHistory);
+  const commandItems = useMemo<ReaderCommand[]>(
+    () => [
+      {
+        id: "open",
+        label: "打开文档",
+        shortcut: "Ctrl O",
+      },
+      {
+        id: "workspace",
+        label: "添加整个文件夹",
+        shortcut: "Ctrl ⇧ O",
+      },
+      {
+        id: "quick-open",
+        label: "快速打开",
+        shortcut: "Ctrl P",
+      },
+      {
+        id: "toggle-mode",
+        label: mode === "rendered" ? "进入编辑模式" : "切换到阅读模式",
+        shortcut: "Ctrl E",
+        disabled: !canEdit,
+      },
+      {
+        id: "save",
+        label: "保存当前文档",
+        shortcut: "Ctrl S",
+        disabled: !documentState?.modified,
+      },
+      {
+        id: "undo",
+        label: "撤销上一次编辑",
+        shortcut: "Ctrl Z",
+        disabled: !canUndo,
+      },
+      {
+        id: "redo",
+        label: "重做上一次编辑",
+        shortcut: "Ctrl Y",
+        disabled: !canRedo,
+      },
+      {
+        id: "link",
+        label: "插入 Markdown 链接",
+        shortcut: "Ctrl K",
+        disabled: !canEdit,
+      },
+      {
+        id: "context",
+        label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
+        shortcut: "Ctrl ⇧ R",
+      },
+      {
+        id: "focus",
+        label: focusMode ? "退出专注阅读" : "进入专注阅读",
+        shortcut: "Ctrl ⇧ Enter",
+        disabled: !documentState,
+      },
+    ],
+    [canEdit, canRedo, canUndo, focusMode, mode, rightPanelOpen, documentState],
+  );
+  const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
+    const items = new Map<string, QuickOpenCandidate>();
+    const add = (candidate: QuickOpenCandidate) => {
+      const key = comparablePath(candidate.path);
+      const existing = items.get(key);
+      items.set(key, existing ? { ...existing, isRecent: existing.isRecent || candidate.isRecent } : candidate);
+    };
+
+    workspaceFiles.forEach((file) => add(file));
+    openTabs.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));
+    recentFiles.forEach((file) => add({ ...file, relativePath: file.path, isRecent: true }));
+
+    return [...items.values()].sort((left, right) => Number(right.isRecent) - Number(left.isRecent));
+  }, [openTabs, recentFiles, workspaceFiles]);
+
+  const handleCancelWorkspaceExport = useCallback(() => {
+    workspaceExportAbortRef.current?.abort();
+    if (pdfBatchExportRef.current) finishPdfBatch(true);
+  }, [finishPdfBatch]);
+
+  const copyWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持复制到剪贴板。");
+      await navigator.clipboard.writeText(formatExportFailureReport(workspaceExportFailures));
+      setWorkspaceExportNotice(`已复制 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制导出失败清单失败。");
+    }
+  }, [workspaceExportFailures]);
+
+  const saveWorkspaceExportFailures = useCallback(async () => {
+    if (workspaceExportFailures.length === 0) return;
+
+    const report = formatExportFailureReport(workspaceExportFailures);
+    try {
+      if (isTauriRuntime()) {
+        const workspaceName = fileNameFromPath(workspacePath?.replace(/[\\/]+$/, "") ?? "") || "阅读库";
+        const defaultPath = pathWithExtension(`${workspacePath ?? ""}\\${workspaceName} - 导出失败清单.md`, "md");
+        const path = await chooseSavePath(defaultPath, "markdown");
+        if (!path) return;
+        await writeTextFile(path, report);
+      } else {
+        downloadText("moyang-reader-export-failures.md", report);
+      }
+      setWorkspaceExportNotice(`已保存 ${workspaceExportFailures.length} 个失败项清单。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "保存导出失败清单失败。");
+    }
+  }, [workspaceExportFailures, workspacePath]);
+
+  const handleExportWorkspace = useCallback(
+    async (format: "html" | "docx" | "pdf") => {
+      if (!workspacePath || workspaceExportFiles.length === 0 || !isTauriRuntime()) return;
+
+      const workspaceName = fileNameFromPath(workspacePath.replace(/[\\/]+$/, "")) || "阅读库";
+      let savePath: string | null = null;
+      try {
+        if (format !== "pdf") {
+          savePath = await chooseSavePath(pathWithExtension(`${workspacePath}\\${workspaceName}`, format), format);
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "打开导出保存位置失败。");
+        return;
+      }
+      if (format !== "pdf" && !savePath) return;
+
+      const controller = new AbortController();
+      workspaceExportAbortRef.current = controller;
+      setWorkspaceExporting(true);
+      setWorkspaceExportProgress({ current: 0, total: workspaceExportFiles.length, fileName: "准备导出…" });
+      setWorkspaceExportFailures([]);
+      setWorkspaceExportNotice(null);
+      setError(null);
+
+      if (format === "pdf") {
+        const files = workspaceExportFiles.filter(
+          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
+        );
+        if (files.length === 0) {
+          workspaceExportAbortRef.current = null;
+          setWorkspaceExporting(false);
+          setWorkspaceExportProgress(null);
+          setWorkspaceExportNotice("当前筛选中没有可打印的 Markdown、文本或 Word 文档。");
+          return;
+        }
+
+        pdfBatchExportRef.current = {
+          files,
+          nextIndex: 0,
+          volumeNumber: 0,
+          exported: 0,
+          skippedFiles: [],
+          title: `${workspaceName} 阅读库`,
+          options: {
+            paper: preferences.exportPaper,
+            orientation: preferences.exportOrientation,
+            margin: preferences.exportMargin,
+          },
+        };
+        try {
+          await prepareNextPdfBatch();
+        } catch (cause) {
+          finishPdfBatch(true);
+          setError(cause instanceof Error ? cause.message : "批量打印准备失败。");
+        }
+        return;
+      }
+
+      let exported = 0;
+      let writtenVolumes = 0;
+      const skippedFiles: WorkspaceExportFailure[] = [];
+      const recordSkippedFile = (fileName: string, reason: string) => {
+        skippedFiles.push({ fileName, reason });
+        setWorkspaceExportFailures([...skippedFiles]);
+      };
+      try {
+        const exportTitle = `${workspaceName} 阅读库`;
+        const exportOptions = {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        };
+        const exportableFileCount = workspaceExportFiles.filter(
+          (file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text",
+        ).length;
+        const estimatedExportBytes = workspaceExportFiles
+          .filter((file) => file.kind === "docx" || file.kind === "markdown" || file.kind === "text")
+          .reduce((total, file) => total + file.size, 0);
+        const expectedVolumeCount = Math.max(
+          1,
+          Math.ceil(exportableFileCount / BATCH_EXPORT_CHUNK_SIZE),
+          Math.ceil(estimatedExportBytes / BATCH_EXPORT_MAX_ESTIMATED_BYTES),
+        );
+        let documents: { title: string; body: string }[] = [];
+        let estimatedDocumentBytes = 0;
+        const flushDocuments = async () => {
+          if (documents.length === 0) return;
+          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
+
+          const batch = documents;
+          documents = [];
+          estimatedDocumentBytes = 0;
+          const volumeNumber = writtenVolumes + 1;
+          const volumeTitle = expectedVolumeCount > 1 ? `${exportTitle} · 第 ${volumeNumber} 卷` : exportTitle;
+          if (format === "html") {
+            if (!savePath) throw new Error("没有选择 HTML 保存位置。");
+            const targetPath =
+              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "html") : savePath;
+            await writeTextFile(targetPath, buildBatchHtmlExport(volumeTitle, batch, exportOptions));
+          } else {
+            if (!savePath) throw new Error("没有选择 Word 保存位置。");
+            const targetPath =
+              expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "docx") : savePath;
+            await writeBinaryFile(
+              targetPath,
+              await buildBatchDocxExport(volumeTitle, batch, exportOptions, controller.signal),
+            );
+          }
+          writtenVolumes = volumeNumber;
+          if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
+        };
+
+        for (const [index, file] of workspaceExportFiles.entries()) {
+          if (controller.signal.aborted) {
+            setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
+            return;
+          }
+          setWorkspaceExportProgress({
+            current: index + 1,
+            total: workspaceExportFiles.length,
+            fileName: file.relativePath,
+          });
+          try {
+            let rendered;
+            if (file.kind === "docx") {
+              rendered = await renderDocx(await readBinaryFile(file.path), {
+                allowRemoteResources: preferences.allowRemoteResources,
+              });
+            } else if (file.kind === "markdown" || file.kind === "text") {
+              rendered = await renderSource(
+                file.kind === "text" ? "workspace-export.txt" : "workspace-export.md",
+                await readTextFile(file.path),
+                {
+                  allowRemoteResources: preferences.allowRemoteResources,
+                },
+              );
+            } else {
+              recordSkippedFile(file.relativePath, "类型不支持");
+              continue;
+            }
+
+            const body = await inlineLocalImages(
+              rendered.html,
+              (source) => {
+                const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+                if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+                return resolveRelativePath(file.path, safeDecode(target));
+              },
+              readBinaryFile,
+              imageMimeType,
+              fileSize,
+            );
+            documents.push({ title: file.relativePath, body });
+            estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;
+            exported += 1;
+            if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();
+          } catch (cause) {
+            recordSkippedFile(file.relativePath, cause instanceof Error ? cause.message : "读取失败");
+          }
+        }
+
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
+          return;
+        }
+
+        if (exported === 0) {
+          const failureSummary = summarizeExportFailures(
+            skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+          );
+          throw new Error(
+            failureSummary
+              ? `当前筛选中没有可导出的文档。跳过 ${skippedFiles.length} 个：${failureSummary}`
+              : "当前筛选中没有可导出的 Markdown、文本或 Word 文档。",
+          );
+        }
+        await flushDocuments();
+        const formatLabel = format === "html" ? "HTML" : "Word";
+        const failureSummary = summarizeExportFailures(
+          skippedFiles.map((failure) => `${failure.fileName}（${failure.reason}）`),
+        );
+        const volumeNotice = writtenVolumes > 1 ? `，已分卷为 ${writtenVolumes} 个文件` : "";
+        const destinationNotice = savePath ? `（${fileNameFromPath(savePath)}）` : "";
+        setWorkspaceExportNotice(
+          `已导出 ${exported} 篇文档为 ${formatLabel}${destinationNotice}${volumeNotice}${
+            failureSummary ? `，跳过 ${skippedFiles.length} 个：${failureSummary}` : ""
+          }。`,
+        );
+      } catch (cause) {
+        if (controller.signal.aborted) {
+          setWorkspaceExportNotice(formatExportCancellationNotice(exported, writtenVolumes));
+        } else {
+          setError(cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "批量导出失败。");
+        }
+      } finally {
+        if (workspaceExportAbortRef.current === controller) workspaceExportAbortRef.current = null;
+        setWorkspaceExporting(false);
+        setWorkspaceExportProgress(null);
+      }
+    },
+    [
+      preferences.allowRemoteResources,
+      preferences.exportMargin,
+      preferences.exportOrientation,
+      preferences.exportPaper,
+      finishPdfBatch,
+      prepareNextPdfBatch,
+      workspaceExportFiles,
+      workspacePath,
+    ],
+  );
+
+  return (
+    <div
+      className={`app-shell reading-width-${preferences.readingWidth}${
+        focusMode ? " focus-mode" : ""
+      }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
+      style={
+        {
+          "--sidebar-width": `${paneWidths.sidebar}px`,
+          "--context-width": `${paneWidths.context}px`,
+          "--reading-zoom": `${preferences.readingZoom / 100}`,
+        } as CSSProperties
+      }
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
+      <TopBar
+        fileName={documentState?.name ?? null}
+        mode={mode}
+        documentKind={documentState?.kind ?? null}
+        canEdit={canEdit}
+        modified={documentState?.modified ?? false}
+        externallyModified={documentState?.externallyModified ?? false}
+        onShowExternalChange={() => {
+          if (documentState?.path) setExternalChangePath(documentState.path);
+        }}
+        searchOpen={searchOpen}
+        searchQuery={searchQuery}
+        searchResultCount={searchResultCount}
+        searchResultIndex={searchResultIndex}
+        theme={theme}
+        locale={locale}
+        readingZoom={preferences.readingZoom}
+        readingWidth={preferences.readingWidth}
+        exportPaper={preferences.exportPaper}
+        exportOrientation={preferences.exportOrientation}
+        exportMargin={preferences.exportMargin}
+        onReadingZoomChange={setReadingZoom}
+        onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
+        onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}
+        onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}
+        onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}
+        allowRemoteResources={preferences.allowRemoteResources}
+        startupUpdateCheck={preferences.startupUpdateCheck}
+        onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
+        onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
+        onExportSettings={() => void exportPortableSettings()}
+        onImportSettings={importPortableSettings}
+        onOpenGuide={() => setGuideOpen(true)}
+        settingsPersistenceStatus={settingsPersistenceStatus}
+        onOpen={() => void openSelectedFile()}
+        onAddWorkspace={() => void handleChooseWorkspace()}
+        workspaceOpen={Boolean(workspacePath)}
+        workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}
+        onQuickOpen={() => setQuickOpen(true)}
+        draftCount={draftSnapshots.length}
+        onOpenRecovery={() => setDraftRecoveryOpen(true)}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((current) => !current)}
+        onToggleMode={toggleReadingEditing}
+        onCycleMode={toggleDocumentMode}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undoEditor}
+        onRedo={redoEditor}
+        rightPanelOpen={rightPanelOpen}
+        onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onSave={() => void saveDocument()}
+        onCopy={() => void handleCopy()}
+        copyFeedback={copyFeedback}
+        onExport={() => void handleExport()}
+        exportLabel={
+          documentState?.kind === "pdf"
+            ? "打开 PDF"
+            : documentState?.kind === "image"
+              ? "打开图片"
+              : isTauriRuntime()
+                ? "保存 PDF"
+                : "打印 / PDF"
+        }
+        canPreviewPrint={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        onPreviewPrint={() => void handlePreviewPrint()}
+        canExportMarkdown={Boolean(documentState && isEditableDocument(documentState.kind))}
+        canExportHtml={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        canExportDocx={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        canCopy={Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image")}
+        onExportMarkdown={() => void handleExportMarkdown()}
+        onExportHtml={() => void handleExportHtml()}
+        onExportDocx={() => void handleExportDocx()}
+        onToggleSearch={() => setSearchOpen((current) => !current)}
+        updateStatus={updateStatus}
+        updateVersion={availableUpdate?.version ?? null}
+        onCheckUpdates={() => {
+          if (updateStatus === "downloading") setUpdateNoticeVisible(true);
+          else void checkForUpdates(true);
+        }}
+        onSearchQueryChange={(query) => {
+          setSearchQuery(query);
+          setSearchResultIndex(0);
+        }}
+        onSearchPrevious={() => moveSearchResult(-1)}
+        onSearchNext={() => moveSearchResult(1)}
+        onCloseSearch={() => {
+          setSearchOpen(false);
+          setSearchQuery("");
+        }}
+        onCycleTheme={cycleTheme}
+        onLocaleChange={setLocale}
+      />
+      <div className="navigation-strip">
+        {settingsNotice && (
+          <div className="settings-notice" role="status">
+            {settingsNotice}
+          </div>
+        )}
+        {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (
+          <UpdateNotice
+            status={updateStatus}
+            version={availableUpdate?.version ?? null}
+            notes={availableUpdate?.body?.trim() || null}
+            progress={updateProgress}
+            error={updateError}
+            onInstall={() => void installUpdate()}
+            onRelaunch={() => void relaunchUpdatedApp()}
+            onHide={() => setUpdateNoticeVisible(false)}
+            onDismiss={dismissUpdateNotice}
+          />
+        )}
+        <Tabs
+          tabs={openTabs}
+          activePath={documentState?.path ?? null}
+          externallyModified={documentState?.externallyModified ?? false}
+          onShowExternalChange={() => {
+            if (documentState?.path) setExternalChangePath(documentState.path);
+          }}
+          onSelect={(path) => void handleSelectTab(path)}
+          onClose={(path) => void handleCloseTab(path)}
+          onCloseMany={(paths) => void handleCloseTabs(paths)}
+          onReorder={handleReorderTabs}
+        />
+      </div>
+      <div className="workspace-grid">
+        <aside className="sidebar">
+          <WorkspacePanel
+            onExportWorkspace={(format) => void handleExportWorkspace(format)}
+            onCancelWorkspaceExport={handleCancelWorkspaceExport}
+            workspaceExporting={workspaceExporting}
+            workspaceExportProgress={workspaceExportProgress}
+            workspaceExportFailures={workspaceExportFailures}
+            onCopyExportFailures={() => void copyWorkspaceExportFailures()}
+            onSaveExportFailures={() => void saveWorkspaceExportFailures()}
+            workspaceExportNotice={workspaceExportNotice}
+            workspaceIndexLoading={workspaceIndexLoading}
+            workspacePath={workspacePath}
+            files={workspaceFiles}
+            folders={workspaceFolders}
+            visibleFiles={visibleWorkspaceFiles}
+            visibleResultCount={visibleWorkspaceResults.length}
+            exportableFiles={workspaceExportFiles}
+            recentFiles={recentFiles}
+            recentWorkspaces={recentWorkspaces}
+            mountedWorkspaces={mountedWorkspaces}
+            activePath={documentState?.path ?? null}
+            searchQuery={workspaceQuery}
+            searchResults={visibleWorkspaceResults}
+            searchLoading={workspaceSearchLoading}
+            tagOptions={availableTags}
+            selectedTag={selectedTag}
+            selectedKind={selectedFileKind}
+            onAddWorkspace={() => void handleChooseWorkspace()}
+            workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}
+            onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
+            onRemoveWorkspace={handleRemoveMountedWorkspace}
+            onOpenFile={(path) => void handleSelectTab(path)}
+            onCloseFile={(path) => void handleCloseTab(path)}
+            onCreateNote={(parentPath) => void handleCreateWorkspaceNote(parentPath)}
+            onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}
+            onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}
+            onDeleteEntry={(entryPath, kind) => void handleDeleteWorkspaceEntry(entryPath, kind)}
+            onDuplicateEntry={(entryPath, kind) => void handleDuplicateWorkspaceEntry(entryPath, kind)}
+            onShowDetails={handleShowWorkspaceDetails}
+            onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}
+            onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}
+            onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}
+            onCopyName={(entryPath) => void handleCopyWorkspaceName(entryPath)}
+            onRefresh={(entryPath) => void handleRefreshWorkspaceEntry(entryPath)}
+            onSearchQueryChange={setWorkspaceQuery}
+            onTagChange={setSelectedTag}
+            onKindChange={setSelectedFileKind}
+            onClearFilters={() => {
+              setSelectedTag(null);
+              setSelectedFileKind("all");
+            }}
+          />
+          {workspaceLoading && <div className="workspace-loading">正在读取阅读库…</div>}
+          {workspaceWatchError && <div className="workspace-watch-note">{workspaceWatchError}</div>}
+          {documentState ? (
+            <div className="sidebar-note">
+              <div className="panel-kicker">READING DESK</div>
+              <p>文件树负责找到内容，右侧上下文面板负责理解当前文档。</p>
+            </div>
+          ) : (
+            <div className="sidebar-note">
+              <div className="panel-kicker">MOMENT</div>
+              <p>一个轻量的本地入口，先让内容抵达你面前。</p>
+            </div>
+          )}
+        </aside>
+        {!sidebarCollapsed && !focusMode && (
+          <PaneResizeHandle
+            side="sidebar"
+            value={paneWidths.sidebar}
+            min={PANE_WIDTH_LIMITS.sidebar.min}
+            max={PANE_WIDTH_LIMITS.sidebar.max}
+            onResizeBy={(delta) => resizePane("sidebar", delta)}
+            onReset={() => resetPane("sidebar")}
+          />
+        )}
+
+        <main ref={contentAreaRef} className="content-area" aria-live="polite" onWheel={handleReaderWheel}>
+          {readingZoomNotice !== null && (
+            <div className="reading-zoom-hud" role="status" aria-live="polite">
+              阅读缩放 {readingZoomNotice}%
+            </div>
+          )}
+          {sidebarCollapsed && !focusMode && (
+            <button
+              type="button"
+              className="sidebar-restore"
+              onClick={() => setSidebarCollapsed(false)}
+              title="显示侧栏 (Ctrl+Shift+B)"
+            >
+              显示侧栏 <span>Ctrl+Shift+B</span>
+            </button>
+          )}
+          {focusMode && (
+            <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
+              退出专注 <span>Esc</span>
+            </button>
+          )}
+          {loading && <div className="loading-state">正在打开文档…</div>}
+          {externalChangePath && documentState?.path === externalChangePath && (
+            <ExternalChangeNotice
+              fileName={documentState.name}
+              onReload={() => void reloadExternalChange()}
+              onOverwrite={overwriteExternalChange}
+              onSaveAs={() => void handleExportMarkdown()}
+              onDismiss={() => setExternalChangePath(null)}
+            />
+          )}
+          {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
+            <DraftRecoveryNotice
+              snapshot={draftRecovery}
+              onRecover={recoverDraft}
+              onLater={deferDraftRecovery}
+              onDiscard={discardDraft}
+            />
+          )}
+          {error && (
+            <div className="error-state" role="alert">
+              {error}
+            </div>
+          )}
+          {!loading && !documentState && (
+            <EmptyState
+              onOpen={() => void openSelectedFile()}
+              onChooseWorkspace={() => void handleChooseWorkspace()}
+              onOpenGuide={() => setGuideOpen(true)}
+              hasWorkspace={Boolean(workspacePath)}
+              showWorkspaceAction={!workspacePath && !sidebarCollapsed}
+            />
+          )}
+          {!loading && documentState && documentState.kind === "pdf" && mode === "rendered" && (
+            <PdfPreview name={documentState.name} src={documentState.previewUrl} />
+          )}
+          {!loading && documentState && documentState.kind === "image" && mode === "rendered" && (
+            <ImagePreview name={documentState.name} src={documentState.previewUrl} />
+          )}
+          {!loading &&
+            documentState &&
+            documentState.kind !== "pdf" &&
+            documentState.kind !== "image" &&
+            mode === "rendered" && (
+              <div className="reader-stage">
+                <article
+                  ref={articleRef}
+                  className="reader-content markdown-body"
+                  onClick={handleReaderClick}
+                  onContextMenu={handleReaderContextMenu}
+                >
+                  <div className="reader-meta" aria-label="文档信息">
+                    <span className="reader-meta-kicker">DOCUMENT</span>
+                    <span>
+                      {fileTypeLabel(documentState.kind)} · {documentState.rendered.wordCount.toLocaleString("zh-CN")}{" "}
+                      字 · {documentState.rendered.readingMinutes} 分钟阅读
+                    </span>
+                    {documentState.externallyModified && (
+                      <button
+                        type="button"
+                        className="reader-external-change"
+                        onClick={() => setExternalChangePath(documentState.path)}
+                      >
+                        文件已被外部修改 · 处理
+                      </button>
+                    )}
+                  </div>
+                  {!startsWithHeading(documentState.rendered.html) && (
+                    <header className="print-document-header" aria-hidden="true">
+                      <span className="print-document-kicker">MOYANG READER · DOCUMENT</span>
+                      <div className="print-document-title">{documentState.name}</div>
+                    </header>
+                  )}
+                  <ProgressiveReaderContent html={documentState.rendered.html} />
+                </article>
+              </div>
+            )}
+          {!loading && documentState && documentState.kind === "markdown" && mode === "wysiwyg" && (
+            <Suspense fallback={<div className="wysiwyg-loading-state">正在准备所见即所得编辑器…</div>}>
+              <LazyMarkdownWysiwygEditor
+                source={sourceDraft}
+                documentKey={documentState.path}
+                ariaLabel="Markdown 所见即所得编辑器"
+                onChange={(value) => void updateSource(value)}
+                onInsertLink={() => handleInsertLink()}
+                onFindText={handleFindEditorText}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={(target) => undoEditor(target)}
+                onRedo={(target) => redoEditor(target)}
+                onStatusMessage={(message) => setSettingsNotice(message)}
+                wikiCandidates={wikiLinkCandidates}
+              />
+            </Suspense>
+          )}
+          {!loading && documentState && canEdit && mode === "source" && (
+            <SourceEditor
+              value={sourceDraft}
+              ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
+              onChange={(value) => void updateSource(value)}
+              onPaste={handleSourcePaste}
+              onInsertLink={handleInsertLink}
+              onFindText={handleFindEditorText}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={(target) => undoEditor(target)}
+              onRedo={(target) => redoEditor(target)}
+              onStatusMessage={(message) => setSettingsNotice(message)}
+              wikiCompletions={wikiLinkCandidates}
+            />
+          )}
+          {readerContextMenu && documentState && mode === "rendered" && (
+            <ReaderContextMenu
+              target={readerContextMenu}
+              documentPath={documentState.path.startsWith("browser://") ? null : documentState.path}
+              canEdit={canEdit}
+              editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}
+              onCopySelection={(text) => void handleCopyReaderText(text)}
+              onFindSelection={(text) => handleFindEditorText(text)}
+              onCopyLink={(href) => void handleCopyReaderLink(href)}
+              onOpenLink={handleOpenReaderLink}
+              onEdit={toggleReadingEditing}
+              onCopyDocumentPath={() => void handleCopyReaderDocumentPath()}
+              onClose={() => setReaderContextMenu(null)}
+            />
+          )}
+        </main>
+        {rightPanelOpen && !focusMode && (
+          <PaneResizeHandle
+            side="context"
+            value={paneWidths.context}
+            min={PANE_WIDTH_LIMITS.context.min}
+            max={PANE_WIDTH_LIMITS.context.max}
+            onResizeBy={(delta) => resizePane("context", delta)}
+            onReset={() => resetPane("context")}
+          />
+        )}
+        {rightPanelOpen && !focusMode && (
+          <ContextPanel
+            documentState={documentState}
+            entry={currentIndexEntry}
+            backlinks={backlinks}
+            outgoing={outgoing}
+            canCreateNote={Boolean(workspacePath && isTauriRuntime())}
+            selectedTag={selectedTag}
+            toc={documentState?.rendered.toc ?? []}
+            activeHeadingId={currentHeadingId}
+            currentHeading={currentHeading}
+            readingProgress={readingProgress}
+            mode={mode}
+            activeTab={activeContextTab}
+            onTabChange={setActiveContextTab}
+            onClose={() => setRightPanelOpen(false)}
+            onOpenFile={(path) => void handleSelectTab(path)}
+            onCreateNote={(target) => void handleCreateNote(target)}
+            onOpenGraph={() => setGraphOpen(true)}
+            onSelectTag={setSelectedTag}
+            onScrollToTop={() => scrollToReaderEdge("top")}
+            onScrollToBottom={() => scrollToReaderEdge("bottom")}
+            onNavigateHeading={navigateToHeading}
+          />
+        )}
+      </div>
+
+      <footer className="statusbar">
+        <span>{documentState?.path ?? "等待打开文件"}</span>
+        {documentState && (
+          <span>
+            {documentState.kind === "pdf"
+              ? "PDF"
+              : documentState.kind === "image"
+                ? "图片"
+                : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}
+          </span>
+        )}
+        {documentState?.externallyModified && (
+          <button
+            type="button"
+            className="statusbar-external-change"
+            onClick={() => setExternalChangePath(documentState.path)}
+          >
+            外部修改待处理
+          </button>
+        )}
+        <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>
+      </footer>
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.docx,.pdf,.avif,.gif,.jpeg,.jpg,.png,.svg,.webp,text/markdown,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,image/*"
+        hidden
+        onChange={(event) => {
+          void handleBrowserFiles(event.target.files);
+          event.currentTarget.value = "";
+        }}
+      />
+      {graphOpen && (
+        <RelationGraph
+          current={currentIndexEntry}
+          entries={workspaceIndex}
+          onClose={() => setGraphOpen(false)}
+          onOpenFile={(path) => void handleSelectTab(path)}
+        />
+      )}
+      {workspaceEntryDetails && (
+        <WorkspaceEntryDetailsDialog details={workspaceEntryDetails} onClose={() => setWorkspaceEntryDetails(null)} />
+      )}
+      {printPreview && (
+        <PrintPreview
+          title={printPreview.title}
+          html={printPreview.html}
+          actionLabel={printPreview.actionLabel}
+          actionHint={printPreview.actionHint}
+          paper={printPreview.paper}
+          orientation={printPreview.orientation}
+          margin={printPreview.margin}
+          onPrint={handlePrintPreview}
+          onClose={handleClosePrintPreview}
+        />
+      )}
+      {quickOpen && (
+        <QuickOpenPalette
+          items={quickOpenItems}
+          onClose={() => setQuickOpen(false)}
+          onOpenFile={(path) => {
+            setQuickOpen(false);
+            void handleSelectTab(path);
+          }}
+        />
+      )}
+      {commandPaletteOpen && (
+        <CommandPalette
+          commands={commandItems}
+          onClose={() => setCommandPaletteOpen(false)}
+          onExecute={executeCommand}
+        />
+      )}
+      {draftRecoveryOpen && draftSnapshots.length > 0 && (
+        <DraftRecoveryCenter
+          snapshots={draftSnapshots}
+          onOpen={(path) => void openDraftSnapshot(path)}
+          onDiscard={requestDraftDiscardByPath}
+          onClearAll={clearAllDrafts}
+          onClose={() => setDraftRecoveryOpen(false)}
+        />
+      )}
+      {draftDiscardRequest && (
+        <DraftDiscardConfirmationDialog
+          path={draftDiscardRequest.path}
+          onCancel={cancelDraftDiscard}
+          onConfirm={confirmDraftDiscard}
+        />
+      )}
+      {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
+      {externalOverwriteConfirmationOpen && (
+        <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
+      )}
+      {guideOpen && (
+        <GettingStartedDialog
+          locale={locale}
+          onClose={closeGettingStarted}
+          onOpenDocument={openDocumentFromGuide}
+          onAddWorkspace={addWorkspaceFromGuide}
+        />
+      )}
+    </div>
+  );
+}

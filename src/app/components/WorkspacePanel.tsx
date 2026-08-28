@@ -1,1 +1,478 @@
-import type {\n  RecentFile,\n  RecentWorkspace,\n  WorkspaceDirectory,\n  WorkspaceEntryDetails,\n  WorkspaceExportFailure,\n  WorkspaceFile,\n  WorkspaceSearchResult,\n} from "../types";\nimport { WorkspaceTreeView, type WorkspaceEntryKind } from "./WorkspaceTree";\nimport type { WorkspaceKindFilter } from "../workspace-filter";\nimport { filterSwitchableWorkspaces } from "../workspace-switcher";\nimport { MAX_MOUNTED_WORKSPACES } from "../storage";\n\nconst workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [\n  { value: "all", label: "全部类型" },\n  { value: "markdown", label: "Markdown" },\n  { value: "text", label: "纯文本" },\n  { value: "docx", label: "Word" },\n  { value: "pdf", label: "PDF" },\n  { value: "image", label: "图片" },\n];\n\ntype WorkspacePanelProps = {\n  workspacePath: string | null;\n  files: WorkspaceFile[];\n  folders?: WorkspaceDirectory[];\n  visibleFiles: WorkspaceFile[];\n  visibleResultCount: number;\n  exportableFiles: WorkspaceFile[];\n  recentFiles: RecentFile[];\n  recentWorkspaces: RecentWorkspace[];\n  mountedWorkspaces: RecentWorkspace[];\n  activePath: string | null;\n  searchQuery: string;\n  searchResults: WorkspaceSearchResult[];\n  searchLoading: boolean;\n  tagOptions: string[];\n  selectedTag: string | null;\n  selectedKind: WorkspaceKindFilter;\n  onAddWorkspace: () => void;\n  workspaceLimitReached: boolean;\n  onOpenWorkspace: (path: string) => void;\n  onRemoveWorkspace: (path: string) => void;\n  onExportWorkspace: (format: "html" | "docx" | "pdf") => void;\n  onCancelWorkspaceExport: () => void;\n  workspaceExporting: boolean;\n  workspaceExportProgress: { current: number; total: number; fileName: string } | null;\n  workspaceExportFailures: WorkspaceExportFailure[];\n  onCopyExportFailures: () => void;\n  onSaveExportFailures: () => void;\n  workspaceExportNotice: string | null;\n  workspaceIndexLoading: boolean;\n  onOpenFile: (path: string) => void;\n  onCloseFile?: (path: string) => void;\n  onCreateNote?: (parentPath: string) => void;\n  onCreateFolder?: (parentPath: string) => void;\n  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onShowDetails?: (details: WorkspaceEntryDetails) => void;\n  onRevealEntry?: (entryPath: string) => void;\n  onCopyPath?: (entryPath: string) => void;\n  onCopyRelativePath?: (entryPath: string) => void;\n  onCopyName?: (entryPath: string) => void;\n  onRefresh?: (entryPath: string) => void;\n  onSearchQueryChange: (query: string) => void;\n  onTagChange: (tag: string | null) => void;\n  onKindChange: (kind: WorkspaceKindFilter) => void;\n  onClearFilters: () => void;\n};\n\nfunction pathName(path: string): string {\n  return path.split(/[\\/]/).pop() || path;\n}\n\nfunction isBatchExportable(file: WorkspaceFile): boolean {\n  return file.kind === "markdown" || file.kind === "text" || file.kind === "docx";\n}\n\nexport function WorkspacePanel({\n  workspacePath,\n  files,\n  folders = [],\n  visibleFiles,\n  visibleResultCount,\n  exportableFiles,\n  recentFiles,\n  recentWorkspaces,\n  mountedWorkspaces,\n  activePath,\n  searchQuery,\n  searchResults,\n  searchLoading,\n  tagOptions,\n  selectedTag,\n  selectedKind,\n  onAddWorkspace,\n  workspaceLimitReached,\n  onOpenWorkspace,\n  onRemoveWorkspace,\n  onExportWorkspace,\n  onCancelWorkspaceExport,\n  workspaceExporting,\n  workspaceExportProgress,\n  workspaceExportFailures,\n  onCopyExportFailures,\n  onSaveExportFailures,\n  workspaceExportNotice,\n  workspaceIndexLoading,\n  onOpenFile,\n  onCloseFile,\n  onCreateNote,\n  onCreateFolder,\n  onRenameEntry,\n  onDeleteEntry,\n  onDuplicateEntry,\n  onShowDetails,\n  onRevealEntry,\n  onCopyPath,\n  onCopyRelativePath,\n  onCopyName,\n  onRefresh,\n  onSearchQueryChange,\n  onTagChange,\n  onKindChange,\n  onClearFilters,\n}: WorkspacePanelProps) {\n  const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";\n  const hasFilters = Boolean(selectedTag) || selectedKind !== "all";\n  const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);\n  const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));\n  const treeFolders = hasFilters ? [] : folders;\n\n  return (\n    <section className="workspace-panel" aria-labelledby="workspace-title">\n      <div className="workspace-heading">\n        <div>\n          <div className="panel-kicker">WORKSPACE</div>\n          <h2 id="workspace-title">阅读库</h2>\n        </div>\n        <div className="workspace-actions">\n          {workspacePath && onCreateNote && onCreateFolder && (\n            <details className="workspace-create-menu">\n              <summary className="quiet-button workspace-create-button">新建</summary>\n              <div className="workspace-create-menu-panel" role="menu">\n                <div className="workspace-switcher-label">阅读库根目录</div>\n                <button\n                  type="button"\n                  role="menuitem"\n                  onClick={(event) => {\n                    event.currentTarget.closest("details")?.removeAttribute("open");\n                    onCreateNote("");\n                  }}\n                >\n                  新建笔记\n                </button>\n                <button\n                  type="button"\n                  role="menuitem"\n                  onClick={(event) => {\n                    event.currentTarget.closest("details")?.removeAttribute("open");\n                    onCreateFolder("");\n                  }}\n                >\n                  新建文件夹\n                </button>\n              </div>\n            </details>\n          )}\n          {(canBatchExport || workspaceExporting) && (\n            <details className="export-menu workspace-export-menu">\n              <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>\n              <div className="export-menu-panel">\n                <button\n                  type="button"\n                  disabled={!canBatchExport || workspaceExporting}\n                  onClick={() => onExportWorkspace("html")}\n                >\n                  单文件 HTML\n                </button>\n                <button\n                  type="button"\n                  disabled={!canBatchExport || workspaceExporting}\n                  onClick={() => onExportWorkspace("docx")}\n                >\n                  单文件 Word\n                </button>\n                <button\n                  type="button"\n                  disabled={!canBatchExport || workspaceExporting}\n                  onClick={() => onExportWorkspace("pdf")}\n                >\n                  批量打印 / PDF\n                </button>\n              </div>\n            </details>\n          )}\n          {workspaceExporting && (\n            <button type="button" className="quiet-button workspace-export-cancel" onClick={onCancelWorkspaceExport}>\n              取消导出\n            </button>\n          )}\n          {workspacePath && (\n            <button\n              type="button"\n              className="quiet-button workspace-add-button"\n              onClick={onAddWorkspace}\n              disabled={workspaceLimitReached}\n              title={\n                workspaceLimitReached\n                  ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`\n                  : "添加另一个阅读库"\n              }\n            >\n              添加阅读库\n            </button>\n          )}\n        </div>\n      </div>\n\n      {workspacePath ? (\n        <div className="workspace-location" title={workspacePath}>\n          <span className="workspace-dot" aria-hidden="true" />\n          <span>{pathName(workspacePath)}</span>\n          <small>\n            {files.length} 项 · {mountedWorkspaces.length} 个阅读库\n          </small>\n          {switchableWorkspaces.length > 0 && (\n            <details className="workspace-switcher">\n              <summary className="workspace-switcher-trigger" aria-label="切换阅读库">\n                切换\n              </summary>\n              <div className="workspace-switcher-menu" role="menu">\n                <div className="workspace-switcher-label">\n                  已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}\n                </div>\n                {switchableWorkspaces.map((workspace) => (\n                  <div className="workspace-switcher-item" role="none" key={workspace.path}>\n                    <button\n                      type="button"\n                      role="menuitem"\n                      title={workspace.path}\n                      onClick={(event) => {\n                        event.currentTarget.closest("details")?.removeAttribute("open");\n                        onOpenWorkspace(workspace.path);\n                      }}\n                    >\n                      <strong>{workspace.name}</strong>\n                      <span>{workspace.path}</span>\n                    </button>\n                    <button\n                      type="button"\n                      className="workspace-switcher-remove"\n                      title={`移除 ${workspace.name}`}\n                      aria-label={`从已挂载阅读库移除 ${workspace.name}`}\n                      onClick={() => onRemoveWorkspace(workspace.path)}\n                    >\n                      ×\n                    </button>\n                  </div>\n                ))}\n              </div>\n            </details>\n          )}\n        </div>\n      ) : (\n        <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>\n      )}\n      {workspaceExportNotice && (\n        <div className="workspace-export-note" role="status">\n          {workspaceExportNotice}\n        </div>\n      )}\n      {workspaceExportProgress && (\n        <div className="workspace-export-progress" role="status" aria-live="polite">\n          <div className="workspace-export-progress-label">\n            <span>\n              正在整理 {workspaceExportProgress.current} / {workspaceExportProgress.total}\n            </span>\n            <strong title={workspaceExportProgress.fileName}>{workspaceExportProgress.fileName}</strong>\n          </div>\n          <div\n            className="workspace-export-progress-track"\n            role="progressbar"\n            aria-label="批量导出进度"\n            aria-valuemin={0}\n            aria-valuemax={workspaceExportProgress.total}\n            aria-valuenow={workspaceExportProgress.current}\n          >\n            <span\n              style={{\n                width: `${Math.round((workspaceExportProgress.current / Math.max(1, workspaceExportProgress.total)) * 100)}%`,\n              }}\n            />\n          </div>\n        </div>\n      )}\n      {workspaceExportFailures.length > 0 && (\n        <details className="workspace-export-failures">\n          <summary>查看 {workspaceExportFailures.length} 个未导出文件</summary>\n          <div className="workspace-export-failure-actions">\n            <button type="button" className="quiet-button" onClick={onCopyExportFailures}>\n              复制清单\n            </button>\n            <button type="button" className="quiet-button" onClick={onSaveExportFailures}>\n              保存清单\n            </button>\n          </div>\n          <ul>\n            {workspaceExportFailures.map((failure) => (\n              <li key={`${failure.fileName}-${failure.reason}`}>\n                <strong title={failure.fileName}>{failure.fileName}</strong>\n                <span>{failure.reason}</span>\n              </li>\n            ))}\n          </ul>\n        </details>\n      )}\n      {workspaceIndexLoading && (\n        <div className="workspace-index-note" role="status">\n          目录已打开，正在整理链接与标签…\n        </div>\n      )}\n\n      {workspacePath && (\n        <>\n          <div className="workspace-filter-summary" role="status">\n            <span>\n              {searchQuery.trim()\n                ? searchLoading\n                  ? "正在整理搜索结果…"\n                  : `当前结果 ${visibleResultCount} 项`\n                : `显示 ${visibleFiles.length} / ${files.length} 项`}\n            </span>\n            {hasFilters && (\n              <>\n                <span className="workspace-filter-label">\n                  · {selectedKind !== "all" ? selectedKindLabel : ""}\n                  {selectedKind !== "all" && selectedTag ? " · " : ""}\n                  {selectedTag ? `#${selectedTag}` : ""}\n                </span>\n                <button type="button" className="workspace-clear-filter" onClick={onClearFilters}>\n                  清除筛选\n                </button>\n              </>\n            )}\n          </div>\n          <input\n            className="workspace-search"\n            type="search"\n            aria-label="搜索工作区"\n            placeholder="搜索整个阅读库"\n            value={searchQuery}\n            onChange={(event) => onSearchQueryChange(event.target.value)}\n          />\n          {tagOptions.length > 0 && (\n            <label className="tag-filter">\n              <span>标签</span>\n              <select\n                aria-label="按标签筛选工作区"\n                value={selectedTag ?? ""}\n                onChange={(event) => onTagChange(event.target.value || null)}\n              >\n                <option value="">全部标签</option>\n                {tagOptions.map((tag) => (\n                  <option key={tag} value={tag}>\n                    #{tag}\n                  </option>\n                ))}\n              </select>\n            </label>\n          )}\n          <label className="tag-filter">\n            <span>类型</span>\n            <select\n              aria-label="按类型筛选工作区"\n              value={selectedKind}\n              onChange={(event) => onKindChange(event.target.value as WorkspaceKindFilter)}\n            >\n              {workspaceKindOptions.map((option) => (\n                <option key={option.value} value={option.value}>\n                  {option.label}\n                </option>\n              ))}\n            </select>\n          </label>\n        </>\n      )}\n\n      {searchQuery.trim() ? (\n        <div className="workspace-results" aria-live="polite">\n          {searchQuery.trim().length < 2 && <p className="muted-copy">再输入一个字符开始搜索。</p>}\n          {searchLoading && <p className="muted-copy">正在搜索…</p>}\n          {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (\n            <p className="muted-copy">没有找到匹配文档。</p>\n          )}\n          {!searchLoading &&\n            searchResults.map((result) => (\n              <button\n                type="button"\n                className="workspace-result"\n                key={result.file.path}\n                onClick={() => onOpenFile(result.file.path)}\n              >\n                <strong>{result.file.name}</strong>\n                <span>{result.preview || result.file.relativePath}</span>\n              </button>\n            ))}\n        </div>\n      ) : (\n        <>\n          {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0 || !hasFilters) && (\n            <div className="workspace-files" aria-label="工作区文件">\n              <div className="workspace-subheading">文件</div>\n              <WorkspaceTreeView\n                files={visibleFiles}\n                folders={treeFolders}\n                activePath={activePath}\n                onOpenFile={onOpenFile}\n                onCloseFile={onCloseFile}\n                onCreateNote={onCreateNote}\n                onCreateFolder={onCreateFolder}\n                onRenameEntry={onRenameEntry}\n                onDeleteEntry={onDeleteEntry}\n                onDuplicateEntry={onDuplicateEntry}\n                onShowDetails={onShowDetails}\n                onRevealEntry={onRevealEntry}\n                onCopyPath={onCopyPath}\n                onCopyRelativePath={onCopyRelativePath}\n                onCopyName={onCopyName}\n                onRefresh={onRefresh}\n              />\n            </div>\n          )}\n\n          {workspacePath && visibleFiles.length === 0 && <p className="muted-copy">当前标签下没有文件。</p>}\n\n          {!workspacePath && recentWorkspaces.length > 0 && (\n            <div className="workspace-files recent-files" aria-label="最近阅读库">\n              <div className="workspace-subheading">最近阅读库</div>\n              {recentWorkspaces.map((workspace) => (\n                <button\n                  type="button"\n                  className="workspace-file"\n                  key={workspace.path}\n                  title={workspace.path}\n                  onClick={() => onOpenWorkspace(workspace.path)}\n                >\n                  <span>{workspace.name}</span>\n                  <small>{workspace.path}</small>\n                </button>\n              ))}\n            </div>\n          )}\n\n          {!workspacePath && recentFiles.length > 0 && (\n            <div className="workspace-files recent-files" aria-label="最近打开">\n              <div className="workspace-subheading">最近打开</div>\n              {recentFiles.map((file) => (\n                <button\n                  type="button"\n                  className="workspace-file"\n                  key={file.path}\n                  title={file.path}\n                  onClick={() => onOpenFile(file.path)}\n                >\n                  <span>{file.name}</span>\n                  <small>{file.path}</small>\n                </button>\n              ))}\n            </div>\n          )}\n        </>\n      )}\n    </section>\n  );\n}\n
+import type {
+  RecentFile,
+  RecentWorkspace,
+  WorkspaceDirectory,
+  WorkspaceEntryDetails,
+  WorkspaceExportFailure,
+  WorkspaceFile,
+  WorkspaceSearchResult,
+} from "../types";
+import { WorkspaceTreeView, type WorkspaceEntryKind } from "./WorkspaceTree";
+import type { WorkspaceKindFilter } from "../workspace-filter";
+import { filterSwitchableWorkspaces } from "../workspace-switcher";
+import { MAX_MOUNTED_WORKSPACES } from "../storage";
+
+const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
+  { value: "all", label: "全部类型" },
+  { value: "markdown", label: "Markdown" },
+  { value: "text", label: "纯文本" },
+  { value: "docx", label: "Word" },
+  { value: "pdf", label: "PDF" },
+  { value: "image", label: "图片" },
+];
+
+type WorkspacePanelProps = {
+  workspacePath: string | null;
+  files: WorkspaceFile[];
+  folders?: WorkspaceDirectory[];
+  visibleFiles: WorkspaceFile[];
+  visibleResultCount: number;
+  exportableFiles: WorkspaceFile[];
+  recentFiles: RecentFile[];
+  recentWorkspaces: RecentWorkspace[];
+  mountedWorkspaces: RecentWorkspace[];
+  activePath: string | null;
+  searchQuery: string;
+  searchResults: WorkspaceSearchResult[];
+  searchLoading: boolean;
+  tagOptions: string[];
+  selectedTag: string | null;
+  selectedKind: WorkspaceKindFilter;
+  onAddWorkspace: () => void;
+  workspaceLimitReached: boolean;
+  onOpenWorkspace: (path: string) => void;
+  onRemoveWorkspace: (path: string) => void;
+  onExportWorkspace: (format: "html" | "docx" | "pdf") => void;
+  onCancelWorkspaceExport: () => void;
+  workspaceExporting: boolean;
+  workspaceExportProgress: { current: number; total: number; fileName: string } | null;
+  workspaceExportFailures: WorkspaceExportFailure[];
+  onCopyExportFailures: () => void;
+  onSaveExportFailures: () => void;
+  workspaceExportNotice: string | null;
+  workspaceIndexLoading: boolean;
+  onOpenFile: (path: string) => void;
+  onCloseFile?: (path: string) => void;
+  onCreateNote?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
+  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onShowDetails?: (details: WorkspaceEntryDetails) => void;
+  onRevealEntry?: (entryPath: string) => void;
+  onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
+  onSearchQueryChange: (query: string) => void;
+  onTagChange: (tag: string | null) => void;
+  onKindChange: (kind: WorkspaceKindFilter) => void;
+  onClearFilters: () => void;
+};
+
+function pathName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
+
+function isBatchExportable(file: WorkspaceFile): boolean {
+  return file.kind === "markdown" || file.kind === "text" || file.kind === "docx";
+}
+
+export function WorkspacePanel({
+  workspacePath,
+  files,
+  folders = [],
+  visibleFiles,
+  visibleResultCount,
+  exportableFiles,
+  recentFiles,
+  recentWorkspaces,
+  mountedWorkspaces,
+  activePath,
+  searchQuery,
+  searchResults,
+  searchLoading,
+  tagOptions,
+  selectedTag,
+  selectedKind,
+  onAddWorkspace,
+  workspaceLimitReached,
+  onOpenWorkspace,
+  onRemoveWorkspace,
+  onExportWorkspace,
+  onCancelWorkspaceExport,
+  workspaceExporting,
+  workspaceExportProgress,
+  workspaceExportFailures,
+  onCopyExportFailures,
+  onSaveExportFailures,
+  workspaceExportNotice,
+  workspaceIndexLoading,
+  onOpenFile,
+  onCloseFile,
+  onCreateNote,
+  onCreateFolder,
+  onRenameEntry,
+  onDeleteEntry,
+  onDuplicateEntry,
+  onShowDetails,
+  onRevealEntry,
+  onCopyPath,
+  onCopyRelativePath,
+  onCopyName,
+  onRefresh,
+  onSearchQueryChange,
+  onTagChange,
+  onKindChange,
+  onClearFilters,
+}: WorkspacePanelProps) {
+  const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
+  const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
+  const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
+  const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));
+  const treeFolders = hasFilters ? [] : folders;
+
+  return (
+    <section className="workspace-panel" aria-labelledby="workspace-title">
+      <div className="workspace-heading">
+        <div>
+          <div className="panel-kicker">WORKSPACE</div>
+          <h2 id="workspace-title">阅读库</h2>
+        </div>
+        <div className="workspace-actions">
+          {workspacePath && onCreateNote && onCreateFolder && (
+            <details className="workspace-create-menu">
+              <summary className="quiet-button workspace-create-button">新建</summary>
+              <div className="workspace-create-menu-panel" role="menu">
+                <div className="workspace-switcher-label">阅读库根目录</div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onCreateNote("");
+                  }}
+                >
+                  新建笔记
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onCreateFolder("");
+                  }}
+                >
+                  新建文件夹
+                </button>
+              </div>
+            </details>
+          )}
+          {(canBatchExport || workspaceExporting) && (
+            <details className="export-menu workspace-export-menu">
+              <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
+              <div className="export-menu-panel">
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("html")}
+                >
+                  单文件 HTML
+                </button>
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("docx")}
+                >
+                  单文件 Word
+                </button>
+                <button
+                  type="button"
+                  disabled={!canBatchExport || workspaceExporting}
+                  onClick={() => onExportWorkspace("pdf")}
+                >
+                  批量打印 / PDF
+                </button>
+              </div>
+            </details>
+          )}
+          {workspaceExporting && (
+            <button type="button" className="quiet-button workspace-export-cancel" onClick={onCancelWorkspaceExport}>
+              取消导出
+            </button>
+          )}
+          {workspacePath && (
+            <button
+              type="button"
+              className="quiet-button workspace-add-button"
+              onClick={onAddWorkspace}
+              disabled={workspaceLimitReached}
+              title={
+                workspaceLimitReached
+                  ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`
+                  : "添加另一个阅读库"
+              }
+            >
+              添加阅读库
+            </button>
+          )}
+        </div>
+      </div>
+
+      {workspacePath ? (
+        <div className="workspace-location" title={workspacePath}>
+          <span className="workspace-dot" aria-hidden="true" />
+          <span>{pathName(workspacePath)}</span>
+          <small>
+            {files.length} 项 · {mountedWorkspaces.length} 个阅读库
+          </small>
+          {switchableWorkspaces.length > 0 && (
+            <details className="workspace-switcher">
+              <summary className="workspace-switcher-trigger" aria-label="切换阅读库">
+                切换
+              </summary>
+              <div className="workspace-switcher-menu" role="menu">
+                <div className="workspace-switcher-label">
+                  已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
+                </div>
+                {switchableWorkspaces.map((workspace) => (
+                  <div className="workspace-switcher-item" role="none" key={workspace.path}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={workspace.path}
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        onOpenWorkspace(workspace.path);
+                      }}
+                    >
+                      <strong>{workspace.name}</strong>
+                      <span>{workspace.path}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="workspace-switcher-remove"
+                      title={`移除 ${workspace.name}`}
+                      aria-label={`从已挂载阅读库移除 ${workspace.name}`}
+                      onClick={() => onRemoveWorkspace(workspace.path)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      ) : (
+        <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
+      )}
+      {workspaceExportNotice && (
+        <div className="workspace-export-note" role="status">
+          {workspaceExportNotice}
+        </div>
+      )}
+      {workspaceExportProgress && (
+        <div className="workspace-export-progress" role="status" aria-live="polite">
+          <div className="workspace-export-progress-label">
+            <span>
+              正在整理 {workspaceExportProgress.current} / {workspaceExportProgress.total}
+            </span>
+            <strong title={workspaceExportProgress.fileName}>{workspaceExportProgress.fileName}</strong>
+          </div>
+          <div
+            className="workspace-export-progress-track"
+            role="progressbar"
+            aria-label="批量导出进度"
+            aria-valuemin={0}
+            aria-valuemax={workspaceExportProgress.total}
+            aria-valuenow={workspaceExportProgress.current}
+          >
+            <span
+              style={{
+                width: `${Math.round((workspaceExportProgress.current / Math.max(1, workspaceExportProgress.total)) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {workspaceExportFailures.length > 0 && (
+        <details className="workspace-export-failures">
+          <summary>查看 {workspaceExportFailures.length} 个未导出文件</summary>
+          <div className="workspace-export-failure-actions">
+            <button type="button" className="quiet-button" onClick={onCopyExportFailures}>
+              复制清单
+            </button>
+            <button type="button" className="quiet-button" onClick={onSaveExportFailures}>
+              保存清单
+            </button>
+          </div>
+          <ul>
+            {workspaceExportFailures.map((failure) => (
+              <li key={`${failure.fileName}-${failure.reason}`}>
+                <strong title={failure.fileName}>{failure.fileName}</strong>
+                <span>{failure.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {workspaceIndexLoading && (
+        <div className="workspace-index-note" role="status">
+          目录已打开，正在整理链接与标签…
+        </div>
+      )}
+
+      {workspacePath && (
+        <>
+          <div className="workspace-filter-summary" role="status">
+            <span>
+              {searchQuery.trim()
+                ? searchLoading
+                  ? "正在整理搜索结果…"
+                  : `当前结果 ${visibleResultCount} 项`
+                : `显示 ${visibleFiles.length} / ${files.length} 项`}
+            </span>
+            {hasFilters && (
+              <>
+                <span className="workspace-filter-label">
+                  · {selectedKind !== "all" ? selectedKindLabel : ""}
+                  {selectedKind !== "all" && selectedTag ? " · " : ""}
+                  {selectedTag ? `#${selectedTag}` : ""}
+                </span>
+                <button type="button" className="workspace-clear-filter" onClick={onClearFilters}>
+                  清除筛选
+                </button>
+              </>
+            )}
+          </div>
+          <input
+            className="workspace-search"
+            type="search"
+            aria-label="搜索工作区"
+            placeholder="搜索整个阅读库"
+            value={searchQuery}
+            onChange={(event) => onSearchQueryChange(event.target.value)}
+          />
+          {tagOptions.length > 0 && (
+            <label className="tag-filter">
+              <span>标签</span>
+              <select
+                aria-label="按标签筛选工作区"
+                value={selectedTag ?? ""}
+                onChange={(event) => onTagChange(event.target.value || null)}
+              >
+                <option value="">全部标签</option>
+                {tagOptions.map((tag) => (
+                  <option key={tag} value={tag}>
+                    #{tag}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="tag-filter">
+            <span>类型</span>
+            <select
+              aria-label="按类型筛选工作区"
+              value={selectedKind}
+              onChange={(event) => onKindChange(event.target.value as WorkspaceKindFilter)}
+            >
+              {workspaceKindOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+
+      {searchQuery.trim() ? (
+        <div className="workspace-results" aria-live="polite">
+          {searchQuery.trim().length < 2 && <p className="muted-copy">再输入一个字符开始搜索。</p>}
+          {searchLoading && <p className="muted-copy">正在搜索…</p>}
+          {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
+            <p className="muted-copy">没有找到匹配文档。</p>
+          )}
+          {!searchLoading &&
+            searchResults.map((result) => (
+              <button
+                type="button"
+                className="workspace-result"
+                key={result.file.path}
+                onClick={() => onOpenFile(result.file.path)}
+              >
+                <strong>{result.file.name}</strong>
+                <span>{result.preview || result.file.relativePath}</span>
+              </button>
+            ))}
+        </div>
+      ) : (
+        <>
+          {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0 || !hasFilters) && (
+            <div className="workspace-files" aria-label="工作区文件">
+              <div className="workspace-subheading">文件</div>
+              <WorkspaceTreeView
+                files={visibleFiles}
+                folders={treeFolders}
+                activePath={activePath}
+                onOpenFile={onOpenFile}
+                onCloseFile={onCloseFile}
+                onCreateNote={onCreateNote}
+                onCreateFolder={onCreateFolder}
+                onRenameEntry={onRenameEntry}
+                onDeleteEntry={onDeleteEntry}
+                onDuplicateEntry={onDuplicateEntry}
+                onShowDetails={onShowDetails}
+                onRevealEntry={onRevealEntry}
+                onCopyPath={onCopyPath}
+                onCopyRelativePath={onCopyRelativePath}
+                onCopyName={onCopyName}
+                onRefresh={onRefresh}
+              />
+            </div>
+          )}
+
+          {workspacePath && visibleFiles.length === 0 && <p className="muted-copy">当前标签下没有文件。</p>}
+
+          {!workspacePath && recentWorkspaces.length > 0 && (
+            <div className="workspace-files recent-files" aria-label="最近阅读库">
+              <div className="workspace-subheading">最近阅读库</div>
+              {recentWorkspaces.map((workspace) => (
+                <button
+                  type="button"
+                  className="workspace-file"
+                  key={workspace.path}
+                  title={workspace.path}
+                  onClick={() => onOpenWorkspace(workspace.path)}
+                >
+                  <span>{workspace.name}</span>
+                  <small>{workspace.path}</small>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!workspacePath && recentFiles.length > 0 && (
+            <div className="workspace-files recent-files" aria-label="最近打开">
+              <div className="workspace-subheading">最近打开</div>
+              {recentFiles.map((file) => (
+                <button
+                  type="button"
+                  className="workspace-file"
+                  key={file.path}
+                  title={file.path}
+                  onClick={() => onOpenFile(file.path)}
+                >
+                  <span>{file.name}</span>
+                  <small>{file.path}</small>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

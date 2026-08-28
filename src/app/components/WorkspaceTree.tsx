@@ -1,1 +1,575 @@
-import { useMemo, useState, type KeyboardEvent } from "react";\nimport type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";\nimport { buildWorkspaceTree, type WorkspaceTreeFolder } from "../workspace-tree";\nimport { ContextMenu } from "./ContextMenu";\n\nexport type WorkspaceEntryKind = "file" | "folder";\n\ntype WorkspaceTreeContextTarget = {\n  x: number;\n  y: number;\n  parentPath: string;\n  label: string;\n  entryPath: string;\n  entryKind: "root" | WorkspaceEntryKind;\n  filePath?: string;\n  details?: WorkspaceEntryDetails;\n};\n\ntype WorkspaceTreeProps = {\n  files: WorkspaceFile[];\n  folders?: WorkspaceDirectory[];\n  activePath: string | null;\n  onOpenFile: (path: string) => void;\n  onCloseFile?: (path: string) => void;\n  onCreateNote?: (parentPath: string) => void;\n  onCreateFolder?: (parentPath: string) => void;\n  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onShowDetails?: (details: WorkspaceEntryDetails) => void;\n  onRevealEntry?: (entryPath: string) => void;\n  onCopyPath?: (entryPath: string) => void;\n  onCopyRelativePath?: (entryPath: string) => void;\n  onCopyName?: (entryPath: string) => void;\n  onRefresh?: (entryPath: string) => void;\n};\n\nfunction formatSize(size: number): string {\n  if (size < 1024) return `${size} B`;\n  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;\n  return `${(size / (1024 * 1024)).toFixed(1)} MB`;\n}\n\nfunction parentRelativePath(relativePath: string): string {\n  const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);\n  parts.pop();\n  return parts.join("/");\n}\n\nfunction isContextMenuKey(event: KeyboardEvent): boolean {\n  return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);\n}\n\nfunction isWorkspaceEntryKind(kind: WorkspaceTreeContextTarget["entryKind"]): kind is WorkspaceEntryKind {\n  return kind !== "root";\n}\n\nfunction targetFromKeyboard(\n  event: KeyboardEvent<HTMLButtonElement>,\n  details: Omit<WorkspaceTreeContextTarget, "x" | "y">,\n): WorkspaceTreeContextTarget {\n  const rect = event.currentTarget.getBoundingClientRect();\n  return {\n    x: rect.left + Math.min(32, rect.width / 2),\n    y: rect.bottom,\n    ...details,\n  };\n}\n\ntype WorkspaceFileButtonProps = {\n  file: WorkspaceFile;\n  activePath: string | null;\n  depth: number;\n  onOpenFile: (path: string) => void;\n  onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;\n};\n\nfunction WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContextMenu }: WorkspaceFileButtonProps) {\n  const parentPath = parentRelativePath(file.relativePath);\n  return (\n    <button\n      type="button"\n      className={`workspace-file ${activePath === file.path ? "active" : ""}`}\n      style={{ paddingLeft: `${7 + depth * 14}px` }}\n      title={`${file.relativePath} · ${formatSize(file.size)}`}\n      onClick={() => onOpenFile(file.path)}\n      onContextMenu={(event) => {\n        event.preventDefault();\n        event.stopPropagation();\n        onOpenContextMenu({\n          x: event.clientX,\n          y: event.clientY,\n          parentPath,\n          label: `“${file.relativePath}”`,\n          entryPath: file.relativePath,\n          entryKind: "file",\n          filePath: file.path,\n          details: {\n            kind: "file",\n            name: file.name,\n            relativePath: file.relativePath,\n            absolutePath: file.path,\n            documentKind: file.kind,\n            size: file.size,\n          },\n        });\n      }}\n      onKeyDown={(event) => {\n        if (!isContextMenuKey(event)) return;\n        event.preventDefault();\n        onOpenContextMenu(\n          targetFromKeyboard(event, {\n            parentPath,\n            label: `“${file.relativePath}”`,\n            entryPath: file.relativePath,\n            entryKind: "file",\n            filePath: file.path,\n            details: {\n              kind: "file",\n              name: file.name,\n              relativePath: file.relativePath,\n              absolutePath: file.path,\n              documentKind: file.kind,\n              size: file.size,\n            },\n          }),\n        );\n      }}\n    >\n      <span>{file.name}</span>\n      {depth === 0 && file.relativePath !== file.name && <small>{file.relativePath}</small>}\n    </button>\n  );\n}\n\ntype WorkspaceFolderProps = {\n  folder: WorkspaceTreeFolder;\n  depth: number;\n  collapsedFolders: ReadonlySet<string>;\n  onToggleFolder: (path: string) => void;\n  activePath: string | null;\n  onOpenFile: (path: string) => void;\n  onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;\n  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;\n  onShowDetails?: (details: WorkspaceEntryDetails) => void;\n  onRevealEntry?: (entryPath: string) => void;\n  onCopyPath?: (entryPath: string) => void;\n  onCopyRelativePath?: (entryPath: string) => void;\n  onCopyName?: (entryPath: string) => void;\n  onRefresh?: (entryPath: string) => void;\n};\n\nfunction WorkspaceFolder({\n  folder,\n  depth,\n  collapsedFolders,\n  onToggleFolder,\n  activePath,\n  onOpenFile,\n  onOpenContextMenu,\n  onRenameEntry,\n  onDeleteEntry,\n  onDuplicateEntry,\n  onShowDetails,\n  onRevealEntry,\n  onCopyPath,\n  onCopyRelativePath,\n  onCopyName,\n  onRefresh,\n}: WorkspaceFolderProps) {\n  const isOpen = !collapsedFolders.has(folder.path);\n  const folderLabel = `“${folder.path}”`;\n\n  return (\n    <div className="workspace-folder-group">\n      <button\n        type="button"\n        className="workspace-folder"\n        style={{ paddingLeft: `${7 + depth * 14}px` }}\n        aria-expanded={isOpen}\n        onClick={() => onToggleFolder(folder.path)}\n        onContextMenu={(event) => {\n          event.preventDefault();\n          event.stopPropagation();\n          onOpenContextMenu({\n            x: event.clientX,\n            y: event.clientY,\n            parentPath: folder.path,\n            label: folderLabel,\n            entryPath: folder.path,\n            entryKind: "folder",\n            details: {\n              kind: "folder",\n              name: folder.name,\n              relativePath: folder.path,\n              fileCount: folder.fileCount,\n            },\n          });\n        }}\n        onKeyDown={(event) => {\n          if (!isContextMenuKey(event)) return;\n          event.preventDefault();\n          onOpenContextMenu(\n            targetFromKeyboard(event, {\n              parentPath: folder.path,\n              label: folderLabel,\n              entryPath: folder.path,\n              entryKind: "folder",\n              details: {\n                kind: "folder",\n                name: folder.name,\n                relativePath: folder.path,\n                fileCount: folder.fileCount,\n              },\n            }),\n          );\n        }}\n      >\n        <span className="workspace-folder-caret" aria-hidden="true">\n          {isOpen ? "⌄" : "›"}\n        </span>\n        <span className="workspace-folder-icon" aria-hidden="true">\n          ▱\n        </span>\n        <span className="workspace-folder-name">{folder.name}</span>\n        <small>{folder.fileCount > 0 ? folder.fileCount : "空"}</small>\n      </button>\n      {isOpen && (\n        <>\n          {folder.files.map((file) => (\n            <WorkspaceFileButton\n              key={file.path}\n              file={file}\n              activePath={activePath}\n              depth={depth + 1}\n              onOpenFile={onOpenFile}\n              onOpenContextMenu={onOpenContextMenu}\n            />\n          ))}\n          {folder.folders.map((child) => (\n            <WorkspaceFolder\n              key={child.path}\n              folder={child}\n              depth={depth + 1}\n              collapsedFolders={collapsedFolders}\n              onToggleFolder={onToggleFolder}\n              activePath={activePath}\n              onOpenFile={onOpenFile}\n              onOpenContextMenu={onOpenContextMenu}\n              onRenameEntry={onRenameEntry}\n              onDeleteEntry={onDeleteEntry}\n              onDuplicateEntry={onDuplicateEntry}\n              onShowDetails={onShowDetails}\n              onRevealEntry={onRevealEntry}\n              onCopyPath={onCopyPath}\n              onCopyRelativePath={onCopyRelativePath}\n              onCopyName={onCopyName}\n              onRefresh={onRefresh}\n            />\n          ))}\n        </>\n      )}\n    </div>\n  );\n}\n\nexport function WorkspaceTreeView({\n  files,\n  folders = [],\n  activePath,\n  onOpenFile,\n  onCloseFile,\n  onCreateNote,\n  onCreateFolder,\n  onRenameEntry,\n  onDeleteEntry,\n  onDuplicateEntry,\n  onShowDetails,\n  onRevealEntry,\n  onCopyPath,\n  onCopyRelativePath,\n  onCopyName,\n  onRefresh,\n}: WorkspaceTreeProps) {\n  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());\n  const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);\n  const tree = useMemo(() => buildWorkspaceTree(files, folders), [files, folders]);\n  const canManage = Boolean(\n    onCreateNote ||\n    onCreateFolder ||\n    onRenameEntry ||\n    onDeleteEntry ||\n    onDuplicateEntry ||\n    onShowDetails ||\n    onRevealEntry ||\n    onCopyPath ||\n    onCopyRelativePath ||\n    onCopyName ||\n    onRefresh,\n  );\n\n  const toggleFolder = (path: string) => {\n    setCollapsedFolders((current) => {\n      const next = new Set(current);\n      if (next.has(path)) next.delete(path);\n      else next.add(path);\n      return next;\n    });\n  };\n\n  const openContextMenu = (target: WorkspaceTreeContextTarget) => {\n    if (!canManage) return;\n    setContextMenu(target);\n  };\n\n  return (\n    <div\n      className="workspace-tree"\n      onContextMenu={(event) => {\n        if (!canManage || event.target !== event.currentTarget) return;\n        event.preventDefault();\n        openContextMenu({\n          x: event.clientX,\n          y: event.clientY,\n          parentPath: "",\n          label: "阅读库根目录",\n          entryPath: "",\n          entryKind: "root",\n        });\n      }}\n    >\n      {tree.files.map((file) => (\n        <WorkspaceFileButton\n          key={file.path}\n          file={file}\n          activePath={activePath}\n          depth={0}\n          onOpenFile={onOpenFile}\n          onOpenContextMenu={openContextMenu}\n        />\n      ))}\n      {tree.folders.map((folder) => (\n        <WorkspaceFolder\n          key={folder.path}\n          folder={folder}\n          depth={0}\n          collapsedFolders={collapsedFolders}\n          onToggleFolder={toggleFolder}\n          activePath={activePath}\n          onOpenFile={onOpenFile}\n          onOpenContextMenu={openContextMenu}\n          onRenameEntry={onRenameEntry}\n          onDeleteEntry={onDeleteEntry}\n          onDuplicateEntry={onDuplicateEntry}\n          onShowDetails={onShowDetails}\n          onRevealEntry={onRevealEntry}\n          onCopyPath={onCopyPath}\n          onCopyRelativePath={onCopyRelativePath}\n          onCopyName={onCopyName}\n          onRefresh={onRefresh}\n        />\n      ))}\n      {contextMenu && canManage && (\n        <ContextMenu\n          x={contextMenu.x}\n          y={contextMenu.y}\n          title={contextMenu.entryKind === "root" ? "阅读库根目录" : contextMenu.label}\n          ariaLabel="工作区管理菜单"\n          groups={[\n            ...(contextMenu.entryKind === "file"\n              ? [\n                  {\n                    label: "打开",\n                    items: [\n                      {\n                        id: "open-file",\n                        label: "打开文件",\n                        onSelect: () => contextMenu.filePath && onOpenFile(contextMenu.filePath),\n                      },\n                    ],\n                  },\n                ]\n              : []),\n            ...(contextMenu.entryKind === "file" && contextMenu.filePath === activePath && onCloseFile\n              ? [\n                  {\n                    label: "标签页",\n                    items: [\n                      {\n                        id: "close-file-tab",\n                        label: "关闭当前标签",\n                        onSelect: () => onCloseFile(contextMenu.filePath as string),\n                      },\n                    ],\n                  },\n                ]\n              : []),\n            ...(onCreateNote || onCreateFolder\n              ? [\n                  {\n                    label: "新建",\n                    items: [\n                      ...(onCreateNote\n                        ? [\n                            {\n                              id: "new-note",\n                              label: contextMenu.entryKind === "file" ? "在所在文件夹中新建笔记" : "新建笔记",\n                              onSelect: () => onCreateNote(contextMenu.parentPath),\n                            },\n                          ]\n                        : []),\n                      ...(onCreateFolder\n                        ? [\n                            {\n                              id: "new-folder",\n                              label: contextMenu.entryKind === "file" ? "在所在文件夹中新建文件夹" : "新建文件夹",\n                              onSelect: () => onCreateFolder(contextMenu.parentPath),\n                            },\n                          ]\n                        : []),\n                    ],\n                  },\n                ]\n              : []),\n            ...(contextMenu.entryKind !== "root" && (onRenameEntry || onDeleteEntry || onDuplicateEntry)\n              ? [\n                  {\n                    label: "管理",\n                    items: [\n                      ...(onDuplicateEntry\n                        ? [\n                            {\n                              id: "duplicate-entry",\n                              label: contextMenu.entryKind === "folder" ? "复制文件夹" : "复制文件",\n                              onSelect: () => {\n                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {\n                                  onDuplicateEntry(contextMenu.entryPath, contextMenu.entryKind);\n                                }\n                              },\n                            },\n                          ]\n                        : []),\n                      ...(onRenameEntry\n                        ? [\n                            {\n                              id: "rename-entry",\n                              label: contextMenu.entryKind === "folder" ? "重命名文件夹" : "重命名文件",\n                              onSelect: () => {\n                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {\n                                  onRenameEntry(contextMenu.entryPath, contextMenu.entryKind);\n                                }\n                              },\n                            },\n                          ]\n                        : []),\n                      ...(onDeleteEntry\n                        ? [\n                            {\n                              id: "delete-entry",\n                              label: contextMenu.entryKind === "folder" ? "删除文件夹及内容" : "删除文件",\n                              tone: "danger" as const,\n                              onSelect: () => {\n                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {\n                                  onDeleteEntry(contextMenu.entryPath, contextMenu.entryKind);\n                                }\n                              },\n                            },\n                          ]\n                        : []),\n                    ],\n                  },\n                ]\n              : []),\n            ...(contextMenu.entryKind !== "root" && contextMenu.details && onShowDetails\n              ? [\n                  {\n                    label: "信息",\n                    items: [\n                      {\n                        id: "show-entry-details",\n                        label: "查看属性",\n                        onSelect: () => onShowDetails(contextMenu.details as WorkspaceEntryDetails),\n                      },\n                    ],\n                  },\n                ]\n              : []),\n            ...(contextMenu.entryKind === "folder"\n              ? [\n                  {\n                    label: "视图",\n                    items: [\n                      {\n                        id: "toggle-folder",\n                        label: collapsedFolders.has(contextMenu.entryPath) ? "展开文件夹" : "折叠文件夹",\n                        onSelect: () => toggleFolder(contextMenu.entryPath),\n                      },\n                    ],\n                  },\n                ]\n              : []),\n            ...(onRevealEntry || onCopyPath || onCopyRelativePath || onCopyName\n              ? [\n                  {\n                    label: "路径",\n                    items: [\n                      ...(contextMenu.entryKind !== "root" && onCopyName\n                        ? [\n                            {\n                              id: "copy-entry-name",\n                              label: "复制名称",\n                              onSelect: () => onCopyName(contextMenu.entryPath),\n                            },\n                          ]\n                        : []),\n                      ...(onRevealEntry\n                        ? [\n                            {\n                              id: "reveal-entry",\n                              label: contextMenu.entryKind === "file" ? "在资源管理器中显示" : "在资源管理器中打开",\n                              onSelect: () => onRevealEntry(contextMenu.entryPath),\n                            },\n                          ]\n                        : []),\n                      ...(onCopyPath\n                        ? [\n                            {\n                              id: "copy-entry-path",\n                              label: "复制完整路径",\n                              onSelect: () => onCopyPath(contextMenu.entryPath),\n                            },\n                          ]\n                        : []),\n                      ...(contextMenu.entryKind !== "root" && onCopyRelativePath\n                        ? [\n                            {\n                              id: "copy-relative-entry-path",\n                              label: "复制相对路径",\n                              onSelect: () => onCopyRelativePath(contextMenu.entryPath),\n                            },\n                          ]\n                        : []),\n                    ],\n                  },\n                ]\n              : []),\n            ...(onRefresh\n              ? [\n                  {\n                    label: "同步",\n                    items: [\n                      {\n                        id: "refresh-entry",\n                        label:\n                          contextMenu.entryKind === "root"\n                            ? "刷新阅读库"\n                            : contextMenu.entryKind === "folder"\n                              ? "刷新文件夹"\n                              : "刷新所在文件夹",\n                        onSelect: () =>\n                          onRefresh(contextMenu.entryKind === "file" ? contextMenu.parentPath : contextMenu.entryPath),\n                      },\n                    ],\n                  },\n                ]\n              : []),\n          ]}\n          onClose={() => setContextMenu(null)}\n        />\n      )}\n    </div>\n  );\n}\n
+import { useMemo, useState, type KeyboardEvent } from "react";
+import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
+import { buildWorkspaceTree, type WorkspaceTreeFolder } from "../workspace-tree";
+import { ContextMenu } from "./ContextMenu";
+
+export type WorkspaceEntryKind = "file" | "folder";
+
+type WorkspaceTreeContextTarget = {
+  x: number;
+  y: number;
+  parentPath: string;
+  label: string;
+  entryPath: string;
+  entryKind: "root" | WorkspaceEntryKind;
+  filePath?: string;
+  details?: WorkspaceEntryDetails;
+};
+
+type WorkspaceTreeProps = {
+  files: WorkspaceFile[];
+  folders?: WorkspaceDirectory[];
+  activePath: string | null;
+  onOpenFile: (path: string) => void;
+  onCloseFile?: (path: string) => void;
+  onCreateNote?: (parentPath: string) => void;
+  onCreateFolder?: (parentPath: string) => void;
+  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onShowDetails?: (details: WorkspaceEntryDetails) => void;
+  onRevealEntry?: (entryPath: string) => void;
+  onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
+};
+
+function formatSize(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function parentRelativePath(relativePath: string): string {
+  const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+  parts.pop();
+  return parts.join("/");
+}
+
+function isContextMenuKey(event: KeyboardEvent): boolean {
+  return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
+}
+
+function isWorkspaceEntryKind(kind: WorkspaceTreeContextTarget["entryKind"]): kind is WorkspaceEntryKind {
+  return kind !== "root";
+}
+
+function targetFromKeyboard(
+  event: KeyboardEvent<HTMLButtonElement>,
+  details: Omit<WorkspaceTreeContextTarget, "x" | "y">,
+): WorkspaceTreeContextTarget {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return {
+    x: rect.left + Math.min(32, rect.width / 2),
+    y: rect.bottom,
+    ...details,
+  };
+}
+
+type WorkspaceFileButtonProps = {
+  file: WorkspaceFile;
+  activePath: string | null;
+  depth: number;
+  onOpenFile: (path: string) => void;
+  onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
+};
+
+function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContextMenu }: WorkspaceFileButtonProps) {
+  const parentPath = parentRelativePath(file.relativePath);
+  return (
+    <button
+      type="button"
+      className={`workspace-file ${activePath === file.path ? "active" : ""}`}
+      style={{ paddingLeft: `${7 + depth * 14}px` }}
+      title={`${file.relativePath} · ${formatSize(file.size)}`}
+      onClick={() => onOpenFile(file.path)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          parentPath,
+          label: `“${file.relativePath}”`,
+          entryPath: file.relativePath,
+          entryKind: "file",
+          filePath: file.path,
+          details: {
+            kind: "file",
+            name: file.name,
+            relativePath: file.relativePath,
+            absolutePath: file.path,
+            documentKind: file.kind,
+            size: file.size,
+          },
+        });
+      }}
+      onKeyDown={(event) => {
+        if (!isContextMenuKey(event)) return;
+        event.preventDefault();
+        onOpenContextMenu(
+          targetFromKeyboard(event, {
+            parentPath,
+            label: `“${file.relativePath}”`,
+            entryPath: file.relativePath,
+            entryKind: "file",
+            filePath: file.path,
+            details: {
+              kind: "file",
+              name: file.name,
+              relativePath: file.relativePath,
+              absolutePath: file.path,
+              documentKind: file.kind,
+              size: file.size,
+            },
+          }),
+        );
+      }}
+    >
+      <span>{file.name}</span>
+      {depth === 0 && file.relativePath !== file.name && <small>{file.relativePath}</small>}
+    </button>
+  );
+}
+
+type WorkspaceFolderProps = {
+  folder: WorkspaceTreeFolder;
+  depth: number;
+  collapsedFolders: ReadonlySet<string>;
+  onToggleFolder: (path: string) => void;
+  activePath: string | null;
+  onOpenFile: (path: string) => void;
+  onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
+  onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDeleteEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onDuplicateEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
+  onShowDetails?: (details: WorkspaceEntryDetails) => void;
+  onRevealEntry?: (entryPath: string) => void;
+  onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
+};
+
+function WorkspaceFolder({
+  folder,
+  depth,
+  collapsedFolders,
+  onToggleFolder,
+  activePath,
+  onOpenFile,
+  onOpenContextMenu,
+  onRenameEntry,
+  onDeleteEntry,
+  onDuplicateEntry,
+  onShowDetails,
+  onRevealEntry,
+  onCopyPath,
+  onCopyRelativePath,
+  onCopyName,
+  onRefresh,
+}: WorkspaceFolderProps) {
+  const isOpen = !collapsedFolders.has(folder.path);
+  const folderLabel = `“${folder.path}”`;
+
+  return (
+    <div className="workspace-folder-group">
+      <button
+        type="button"
+        className="workspace-folder"
+        style={{ paddingLeft: `${7 + depth * 14}px` }}
+        aria-expanded={isOpen}
+        onClick={() => onToggleFolder(folder.path)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            parentPath: folder.path,
+            label: folderLabel,
+            entryPath: folder.path,
+            entryKind: "folder",
+            details: {
+              kind: "folder",
+              name: folder.name,
+              relativePath: folder.path,
+              fileCount: folder.fileCount,
+            },
+          });
+        }}
+        onKeyDown={(event) => {
+          if (!isContextMenuKey(event)) return;
+          event.preventDefault();
+          onOpenContextMenu(
+            targetFromKeyboard(event, {
+              parentPath: folder.path,
+              label: folderLabel,
+              entryPath: folder.path,
+              entryKind: "folder",
+              details: {
+                kind: "folder",
+                name: folder.name,
+                relativePath: folder.path,
+                fileCount: folder.fileCount,
+              },
+            }),
+          );
+        }}
+      >
+        <span className="workspace-folder-caret" aria-hidden="true">
+          {isOpen ? "⌄" : "›"}
+        </span>
+        <span className="workspace-folder-icon" aria-hidden="true">
+          ▱
+        </span>
+        <span className="workspace-folder-name">{folder.name}</span>
+        <small>{folder.fileCount > 0 ? folder.fileCount : "空"}</small>
+      </button>
+      {isOpen && (
+        <>
+          {folder.files.map((file) => (
+            <WorkspaceFileButton
+              key={file.path}
+              file={file}
+              activePath={activePath}
+              depth={depth + 1}
+              onOpenFile={onOpenFile}
+              onOpenContextMenu={onOpenContextMenu}
+            />
+          ))}
+          {folder.folders.map((child) => (
+            <WorkspaceFolder
+              key={child.path}
+              folder={child}
+              depth={depth + 1}
+              collapsedFolders={collapsedFolders}
+              onToggleFolder={onToggleFolder}
+              activePath={activePath}
+              onOpenFile={onOpenFile}
+              onOpenContextMenu={onOpenContextMenu}
+              onRenameEntry={onRenameEntry}
+              onDeleteEntry={onDeleteEntry}
+              onDuplicateEntry={onDuplicateEntry}
+              onShowDetails={onShowDetails}
+              onRevealEntry={onRevealEntry}
+              onCopyPath={onCopyPath}
+              onCopyRelativePath={onCopyRelativePath}
+              onCopyName={onCopyName}
+              onRefresh={onRefresh}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function WorkspaceTreeView({
+  files,
+  folders = [],
+  activePath,
+  onOpenFile,
+  onCloseFile,
+  onCreateNote,
+  onCreateFolder,
+  onRenameEntry,
+  onDeleteEntry,
+  onDuplicateEntry,
+  onShowDetails,
+  onRevealEntry,
+  onCopyPath,
+  onCopyRelativePath,
+  onCopyName,
+  onRefresh,
+}: WorkspaceTreeProps) {
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
+  const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);
+  const tree = useMemo(() => buildWorkspaceTree(files, folders), [files, folders]);
+  const canManage = Boolean(
+    onCreateNote ||
+    onCreateFolder ||
+    onRenameEntry ||
+    onDeleteEntry ||
+    onDuplicateEntry ||
+    onShowDetails ||
+    onRevealEntry ||
+    onCopyPath ||
+    onCopyRelativePath ||
+    onCopyName ||
+    onRefresh,
+  );
+
+  const toggleFolder = (path: string) => {
+    setCollapsedFolders((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const openContextMenu = (target: WorkspaceTreeContextTarget) => {
+    if (!canManage) return;
+    setContextMenu(target);
+  };
+
+  return (
+    <div
+      className="workspace-tree"
+      onContextMenu={(event) => {
+        if (!canManage || event.target !== event.currentTarget) return;
+        event.preventDefault();
+        openContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          parentPath: "",
+          label: "阅读库根目录",
+          entryPath: "",
+          entryKind: "root",
+        });
+      }}
+    >
+      {tree.files.map((file) => (
+        <WorkspaceFileButton
+          key={file.path}
+          file={file}
+          activePath={activePath}
+          depth={0}
+          onOpenFile={onOpenFile}
+          onOpenContextMenu={openContextMenu}
+        />
+      ))}
+      {tree.folders.map((folder) => (
+        <WorkspaceFolder
+          key={folder.path}
+          folder={folder}
+          depth={0}
+          collapsedFolders={collapsedFolders}
+          onToggleFolder={toggleFolder}
+          activePath={activePath}
+          onOpenFile={onOpenFile}
+          onOpenContextMenu={openContextMenu}
+          onRenameEntry={onRenameEntry}
+          onDeleteEntry={onDeleteEntry}
+          onDuplicateEntry={onDuplicateEntry}
+          onShowDetails={onShowDetails}
+          onRevealEntry={onRevealEntry}
+          onCopyPath={onCopyPath}
+          onCopyRelativePath={onCopyRelativePath}
+          onCopyName={onCopyName}
+          onRefresh={onRefresh}
+        />
+      ))}
+      {contextMenu && canManage && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          title={contextMenu.entryKind === "root" ? "阅读库根目录" : contextMenu.label}
+          ariaLabel="工作区管理菜单"
+          groups={[
+            ...(contextMenu.entryKind === "file"
+              ? [
+                  {
+                    label: "打开",
+                    items: [
+                      {
+                        id: "open-file",
+                        label: "打开文件",
+                        onSelect: () => contextMenu.filePath && onOpenFile(contextMenu.filePath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(contextMenu.entryKind === "file" && contextMenu.filePath === activePath && onCloseFile
+              ? [
+                  {
+                    label: "标签页",
+                    items: [
+                      {
+                        id: "close-file-tab",
+                        label: "关闭当前标签",
+                        onSelect: () => onCloseFile(contextMenu.filePath as string),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(onCreateNote || onCreateFolder
+              ? [
+                  {
+                    label: "新建",
+                    items: [
+                      ...(onCreateNote
+                        ? [
+                            {
+                              id: "new-note",
+                              label: contextMenu.entryKind === "file" ? "在所在文件夹中新建笔记" : "新建笔记",
+                              onSelect: () => onCreateNote(contextMenu.parentPath),
+                            },
+                          ]
+                        : []),
+                      ...(onCreateFolder
+                        ? [
+                            {
+                              id: "new-folder",
+                              label: contextMenu.entryKind === "file" ? "在所在文件夹中新建文件夹" : "新建文件夹",
+                              onSelect: () => onCreateFolder(contextMenu.parentPath),
+                            },
+                          ]
+                        : []),
+                    ],
+                  },
+                ]
+              : []),
+            ...(contextMenu.entryKind !== "root" && (onRenameEntry || onDeleteEntry || onDuplicateEntry)
+              ? [
+                  {
+                    label: "管理",
+                    items: [
+                      ...(onDuplicateEntry
+                        ? [
+                            {
+                              id: "duplicate-entry",
+                              label: contextMenu.entryKind === "folder" ? "复制文件夹" : "复制文件",
+                              onSelect: () => {
+                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {
+                                  onDuplicateEntry(contextMenu.entryPath, contextMenu.entryKind);
+                                }
+                              },
+                            },
+                          ]
+                        : []),
+                      ...(onRenameEntry
+                        ? [
+                            {
+                              id: "rename-entry",
+                              label: contextMenu.entryKind === "folder" ? "重命名文件夹" : "重命名文件",
+                              onSelect: () => {
+                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {
+                                  onRenameEntry(contextMenu.entryPath, contextMenu.entryKind);
+                                }
+                              },
+                            },
+                          ]
+                        : []),
+                      ...(onDeleteEntry
+                        ? [
+                            {
+                              id: "delete-entry",
+                              label: contextMenu.entryKind === "folder" ? "删除文件夹及内容" : "删除文件",
+                              tone: "danger" as const,
+                              onSelect: () => {
+                                if (isWorkspaceEntryKind(contextMenu.entryKind)) {
+                                  onDeleteEntry(contextMenu.entryPath, contextMenu.entryKind);
+                                }
+                              },
+                            },
+                          ]
+                        : []),
+                    ],
+                  },
+                ]
+              : []),
+            ...(contextMenu.entryKind !== "root" && contextMenu.details && onShowDetails
+              ? [
+                  {
+                    label: "信息",
+                    items: [
+                      {
+                        id: "show-entry-details",
+                        label: "查看属性",
+                        onSelect: () => onShowDetails(contextMenu.details as WorkspaceEntryDetails),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(contextMenu.entryKind === "folder"
+              ? [
+                  {
+                    label: "视图",
+                    items: [
+                      {
+                        id: "toggle-folder",
+                        label: collapsedFolders.has(contextMenu.entryPath) ? "展开文件夹" : "折叠文件夹",
+                        onSelect: () => toggleFolder(contextMenu.entryPath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(onRevealEntry || onCopyPath || onCopyRelativePath || onCopyName
+              ? [
+                  {
+                    label: "路径",
+                    items: [
+                      ...(contextMenu.entryKind !== "root" && onCopyName
+                        ? [
+                            {
+                              id: "copy-entry-name",
+                              label: "复制名称",
+                              onSelect: () => onCopyName(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
+                      ...(onRevealEntry
+                        ? [
+                            {
+                              id: "reveal-entry",
+                              label: contextMenu.entryKind === "file" ? "在资源管理器中显示" : "在资源管理器中打开",
+                              onSelect: () => onRevealEntry(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
+                      ...(onCopyPath
+                        ? [
+                            {
+                              id: "copy-entry-path",
+                              label: "复制完整路径",
+                              onSelect: () => onCopyPath(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
+                      ...(contextMenu.entryKind !== "root" && onCopyRelativePath
+                        ? [
+                            {
+                              id: "copy-relative-entry-path",
+                              label: "复制相对路径",
+                              onSelect: () => onCopyRelativePath(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
+                    ],
+                  },
+                ]
+              : []),
+            ...(onRefresh
+              ? [
+                  {
+                    label: "同步",
+                    items: [
+                      {
+                        id: "refresh-entry",
+                        label:
+                          contextMenu.entryKind === "root"
+                            ? "刷新阅读库"
+                            : contextMenu.entryKind === "folder"
+                              ? "刷新文件夹"
+                              : "刷新所在文件夹",
+                        onSelect: () =>
+                          onRefresh(contextMenu.entryKind === "file" ? contextMenu.parentPath : contextMenu.entryPath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+          ]}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </div>
+  );
+}
