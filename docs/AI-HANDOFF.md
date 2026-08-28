@@ -8,9 +8,9 @@
 - 实现：新增 `WorkspaceEntryDetailsDialog` 和 `WorkspaceEntryDetails`；文件树右键展示只读属性；标签页复用 `ContextMenu` 提供关闭当前/其他/右侧/全部；Markdown WYSIWYG 与 CodeMirror 源文本共用“查找选中文本”，直接打开顶部搜索。
 - 质量门禁：PR Quality checks `33135276414`、版本 PR Quality checks `33135827247`、Rust audit `33135855058` 和 Release workflow 的 Windows 构建/发布 job `98736611211` 均成功；本地构建、lint、14 个定向 Vitest 和 2 个编辑器 E2E 也通过。
 - GitHub Release：已发布 [v0.10.8](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.8)，Release workflow `33136197499` 已上传 Windows x64 安装包、`.sig` 和 `latest.json`。安装包 4,902,647 字节，SHA-256 `67994715a1f9c9369656c7976bcc8347b55393ba457c3dd6ebcd3fc2e8ee382a`；`.sig` 428 字节，`latest.json` 1,411 字节；三项下载后哈希均与 Release 资产一致。
-- 镜像状态：Cloudflare Pages 静态镜像子任务 `98737666564` 失败，当前镜像仍未切换到 v0.10.8。已定位两个独立问题：仓库 Actions 仍缺少 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`，且 `scripts/prepare-mirror.mjs` 不能从 `latest.json` 的 GitHub API 资产 URL 推导本地下载文件名。不要把镜像记为已验证，也不要把凭据写入仓库或交接上下文；后续应先修复脚本并由维护者补齐 Secrets，再单独重跑镜像。
+- 镜像状态：Cloudflare Pages 静态镜像子任务 `98737666564` 失败；修复 PR [#290](https://github.com/MY-moss/moyang_Reader/pull/290) 已 squash 合并，合并提交为 `main@9da9c8d4d707e29ad65a4c07ab43a99024428a11`。修复后的手动镜像运行 `33139453566` 已通过版本校验并加载资产映射，随后准确停在 `Require Cloudflare credentials`；当前镜像仍未切换到 v0.10.8。不要把镜像记为已验证，也不要把凭据写入仓库或交接上下文；下一步只需由维护者配置 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` 后重跑该版本镜像，不需要重新打包或创建 Release。
 - Issue 状态：#232 保持 open，剩余中键关闭、标签拖拽和连续缩放另行切片；#241 保持 open，继续跟踪旧版本更新器实机回归和 PDF/更新链路最终验收。
-- 交接：v0.10.8 发布切片已完成。下一位 AI 只从已确认的 Ready backlog 选择一个独立切片；若先处理发布基础设施，优先修复镜像下载名映射并验证 Cloudflare Actions，完成后再继续产品功能。不要重复合并 PR #287/#288 或重复创建 v0.10.8 Release。
+- 交接：v0.10.8 发布切片和镜像代码修复已完成。下一位 AI 先确认仓库 Secrets 已配置，再手动重跑 `mirror-release.yml` 的 `v0.10.8`；镜像验证完成后才能从 Ready backlog 选择下一个产品切片。不要重复合并 PR #287/#288/#290 或重复创建 v0.10.8 Release。
 
 ## 已完成发布切片（2026-08-28，v0.10.6）
 

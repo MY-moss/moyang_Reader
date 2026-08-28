@@ -3,7 +3,7 @@ Total output lines: 142
 
 # Moyang Reader 版本路线
 
-当前稳定基线：`v0.10.8`，下一开发目标：从 Ready backlog 选择一个独立切片。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 已完成 Windows x64 稳定发布。撤回/重做阅读位置修复已由 PR #262 合并并随 v0.10.1 发布。PR #269 已合并 v0.10.2 的首个 UI 切片，PR #270 已完成版本准备并发布 Windows x64 安装包；PR #272 已合并首次使用教程和设置持久化修复，v0.10.3 已完成 Windows x64 Release、安装包和 manifest 核验；#187 的完整响应式断点验收仍保持 open。v0.10.4、v0.10.5、v0.10.6、v0.10.7 和 v0.10.8 均已完成 Windows x64 Release、安装包和 GitHub 资产发布。v0.10.8 的 GitHub 资产已在线核验；Cloudflare 静态镜像子任务仍因仓库 Secrets 未配置且脚本无法解析 GitHub API 资产文件名而失败，不能记为已完成。旧版本自动更新器实机回归仍由 #241 跟踪；每个版本可以包含多个功能切片，达到用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
+当前稳定基线：`v0.10.8`，下一开发目标：先完成 Cloudflare 静态镜像凭据配置与 v0.10.8 重跑，再从 Ready backlog 选择一个独立产品切片。Moyang Reader 当前只支持 Windows x64 桌面版；v0.9.5 已发布三栏导航、侧栏滚动和窄屏布局修复，以及可调宽面板交互。#104 的索引快速路径、ASCII 子串候选、工作区文件列表缓存、文件级 LRU、正式 5000 文档 P95 与长文档回退验收已在 PR #257、#259、#261、#264、#266 完成并关闭 Issue；v0.10.1 已完成 Windows x64 稳定发布。撤回/重做阅读位置修复已由 PR #262 合并并随 v0.10.1 发布。PR #269 已合并 v0.10.2 的首个 UI 切片，PR #270 已完成版本准备并发布 Windows x64 安装包；PR #272 已合并首次使用教程和设置持久化修复，v0.10.3 已完成 Windows x64 Release、安装包和 manifest 核验；#187 的完整响应式断点验收仍保持 open。v0.10.4、v0.10.5、v0.10.6、v0.10.7 和 v0.10.8 均已完成 Windows x64 Release、安装包和 GitHub 资产发布。v0.10.8 的 GitHub 资产已在线核验；PR #290 已修复 GitHub API 资产名映射，手动镜像运行 `33139453566` 已验证代码并仅因仓库 Secrets 缺失停止，Cloudflare 静态镜像仍不能记为已完成。旧版本自动更新器实机回归仍由 #241 跟踪；每个版本可以包含多个功能切片，达到用户功能版本的验收标准后必须生成安装包和公开更新，不为每个 commit 创建 Release。
 
 ## v0.10.7 已完成发布切片：Windows PDF 文件落盘修复（#241）
 
@@ -17,11 +17,11 @@ Total output lines: 142
 - 目标：补齐文件/文件夹属性查看、标签页批量关闭和编辑器选中文本查找，让右键操作覆盖查看、管理和定位的高频路径。
 - 非目标：文件移动、回收站恢复、批量文件操作、属性写回、DOCX/PDF 原格式编辑和插件能力不在本切片内。
 - 验收：文件/文件夹属性弹层信息正确且遵循焦点契约；标签页关闭当前/其他/右侧/全部能复用未保存保护；Markdown WYSIWYG 与源文本都能从右键打开当前文档搜索；前端、Rust 和 Windows 桌面既有 CRUD 不回归。
-- 发布：PR #287、版本 PR #288 已合并到 `main@8d957327e09d8dba10cd5a5a144cfc4787dfc64c`；v0.10.8 Windows x64 Release 已公开，安装包、签名和 `latest.json` 均已上传并核验。Cloudflare 静态镜像待修复下载名映射并补齐仓库 Secrets 后单独重跑。
+- 发布：PR #287、版本 PR #288 已合并到 `main@8d957327e09d8dba10cd5a5a144cfc4787dfc64c`；v0.10.8 Windows x64 Release 已公开，安装包、签名和 `latest.json` 均已上传并核验。PR #290 已合并资产名映射修复；镜像代码已通过手动运行验证，待补齐仓库 Secrets 后单独重跑，不重复生成安装包。
 
 ## 下一 Ready 选择
 
-- 首选发布基础设施切片：修复 `scripts/prepare-mirror.mjs` 对 GitHub API 资产 URL 的文件名映射，补充回归测试，并在维护者配置 Secrets 后验证 v0.10.8 镜像；不重复生成安装包。
+- 首选发布收尾动作：由维护者配置 `CLOUDFLARE_API_TOKEN`（Pages 写入权限）和 `CLOUDFLARE_ACCOUNT_ID` 到 GitHub Actions Secrets，重跑 `mirror-release.yml` 的 `v0.10.8` 并核验根 manifest、版本目录、安装包和 `.sig`；不重复生成安装包。
 - 产品候选：继续拆分 #232 的标签页中键关闭/拖拽排序与连续缩放；必须先明确单一验收范围，不将多个桌面惯例混入同一个 PR。
 
 ## 平台范围收敛
