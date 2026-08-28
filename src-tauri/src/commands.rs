@@ -1071,7 +1071,7 @@ fn normalize_access_path(path: &Path) -> Result<PathBuf, String> {
     for component in missing_components.iter().rev() {
         normalized.push(component);
     }
-    normalized
+    Ok(normalized)
 }
 
 fn access_path_contains(root: &Path, candidate: &Path) -> bool {
