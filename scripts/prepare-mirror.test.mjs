@@ -72,6 +72,53 @@ test("rejects an insecure mirror base URL", () => {
   );
 });
 
+test("resolves GitHub API asset URLs using the downloaded Release asset map", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-mirror-"));
+  try {
+    const assetDir = path.join(root, "assets");
+    const outputDir = path.join(root, "mirror");
+    fs.mkdirSync(assetDir);
+    const assetName = "Moyang.Reader_0.10.8_x64-setup.exe";
+    const apiUrl = "https://api.github.com/repos/example/repo/releases/assets/533159903";
+    fs.writeFileSync(path.join(assetDir, assetName), Uint8Array.from([4, 5, 6]));
+    fs.writeFileSync(path.join(assetDir, `${assetName}.sig`), "signature");
+    const manifestPath = path.join(assetDir, "latest.json");
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        version: "0.10.8",
+        platforms: {
+          "windows-x86_64": { url: apiUrl, signature: "signature" },
+          "windows-x86_64-nsis": { url: apiUrl, signature: "signature" },
+        },
+      }),
+    );
+    const assetMapPath = path.join(assetDir, "release-assets.json");
+    fs.writeFileSync(
+      assetMapPath,
+      JSON.stringify({ assets: [{ id: "RA_kwDOUBcTl84fx1_f", apiUrl, name: assetName }] }),
+    );
+
+    const result = prepareMirror({
+      manifestPath,
+      assetDir,
+      outputDir,
+      assetMapPath,
+      baseUrl: "https://moyang-reader-mirror.pages.dev",
+      expectedVersion: "v0.10.8",
+    });
+
+    assert.deepEqual(result, { version: "0.10.8", assets: [assetName] });
+    const mirroredManifest = JSON.parse(fs.readFileSync(path.join(outputDir, "latest.json"), "utf8"));
+    assert.equal(
+      mirroredManifest.platforms["windows-x86_64"].url,
+      `https://moyang-reader-mirror.pages.dev/v0.10.8/${assetName}`,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("rejects encoded path separators in release asset names", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-mirror-"));
   try {

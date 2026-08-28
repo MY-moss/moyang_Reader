@@ -77,6 +77,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "无法下载 Release 资产：$env:RELEASE_TAG"
           }
+          $assetMapPath = Join-Path $assetDir "release-assets.json"
+          $assetMapJson = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取 Release 资产映射：$env:RELEASE_TAG"
+          }
+          [System.IO.File]::WriteAllText($assetMapPath, ($assetMapJson -join [Environment]::NewLine), [System.Text.UTF8Encoding]::new($false))
           $manifestPath = Join-Path $assetDir "latest.json"
           if (-not (Test-Path -LiteralPath $manifestPath)) {
             throw "Release 缺少 latest.json。"
@@ -91,7 +97,7 @@ jobs:
         shell: pwsh
         run: |
           $outputDir = Join-Path $env:RUNNER_TEMP "moyang-reader-mirror"
-          node scripts/prepare-mirror.mjs --manifest="$env:ASSET_DIR/latest.json" --asset-dir="$env:ASSET_DIR" --output="$outputDir" --base-url="$env:MIRROR_BASE_URL" --version="$env:RELEASE_TAG"
+          node scripts/prepare-mirror.mjs --manifest="$env:ASSET_DIR/latest.json" --asset-dir="$env:ASSET_DIR" --asset-map="$env:ASSET_DIR/release-assets.json" --output="$outputDir" --base-url="$env:MIRROR_BASE_URL" --version="$env:RELEASE_TAG"
           if ($LASTEXITCODE -ne 0) {
             throw "无法生成 Cloudflare 静态镜像目录。"
           }

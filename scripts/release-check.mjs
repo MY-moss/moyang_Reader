@@ -115,6 +115,9 @@ export function validateReleaseWorkflow(projectRoot = defaultRoot) {
   if (!mirror.includes("scripts/prepare-mirror.mjs")) {
     errors.push("mirror-release.yml 必须运行镜像清单自检脚本。");
   }
+  if (!mirror.includes("release-assets.json") || !mirror.includes("--asset-map=")) {
+    errors.push("mirror-release.yml 必须传入 Release 资产映射，避免把 GitHub API 资产 ID 当作本地文件名。");
+  }
   if (!mirror.includes("Require Cloudflare credentials") || !mirror.includes("正式 Release 不允许跳过镜像上传")) {
     errors.push("mirror-release.yml 必须要求 Cloudflare 凭据，不能把未上传的镜像标记为成功。");
   }
