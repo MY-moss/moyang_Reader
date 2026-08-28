@@ -23,6 +23,14 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## v0.10.12 发布记录（2026-08-29）
+
+- GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开，包含 Windows x64 安装包、`.sig` 和 `latest.json`。
+- 安装包：4,976,921 字节，SHA-256 `de577b06d78eabc837df87da4e20ab5f127c8ddcd15fcd8d62e1f4ac558d8e74`；签名文件 428 字节，SHA-256 `fcedb0c65194abb42838ba079458506e98b5e6fbeb2207309108b7b36bdec65d`。
+- Cloudflare Pages 的 `latest.json` 已返回 `0.10.12`，镜像安装包和签名 HTTP 200，大小与 SHA-256 和 GitHub Release 一致。
+- Release 的静态镜像 job 因缺少 Cloudflare Actions Secrets 失败；公开镜像当前可用，但自动同步链路仍需维护者安全配置 Secret 后重跑验证。本轮未上传任何凭据。
+- PR #307 已修复 Windows PDF 导出在高负载下偶发未及时落盘的问题，Quality checks 全绿；该修复随下一稳定批次发布。
+
 ## v0.10.10 发布记录（2026-08-28）
 
 - 发布范围：PR [#296](https://github.com/MY-moss/moyang_Reader/pull/296) 增加工作区内文件/文件夹剪切、复制、粘贴和编辑器“粘贴为纯文本”；版本准备 PR [#297](https://github.com/MY-moss/moyang_Reader/pull/297) 同步版本号、CHANGELOG 和发布文档。

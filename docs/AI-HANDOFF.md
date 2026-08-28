@@ -1,12 +1,14 @@
 # AI 开发与交接流程
 
-## v0.10.12 稳定发布准备（2026-08-29）
+## v0.10.12 稳定发布结果（2026-08-29）
 
-- 内容：PR #305 已合并到 `main@c3165828e220890a636c61b2e06b587933279869`，Issue #169 已标记 completed；本版本只包含大型工作区枚举边界、生成目录过滤、单次列表 IPC 和文件树窗口化渲染。
-- 版本准备：当前分支 `codex/release-v0.10.12-2026-08-29` 统一更新 `package.json`、`package-lock.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 和 `src-tauri/tauri.conf.json` 至 `0.10.12`，并补充 CHANGELOG。
-- 验证依据：PR Quality checks `33204727411` 全绿；前端 57 files / 220 tests、5000 文档暖搜索 P95 14 ms、浏览器 E2E 45/45、Windows 桌面 smoke 11/11，以及 Rust fmt/clippy/tests、依赖和发布预检均通过。
-- 发布边界：版本 PR 通过门禁后创建 `v0.10.12` tag，由 Release workflow 生成 Windows x64 安装包、`.sig` 和 `latest.json`，再核验 GitHub 与 Cloudflare；不上传私钥或 Cloudflare 凭据。
-- 下一步：只完成版本门禁、PR、tag、Release 资产与在线哈希核验；发布结束后停止，不自动开启 #168/#181。
+- 发布范围：PR #305 已合并，Issue #169 已标记 completed；版本 PR #306 已合并到 `main@0e8d0bf6b14753953c9b988f07c2ddc08e5476d6`，内容为大型工作区枚举边界、生成目录过滤、单次列表 IPC 和文件树窗口化渲染。
+- GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开；Release run `33207011251` 的 Windows 构建/发布 job `98970518793` 成功。
+- 资产核验：`latest.json` 1,413 字节；Windows x64 安装包 4,976,921 字节，SHA-256 `de577b06d78eabc837df87da4e20ab5f127c8ddcd15fcd8d62e1f4ac558d8e74`；`.sig` 428 字节，SHA-256 `fcedb0c65194abb42838ba079458506e98b5e6fbeb2207309108b7b36bdec65d`。
+- 镜像核验：Cloudflare Pages 的 manifest 版本为 `0.10.12`，根 `latest.json`、安装包和 `.sig` 均可访问；镜像安装包与 GitHub 资产大小和 SHA-256 一致，Windows manifest URL 已重写到 Pages 版本目录。
+- 发布边界：同一 Release 的镜像 job `98973037391` 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据检查阶段失败；这不影响 GitHub 安装包，但不能将整个 workflow 记录为全绿。未上传任何私钥或令牌。
+- 后续修复：PR #307 已合并为 `main@a2f6ef61c151ce127ede11cade50a3a82383d82b`；Quality checks run `33209526541` 全绿，Windows PDF 导出改为后台渲染并将有效文件等待窗口从约 5 秒提高到 15 秒。#241 继续保持 open，待自动镜像 Secret 链路重新验证；旧版本更新器历史实机结果仍以 Issue 记录为准。
+- 下一步：从最新 `main` 重新检查 Issues，选择一个独立 Ready 切片；不要重复 #169/#307，也不要为本次 PDF 修复立即单独打包，待稳定批次再发布。
 
 ## v0.10.11 稳定发布结果（2026-08-29）
 
