@@ -77,20 +77,28 @@ async function waitForExport(pathname, description) {
   );
 }
 
+async function workspaceEntryExists(selector, text = "") {
+  return browser.execute(
+    (entrySelector, expectedText) => {
+      const entries = Array.from(document.querySelectorAll(entrySelector));
+      return entries.some((entry) => {
+        if (!expectedText) return true;
+        const label = entrySelector === ".workspace-folder" ? entry.querySelector(".workspace-folder-name") : entry;
+        const value = (label?.textContent ?? "").trim();
+        return entrySelector === ".workspace-folder" ? value === expectedText : value.includes(expectedText);
+      });
+    },
+    selector,
+    text,
+  );
+}
+
 async function workspaceEntryMatches(selector, entry, text) {
   if (!text) return true;
   if (selector === ".workspace-folder") {
     return (await entry.$(".workspace-folder-name").getText()).trim() === text;
   }
   return (await entry.getText()).includes(text);
-}
-
-async function workspaceEntryExists(selector, text = "") {
-  const entries = await browser.$$(selector);
-  for (const entry of entries) {
-    if (await workspaceEntryMatches(selector, entry, text)) return true;
-  }
-  return false;
 }
 
 async function waitForWorkspaceEntry(selector, text, expected, description) {
