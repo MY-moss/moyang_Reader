@@ -1,5 +1,14 @@
 # AI 开发与交接流程
 
+## #241 验收进展（2026-08-28，v0.10.10 主线）
+
+- 远程基线：`main@b36619c358b86c9cef950898a1add30fad9d3bab`；本次使用独立干净工作副本验证，没有改动原工作区的未提交内容。
+- PDF 子场景已通过：使用 `VITE_MOYANG_DESKTOP_E2E=1 npx tauri build --debug --no-bundle --ci --features wdio --config src-tauri/tauri.wdio.conf.json` 构建后，运行 `npx wdio run desktop-e2e/wdio.conf.mjs --mochaOpts.grep "exports a real PDF"`，真实 Windows Tauri smoke `1/1` 通过；文件存在、大小有效、`%PDF-` 文件头和 `%%EOF` 均通过校验。
+- 测试注意：桌面 smoke 的 Tauri 可执行文件必须在构建时带 `VITE_MOYANG_DESKTOP_E2E=1`，只在构建后重新生成 `dist` 不会更新已打包的 exe；`tauri-driver not found` 是当前嵌入式驱动的诊断提示，不影响本次用例通过。
+- 未完成边界：本次没有重新安装旧版本并执行 v0.10.10 的检查更新、签名校验、替换、重启全链路；历史 v0.9.3→v0.9.4 实机升级证据仍保留在 `docs/UPDATE.md`。#241 继续保持 open。
+- 外部阻塞：v0.10.10 Release workflow 的静态 Cloudflare 镜像 job `98791213977` 仍因仓库缺少 Secret 失败；公开 Pages 代理和 GitHub 回退可用，但不能把静态自动同步记为完成。不得在仓库或交接记录中写入凭据。
+- 交接：本次为验证/文档同步切片，无产品代码、无 Release、无安装包。唯一下一步是由维护者配置 Cloudflare Secret 后重跑对应镜像 job，并在具备旧安装实例时补做当前版本更新回归；完成前不要关闭 #241。
+
 ## 已完成发布切片（2026-08-28，v0.10.10 工作区转移与纯文本粘贴）
 
 - 目标：将已合并的工作区内文件/文件夹剪切复制粘贴与编辑器纯文本粘贴作为 Windows x64 稳定版本发布。
