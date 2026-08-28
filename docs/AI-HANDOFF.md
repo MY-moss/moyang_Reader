@@ -1,14 +1,16 @@
 # AI 开发与交接流程
 
-## 进行中功能切片（2026-08-28，#241 PDF 文件落盘）
+## 已完成发布切片（2026-08-28，v0.10.7）
 
-- 目标：修复 Windows 桌面“保存 PDF”偶发退出码为 0 但没有生成文件的问题，并保留有效 PDF 文件头、原子替换和路径授权边界。
-- 分支：`codex/pdf-export-file-2026-08-28`，基于 `origin/main@9052016bebebb2f6f1516ab3a26d1ec438dfaf42`。
-- 非目标：本切片不处理 #241 中旧版本自动更新器的实机回归，不修改更新协议、签名密钥、Cloudflare 凭据或其他导出格式。
-- 实现：Windows Edge headless 导出增加 `--run-all-compositor-stages-before-draw` 与 `--virtual-time-budget=1000`，避免 Edge 在页面完成绘制前退出；桌面 PDF smoke 改为通过实际“更多操作”菜单触发保存动作，适配窄窗口布局。
-- 根因：Edge headless 的父进程退出时，子进程仍可能异步写入 `--print-to-pdf` 目标；旧实现立即检查并清理临时文件，导致有效 PDF 被清理前尚未出现。现在退出后最多轮询 5 秒，直到文件以 `%PDF-` 开头，再执行原子替换。
-- 当前验证：Rust 格式检查、`cargo build --features wdio`、Windows PDF 回归单测和直接 Edge 参数校验通过；Rust 回归单测复现了旧失败并验证新轮询。完整本机桌面 smoke 未通过，首个根因是 Tauri WebDriver 未进入应用页面（`Tauri core.invoke not available`、`tauri-driver` 缺失警告），该环境问题与本切片分开记录。
-- 交接：提交前补跑针对性 Rust/前端门禁；推送本分支并创建唯一 PR 关联 #241。合并与主线门禁通过后，再单独执行 v0.10.7 patch 发布和安装包/manifest/镜像核验；旧更新器仍由 #241 的后续切片负责。
+- 目标：修复 Windows 桌面“保存 PDF”偶发退出码为 0 但文件尚未落盘的问题，并作为稳定 Windows x64 patch 发布。
+- 基线：PDF 修复 PR #284 与版本准备 PR #285 已合并；发布提交为 main@c1bf7d739afa1bfb31507564af3377e77bb088b5，tag 为 v0.10.7。
+- 根因与修复：Edge headless 父进程退出时子进程仍可能异步写入 print-to-pdf 目标；旧逻辑立即检查并清理临时文件。现在退出后最多轮询 5 秒，确认 PDF 文件头后再原子替换，并增加 Windows Rust 回归测试。
+- 质量门禁：PR Quality checks 33127355219、PR Rust dependency audit 33128205619、main CI 33128664940、main Rust dependency audit 33128664961，以及 Release Quality gate 均成功；Windows Desktop smoke 和 Rust tests 均通过。
+- 发布资产：Release workflow 33129082220 的 Windows 构建/发布 job 98714111104 成功；安装包 4,901,397 字节、SHA-256 ae6a803c9b4e8e6c343278e0780eedbaaee9f3ec1a10da135d3169c553637629；.sig 428 字节、SHA-256 913815eef12d5519b8c1177cd3efa0e8c9b340dcccce0a7b52875364d2e02da4；latest.json 1,411 字节、SHA-256 02047ae696f6c207159e9d4971f8c53b982568e691c292af8b4711e5146e2ed7。
+- 在线核验：GitHub Release 和 Cloudflare 动态镜像的 manifest、安装包、签名均 HTTP 200；镜像安装包和签名 SHA-256 与 GitHub Release 一致，manifest 版本、签名、公钥字段一致。
+- 镜像边界：静态镜像子 job 98715331213 仍因缺少 Cloudflare Secrets 失败；未上传私钥或 Cloudflare 凭据。动态镜像可用。
+- 已知事项：#241 的旧版本自动更新器实机回归仍未完成，#241 保持 open；#232 的剩余桌面交互范围继续留在 backlog。
+- 交接：本切片已完成；下一位 AI 只能从已确认的 Ready backlog 选择单一切片，不重复发布 v0.10.7，不扩大范围。
 
 ## 已完成发布切片（2026-08-28，v0.10.6）
 
