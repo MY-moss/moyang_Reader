@@ -2456,7 +2456,7 @@ export function App() {
         return false;
       }
     },
-    [copyWorkspaceEntry, moveWorkspaceEntry, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
   );
 
   const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {

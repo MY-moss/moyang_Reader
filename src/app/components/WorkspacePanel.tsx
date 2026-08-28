@@ -7,11 +7,7 @@ import type {
   WorkspaceFile,
   WorkspaceSearchResult,
 } from "../types";
-import {
-  WorkspaceTreeView,
-  type WorkspaceEntryKind,
-  type WorkspaceEntryTransferMode,
-} from "./WorkspaceTree";
+import { WorkspaceTreeView, type WorkspaceEntryKind, type WorkspaceEntryTransferMode } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
 import { MAX_MOUNTED_WORKSPACES } from "../storage";

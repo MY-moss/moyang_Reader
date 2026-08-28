@@ -61,9 +61,11 @@ function parentRelativePath(relativePath: string): string {
   return parts.join("/");
 }
 
-
 function normalizeRelativePath(path: string): string {
-  return path.replace(/[\\/]+/g, "/").replace(/^\/+|\/+$/g, "").toLowerCase();
+  return path
+    .replace(/[\\/]+/g, "/")
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase();
 }
 
 function isRelativePathWithin(parentPath: string, candidatePath: string): boolean {
@@ -384,12 +386,13 @@ export function WorkspaceTreeView({
     setContextMenu(null);
     let completed = false;
     try {
-      completed = (await onTransferEntry(pending.entryPath, destinationParentPath, pending.mode, pending.kind)) !== false;
+      completed =
+        (await onTransferEntry(pending.entryPath, destinationParentPath, pending.mode, pending.kind)) !== false;
     } catch {
       onStatusMessage?.("粘贴失败，请检查目标文件夹后重试。");
     }
     if (completed) {
-      setClipboard(null);
+      if (pending.mode === "move") setClipboard(null);
       onStatusMessage?.(`${pending.mode === "move" ? "移动" : "复制"}完成：${pending.label}`);
     }
   };

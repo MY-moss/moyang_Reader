@@ -258,7 +258,6 @@ describe("WorkspaceTreeView", () => {
     container.remove();
   });
 
-
   it("supports cutting and pasting an entry into another folder", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -303,6 +302,60 @@ describe("WorkspaceTreeView", () => {
     });
 
     expect(onTransferEntry).toHaveBeenCalledWith("notes/0.md", "Archive", "move", "file");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps copied entries available for another paste", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onTransferEntry = vi.fn().mockResolvedValue(true);
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={[file(0)]}
+          folders={[{ path: "C:/vault/Archive", name: "Archive", relativePath: "Archive" }]}
+          activePath={null}
+          onOpenFile={() => {}}
+          onTransferEntry={onTransferEntry}
+        />,
+      );
+    });
+
+    const fileButton = container.querySelector<HTMLButtonElement>(".workspace-file");
+    const menuItems = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const copy = menuItems().find((button) => button.textContent?.includes("复制到其他文件夹"));
+    expect(copy).toBeTruthy();
+    act(() => copy?.click());
+
+    const archive = Array.from(container.querySelectorAll<HTMLButtonElement>(".workspace-folder")).find(
+      (button) => button.querySelector(".workspace-folder-name")?.textContent === "Archive",
+    );
+    expect(archive).toBeTruthy();
+    const pasteIntoArchive = async () => {
+      act(() => {
+        archive?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 30, clientY: 40 }));
+      });
+      const paste = menuItems().find((button) => button.textContent?.includes("粘贴到此处"));
+      expect(paste?.disabled).toBe(false);
+      await act(async () => {
+        paste?.click();
+        await Promise.resolve();
+      });
+    };
+
+    await pasteIntoArchive();
+    await pasteIntoArchive();
+
+    expect(onTransferEntry).toHaveBeenCalledTimes(2);
+    expect(onTransferEntry).toHaveBeenNthCalledWith(1, "notes/0.md", "Archive", "copy", "file");
+    expect(onTransferEntry).toHaveBeenNthCalledWith(2, "notes/0.md", "Archive", "copy", "file");
 
     act(() => root.unmount());
     container.remove();

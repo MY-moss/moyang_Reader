@@ -2673,7 +2673,8 @@ fn transfer_workspace_entry_inner(
             fs::copy(&source, &destination).map_err(|error| format!("无法复制文件：{error}"))?;
         }
     } else {
-        fs::rename(&source, &destination).map_err(|error| format!("无法移动工作区条目：{error}"))?;
+        fs::rename(&source, &destination)
+            .map_err(|error| format!("无法移动工作区条目：{error}"))?;
     }
 
     Ok(display_path(&destination))
@@ -3299,7 +3300,6 @@ mod tests {
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
         create_workspace_note_inner, decode_ipc_path, decode_text, delete_workspace_entry_inner,
         duplicate_workspace_entry_inner, extract_markdown_links, extract_tags, extract_title,
-        transfer_workspace_entry_inner,
         extract_wiki_links, has_pdf_header, index_workspace_inner, is_supported_document_path,
         is_supported_text_path, is_write_allowed_for_new_path, list_workspace_files_inner,
         path_exists_inner, persistent_search_index_path, prune_search_entries,
@@ -3307,10 +3307,11 @@ mod tests {
         search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, source_search_tokens, touch_indexed_file,
-        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
-        CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
-        MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, TEMP_FILE_COUNTER,
+        transfer_workspace_entry_inner, write_bytes_file_inner, write_text_file_inner,
+        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind, WorkspaceFile,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
+        TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -4756,6 +4757,4 @@ mod tests {
 
         fs::remove_dir_all(root).expect("remove transfer workspace");
     }
-
-
 }
