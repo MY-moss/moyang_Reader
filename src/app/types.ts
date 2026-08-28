@@ -41,6 +41,7 @@ export type WorkspaceFile = {
   name: string;
   relativePath: string;
   size: number;
+  modifiedMs?: number | null;
   kind: DocumentKind;
 };
 
@@ -118,3 +119,4 @@ export type OpenDocument = {
   modified: boolean;
   externallyModified: boolean;
 };
+
