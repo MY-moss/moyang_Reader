@@ -93,4 +93,3 @@ export function isCurrentWorkspaceLoad(
 export function isSelfWrittenChangePending(writtenUntil: number | undefined, now: number): boolean {
   return typeof writtenUntil === "number" && writtenUntil > now;
 }
-

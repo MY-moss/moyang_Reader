@@ -106,4 +106,3 @@ describe("workspace refresh guards", () => {
     expect(applyWorkspaceFolderDelta(current, delta)).toEqual([replacement, current[0]]);
   });
 });
-

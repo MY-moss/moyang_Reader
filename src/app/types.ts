@@ -119,4 +119,3 @@ export type OpenDocument = {
   modified: boolean;
   externallyModified: boolean;
 };
-
