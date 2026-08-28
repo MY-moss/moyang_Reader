@@ -32,6 +32,7 @@ import { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteConte
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
+import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsDialog";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
@@ -103,6 +104,7 @@ import type {
   TocItem,
   WorkspaceExportFailure,
   WorkspaceDirectory,
+  WorkspaceEntryDetails,
   WorkspaceFile,
   WorkspaceIndexEntry,
   WorkspaceSearchResult,
@@ -547,6 +549,7 @@ export function App() {
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
@@ -2377,6 +2380,14 @@ export function App() {
     }
   }, []);
 
+  const handleShowWorkspaceDetails = useCallback((details: WorkspaceEntryDetails) => {
+    const root = workspacePathRef.current;
+    const absolutePath =
+      details.absolutePath ?? (root ? workspaceEntryAbsolutePath(root, details.relativePath) : details.relativePath);
+    setWorkspaceEntryDetails({ ...details, absolutePath });
+    setError(null);
+  }, []);
+
   const handleDuplicateWorkspaceEntry = useCallback(
     async (entryPath: string, kind: "file" | "folder") => {
       const root = workspacePathRef.current;
@@ -2743,6 +2754,14 @@ export function App() {
       if (currentDocument.kind !== "markdown") return "source";
       return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
     });
+  }, []);
+
+  const handleFindEditorText = useCallback((text: string) => {
+    const query = text.trim();
+    if (!query) return;
+    setSearchOpen(true);
+    setSearchQuery(query);
+    setSearchResultIndex(0);
   }, []);
 
   useEffect(() => {
@@ -3500,11 +3519,16 @@ export function App() {
     [confirmDocumentReplacement, documentState, openPath],
   );
 
-  const handleCloseTab = useCallback(
-    async (path: string) => {
-      const index = openTabs.findIndex((tab) => tab.path === path);
-      if (index < 0) return;
-      if (documentState?.path === path && documentState.modified) {
+  const handleCloseTabs = useCallback(
+    async (paths: readonly string[]) => {
+      const currentTabs = openTabsRef.current;
+      const targetTabs = currentTabs.filter((tab) => paths.some((path) => isSameDocumentPath(path, tab.path)));
+      if (targetTabs.length === 0) return;
+
+      const current = documentStateRef.current;
+      const activeIndex = current ? currentTabs.findIndex((tab) => isSameDocumentPath(tab.path, current.path)) : -1;
+      const closesActive = Boolean(current && targetTabs.some((tab) => isSameDocumentPath(tab.path, current.path)));
+      if (closesActive && current?.modified) {
         const draftOutcome = flushCurrentDraft();
         if (
           draftOutcome === "failed" ||
@@ -3514,12 +3538,16 @@ export function App() {
         }
       }
 
-      const nextTabs = openTabs.filter((tab) => tab.path !== path);
-      releaseDocumentResources(path);
+      const nextTabs = currentTabs.filter(
+        (tab) => !targetTabs.some((target) => isSameDocumentPath(target.path, tab.path)),
+      );
+      targetTabs.forEach((tab) => releaseDocumentResources(tab.path));
+      openTabsRef.current = nextTabs;
       setOpenTabs(nextTabs);
-      if (documentState?.path !== path) return;
+      saveOpenTabs(nextTabs);
+      if (!closesActive) return;
 
-      const nextTab = nextTabs[index] ?? nextTabs[index - 1];
+      const nextTab = nextTabs[activeIndex] ?? nextTabs[activeIndex - 1];
       if (nextTab) {
         await openPath(nextTab.path);
       } else {
@@ -3534,7 +3562,14 @@ export function App() {
         }
       }
     },
-    [documentState, flushCurrentDraft, openPath, openTabs, releaseDocumentResources, workspacePath],
+    [flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],
+  );
+
+  const handleCloseTab = useCallback(
+    (path: string) => {
+      void handleCloseTabs([path]);
+    },
+    [handleCloseTabs],
   );
 
   const handleReorderTabs = useCallback((sourcePath: string, targetPath: string) => {
@@ -4321,6 +4356,7 @@ export function App() {
           }}
           onSelect={(path) => void handleSelectTab(path)}
           onClose={(path) => void handleCloseTab(path)}
+          onCloseMany={(paths) => void handleCloseTabs(paths)}
           onReorder={handleReorderTabs}
         />
       </div>
@@ -4362,6 +4398,7 @@ export function App() {
             onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}
             onDeleteEntry={(entryPath, kind) => void handleDeleteWorkspaceEntry(entryPath, kind)}
             onDuplicateEntry={(entryPath, kind) => void handleDuplicateWorkspaceEntry(entryPath, kind)}
+            onShowDetails={handleShowWorkspaceDetails}
             onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}
             onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}
             onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}
@@ -4498,6 +4535,7 @@ export function App() {
                 ariaLabel="Markdown 所见即所得编辑器"
                 onChange={(value) => void updateSource(value)}
                 onInsertLink={() => handleInsertLink()}
+                onFindText={handleFindEditorText}
                 canUndo={canUndo}
                 canRedo={canRedo}
                 onUndo={(target) => undoEditor(target)}
@@ -4514,6 +4552,7 @@ export function App() {
               onChange={(value) => void updateSource(value)}
               onPaste={handleSourcePaste}
               onInsertLink={handleInsertLink}
+              onFindText={handleFindEditorText}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={(target) => undoEditor(target)}
@@ -4601,6 +4640,9 @@ export function App() {
           onClose={() => setGraphOpen(false)}
           onOpenFile={(path) => void handleSelectTab(path)}
         />
+      )}
+      {workspaceEntryDetails && (
+        <WorkspaceEntryDetailsDialog details={workspaceEntryDetails} onClose={() => setWorkspaceEntryDetails(null)} />
       )}
       {printPreview && (
         <PrintPreview

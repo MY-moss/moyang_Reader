@@ -41,6 +41,7 @@ type MarkdownWysiwygEditorProps = {
   onInsertLink: () => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
+  onFindText?: (text: string) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
@@ -217,6 +218,7 @@ function MilkdownSurface({
   onInsertLink,
   onUndo,
   onRedo,
+  onFindText,
   canUndo = false,
   canRedo = false,
   onStatusMessage,
@@ -235,6 +237,7 @@ function MilkdownSurface({
   const completionRef = useRef<CompletionOverlayState | null>(null);
   const onUndoRef = useRef(onUndo);
   const onRedoRef = useRef(onRedo);
+  const onFindTextRef = useRef(onFindText);
   const onStatusMessageRef = useRef(onStatusMessage);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -250,6 +253,10 @@ function MilkdownSurface({
   useEffect(() => {
     onRedoRef.current = onRedo;
   }, [onRedo]);
+
+  useEffect(() => {
+    onFindTextRef.current = onFindText;
+  }, [onFindText]);
 
   useEffect(() => {
     onStatusMessageRef.current = onStatusMessage;
@@ -403,6 +410,16 @@ function MilkdownSurface({
         return;
       }
 
+      if (action === "find-selection") {
+        const selectedText = view.state.doc
+          .textBetween(view.state.selection.from, view.state.selection.to, "\n")
+          .trim();
+        if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
+        else onFindTextRef.current?.(selectedText);
+        setContextMenu(null);
+        return;
+      }
+
       if (action === "clear-format") {
         if (view.state.selection.empty) {
           onStatusMessageRef.current?.("请先选择要清除格式的文本。");
@@ -523,6 +540,7 @@ function MilkdownSurface({
         (item.action === "undo" && !canUndo) ||
         (item.action === "redo" && !canRedo) ||
         ((item.action === "cut" || item.action === "copy") && !contextMenu?.hasSelection) ||
+        (item.action === "find-selection" && !contextMenu?.hasSelection) ||
         (item.action === "clear-format" && !contextMenu?.hasSelection),
       onSelect: () => applyContextAction(item.action),
     })),

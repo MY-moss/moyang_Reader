@@ -1,16 +1,15 @@
 # AI 开发与交接流程
 
-## 已完成发布切片（2026-08-28，v0.10.7）
+## 已推送、待合并与发布（2026-08-28，右键管理增强）
 
-- 目标：修复 Windows 桌面“保存 PDF”偶发退出码为 0 但文件尚未落盘的问题，并作为稳定 Windows x64 patch 发布。
-- 基线：PDF 修复 PR #284 与版本准备 PR #285 已合并；发布提交为 main@c1bf7d739afa1bfb31507564af3377e77bb088b5，tag 为 v0.10.7。
-- 根因与修复：Edge headless 父进程退出时子进程仍可能异步写入 print-to-pdf 目标；旧逻辑立即检查并清理临时文件。现在退出后最多轮询 5 秒，确认 PDF 文件头后再原子替换，并增加 Windows Rust 回归测试。
-- 质量门禁：PR Quality checks 33127355219、PR Rust dependency audit 33128205619、main CI 33128664940、main Rust dependency audit 33128664961，以及 Release Quality gate 均成功；Windows Desktop smoke 和 Rust tests 均通过。
-- 发布资产：Release workflow 33129082220 的 Windows 构建/发布 job 98714111104 成功；安装包 4,901,397 字节、SHA-256 ae6a803c9b4e8e6c343278e0780eedbaaee9f3ec1a10da135d3169c553637629；.sig 428 字节、SHA-256 913815eef12d5519b8c1177cd3efa0e8c9b340dcccce0a7b52875364d2e02da4；latest.json 1,411 字节、SHA-256 02047ae696f6c207159e9d4971f8c53b982568e691c292af8b4711e5146e2ed7。
-- 在线核验：GitHub Release 和 Cloudflare 动态镜像的 manifest、安装包、签名均 HTTP 200；镜像安装包和签名 SHA-256 与 GitHub Release 一致，manifest 版本、签名、公钥字段一致。
-- 镜像边界：静态镜像子 job 98715331213 仍因缺少 Cloudflare Secrets 失败；未上传私钥或 Cloudflare 凭据。动态镜像可用。
-- 已知事项：#241 的旧版本自动更新器实机回归仍未完成，#241 保持 open；#232 的剩余桌面交互范围继续留在 backlog。
-- 交接：本切片已完成；下一位 AI 只能从已确认的 Ready backlog 选择单一切片，不重复发布 v0.10.7，不扩大范围。
+- 目标：在现有文件/文件夹 CRUD 和编辑器菜单基础上，补齐条目属性查看、标签页批量关闭和编辑器选中文本查找。
+- 分支：`codex/context-menu-more-2026-08-28`；PR [#287](https://github.com/MY-moss/moyang_Reader/pull/287) 已创建，当前 head 为 `c6552cad0a8a75e9325cb810569880126088535d`，实现基于远程 `main@618a634f7aa55c0ccde2cb421fc51159cdc2f580` 的 Windows x64 代码基线。
+- 非目标：本切片不处理文件移动、回收站恢复、批量文件操作、属性写回、更新器或 DOCX/PDF 原格式编辑。
+- 实现：新增 `WorkspaceEntryDetailsDialog` 和 `WorkspaceEntryDetails`；文件树右键展示只读属性；标签页复用 `ContextMenu` 提供关闭当前/其他/右侧/全部；Markdown WYSIWYG 与 CodeMirror 源文本共用“查找选中文本”，直接打开顶部搜索。
+- 安全与状态：属性弹层只读；批量关闭通过应用层统一处理未保存当前文档，取消或保存失败不改动标签；现有工作区授权、路径校验和文件 CRUD 边界不变。
+- 当前验证：`npm run build`、`npm run lint`、4 组定向 Vitest（14/14）、本次涉及文件的 Prettier 检查和右键编辑器浏览器 E2E（2/2）通过；远程 PR Quality checks 仍在运行，Windows 定向桌面 smoke 尚未补跑。
+- 远程状态：PR #287 与 `main` 无冲突；Quality checks run `33134993915` 当前为 `in_progress`。不要重复创建 PR、重跑未失败的检查或提前合并。
+- 交接：Quality checks 和必要的 Windows smoke 通过后合并 PR #287，再准备 v0.10.8 Windows x64 安装包/Release；发布后回填资产核验并停止，不自动开启下一切片。关联 Issue：#232（保持 open，剩余桌面交互另行切片）。
 
 ## 已完成发布切片（2026-08-28，v0.10.6）
 
