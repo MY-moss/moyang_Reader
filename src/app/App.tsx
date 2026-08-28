@@ -38,6 +38,7 @@ import { UpdateNotice } from "./components/UpdateNotice";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
+import { createSearchHighlightController, type SearchHighlightController } from "./search-highlighter";
 import {
   chooseDocumentPaths,
   chooseSavePath,
@@ -586,6 +587,11 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
+  const searchHighlightRef = useRef<{
+    root: HTMLElement;
+    contentKey: string;
+    controller: SearchHighlightController;
+  } | null>(null);
   const readingHeadingsRef = useRef<HTMLElement[]>([]);
   const readingHeadingObserverRef = useRef<IntersectionObserver | null>(null);
   const readingHeadingCandidatesRef = useRef(new Set<HTMLElement>());
@@ -4031,73 +4037,45 @@ export function App() {
 
   useEffect(() => {
     const root = articleRef.current;
+    const contentKey = documentState?.rendered.html ?? "";
     if (!root || mode !== "rendered") {
+      searchHighlightRef.current?.controller.dispose();
+      searchHighlightRef.current = null;
       setSearchResultCount(0);
       setSearchResultIndex(0);
       return;
     }
 
-    root.querySelectorAll("mark.moyang-search-hit").forEach((mark) => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-      parent.removeChild(mark);
-      parent.normalize();
-    });
-
-    const query = debouncedSearchQuery.trim().toLocaleLowerCase();
-    if (!query) {
-      setSearchResultCount(0);
-      setSearchResultIndex(0);
-      return;
+    if (
+      !searchHighlightRef.current ||
+      searchHighlightRef.current.root !== root ||
+      searchHighlightRef.current.contentKey !== contentKey
+    ) {
+      searchHighlightRef.current?.controller.dispose();
+      searchHighlightRef.current = {
+        root,
+        contentKey,
+        controller: createSearchHighlightController(root),
+      };
     }
 
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const textNodes: Text[] = [];
-    let currentNode = walker.nextNode();
-    while (currentNode) {
-      if (currentNode.parentElement?.tagName !== "SCRIPT" && currentNode.parentElement?.tagName !== "STYLE") {
-        textNodes.push(currentNode as Text);
-      }
-      currentNode = walker.nextNode();
-    }
-
-    for (const textNode of textNodes) {
-      const value = textNode.nodeValue ?? "";
-      const lowerValue = value.toLocaleLowerCase();
-      const positions: number[] = [];
-      let cursor = 0;
-      while (true) {
-        const position = lowerValue.indexOf(query, cursor);
-        if (position < 0) break;
-        positions.push(position);
-        cursor = position + query.length;
-      }
-
-      for (const position of positions.reverse()) {
-        const range = document.createRange();
-        range.setStart(textNode, position);
-        range.setEnd(textNode, position + query.length);
-        const mark = document.createElement("mark");
-        mark.className = "moyang-search-hit";
-        range.surroundContents(mark);
-      }
-    }
-
-    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
-    setSearchResultCount(hits.length);
-    setSearchResultIndex((current) => (hits.length ? Math.min(current, hits.length - 1) : 0));
+    const count = searchHighlightRef.current.controller.update(debouncedSearchQuery);
+    setSearchResultCount(count);
+    setSearchResultIndex((current) => (count ? Math.min(current, count - 1) : 0));
   }, [debouncedSearchQuery, documentState?.rendered.html, mode]);
 
   useEffect(() => {
-    const root = articleRef.current;
-    if (!root || mode !== "rendered") return;
-
-    const hits = Array.from(root.querySelectorAll<HTMLElement>("mark.moyang-search-hit"));
-    const nextIndex = hits.length ? Math.min(searchResultIndex, hits.length - 1) : 0;
-    hits.forEach((hit, index) => hit.classList.toggle("active", index === nextIndex));
-    hits[nextIndex]?.scrollIntoView({ block: "center" });
+    if (mode !== "rendered") return;
+    const target = searchHighlightRef.current?.controller.setActive(searchResultIndex);
+    target?.scrollIntoView({ block: "center" });
   }, [debouncedSearchQuery, documentState?.rendered.html, mode, searchResultIndex]);
+
+  useEffect(() => {
+    return () => {
+      searchHighlightRef.current?.controller.dispose();
+      searchHighlightRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const root = articleRef.current;
@@ -4868,6 +4846,8 @@ export function App() {
                 <article
                   ref={articleRef}
                   className="reader-content markdown-body"
+                  data-search-result-count={searchResultCount}
+                  data-search-active-result={searchResultCount ? searchResultIndex + 1 : 0}
                   onClick={handleReaderClick}
                   onContextMenu={handleReaderContextMenu}
                 >

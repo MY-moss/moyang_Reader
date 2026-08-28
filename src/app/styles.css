@@ -2834,6 +2834,16 @@ html.pane-resizing * {
   background: var(--search-hit-active);
   box-shadow: 0 0 0 2px rgba(232, 154, 79, 0.28);
 }
+::highlight(moyang-search-hit) {
+  background-color: var(--search-hit);
+  color: inherit;
+}
+::highlight(moyang-search-hit-active) {
+  background-color: var(--search-hit-active);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
 .source-editor {
   display: block;
   width: min(960px, calc(100% - 96px));

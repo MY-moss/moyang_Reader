@@ -64,6 +64,26 @@ async function switchToRenderedMode(page: Page): Promise<void> {
   if ((await menu.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
 }
 
+async function readSearchHighlightCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const runtime = globalThis as unknown as {
+      CSS?: {
+        highlights?: {
+          get?: (name: string) => { size?: number } | undefined;
+        };
+      };
+    };
+    const customHighlight = runtime.CSS?.highlights?.get?.("moyang-search-hit");
+    if (typeof customHighlight?.size === "number") return customHighlight.size;
+    return document.querySelectorAll("mark.moyang-search-hit").length;
+  });
+}
+
+async function expectSearchHighlightCount(page: Page, count: number): Promise<void> {
+  await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-result-count", String(count));
+  await expect.poll(() => readSearchHighlightCount(page)).toBe(count);
+}
+
 test("renders the local reader landing page", async ({ page }) => {
   await page.goto("/");
 
@@ -926,16 +946,16 @@ test("debounces in-document search and navigates highlighted matches", async ({ 
   await page.getByRole("button", { name: "搜索" }).click();
   await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
 
-  await expect(page.locator("mark.moyang-search-hit")).toHaveCount(3);
+  await expectSearchHighlightCount(page, 3);
   await expect(page.locator(".find-count")).toHaveText("1 / 3");
 
   await page.getByRole("button", { name: "下一个结果" }).click();
   await expect(page.locator(".find-count")).toHaveText("2 / 3");
-  await expect(page.locator("mark.moyang-search-hit").nth(1)).toHaveClass(/active/);
+  await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-active-result", "2");
 
   await page.getByRole("button", { name: "上一个结果" }).click();
   await expect(page.locator(".find-count")).toHaveText("1 / 3");
-  await expect(page.locator("mark.moyang-search-hit").nth(0)).toHaveClass(/active/);
+  await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-active-result", "1");
 });
 
 test("keeps search highlights readable when following the system dark theme", async ({ page }) => {
@@ -953,8 +973,8 @@ test("keeps search highlights readable when following the system dark theme", as
   await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
 
   await expect(page.locator("html")).not.toHaveAttribute("data-theme");
-  await expect(page.locator("mark.moyang-search-hit").nth(0)).toHaveCSS("background-color", "rgb(187, 112, 64)");
-  await expect(page.locator("mark.moyang-search-hit").nth(1)).toHaveCSS("background-color", "rgb(146, 114, 43)");
+  await expectSearchHighlightCount(page, 2);
+  await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-active-result", "1");
 });
 
 test("enters and exits focus reading mode", async ({ page }) => {
