@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Mutex,
+    Arc, Mutex,
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -41,6 +41,16 @@ const MAX_APP_SETTINGS_BYTES: usize = 256 * 1024;
 const APP_SETTINGS_FILE_NAME: &str = "settings.json";
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+async fn run_blocking<T, F>(operation: &'static str, task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|error| format!("{operation}后台任务失败：{error}"))?
+}
+
 #[derive(Default)]
 pub struct AccessRegistry {
     read_entries: Mutex<Vec<PathBuf>>,
@@ -58,19 +68,19 @@ pub struct WorkspaceWatcher {
     current: Mutex<Option<ActiveWorkspaceWatcher>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct WorkspaceSearchCache {
-    entries: Mutex<HashMap<String, CachedSearchText>>,
-    file_lists: Mutex<HashMap<String, CachedWorkspaceFileList>>,
-    search_indexes: Mutex<HashMap<String, CachedSearchIndex>>,
-    event_driven_roots: Mutex<HashSet<String>>,
-    access_counter: AtomicU64,
+    entries: Arc<Mutex<HashMap<String, CachedSearchText>>>,
+    file_lists: Arc<Mutex<HashMap<String, CachedWorkspaceFileList>>>,
+    search_indexes: Arc<Mutex<HashMap<String, CachedSearchIndex>>>,
+    event_driven_roots: Arc<Mutex<HashSet<String>>>,
+    access_counter: Arc<AtomicU64>,
     #[cfg(test)]
-    metadata_checks: AtomicUsize,
+    metadata_checks: Arc<AtomicUsize>,
     #[cfg(test)]
-    text_reads: AtomicUsize,
+    text_reads: Arc<AtomicUsize>,
     #[cfg(test)]
-    directory_stamp_checks: AtomicUsize,
+    directory_stamp_checks: Arc<AtomicUsize>,
 }
 
 struct CachedSearchText {
@@ -1081,12 +1091,16 @@ fn access_path_contains(root: &Path, candidate: &Path) -> bool {
 }
 
 fn access_path_key(path: &Path) -> String {
-    let value = path.to_string_lossy().replace('\\', "/");
+    let mut value = path.to_string_lossy().replace('\\', "/");
     if cfg!(windows) {
-        value.to_ascii_lowercase()
-    } else {
-        value
+        if let Some(rest) = value.strip_prefix("//?/UNC/") {
+            value = format!("//{rest}");
+        } else if let Some(rest) = value.strip_prefix("//?/") {
+            value = rest.to_string();
+        }
+        value.make_ascii_lowercase();
     }
+    value
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1096,6 +1110,7 @@ pub struct WorkspaceFile {
     pub name: String,
     pub relative_path: String,
     pub size: u64,
+    pub modified_ms: Option<u64>,
     pub kind: String,
 }
 
@@ -1488,11 +1503,17 @@ pub fn write_app_settings(app: AppHandle, contents: String) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn read_text_file(path: String, access: State<'_, AccessRegistry>) -> Result<String, String> {
+pub async fn read_text_file(
+    path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<String, String> {
     if !access.is_read_allowed(Path::new(&path)) {
         return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
-    read_text_file_inner(PathBuf::from(path))
+    run_blocking("读取文本文件", move || {
+        read_text_file_inner(PathBuf::from(path))
+    })
+    .await
 }
 
 fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
@@ -1505,7 +1526,7 @@ fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn read_binary_file(
+pub async fn read_binary_file(
     path: String,
     access: State<'_, AccessRegistry>,
 ) -> Result<tauri::ipc::Response, String> {
@@ -1513,13 +1534,15 @@ pub fn read_binary_file(
     if !access.is_read_allowed(&path) {
         return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
-    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
-    if metadata.len() > MAX_READ_FILE_BYTES {
-        return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
-    }
-    fs::read(&path)
-        .map(tauri::ipc::Response::new)
-        .map_err(|error| format!("无法读取文件：{error}"))
+    let bytes = run_blocking("读取二进制文件", move || {
+        let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+        if metadata.len() > MAX_READ_FILE_BYTES {
+            return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
+        }
+        fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))
+    })
+    .await?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]
@@ -1723,6 +1746,11 @@ fn workspace_file(root: &Path, path: &Path) -> Result<WorkspaceFile, String> {
         name: name.to_string(),
         relative_path,
         size: metadata.len(),
+        modified_ms: metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .and_then(|duration| duration.as_millis().try_into().ok()),
         kind: document_kind(path).unwrap_or("markdown").to_string(),
     })
 }
@@ -1815,14 +1843,17 @@ fn sorted_workspace_directories(root: &Path) -> Result<Vec<WorkspaceDirectory>, 
 }
 
 #[tauri::command]
-pub fn list_workspace_files(
+pub async fn list_workspace_files(
     root: String,
     access: State<'_, AccessRegistry>,
 ) -> Result<Vec<WorkspaceFile>, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
-    list_workspace_files_inner(PathBuf::from(root))
+    run_blocking("读取工作区文件", move || {
+        list_workspace_files_inner(PathBuf::from(root))
+    })
+    .await
 }
 
 fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, String> {
@@ -1830,20 +1861,23 @@ fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, Strin
 }
 
 #[tauri::command]
-pub fn list_workspace_directories(
+pub async fn list_workspace_directories(
     root: String,
     access: State<'_, AccessRegistry>,
 ) -> Result<Vec<WorkspaceDirectory>, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
-    let root = fs::canonicalize(PathBuf::from(root))
-        .map_err(|error| format!("无法确认工作区路径：{error}"))?;
-    sorted_workspace_directories(&root)
+    run_blocking("读取工作区文件夹", move || {
+        let root = fs::canonicalize(PathBuf::from(root))
+            .map_err(|error| format!("无法确认工作区路径：{error}"))?;
+        sorted_workspace_directories(&root)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn search_workspace(
+pub async fn search_workspace(
     root: String,
     query: String,
     access: State<'_, AccessRegistry>,
@@ -1854,12 +1888,16 @@ pub fn search_workspace(
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
     let persistence_directory = app.path().app_cache_dir().ok();
-    search_workspace_inner_with_cache_and_persistence(
-        PathBuf::from(root),
-        query,
-        &cache,
-        persistence_directory.as_deref(),
-    )
+    let cache = cache.inner().clone();
+    run_blocking("搜索工作区", move || {
+        search_workspace_inner_with_cache_and_persistence(
+            PathBuf::from(root),
+            query,
+            &cache,
+            persistence_directory.as_deref(),
+        )
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -2817,18 +2855,21 @@ pub fn reveal_workspace_entry(
 }
 
 #[tauri::command]
-pub fn index_workspace(
+pub async fn index_workspace(
     root: String,
     access: State<'_, AccessRegistry>,
 ) -> Result<Vec<WorkspaceIndexEntry>, String> {
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
     }
-    index_workspace_inner(PathBuf::from(root))
+    run_blocking("建立工作区索引", move || {
+        index_workspace_inner(PathBuf::from(root))
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn refresh_workspace(
+pub async fn refresh_workspace(
     root: String,
     paths: Vec<String>,
     access: State<'_, AccessRegistry>,
@@ -2837,9 +2878,13 @@ pub fn refresh_workspace(
     if !access.is_read_allowed(Path::new(&root)) {
         return Err("拒绝读取未通过用户选择的工作区。请重新添加工作区。".to_string());
     }
-    let result = refresh_workspace_inner(PathBuf::from(root), paths)?;
-    cache.invalidate_scopes(&result.scope_paths);
-    Ok(result)
+    let cache = cache.inner().clone();
+    run_blocking("刷新工作区", move || {
+        let result = refresh_workspace_inner(PathBuf::from(root), paths)?;
+        cache.invalidate_scopes(&result.scope_paths);
+        Ok(result)
+    })
+    .await
 }
 
 fn index_entry_for_file(file: WorkspaceFile) -> Option<WorkspaceIndexEntry> {
@@ -2903,6 +2948,17 @@ fn refresh_workspace_inner(
             scope_paths.push(display);
         }
 
+        // A watcher can report a directory after it has already been removed.
+        // Keep that missing path as a folder invalidation scope so the frontend
+        // can remove the directory itself instead of only refreshing its parent.
+        if !scope.exists()
+            && !folder_scope_paths
+                .iter()
+                .any(|existing| access_path_key(Path::new(existing)) == access_path_key(&scope))
+        {
+            folder_scope_paths.push(display_path(&scope));
+        }
+
         let folder_scope = if scope.is_dir() {
             Some(scope.clone())
         } else if !scope.is_file() {
@@ -2959,7 +3015,7 @@ fn refresh_workspace_inner(
 }
 
 #[tauri::command]
-pub fn write_text_file(
+pub async fn write_text_file(
     path: String,
     contents: String,
     access: State<'_, AccessRegistry>,
@@ -2968,7 +3024,10 @@ pub fn write_text_file(
     if !is_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
-    write_text_file_inner(path, contents)
+    run_blocking("保存文本文件", move || {
+        write_text_file_inner(path, contents)
+    })
+    .await
 }
 
 fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> {
@@ -2976,7 +3035,7 @@ fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-pub fn write_binary_file(
+pub async fn write_binary_file(
     path: String,
     contents: Vec<u8>,
     access: State<'_, AccessRegistry>,
@@ -2985,7 +3044,10 @@ pub fn write_binary_file(
     if !is_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
     }
-    write_bytes_file_inner(path, &contents, false)
+    run_blocking("保存二进制文件", move || {
+        write_bytes_file_inner(path, &contents, false)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -3161,7 +3223,7 @@ fn decode_ipc_path(encoded_path: &str) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn write_binary_file_raw(
+pub async fn write_binary_file_raw(
     request: tauri::ipc::Request<'_>,
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
@@ -3179,10 +3241,13 @@ pub fn write_binary_file_raw(
     }
 
     let contents = match request.body() {
-        tauri::ipc::InvokeBody::Raw(contents) => contents,
+        tauri::ipc::InvokeBody::Raw(contents) => contents.to_vec(),
         _ => return Err("IPC 二进制写入需要原始字节请求体。".to_string()),
     };
-    write_bytes_file_inner(path, contents, false)
+    run_blocking("保存原始二进制文件", move || {
+        write_bytes_file_inner(path, &contents, false)
+    })
+    .await
 }
 
 fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
@@ -3302,9 +3367,9 @@ mod tests {
         duplicate_workspace_entry_inner, extract_markdown_links, extract_tags, extract_title,
         extract_wiki_links, has_pdf_header, index_workspace_inner, is_supported_document_path,
         is_supported_text_path, is_write_allowed_for_new_path, list_workspace_files_inner,
-        path_exists_inner, persistent_search_index_path, prune_search_entries,
-        read_text_file_inner, refresh_workspace_inner, rename_workspace_entry_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
+        normalize_access_path, path_exists_inner, persistent_search_index_path,
+        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
+        rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, source_search_tokens, touch_indexed_file,
         transfer_workspace_entry_inner, write_bytes_file_inner, write_text_file_inner,
@@ -3697,6 +3762,7 @@ mod tests {
             name: "fallback.md".to_string(),
             relative_path: "fallback.md".to_string(),
             size: 0,
+            modified_ms: None,
             kind: "markdown".to_string(),
         };
         assert_eq!(
@@ -4547,13 +4613,32 @@ mod tests {
             vec![removed_file.to_string_lossy().into_owned()],
         )
         .expect("refresh deleted child after parent removal");
+        let expected_removed_directory =
+            normalize_access_path(&removed_directory).expect("normalize removed directory");
 
         assert_eq!(removed.scope_paths.len(), 1);
-        assert_eq!(removed.folder_scope_paths.len(), 1);
+        assert!(removed
+            .folder_scope_paths
+            .iter()
+            .any(|path| access_path_key(Path::new(path))
+                == access_path_key(&expected_removed_directory)));
         assert!(removed.files.is_empty());
         assert!(removed.folders.is_empty());
 
         fs::remove_dir_all(root).expect("remove deleted-child refresh workspace");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn normalizes_windows_extended_paths_for_scope_comparisons() {
+        assert_eq!(
+            access_path_key(Path::new(r"C:\Vault\Notes")),
+            access_path_key(Path::new(r"\\?\C:\Vault\Notes"))
+        );
+        assert_eq!(
+            access_path_key(Path::new(r"\\server\share\Vault")),
+            access_path_key(Path::new(r"\\?\UNC\server\share\Vault"))
+        );
     }
 
     #[test]

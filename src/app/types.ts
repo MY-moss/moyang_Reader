@@ -41,6 +41,7 @@ export type WorkspaceFile = {
   name: string;
   relativePath: string;
   size: number;
+  modifiedMs?: number | null;
   kind: DocumentKind;
 };
 

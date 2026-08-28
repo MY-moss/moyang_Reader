@@ -17,6 +17,37 @@ function sortWorkspaceFiles(files: WorkspaceFile[]): WorkspaceFile[] {
   );
 }
 
+export function workspaceFilesMatch(left: WorkspaceFile[], right: WorkspaceFile[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((file, index) => {
+      const other = right[index];
+      return (
+        normalizeWorkspacePath(file.path) === normalizeWorkspacePath(other.path) &&
+        file.name === other.name &&
+        file.relativePath === other.relativePath &&
+        file.size === other.size &&
+        (file.modifiedMs ?? null) === (other.modifiedMs ?? null) &&
+        file.kind === other.kind
+      );
+    })
+  );
+}
+
+export function workspaceFoldersMatch(left: WorkspaceDirectory[], right: WorkspaceDirectory[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((folder, index) => {
+      const other = right[index];
+      return (
+        normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(other.path) &&
+        folder.name === other.name &&
+        folder.relativePath === other.relativePath
+      );
+    })
+  );
+}
+
 export function applyWorkspaceFileDelta(current: WorkspaceFile[], delta: WorkspaceRefreshResult): WorkspaceFile[] {
   const retained = current.filter((file) => !delta.scopePaths.some((scope) => isWithinScope(file.path, scope)));
   const byPath = new Map(retained.map((file) => [normalizeWorkspacePath(file.path), file]));

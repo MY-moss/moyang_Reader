@@ -202,6 +202,8 @@ import {
   applyWorkspaceFolderDelta,
   applyWorkspaceIndexDelta,
   isCurrentWorkspaceLoad,
+  workspaceFilesMatch,
+  workspaceFoldersMatch,
 } from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
@@ -454,6 +456,7 @@ type CachedWorkspace = {
   files: WorkspaceFile[];
   folders: WorkspaceDirectory[];
   index: WorkspaceIndexEntry[];
+  indexReady: boolean;
   revision: number;
   selectedTag: string | null;
   selectedFileKind: WorkspaceKindFilter;
@@ -601,7 +604,7 @@ export function App() {
   const documentCacheRef = useRef(new DocumentCache());
   const pendingWorkspaceMountsRef = useRef(new Set<string>());
   const workspaceLoadRequestRef = useRef(0);
-  const workspaceRefreshRequestRef = useRef(0);
+  const workspaceRefreshQueueRef = useRef<Promise<void>>(Promise.resolve());
   const workspaceReloadTimerRef = useRef<number | null>(null);
   const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWritingPathsRef = useRef(new Set<string>());
@@ -1490,46 +1493,50 @@ export function App() {
     };
   }, [checkForUpdates]);
 
-  const refreshWorkspaceChanges = useCallback(async (root: string, paths: string[]) => {
-    if (!isTauriRuntime() || paths.length === 0) return;
+  const refreshWorkspaceChanges = useCallback((root: string, paths: string[]): Promise<void> => {
+    if (!isTauriRuntime() || paths.length === 0) return Promise.resolve();
 
-    const requestId = ++workspaceRefreshRequestRef.current;
-    setWorkspaceIndexLoading(true);
-    try {
-      const delta = await refreshWorkspace(root, paths);
-      if (
-        requestId !== workspaceRefreshRequestRef.current ||
-        comparablePath(workspacePathRef.current ?? "") !== comparablePath(root)
-      ) {
-        return;
+    const loadRequestId = workspaceLoadRequestRef.current;
+    const refresh = workspaceRefreshQueueRef.current.then(async () => {
+      const isActiveWorkspace = () =>
+        loadRequestId === workspaceLoadRequestRef.current &&
+        comparablePath(workspacePathRef.current ?? "") === comparablePath(root);
+
+      if (!isActiveWorkspace()) return;
+
+      setWorkspaceIndexLoading(true);
+      try {
+        const delta = await refreshWorkspace(root, paths);
+        if (!isActiveWorkspace()) return;
+
+        setWorkspaceFiles((current) => {
+          const next = applyWorkspaceFileDelta(current, delta);
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
+          return next;
+        });
+        setWorkspaceFolders((current) => {
+          const next = applyWorkspaceFolderDelta(current, delta);
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });
+          return next;
+        });
+        setWorkspaceIndex((current) => {
+          const next = applyWorkspaceIndexDelta(current, delta);
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
+          return next;
+        });
+        setWorkspaceRevision((current) => {
+          const next = current + 1;
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
+          return next;
+        });
+      } catch {
+        if (isActiveWorkspace()) setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
+      } finally {
+        if (isActiveWorkspace()) setWorkspaceIndexLoading(false);
       }
-      setWorkspaceFiles((current) => {
-        const next = applyWorkspaceFileDelta(current, delta);
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
-        return next;
-      });
-      setWorkspaceFolders((current) => {
-        const next = applyWorkspaceFolderDelta(current, delta);
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });
-        return next;
-      });
-      setWorkspaceIndex((current) => {
-        const next = applyWorkspaceIndexDelta(current, delta);
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
-        return next;
-      });
-      setWorkspaceRevision((current) => {
-        const next = current + 1;
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
-        return next;
-      });
-    } catch {
-      if (requestId === workspaceRefreshRequestRef.current) {
-        setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
-      }
-    } finally {
-      if (requestId === workspaceRefreshRequestRef.current) setWorkspaceIndexLoading(false);
-    }
+    });
+    workspaceRefreshQueueRef.current = refresh.catch(() => undefined);
+    return refresh;
   }, []);
 
   const loadWorkspace = useCallback(async (root: string, silent = false) => {
@@ -1574,7 +1581,6 @@ export function App() {
     }
 
     const requestId = ++workspaceLoadRequestRef.current;
-    workspaceRefreshRequestRef.current += 1;
     setWorkspaceLoading(true);
     setWorkspaceIndexLoading(true);
     try {
@@ -1621,14 +1627,25 @@ export function App() {
             ) {
               return;
             }
-            setWorkspaceFiles(files);
-            setWorkspaceFolders(folders);
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files, folders });
-            setWorkspaceRevision((current) => {
-              const next = current + 1;
-              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
-              return next;
-            });
+            const filesChanged = !workspaceFilesMatch(cached.files, files);
+            const foldersChanged = !workspaceFoldersMatch(cached.folders, folders);
+            if (filesChanged) {
+              setWorkspaceFiles(files);
+              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files });
+            }
+            if (foldersChanged) {
+              setWorkspaceFolders(folders);
+              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { folders });
+            }
+            if (filesChanged || foldersChanged) {
+              setWorkspaceRevision((current) => {
+                const next = current + 1;
+                updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
+                return next;
+              });
+            }
+            if (cached.indexReady && !filesChanged) return;
+
             const index = await indexWorkspace(cached.path);
             if (
               !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
@@ -1636,7 +1653,7 @@ export function App() {
               return;
             }
             setWorkspaceIndex(index);
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index });
+            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index, indexReady: true });
           } catch (cause) {
             if (requestId === workspaceLoadRequestRef.current && !silent) {
               setError(cause instanceof Error ? cause.message : "工作区刷新失败。");
@@ -1661,6 +1678,7 @@ export function App() {
         files,
         folders,
         index: [],
+        indexReady: false,
         revision: 0,
         selectedTag: null,
         selectedFileKind: "all",
@@ -1698,7 +1716,7 @@ export function App() {
           if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))
             return;
           setWorkspaceIndex(index);
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index });
+          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index, indexReady: true });
         })
         .catch((cause) => {
           if (requestId !== workspaceLoadRequestRef.current) return;

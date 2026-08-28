@@ -6,6 +6,8 @@ import {
   applyWorkspaceIndexDelta,
   isCurrentWorkspaceLoad,
   isSelfWrittenChangePending,
+  workspaceFilesMatch,
+  workspaceFoldersMatch,
 } from "./workspace-refresh";
 
 describe("workspace refresh guards", () => {
@@ -19,6 +21,23 @@ describe("workspace refresh guards", () => {
     expect(isSelfWrittenChangePending(1_500, 1_499)).toBe(true);
     expect(isSelfWrittenChangePending(1_500, 1_500)).toBe(false);
     expect(isSelfWrittenChangePending(undefined, 1_499)).toBe(false);
+  });
+
+  it("detects file and folder snapshots that can safely reuse a cached index", () => {
+    const file = {
+      path: "C:/Vault/note.md",
+      name: "note.md",
+      relativePath: "note.md",
+      size: 4,
+      kind: "markdown",
+    } as const;
+    const folder = { path: "C:/Vault/notes", name: "notes", relativePath: "notes" };
+
+    expect(workspaceFilesMatch([file], [{ ...file, path: "c:\\vault\\NOTE.md" }])).toBe(true);
+    expect(workspaceFilesMatch([file], [{ ...file, size: 5 }])).toBe(false);
+    expect(workspaceFilesMatch([file], [{ ...file, modifiedMs: 9 }])).toBe(false);
+    expect(workspaceFoldersMatch([folder], [{ ...folder, path: "c:\\vault\\NOTES" }])).toBe(true);
+    expect(workspaceFoldersMatch([folder], [{ ...folder, relativePath: "archive" }])).toBe(false);
   });
 
   it("replaces only files inside changed scopes", () => {
