@@ -103,6 +103,10 @@ pub fn run() {
             commands::write_text_file,
             commands::write_binary_file,
             commands::write_binary_file_raw,
+            commands::write_binary_file_chunk,
+            commands::write_binary_file_chunk_raw,
+            commands::commit_binary_file,
+            commands::discard_binary_file,
             commands::export_pdf_file,
             commands::create_markdown_file,
             commands::create_workspace_note,
@@ -164,3 +168,4 @@ mod tests {
         }
     }
 }
+
