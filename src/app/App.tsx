@@ -27,6 +27,7 @@ import { PaneResizeHandle } from "./components/PaneResizeHandle";
 import { PrintPreview } from "./components/PrintPreview";
 import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
+import { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";
 import { RelationGraph } from "./components/RelationGraph";
 import { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteContext } from "./components/SourceEditor";
 import { Tabs } from "./components/Tabs";
@@ -258,6 +259,26 @@ function focusEditorSurface(surface: Element | null): void {
     ? surface
     : surface.querySelector<HTMLElement>('.cm-content, [contenteditable="true"], textarea');
   if (target instanceof HTMLElement) target.focus();
+}
+
+async function copyPlainText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("当前环境不支持访问剪贴板。");
+  } finally {
+    textarea.remove();
+  }
 }
 
 const LazyMarkdownWysiwygEditor = lazy(() =>
@@ -550,6 +571,7 @@ export function App() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
+  const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
@@ -2354,8 +2376,7 @@ export function App() {
 
     try {
       const path = workspaceEntryAbsolutePath(root, entryPath);
-      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持访问剪贴板。");
-      await navigator.clipboard.writeText(path);
+      await copyPlainText(path);
       setSettingsNotice("完整路径已复制到剪贴板。");
       setError(null);
     } catch (cause) {
@@ -2371,8 +2392,7 @@ export function App() {
     }
 
     try {
-      if (!navigator.clipboard?.writeText) throw new Error("当前环境不支持访问剪贴板。");
-      await navigator.clipboard.writeText(relativePath);
+      await copyPlainText(relativePath);
       setSettingsNotice("相对路径已复制到剪贴板。");
       setError(null);
     } catch (cause) {
@@ -2426,6 +2446,42 @@ export function App() {
       setError(cause instanceof Error ? cause.message : "无法打开资源管理器。");
     }
   }, []);
+
+  const handleCopyWorkspaceName = useCallback(async (entryPath: string) => {
+    const name = fileNameFromPath(entryPath.replace(/[\\/]+$/, ""));
+    if (!name) {
+      setError("当前条目没有可复制的名称。");
+      return;
+    }
+
+    try {
+      await copyPlainText(name);
+      setSettingsNotice("名称已复制到剪贴板。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制名称失败。");
+    }
+  }, []);
+
+  const handleRefreshWorkspaceEntry = useCallback(
+    async (entryPath: string) => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime()) {
+        setError("请先添加工作区，再刷新文件树。");
+        return;
+      }
+
+      setSettingsNotice("正在刷新文件树…");
+      if (entryPath.trim()) {
+        await refreshWorkspaceChanges(root, [workspaceEntryAbsolutePath(root, entryPath)]);
+      } else {
+        await loadWorkspace(root, true);
+      }
+      setSettingsNotice("文件树已刷新。");
+      setError(null);
+    },
+    [loadWorkspace, refreshWorkspaceChanges],
+  );
 
   const openSelectedFile = useCallback(async () => {
     const nativePaths = await chooseDocumentPaths();
@@ -3584,14 +3640,9 @@ export function App() {
     [handleBrowserFiles],
   );
 
-  const handleReaderClick = useCallback(
-    (event: MouseEvent<HTMLElement>) => {
-      const anchor = (event.target as HTMLElement).closest("a");
-      const href = anchor?.getAttribute("href");
-      if (!anchor || !href) return;
-
+  const handleOpenReaderLink = useCallback(
+    (href: string) => {
       if (href.startsWith("moyang-wiki:")) {
-        event.preventDefault();
         const target = safeDecode(href.slice("moyang-wiki:".length));
         const [rawPath, rawAnchor] = target.split("#", 2);
         const currentEntry = documentState ? findIndexEntry(workspaceIndex, documentState.path) : undefined;
@@ -3611,13 +3662,11 @@ export function App() {
 
       const target = safeDecode(href);
       if (target.startsWith("#")) {
-        event.preventDefault();
         scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current);
         return;
       }
 
       if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) {
-        event.preventDefault();
         const normalized = target.startsWith("//") ? `https:${target}` : target;
         try {
           const externalUrl = new URL(normalized, window.location.href);
@@ -3634,12 +3683,10 @@ export function App() {
         return;
       }
       if (!documentState || documentState.path.startsWith("browser://")) {
-        event.preventDefault();
         setError("浏览器预览模式无法解析本地文档链接，请在 Moyang Reader 桌面版中打开。");
         return;
       }
 
-      event.preventDefault();
       const [rawPath, rawAnchor] = target.split("#", 2);
       const path = resolveRelativePath(documentState.path, rawPath);
       if (!path) {
@@ -3652,6 +3699,72 @@ export function App() {
     },
     [documentState, handleSelectTab, workspaceIndex],
   );
+
+  const handleReaderClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const anchor = (event.target as HTMLElement).closest("a");
+      const href = anchor?.getAttribute("href");
+      if (!anchor || !href) return;
+
+      event.preventDefault();
+      handleOpenReaderLink(href);
+    },
+    [handleOpenReaderLink],
+  );
+
+  const handleReaderContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    const anchor = (event.target as HTMLElement).closest("a");
+    setReaderContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      selectedText: window.getSelection()?.toString() ?? "",
+      linkHref: anchor?.getAttribute("href") ?? null,
+    });
+  }, []);
+
+  const handleCopyReaderText = useCallback(async (text: string) => {
+    const value = text.trim();
+    if (!value) return;
+
+    try {
+      await copyPlainText(value);
+      setSettingsNotice("选中文本已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制选中文本失败。");
+    }
+  }, []);
+
+  const handleCopyReaderLink = useCallback(async (href: string) => {
+    try {
+      await copyPlainText(href);
+      setSettingsNotice("链接地址已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制链接地址失败。");
+    }
+  }, []);
+
+  const handleCopyReaderDocumentPath = useCallback(async () => {
+    const path = documentStateRef.current?.path;
+    if (!path || path.startsWith("browser://")) {
+      setError("当前文档没有可复制的本地路径。");
+      return;
+    }
+
+    try {
+      await copyPlainText(path);
+      setSettingsNotice("文档路径已复制。");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "复制文档路径失败。");
+    }
+  }, []);
+
+  useEffect(() => {
+    setReaderContextMenu(null);
+  }, [documentState?.path, mode]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -4393,6 +4506,7 @@ export function App() {
             onOpenWorkspace={(path) => void handleOpenRecentWorkspace(path)}
             onRemoveWorkspace={handleRemoveMountedWorkspace}
             onOpenFile={(path) => void handleSelectTab(path)}
+            onCloseFile={(path) => void handleCloseTab(path)}
             onCreateNote={(parentPath) => void handleCreateWorkspaceNote(parentPath)}
             onCreateFolder={(parentPath) => void handleCreateWorkspaceFolder(parentPath)}
             onRenameEntry={(entryPath, kind) => void handleRenameWorkspaceEntry(entryPath, kind)}
@@ -4402,6 +4516,8 @@ export function App() {
             onRevealEntry={(entryPath) => void handleRevealWorkspaceEntry(entryPath)}
             onCopyPath={(entryPath) => void handleCopyWorkspacePath(entryPath)}
             onCopyRelativePath={(entryPath) => void handleCopyWorkspaceRelativePath(entryPath)}
+            onCopyName={(entryPath) => void handleCopyWorkspaceName(entryPath)}
+            onRefresh={(entryPath) => void handleRefreshWorkspaceEntry(entryPath)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}
@@ -4500,7 +4616,12 @@ export function App() {
             documentState.kind !== "image" &&
             mode === "rendered" && (
               <div className="reader-stage">
-                <article ref={articleRef} className="reader-content markdown-body" onClick={handleReaderClick}>
+                <article
+                  ref={articleRef}
+                  className="reader-content markdown-body"
+                  onClick={handleReaderClick}
+                  onContextMenu={handleReaderContextMenu}
+                >
                   <div className="reader-meta" aria-label="文档信息">
                     <span className="reader-meta-kicker">DOCUMENT</span>
                     <span>
@@ -4559,6 +4680,21 @@ export function App() {
               onRedo={(target) => redoEditor(target)}
               onStatusMessage={(message) => setSettingsNotice(message)}
               wikiCompletions={wikiLinkCandidates}
+            />
+          )}
+          {readerContextMenu && documentState && mode === "rendered" && (
+            <ReaderContextMenu
+              target={readerContextMenu}
+              documentPath={documentState.path.startsWith("browser://") ? null : documentState.path}
+              canEdit={canEdit}
+              editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}
+              onCopySelection={(text) => void handleCopyReaderText(text)}
+              onFindSelection={(text) => handleFindEditorText(text)}
+              onCopyLink={(href) => void handleCopyReaderLink(href)}
+              onOpenLink={handleOpenReaderLink}
+              onEdit={toggleReadingEditing}
+              onCopyDocumentPath={() => void handleCopyReaderDocumentPath()}
+              onClose={() => setReaderContextMenu(null)}
             />
           )}
         </main>

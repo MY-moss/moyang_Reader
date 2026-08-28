@@ -52,6 +52,7 @@ type WorkspacePanelProps = {
   workspaceExportNotice: string | null;
   workspaceIndexLoading: boolean;
   onOpenFile: (path: string) => void;
+  onCloseFile?: (path: string) => void;
   onCreateNote?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
@@ -61,6 +62,8 @@ type WorkspacePanelProps = {
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
   onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
   onSearchQueryChange: (query: string) => void;
   onTagChange: (tag: string | null) => void;
   onKindChange: (kind: WorkspaceKindFilter) => void;
@@ -106,6 +109,7 @@ export function WorkspacePanel({
   workspaceExportNotice,
   workspaceIndexLoading,
   onOpenFile,
+  onCloseFile,
   onCreateNote,
   onCreateFolder,
   onRenameEntry,
@@ -115,6 +119,8 @@ export function WorkspacePanel({
   onRevealEntry,
   onCopyPath,
   onCopyRelativePath,
+  onCopyName,
+  onRefresh,
   onSearchQueryChange,
   onTagChange,
   onKindChange,
@@ -412,6 +418,7 @@ export function WorkspacePanel({
                 folders={treeFolders}
                 activePath={activePath}
                 onOpenFile={onOpenFile}
+                onCloseFile={onCloseFile}
                 onCreateNote={onCreateNote}
                 onCreateFolder={onCreateFolder}
                 onRenameEntry={onRenameEntry}
@@ -421,6 +428,8 @@ export function WorkspacePanel({
                 onRevealEntry={onRevealEntry}
                 onCopyPath={onCopyPath}
                 onCopyRelativePath={onCopyRelativePath}
+                onCopyName={onCopyName}
+                onRefresh={onRefresh}
               />
             </div>
           )}

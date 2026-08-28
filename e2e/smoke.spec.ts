@@ -571,6 +571,36 @@ test("finds selected text from the editor context menu", async ({ page }) => {
   await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveValue("在当前文档中查找这句话。");
 });
 
+test("opens a reader context menu for selected text and links", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "reader-context-menu.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Reader context menu\n\n阅读模式中的选中文本。\n\n[外部链接](https://example.com)\n"),
+  });
+
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+  await switchToRenderedMode(page);
+
+  const paragraph = page.locator(".reader-content p").filter({ hasText: "阅读模式中的选中文本" }).first();
+  await paragraph.selectText();
+  await paragraph.click({ button: "right" });
+
+  const menu = page.getByRole("menu", { name: "阅读内容菜单" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "复制选中文本" })).toBeEnabled();
+  await expect(menu.getByRole("menuitem", { name: "查找选中文本" })).toBeEnabled();
+  await menu.getByRole("menuitem", { name: "查找选中文本" }).click();
+  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  const link = page.locator('.reader-content a[href="https://example.com"]');
+  await link.click({ button: "right" });
+  const linkMenu = page.getByRole("menu", { name: "阅读内容菜单" });
+  await expect(linkMenu.getByRole("menuitem", { name: "复制链接地址" })).toBeVisible();
+  await expect(linkMenu.getByRole("menuitem", { name: "打开链接" })).toBeVisible();
+});
+
 test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
   // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
   // one canonical form. This test pins the exact output so a Milkdown/remark

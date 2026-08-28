@@ -66,6 +66,9 @@ describe("WorkspaceTreeView", () => {
     const root = createRoot(container);
     const onCreateNote = vi.fn();
     const onCreateFolder = vi.fn();
+    const onCopyRelativePath = vi.fn();
+    const onCopyName = vi.fn();
+    const onRefresh = vi.fn();
 
     act(() => {
       root.render(
@@ -76,6 +79,9 @@ describe("WorkspaceTreeView", () => {
           onOpenFile={() => {}}
           onCreateNote={onCreateNote}
           onCreateFolder={onCreateFolder}
+          onCopyRelativePath={onCopyRelativePath}
+          onCopyName={onCopyName}
+          onRefresh={onRefresh}
         />,
       );
     });
@@ -92,6 +98,33 @@ describe("WorkspaceTreeView", () => {
     expect(createNote).toBeTruthy();
     act(() => createNote?.click());
     expect(onCreateNote).toHaveBeenCalledWith("Archive");
+
+    act(() => {
+      folder?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const folderRelativePath = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
+      (button) => button.textContent?.trim() === "复制相对路径",
+    );
+    act(() => folderRelativePath?.click());
+    expect(onCopyRelativePath).toHaveBeenCalledWith("Archive");
+
+    act(() => {
+      folder?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const folderCopyName = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
+      (button) => button.textContent?.trim() === "复制名称",
+    );
+    act(() => folderCopyName?.click());
+    expect(onCopyName).toHaveBeenCalledWith("Archive");
+
+    act(() => {
+      folder?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const folderRefresh = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
+      (button) => button.textContent?.trim() === "刷新文件夹",
+    );
+    act(() => folderRefresh?.click());
+    expect(onRefresh).toHaveBeenCalledWith("Archive");
 
     act(() => {
       folder?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
@@ -120,6 +153,7 @@ describe("WorkspaceTreeView", () => {
     document.body.appendChild(container);
     const root = createRoot(container);
     const onOpenFile = vi.fn();
+    const onCloseFile = vi.fn();
     const onRenameEntry = vi.fn();
     const onDeleteEntry = vi.fn();
     const onDuplicateEntry = vi.fn();
@@ -127,13 +161,16 @@ describe("WorkspaceTreeView", () => {
     const onRevealEntry = vi.fn();
     const onCopyPath = vi.fn();
     const onCopyRelativePath = vi.fn();
+    const onCopyName = vi.fn();
+    const onRefresh = vi.fn();
 
     act(() => {
       root.render(
         <WorkspaceTreeView
           files={[file(0)]}
-          activePath={null}
+          activePath={file(0).path}
           onOpenFile={onOpenFile}
+          onCloseFile={onCloseFile}
           onRenameEntry={onRenameEntry}
           onDeleteEntry={onDeleteEntry}
           onDuplicateEntry={onDuplicateEntry}
@@ -141,6 +178,8 @@ describe("WorkspaceTreeView", () => {
           onRevealEntry={onRevealEntry}
           onCopyPath={onCopyPath}
           onCopyRelativePath={onCopyRelativePath}
+          onCopyName={onCopyName}
+          onRefresh={onRefresh}
         />,
       );
     });
@@ -153,6 +192,7 @@ describe("WorkspaceTreeView", () => {
 
     const menuItems = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
     expect(menuItems().some((button) => button.textContent?.includes("打开文件"))).toBe(true);
+    expect(menuItems().some((button) => button.textContent?.includes("关闭当前标签"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("重命名文件"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("删除文件"))).toBe(true);
     expect(menuItems().some((button) => button.textContent?.includes("复制文件"))).toBe(true);
@@ -192,6 +232,27 @@ describe("WorkspaceTreeView", () => {
     const relativePath = menuItems().find((button) => button.textContent?.includes("复制相对路径"));
     act(() => relativePath?.click());
     expect(onCopyRelativePath).toHaveBeenCalledWith("notes/0.md");
+
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const closeTab = menuItems().find((button) => button.textContent?.includes("关闭当前标签"));
+    act(() => closeTab?.click());
+    expect(onCloseFile).toHaveBeenCalledWith(file(0).path);
+
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const copyName = menuItems().find((button) => button.textContent?.includes("复制名称"));
+    act(() => copyName?.click());
+    expect(onCopyName).toHaveBeenCalledWith("notes/0.md");
+
+    act(() => {
+      fileButton?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
+    const refresh = menuItems().find((button) => button.textContent?.includes("刷新所在文件夹"));
+    act(() => refresh?.click());
+    expect(onRefresh).toHaveBeenCalledWith("notes");
 
     act(() => root.unmount());
     container.remove();

@@ -21,6 +21,7 @@ type WorkspaceTreeProps = {
   folders?: WorkspaceDirectory[];
   activePath: string | null;
   onOpenFile: (path: string) => void;
+  onCloseFile?: (path: string) => void;
   onCreateNote?: (parentPath: string) => void;
   onCreateFolder?: (parentPath: string) => void;
   onRenameEntry?: (entryPath: string, kind: WorkspaceEntryKind) => void;
@@ -30,6 +31,8 @@ type WorkspaceTreeProps = {
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
   onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
 };
 
 function formatSize(size: number): string {
@@ -144,6 +147,9 @@ type WorkspaceFolderProps = {
   onShowDetails?: (details: WorkspaceEntryDetails) => void;
   onRevealEntry?: (entryPath: string) => void;
   onCopyPath?: (entryPath: string) => void;
+  onCopyRelativePath?: (entryPath: string) => void;
+  onCopyName?: (entryPath: string) => void;
+  onRefresh?: (entryPath: string) => void;
 };
 
 function WorkspaceFolder({
@@ -160,6 +166,9 @@ function WorkspaceFolder({
   onShowDetails,
   onRevealEntry,
   onCopyPath,
+  onCopyRelativePath,
+  onCopyName,
+  onRefresh,
 }: WorkspaceFolderProps) {
   const isOpen = !collapsedFolders.has(folder.path);
   const folderLabel = `“${folder.path}”`;
@@ -246,6 +255,9 @@ function WorkspaceFolder({
               onShowDetails={onShowDetails}
               onRevealEntry={onRevealEntry}
               onCopyPath={onCopyPath}
+              onCopyRelativePath={onCopyRelativePath}
+              onCopyName={onCopyName}
+              onRefresh={onRefresh}
             />
           ))}
         </>
@@ -259,6 +271,7 @@ export function WorkspaceTreeView({
   folders = [],
   activePath,
   onOpenFile,
+  onCloseFile,
   onCreateNote,
   onCreateFolder,
   onRenameEntry,
@@ -268,6 +281,8 @@ export function WorkspaceTreeView({
   onRevealEntry,
   onCopyPath,
   onCopyRelativePath,
+  onCopyName,
+  onRefresh,
 }: WorkspaceTreeProps) {
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<WorkspaceTreeContextTarget | null>(null);
@@ -281,7 +296,9 @@ export function WorkspaceTreeView({
     onShowDetails ||
     onRevealEntry ||
     onCopyPath ||
-    onCopyRelativePath,
+    onCopyRelativePath ||
+    onCopyName ||
+    onRefresh,
   );
 
   const toggleFolder = (path: string) => {
@@ -340,6 +357,9 @@ export function WorkspaceTreeView({
           onShowDetails={onShowDetails}
           onRevealEntry={onRevealEntry}
           onCopyPath={onCopyPath}
+          onCopyRelativePath={onCopyRelativePath}
+          onCopyName={onCopyName}
+          onRefresh={onRefresh}
         />
       ))}
       {contextMenu && canManage && (
@@ -358,6 +378,20 @@ export function WorkspaceTreeView({
                         id: "open-file",
                         label: "打开文件",
                         onSelect: () => contextMenu.filePath && onOpenFile(contextMenu.filePath),
+                      },
+                    ],
+                  },
+                ]
+              : []),
+            ...(contextMenu.entryKind === "file" && contextMenu.filePath === activePath && onCloseFile
+              ? [
+                  {
+                    label: "标签页",
+                    items: [
+                      {
+                        id: "close-file-tab",
+                        label: "关闭当前标签",
+                        onSelect: () => onCloseFile(contextMenu.filePath as string),
                       },
                     ],
                   },
@@ -467,11 +501,20 @@ export function WorkspaceTreeView({
                   },
                 ]
               : []),
-            ...(onRevealEntry || onCopyPath || onCopyRelativePath
+            ...(onRevealEntry || onCopyPath || onCopyRelativePath || onCopyName
               ? [
                   {
                     label: "路径",
                     items: [
+                      ...(contextMenu.entryKind !== "root" && onCopyName
+                        ? [
+                            {
+                              id: "copy-entry-name",
+                              label: "复制名称",
+                              onSelect: () => onCopyName(contextMenu.entryPath),
+                            },
+                          ]
+                        : []),
                       ...(onRevealEntry
                         ? [
                             {
@@ -499,6 +542,26 @@ export function WorkspaceTreeView({
                             },
                           ]
                         : []),
+                    ],
+                  },
+                ]
+              : []),
+            ...(onRefresh
+              ? [
+                  {
+                    label: "同步",
+                    items: [
+                      {
+                        id: "refresh-entry",
+                        label:
+                          contextMenu.entryKind === "root"
+                            ? "刷新阅读库"
+                            : contextMenu.entryKind === "folder"
+                              ? "刷新文件夹"
+                              : "刷新所在文件夹",
+                        onSelect: () =>
+                          onRefresh(contextMenu.entryKind === "file" ? contextMenu.parentPath : contextMenu.entryPath),
+                      },
                     ],
                   },
                 ]
