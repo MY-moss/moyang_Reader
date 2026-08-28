@@ -9,16 +9,19 @@
 - 发布边界：同一 Release 的镜像 job `98973037391` 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据检查阶段失败；这不影响 GitHub 安装包，但不能将整个 workflow 记录为全绿。未上传任何私钥或令牌。
 - 后续修复：PR #307 已合并为 `main@a2f6ef61c151ce127ede11cade50a3a82383d82b`；Quality checks run `33209526541` 全绿，Windows PDF 导出改为后台渲染并将有效文件等待窗口从约 5 秒提高到 15 秒。#241 继续保持 open，待自动镜像 Secret 链路重新验证；旧版本更新器历史实机结果仍以 Issue 记录为准。
 - 当前基线：PR #309 已合并为 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，Issue #168 已标记 completed；Quality checks run `33213057443` 全绿，包含浏览器 smoke、Windows desktop smoke、Rust tests 和发布预检。
-- 下一步：从最新 `main` 重新检查 Issues，选择 #181 作为下一个独立 Ready 切片；不要重复 #168/#169/#307，也不要为本次性能修复立即单独打包，待与 #307 一起进入稳定补丁批次再发布。
+- 最新合并：PR #311 已 squash 合并为 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，Issue #181 已标记 `completed`；Quality checks run `33216115439` 全绿，包含前端、浏览器、Windows desktop、Rust 和发布预检。
+- 下一步：从最新 `main@51e432e19dc76f0d701bd747050c5a589fa017d3` 重新检查 Issues，再从 Ready backlog 选择 #182、#190 或 #87 中的一个独立切片；不要重复 #168/#169/#181/#307，也不要为本次性能修复立即单独打包，待与既有稳定性修复一起进入稳定补丁批次再发布。
 
-## #181 当前切片：渲染关联数据与源码编辑同步（2026-08-29）
+## #181 已完成：渲染关联数据与源码编辑同步（2026-08-29）
 
 - 目标：避免 App 每次渲染为每条出链重复构建全量 `linkIndex`，并避免 SourceEditor 在每次输入时额外复制整篇文档做相同值比较。
 - 改动：`src/app/App.tsx` 按 `workspaceIndex` memoize `linkIndex`、当前条目、反向链接和出链，并让正文双链点击复用同一索引；`src/app/components/SourceEditor.tsx` 用最后已知编辑器值判断外部同步，更新监听器只保留一次必要的 `doc.toString()`。
 - 性能证据：同一 SourceEditor 输入场景，旧实现触发 4 次 `Text.toString()`，当前实现 3 次；减少的是同步 effect 的重复全文复制。App 侧由每次渲染 `K×O(N)` 的全量索引构建改为工作区快照变化时一次构建。
-- 已验证：workspace-index/editor 相关单测 7/7；前端全量测试 224/224；编辑器定向 E2E 5/5，最终改动后的撤回/重做与文内查找 E2E 2/2；`npm run lint`、`npm run format:check` 和一次完整构建通过。
+- 已验证：workspace-index/editor 相关单测 7/7；前端全量测试 224/224；编辑器定向 E2E 5/5，最终改动后的撤回/重做与文内查找 E2E 2/2；`npm run lint`、`npm run format:check` 和一次完整构建通过；远程 Quality checks run `33216115439` 全绿，Windows desktop smoke 通过。
 - 非目标：不重写搜索索引、不改变双链解析优先级、不改 Markdown 数据模型、不拆分 `App.tsx`、不增加依赖、不修改版本号。
-- 下一步：将本切片提交并推送为一个 PR，等待 Quality checks 和 Windows smoke；合并后更新 #181 状态与交接文档，再停止本任务。待 #181 与 #168/#307 一起进入稳定补丁批次时生成 Windows 安装包。
+- 合并结果：分支 `codex/issue-181-render-cache-2026-08-29` 已推送，PR [#311](https://github.com/MY-moss/moyang_Reader/pull/311) 已通过远程门禁并 squash 合并；GitHub 已将 #181 关闭为 `completed`。
+- 发布边界：本切片不单独生成安装包、签名、`latest.json` 或 Cloudflare 镜像；待 #181 与 #168/#307 一起进入下一稳定补丁批次时，再按 Windows x64 发布流程统一生成并核验。
+- 下一位 AI 的唯一下一步：先重新检查 Issues 和 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，从 Ready backlog 选择一个独立切片；完成后停止，不自动扩大范围或生成开发安装包。
 
 ## #168 已完成：长文档滚动阅读轨道（2026-08-29）
 
