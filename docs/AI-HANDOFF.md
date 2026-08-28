@@ -8,16 +8,18 @@
 - 镜像核验：Cloudflare Pages 的 manifest 版本为 `0.10.12`，根 `latest.json`、安装包和 `.sig` 均可访问；镜像安装包与 GitHub 资产大小和 SHA-256 一致，Windows manifest URL 已重写到 Pages 版本目录。
 - 发布边界：同一 Release 的镜像 job `98973037391` 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在凭据检查阶段失败；这不影响 GitHub 安装包，但不能将整个 workflow 记录为全绿。未上传任何私钥或令牌。
 - 后续修复：PR #307 已合并为 `main@a2f6ef61c151ce127ede11cade50a3a82383d82b`；Quality checks run `33209526541` 全绿，Windows PDF 导出改为后台渲染并将有效文件等待窗口从约 5 秒提高到 15 秒。#241 继续保持 open，待自动镜像 Secret 链路重新验证；旧版本更新器历史实机结果仍以 Issue 记录为准。
-- 下一步：从最新 `main` 重新检查 Issues，选择一个独立 Ready 切片；不要重复 #169/#307，也不要为本次 PDF 修复立即单独打包，待稳定批次再发布。
+- 当前基线：PR #309 已合并为 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，Issue #168 已标记 completed；Quality checks run `33213057443` 全绿，包含浏览器 smoke、Windows desktop smoke、Rust tests 和发布预检。
+- 下一步：从最新 `main` 重新检查 Issues，选择 #181 作为下一个独立 Ready 切片；不要重复 #168/#169/#307，也不要为本次性能修复立即单独打包，待与 #307 一起进入稳定补丁批次再发布。
 
-## #168 当前切片：长文档滚动阅读轨道（2026-08-29）
+## #168 已完成：长文档滚动阅读轨道（2026-08-29）
 
 - 目标：修复长文档滚动时全树重渲染和逐标题布局读取造成的抖动；保持阅读轨道进度、目录高亮、边界跳转和当前章节显示一致。
 - 改动：`src/app/App.tsx` 缓存渲染文章标题节点；渲染模式用 `IntersectionObserver` 追踪标题；进度状态按整数百分比刷新；观察器无法直接确定跳跃位置时保留受控回退计算。新增 `src/app/reading-rail.ts` 与单元测试，`e2e/smoke.spec.ts` 增加 120 标题滚动性能回归。
 - 性能证据：相同 120 标题文档、20 个滚动位置的本地基线为 21 次标题查询/1,087 次标题布局读取；当前为 1 次标题查询/284 次布局读取。布局读取不再发生在每个滚动帧。
-- 已验证：阅读轨道浏览器 E2E 通过；性能回归 E2E 通过；阅读轨道单元测试 4/4 通过；`npm run lint` 通过。尚未运行本切片唯一完整构建，也尚未推送 PR。
+- 已验证：阅读轨道浏览器 E2E 通过；性能回归 E2E 通过；前端全量测试 222/222 通过；`npm run lint`、`npm run format:check` 和一次完整构建通过；远程 Quality checks run `33213057443` 全绿。
 - 非目标：不改 Markdown 解析、编辑器、目录模型、阅读位置存储、导出、更新器或版本号；不创建 Release/安装包。
-- 下一步：运行格式检查和一次完整构建，复核 diff 后提交并推送 `codex/issue-168-reading-rail-2026-08-29`，创建对应 PR；等待 Quality checks 和 Windows smoke，合并后在 Issue #168 留下性能数据和验证结果，再停止本任务。若失败只保留根因并按网络/CI 重试规则处理。
+- 合并结果：分支 `codex/issue-168-reading-rail-2026-08-29` 已推送，PR #309 已通过检查并 squash 合并；GitHub 已将 #168 关闭为 completed。性能数据已写入 PR 和路线图。
+- 下一位 AI 的唯一下一步：先重新检查最新 Issues 和 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，若仍无更高优先级 Ready 项，按路线图处理 #181；完成一个切片后停止，不自动生成下一批。
 
 ## v0.10.11 稳定发布结果（2026-08-29）
 
