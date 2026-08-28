@@ -29,6 +29,10 @@ type SourceEditorProps = {
 
 type EditorViewInstance = import("@codemirror/view").EditorView;
 
+export function shouldSyncSourceEditorValue(hasView: boolean, lastKnownValue: string, nextValue: string): boolean {
+  return hasView && lastKnownValue !== nextValue;
+}
+
 export type SourceEditorPasteContext = {
   clipboardData: DataTransfer;
   selectionStart: number;
@@ -85,9 +89,14 @@ export function SourceEditor({
   }, [wikiCompletions]);
 
   useEffect(() => {
-    valueRef.current = value;
     const view = viewRef.current;
-    if (!view || view.state.doc.toString() === value) return;
+    if (!view) {
+      valueRef.current = value;
+      return;
+    }
+    if (!shouldSyncSourceEditorValue(Boolean(view), valueRef.current, value)) return;
+
+    valueRef.current = value;
 
     const viewport = captureEditorViewport(
       containerRef.current?.closest<HTMLElement>(".content-area") ?? null,
@@ -443,7 +452,10 @@ export function SourceEditor({
                 },
               }),
               view.EditorView.updateListener.of((update) => {
-                if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+                if (!update.docChanged) return;
+                const nextValue = update.state.doc.toString();
+                valueRef.current = nextValue;
+                onChangeRef.current(nextValue);
               }),
             ],
           }),
