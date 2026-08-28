@@ -10,7 +10,19 @@
 - 后续修复：PR #307 已合并为 `main@a2f6ef61c151ce127ede11cade50a3a82383d82b`；Quality checks run `33209526541` 全绿，Windows PDF 导出改为后台渲染并将有效文件等待窗口从约 5 秒提高到 15 秒。#241 继续保持 open，待自动镜像 Secret 链路重新验证；旧版本更新器历史实机结果仍以 Issue 记录为准。
 - 当前基线：PR #309 已合并为 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，Issue #168 已标记 completed；Quality checks run `33213057443` 全绿，包含浏览器 smoke、Windows desktop smoke、Rust tests 和发布预检。
 - 最新合并：PR #311 已 squash 合并为 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，Issue #181 已标记 `completed`；Quality checks run `33216115439` 全绿，包含前端、浏览器、Windows desktop、Rust 和发布预检。
-- 下一步：从最新 `main@51e432e19dc76f0d701bd747050c5a589fa017d3` 重新检查 Issues，再从 Ready backlog 选择 #182、#190 或 #87 中的一个独立切片；不要重复 #168/#169/#181/#307，也不要为本次性能修复立即单独打包，待与既有稳定性修复一起进入稳定补丁批次再发布。
+- 最新合并：PR #313 已 squash 合并为 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed`，Issue #182 已标记 `completed`；Quality checks run `33218342844` 全绿，包含前端、浏览器、Windows desktop、Rust 和发布预检。
+- 下一步：从最新 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed` 重新检查 Issues，再从 Ready backlog 选择 #87、#190 或其他更高优先级的独立切片；不要重复 #168/#169/#181/#182/#307，也不要为本次性能修复立即单独打包，待与既有稳定性修复一起进入稳定补丁批次再发布。
+
+## #182 已完成：渲染模式文内搜索高亮优化（2026-08-29）
+
+- 目标：减少大文档连续查找时的全树扫描、旧高亮拆除、布局失效和逐命中 DOM 包裹，同时保持结果数量、当前结果、滚动跳转和暗色主题可读性。
+- 改动：新增 `src/app/search-highlighter.ts`；现代 Windows WebView 优先使用 CSS Custom Highlight，当前渲染树的文本节点只收集一次并复用，活动结果使用独立高亮范围；不支持该 API 时回退到原有 `<mark>` 路径，并一次性恢复文本节点。
+- 性能证据：相同文档连续 3 次查询，旧实现为 3 次 TreeWalker、9 次高亮查询和 9 次 `surroundContents`；当前实现为 1、0、0，CSS 高亮注册 6 次且不修改阅读 DOM。
+- 已验证：高亮控制器单测 2/2；前端全量测试 226/226；搜索与暗色主题 E2E 2/2；`npm run lint`、`npm run format:check`、`npm run build` 和 `git diff --check` 通过；远程 Quality checks run `33218342844` 全绿，Windows desktop smoke 通过。
+- 非目标：不重写工作区搜索、不改变编辑器搜索或跨文本节点匹配语义、不引入第三方依赖、不修改 Markdown 真源、版本号、导出和更新器。
+- 合并结果：分支 `codex/issue-182-search-highlight-2026-08-29` 已推送，PR [#313](https://github.com/MY-moss/moyang_Reader/pull/313) 已通过远程门禁并 squash 合并；GitHub 已将 #182 关闭为 `completed`。
+- 发布边界：本切片不单独生成安装包、签名、`latest.json` 或 Cloudflare 镜像；待 #168/#181/#182 与其他稳定性修复一起进入补丁批次时统一生成 Windows x64 发布资产。
+- 下一位 AI 的唯一下一步：先重新检查 Issues 和 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed`，从 Ready backlog 选择一个独立切片；完成后停止，不自动扩大范围或生成开发安装包。
 
 ## #181 已完成：渲染关联数据与源码编辑同步（2026-08-29）
 
@@ -21,7 +33,7 @@
 - 非目标：不重写搜索索引、不改变双链解析优先级、不改 Markdown 数据模型、不拆分 `App.tsx`、不增加依赖、不修改版本号。
 - 合并结果：分支 `codex/issue-181-render-cache-2026-08-29` 已推送，PR [#311](https://github.com/MY-moss/moyang_Reader/pull/311) 已通过远程门禁并 squash 合并；GitHub 已将 #181 关闭为 `completed`。
 - 发布边界：本切片不单独生成安装包、签名、`latest.json` 或 Cloudflare 镜像；待 #181 与 #168/#307 一起进入下一稳定补丁批次时，再按 Windows x64 发布流程统一生成并核验。
-- 下一位 AI 的唯一下一步：先重新检查 Issues 和 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，从 Ready backlog 选择一个独立切片；完成后停止，不自动扩大范围或生成开发安装包。
+- 下一位 AI 的唯一下一步：先重新检查 Issues 和 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed`，从 Ready backlog 选择一个独立切片；完成后停止，不自动扩大范围或生成开发安装包。
 
 ## #168 已完成：长文档滚动阅读轨道（2026-08-29）
 
