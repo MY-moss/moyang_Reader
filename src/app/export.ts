@@ -1,5 +1,6 @@
 import { escapeHtml } from "../lib/text";
 import type { ExportMargin, ExportOrientation, ExportPaper, TocItem, WorkspaceExportFailure } from "./types";
+import type JSZip from "jszip";
 
 export type ExportOptions = {
   paper: ExportPaper;
@@ -31,6 +32,14 @@ export function pathWithNameSuffix(path: string, suffix: string, extension: stri
   const name = separator >= 0 ? path.slice(separator + 1) : path;
   const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
   return directory + baseName + suffix + "." + extension;
+}
+
+export function pathWithExportTempSuffix(path: string, nonce: string): string {
+  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  const directory = separator >= 0 ? path.slice(0, separator + 1) : "";
+  const name = separator >= 0 ? path.slice(separator + 1) : path;
+  const baseName = name.replace(/\.[^./\\]+$/, "") || "moyang-reader";
+  return `${directory}.${baseName}.moyang-export-part-${nonce}.tmp`;
 }
 
 function normalizeExportLinks(html: string): string {
@@ -91,9 +100,32 @@ const DEFAULT_DOCX_IMAGE_EXTENT: DocxImageExtent = { cx: 5486400, cy: 3657600 };
 const DOCX_MAX_IMAGE_EXTENT = DEFAULT_DOCX_IMAGE_EXTENT;
 export const BATCH_EXPORT_CHUNK_SIZE = 32;
 export const BATCH_EXPORT_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
+const EXPORT_YIELD_INTERVAL = 4;
+const EXPORT_STREAM_WRITE_CHUNK_BYTES = 256 * 1024;
 
 export function shouldFlushBatchExport(documentCount: number, estimatedBytes: number): boolean {
   return documentCount >= BATCH_EXPORT_CHUNK_SIZE || estimatedBytes >= BATCH_EXPORT_MAX_ESTIMATED_BYTES;
+}
+
+export function yieldToExportScheduler(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof globalThis.setTimeout === "function") {
+      globalThis.setTimeout(resolve, 0);
+      return;
+    }
+    queueMicrotask(resolve);
+  });
+}
+
+function mergeExportChunks(chunks: readonly Uint8Array[], byteLength: number): Uint8Array {
+  if (chunks.length === 1) return chunks[0];
+  const merged = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return merged;
 }
 
 const DOCX_IMAGE_EXTENSIONS: Record<string, string> = {
@@ -366,17 +398,16 @@ async function normalizeDocxImageSources(html: string, signal?: AbortSignal): Pr
   if (!root) return html;
 
   const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
-  await Promise.all(
-    images.map(async (element) => {
-      throwIfExportAborted(signal);
-      const source = element.getAttribute("src") ?? "";
-      const image = parseDataImage(source);
-      if (!image || !["image/avif", "image/webp"].includes(image.contentType)) return;
+  for (const [index, element] of images.entries()) {
+    throwIfExportAborted(signal);
+    const source = element.getAttribute("src") ?? "";
+    const image = parseDataImage(source);
+    if (image && ["image/avif", "image/webp"].includes(image.contentType)) {
       const converted = await rasterizeDocxImage(source, image);
       if (converted) element.setAttribute("src", converted);
-      throwIfExportAborted(signal);
-    }),
-  );
+    }
+    if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
 
   return root.innerHTML;
 }
@@ -387,25 +418,30 @@ export async function inlineLocalImages(
   readBinary: (path: string) => Promise<Uint8Array>,
   mimeTypeForPath: (path: string) => string,
   getSize?: (path: string) => Promise<number>,
+  signal?: AbortSignal,
 ): Promise<string> {
   const sources = Array.from(html.matchAll(/\bsrc="([^"]+)"/g), (match) => match[1]);
   const replacements = new Map<string, string>();
 
-  await Promise.all(
-    Array.from(new Set(sources)).map(async (source) => {
-      const localPath = resolveLocalPath(source);
-      if (!localPath) return;
-
+  const uniqueSources = Array.from(new Set(sources));
+  for (const [index, source] of uniqueSources.entries()) {
+    throwIfExportAborted(signal);
+    const localPath = resolveLocalPath(source);
+    if (localPath) {
       try {
-        if (getSize && (await getSize(localPath)) > MAX_INLINE_IMAGE_BYTES) return;
-        const bytes = await readBinary(localPath);
-        if (bytes.length > MAX_INLINE_IMAGE_BYTES) return;
-        replacements.set(source, `data:${mimeTypeForPath(localPath)};base64,${bytesToBase64(bytes)}`);
+        if (!getSize || (await getSize(localPath)) <= MAX_INLINE_IMAGE_BYTES) {
+          const bytes = await readBinary(localPath);
+          if (bytes.length <= MAX_INLINE_IMAGE_BYTES) {
+            replacements.set(source, `data:${mimeTypeForPath(localPath)};base64,${bytesToBase64(bytes)}`);
+          }
+        }
       } catch {
         // Keep an unreadable local image as a relative link so export still succeeds.
       }
-    }),
-  );
+    }
+    if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
+  throwIfExportAborted(signal);
 
   return html.replace(/\bsrc="([^"]+)"/g, (match, source: string) => {
     const replacement = replacements.get(source);
@@ -874,14 +910,21 @@ function docxFooterXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">由 Moyang Reader 导出 · 第 </w:t></w:r><w:fldSimple w:instr="PAGE"><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve"> / </w:t></w:r><w:fldSimple w:instr="NUMPAGES"><w:r><w:rPr><w:color w:val="8A8982"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple></w:p></w:ftr>`;
 }
 
-function docxDocumentXml(title: string, body: string, state: DocxRenderState, options: ExportOptions): string {
+async function docxBodyXml(body: string, state: DocxRenderState, signal?: AbortSignal): Promise<string> {
   const parsed = new DOMParser().parseFromString(`<div>${body}</div>`, "text/html");
   const root = parsed.body.firstElementChild;
-  const content = root
-    ? Array.from(root.childNodes)
-        .map((node) => blockXml(node, state))
-        .join("")
-    : "";
+  if (!root) return "";
+
+  const content: string[] = [];
+  for (const [index, node] of Array.from(root.childNodes).entries()) {
+    throwIfExportAborted(signal);
+    content.push(blockXml(node, state));
+    if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
+  return content.join("");
+}
+
+function docxDocumentXml(title: string, content: string, options: ExportOptions): string {
   const titleParagraph = paragraphXml(runXml(title), "Title");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}${content}<w:sectPr>${docxPageLayoutXml(options)}</w:sectPr></w:body></w:document>`;
 }
@@ -915,16 +958,36 @@ export async function buildDocxExport(
   options: ExportOptions = defaultExportOptions,
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
-  const { default: JSZip } = await import("jszip");
   const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
   const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(body), signal);
   throwIfExportAborted(signal);
-  const zip = new JSZip();
+  const content = await docxBodyXml(normalizedBody, state, signal);
+  const zip = await createDocxArchive(title, content, options, state, signal);
+  return zip.generateAsync(
+    {
+      type: "uint8array",
+      compression: "DEFLATE",
+      streamFiles: true,
+    },
+    () => throwIfExportAborted(signal),
+  );
+}
+
+async function createDocxArchive(
+  title: string,
+  content: string,
+  options: ExportOptions,
+  state: DocxRenderState,
+  signal?: AbortSignal,
+): Promise<JSZip> {
+  const { default: JSZipConstructor } = await import("jszip");
+  throwIfExportAborted(signal);
+  const zip = new JSZipConstructor();
   zip.file(
     "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
   );
-  zip.file("word/document.xml", docxDocumentXml(title, normalizedBody, state, options));
+  zip.file("word/document.xml", docxDocumentXml(title, content, options));
   zip.file("word/styles.xml", docxStylesXml());
   zip.file("word/header1.xml", docxHeaderXml(title));
   zip.file("word/footer1.xml", docxFooterXml());
@@ -941,6 +1004,38 @@ export async function buildDocxExport(
   zip.file("[Content_Types].xml", docxContentTypesXml(state.images));
   zip.file("word/_rels/document.xml.rels", docxRelationshipsXml(state.images, state.links));
   state.images.forEach((image, index) => zip.file(`word/media/image${index + 1}.${image.extension}`, image.bytes));
+  return zip;
+}
+
+async function prepareBatchDocxArchive(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+  signal?: AbortSignal,
+): Promise<JSZip> {
+  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const content: string[] = [];
+  for (const [index, document] of documents.entries()) {
+    throwIfExportAborted(signal);
+    const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(document.body), signal);
+    const pageBreak = index > 0 ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
+    content.push(
+      `${pageBreak}${paragraphXml(runXml(document.title), "Heading1")}${await docxBodyXml(normalizedBody, state, signal)}`,
+    );
+    if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
+
+  throwIfExportAborted(signal);
+  return createDocxArchive(title, content.join(""), options, state, signal);
+}
+
+export async function buildBatchDocxExport(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  const zip = await prepareBatchDocxArchive(title, documents, options, signal);
   return zip.generateAsync(
     {
       type: "uint8array",
@@ -951,19 +1046,131 @@ export async function buildDocxExport(
   );
 }
 
-export async function buildBatchDocxExport(
+export async function streamDocxExport(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+  writeChunk: (chunk: Uint8Array) => Promise<void>,
+  signal?: AbortSignal,
+): Promise<void> {
+  const zip = await prepareBatchDocxArchive(title, documents, options, signal);
+  const stream = zip.generateInternalStream<"uint8array">({
+    type: "uint8array",
+    compression: "DEFLATE",
+    streamFiles: true,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let writing = false;
+    let abortRequested = false;
+    let endReceived = false;
+    let pendingChunks: Uint8Array[] = [];
+    let pendingBytes = 0;
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      pendingChunks = [];
+      pendingBytes = 0;
+      cleanup();
+      resolve();
+    };
+    const fail = (cause: unknown) => {
+      if (settled) return;
+      settled = true;
+      stream.pause();
+      pendingChunks = [];
+      pendingBytes = 0;
+      cleanup();
+      reject(cause instanceof Error ? cause : new Error(String(cause)));
+    };
+    const onAbort = () => {
+      abortRequested = true;
+      stream.pause();
+      if (!writing) fail(new Error("EXPORT_CANCELLED"));
+    };
+    const flushPending = async () => {
+      if (writing || pendingBytes === 0 || settled) return;
+      writing = true;
+      const chunks = pendingChunks;
+      const byteLength = pendingBytes;
+      pendingChunks = [];
+      pendingBytes = 0;
+      try {
+        throwIfExportAborted(signal);
+        await writeChunk(mergeExportChunks(chunks, byteLength));
+        writing = false;
+        if (abortRequested || signal?.aborted) {
+          fail(new Error("EXPORT_CANCELLED"));
+          return;
+        }
+        if (settled) return;
+        if (endReceived) finish();
+        else stream.resume();
+      } catch (cause) {
+        writing = false;
+        fail(abortRequested || signal?.aborted ? new Error("EXPORT_CANCELLED") : cause);
+      }
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+    stream
+      .on("data", (chunk) => {
+        if (settled) return;
+        stream.pause();
+        try {
+          throwIfExportAborted(signal);
+        } catch (cause) {
+          fail(cause);
+          return;
+        }
+        pendingChunks.push(chunk);
+        pendingBytes += chunk.length;
+        if (pendingBytes >= EXPORT_STREAM_WRITE_CHUNK_BYTES) {
+          void flushPending();
+        } else {
+          stream.resume();
+        }
+      })
+      .on("end", () => {
+        endReceived = true;
+        if (pendingBytes > 0) void flushPending();
+        else finish();
+      })
+      .on("error", fail);
+
+    try {
+      throwIfExportAborted(signal);
+      stream.resume();
+    } catch (cause) {
+      fail(cause);
+    }
+  });
+}
+
+export async function buildBatchHtmlExportAsync(
   title: string,
   documents: HtmlExportDocument[],
   options: ExportOptions = defaultExportOptions,
   signal?: AbortSignal,
-): Promise<Uint8Array> {
-  const sections: string[] = [];
-  for (const [index, document] of documents.entries()) {
+): Promise<string> {
+  const index: string[] = [];
+  const content: string[] = [];
+  for (const [documentIndex, document] of documents.entries()) {
     throwIfExportAborted(signal);
-    sections.push(
-      `<section data-page-break="${index > 0 ? "true" : "false"}"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`,
+    index.push(`<li><a href="#moyang-document-${documentIndex}">${escapeHtml(document.title)}</a></li>`);
+    content.push(
+      `<section id="moyang-document-${documentIndex}" class="batch-document"><h1>${escapeHtml(document.title)}</h1>${document.body}</section>`,
     );
+    if ((documentIndex + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
   }
 
-  return buildDocxExport(title, sections.join(""), options, signal);
+  throwIfExportAborted(signal);
+  return buildHtmlExport(
+    title,
+    [`<nav class="batch-index"><strong>文档目录</strong><ol>${index.join("")}</ol></nav>`, ...content].join("\n"),
+    options,
+  );
 }
+
