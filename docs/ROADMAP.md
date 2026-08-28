@@ -1,5 +1,12 @@
 # Moyang Reader 版本路线
 
+## v0.10.11 稳定发布批次（2026-08-29）
+
+- 内容：发布已合并的 PR #302（工作区后台 IO、缓存索引复用、Windows 删除目录/路径归一化和增量刷新顺序保护），对应 Issue #179 已完成并关闭。
+- 版本准备：发布分支 `codex/release-v0.10.11-2026-08-29`，版本号和 CHANGELOG 已更新；其余 36 个开放 Issue 不纳入本次发布。
+- 验收门槛：版本 PR 必须通过 lint、格式、前端全量测试、浏览器/Windows 桌面 smoke、依赖审计、发布预检和 Rust 门禁；之后才创建 `v0.10.11` tag 并生成 Windows x64 安装包、签名和 `latest.json`。
+- 镜像门槛：Release 资产发布后验证 Cloudflare Pages 的 manifest、安装包、签名、SHA-256 和自动更新地址；Cloudflare Secret 缺失时保持失败，不以旧镜像冒充新版本。
+
 ## Issue 清理与修复顺序（2026-08-29）
 
 - 审计快照：37 个开放 Issue、0 个开放 PR。以下是本轮审计排序，不改变 GitHub Issue 的 open/closed 状态，也不把所有问题塞进一个 PR。

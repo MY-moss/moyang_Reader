@@ -1,5 +1,12 @@
 # AI 开发与交接流程
 
+## v0.10.11 稳定发布准备（2026-08-29）
+
+- 发布原因：PR #302 已合并到 `main@1ac808b810ad058723cb0d4f8dd9582ddb667c09`，完成 #179 的工作区后台 IO、缓存复用、Windows 路径和增量刷新稳定性修复；Issue #179 已标记 completed。
+- 版本同步：`package.json`、`package-lock.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 和 `src-tauri/tauri.conf.json` 统一为 `0.10.11`，CHANGELOG 已补充用户可见修复说明。
+- 发布状态：发布准备分支为 `codex/release-v0.10.11-2026-08-29`；尚未创建 Release、tag 或安装包。版本 PR 通过质量门禁后再推送 tag，由 Release workflow 构建 Windows x64 安装包、`.sig` 和 `latest.json`，随后验证 Cloudflare 镜像。
+- 交接边界：只发布 #179 修复，不把剩余 36 个开放 Issue 混入本批次；Cloudflare 凭据和签名私钥继续只使用 GitHub Secrets，不进入仓库或交接文本。
+
 ## Issue 清理切片：#179 工作区后台 IO 与缓存复用（2026-08-29）
 
 - 审计快照：仓库当前 37 个开放 Issue、0 个开放 PR；本轮先把最高影响且可复现的 #179 做成独立垂直切片，其余问题不混入同一 PR。
