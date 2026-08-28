@@ -1,14 +1,15 @@
 # AI 开发与交接流程
 
-## 进行中功能切片（2026-08-28，右键管理增强）
+## 已推送、待合并与发布（2026-08-28，右键管理增强）
 
 - 目标：在现有文件/文件夹 CRUD 和编辑器菜单基础上，补齐条目属性查看、标签页批量关闭和编辑器选中文本查找。
-- 分支：`codex/context-menu-more-2026-08-28`；实现基于远程 `main@618a634f7aa55c0ccde2cb421fc51159cdc2f580` 的 Windows x64 代码基线。
+- 分支：`codex/context-menu-more-2026-08-28`；PR [#287](https://github.com/MY-moss/moyang_Reader/pull/287) 已创建，当前 head 为 `c6552cad0a8a75e9325cb810569880126088535d`，实现基于远程 `main@618a634f7aa55c0ccde2cb421fc51159cdc2f580` 的 Windows x64 代码基线。
 - 非目标：本切片不处理文件移动、回收站恢复、批量文件操作、属性写回、更新器或 DOCX/PDF 原格式编辑。
 - 实现：新增 `WorkspaceEntryDetailsDialog` 和 `WorkspaceEntryDetails`；文件树右键展示只读属性；标签页复用 `ContextMenu` 提供关闭当前/其他/右侧/全部；Markdown WYSIWYG 与 CodeMirror 源文本共用“查找选中文本”，直接打开顶部搜索。
 - 安全与状态：属性弹层只读；批量关闭通过应用层统一处理未保存当前文档，取消或保存失败不改动标签；现有工作区授权、路径校验和文件 CRUD 边界不变。
-- 当前验证：`npm run build`、`npm run lint`、4 组定向 Vitest（14/14）、右键编辑器浏览器 E2E（2/2）通过；仍需完成完整格式检查、远程 Quality checks 和 Windows 定向桌面 smoke。
-- 交接：完成 VERIFY 后推送同一功能分支并创建唯一 PR 关联 #232；Quality checks 和 Windows smoke 通过后准备 v0.10.8 安装包/Release，再更新本段为已完成并停止，不自动开启下一切片。
+- 当前验证：`npm run build`、`npm run lint`、4 组定向 Vitest（14/14）、本次涉及文件的 Prettier 检查和右键编辑器浏览器 E2E（2/2）通过；远程 PR Quality checks 仍在运行，Windows 定向桌面 smoke 尚未补跑。
+- 远程状态：PR #287 与 `main` 无冲突；Quality checks run `33134993915` 当前为 `in_progress`。不要重复创建 PR、重跑未失败的检查或提前合并。
+- 交接：Quality checks 和必要的 Windows smoke 通过后合并 PR #287，再准备 v0.10.8 Windows x64 安装包/Release；发布后回填资产核验并停止，不自动开启下一切片。关联 Issue：#232（保持 open，剩余桌面交互另行切片）。
 
 ## 已完成发布切片（2026-08-28，v0.10.6）
 
