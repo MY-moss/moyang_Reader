@@ -1,3 +1,12 @@
+## Issue 治理已完成（2026-08-29）
+
+- 已复核 GitHub 全部 32 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构。
+- 已归档 9 个有明确依据的历史汇总、重复、当前范围外或低优先级不计划项；未关闭仍有价值但尚未完成的事项。
+- Canonical index：[docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)；路线图入口：[docs/ROADMAP.md](./ROADMAP.md)。
+- 当前开放项：23 个（Must 8、Should 14、Could 1），开放 PR 需单独复核。
+- 下一次开发必须先检查 Issues 和最新 main，只选择索引中具备完整 Ready 条件的一个垂直切片；完成后更新对应 Issue、代码/测试/文档和本交接文件，然后停止。
+- 本次治理没有修改产品代码、安装包、Release、密钥或镜像。
+
 # AI 开发与交接流程
 
 ## 已完成切片：#87 批量导出流式写入与取消清理（2026-08-29）
