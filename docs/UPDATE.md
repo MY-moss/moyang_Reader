@@ -23,6 +23,15 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## v0.10.13 发布记录（2026-08-29）
+
+- GitHub Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开，tag 指向 `main@5c016e2ddf71c589de3191383b3595af4c6e7705`。
+- Windows x64 安装包：`Moyang.Reader_0.10.13_x64-setup.exe`，5,046,081 字节，SHA-256 `2bd6097e9952e7c6c74365a4a1751290470586a16e28b54df8e4a994b642782f`。
+- 签名文件：`Moyang.Reader_0.10.13_x64-setup.exe.sig`，428 字节，SHA-256 `7b031ce4636b48d1774d118c4a6b2cbcff716bccb4038a07d072ff760088482c`。
+- `latest.json` 版本为 `0.10.13`，包含 Windows x64/NSIS 签名更新入口；GitHub Release、Cloudflare Pages 的 manifest、安装包和签名均已公开可访问。
+- Cloudflare 镜像安装包与签名均 HTTP 200，大小和 SHA-256 与 GitHub Release 一致；Release workflow run `33245475550` 的自动镜像 job 仍因 Cloudflare Actions Secret 缺失失败，不能把自动同步门禁记为全绿。本轮没有上传任何凭据。
+- 合并后的 main Quality checks run `33245189679`、Rust dependency audit run `33245189698` 均成功；Release Windows 构建与发布 job 成功。真实旧版本安装/更新闭环继续由 #241 跟踪。
+
 ## v0.10.12 发布记录（2026-08-29）
 
 - GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开，包含 Windows x64 安装包、`.sig` 和 `latest.json`。
