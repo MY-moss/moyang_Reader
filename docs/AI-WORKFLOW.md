@@ -157,6 +157,7 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 - 验收：导出可取消；大批量导出不长期阻塞主线程；失败文件可定位并可重试；HTML、PDF/打印和 Word 现有路径不回归。
 - 预计文件：导出命令与适配层、`src/app` 导出状态组件、对应测试和 `docs/RELEASE-POLICY.md`（仅在发布行为变化时）。
 - 测试：T2；定向单元/集成测试加一个导出 E2E，必要时补一次大工作区基准。
+- 当前切片：#87 单卷 DOCX 增量归档只修改 `src/app/export.ts` 与导出测试/决策文档；完成后必须回到本路线重新检查剩余验收，不得把该切片误记为整个 #87 已完成。
 
 ### R3：Windows 安装包与发布工作流可靠性（#51，T3，目标 v0.9.2）
 

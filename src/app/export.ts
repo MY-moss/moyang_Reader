@@ -128,6 +128,294 @@ function mergeExportChunks(chunks: readonly Uint8Array[], byteLength: number): U
   return merged;
 }
 
+type RawCompressionStream = {
+  readable: ReadableStream<Uint8Array>;
+  writable: WritableStream<Uint8Array>;
+};
+
+type RawCompressionStreamConstructor = new (format: string) => RawCompressionStream;
+
+function getRawCompressionStreamConstructor(): RawCompressionStreamConstructor | null {
+  const candidate = (globalThis as typeof globalThis & { CompressionStream?: unknown }).CompressionStream;
+  return typeof candidate === "function" ? (candidate as RawCompressionStreamConstructor) : null;
+}
+
+function supportsRawDeflate(): boolean {
+  const constructor = getRawCompressionStreamConstructor();
+  if (!constructor || typeof TextEncoder === "undefined") return false;
+
+  try {
+    new constructor("deflate-raw");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+class Crc32 {
+  private value = 0xffffffff;
+
+  update(bytes: Uint8Array): void {
+    for (const byte of bytes) this.value = CRC32_TABLE[(this.value ^ byte) & 0xff] ^ (this.value >>> 8);
+  }
+
+  digest(): number {
+    return (this.value ^ 0xffffffff) >>> 0;
+  }
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+class ExportChunkSink {
+  private pendingChunks: Uint8Array[] = [];
+  private pendingBytes = 0;
+  private writtenBytes = 0;
+
+  constructor(
+    private readonly writeChunk: (chunk: Uint8Array) => Promise<void>,
+    private readonly signal?: AbortSignal,
+  ) {}
+
+  get position(): number {
+    return this.writtenBytes + this.pendingBytes;
+  }
+
+  async write(chunk: Uint8Array): Promise<void> {
+    throwIfExportAborted(this.signal);
+    if (chunk.byteLength === 0) return;
+
+    this.pendingChunks.push(chunk);
+    this.pendingBytes += chunk.byteLength;
+    if (this.pendingBytes >= EXPORT_STREAM_WRITE_CHUNK_BYTES) await this.flush();
+  }
+
+  async flush(): Promise<void> {
+    if (this.pendingBytes === 0) return;
+
+    const chunks = this.pendingChunks;
+    const byteLength = this.pendingBytes;
+    this.pendingChunks = [];
+    this.pendingBytes = 0;
+    await this.writeChunk(mergeExportChunks(chunks, byteLength));
+    this.writtenBytes += byteLength;
+    throwIfExportAborted(this.signal);
+  }
+}
+
+type ZipCompressionMethod = 0 | 8;
+
+type ZipEntryRecord = {
+  nameBytes: Uint8Array;
+  method: ZipCompressionMethod;
+  crc: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  offset: number;
+};
+
+function setUint16(bytes: Uint8Array, offset: number, value: number): void {
+  new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint16(offset, value, true);
+}
+
+function setUint32(bytes: Uint8Array, offset: number, value: number): void {
+  new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(offset, value >>> 0, true);
+}
+
+function utf8(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+class StreamingZipEntry {
+  private readonly crc32 = new Crc32();
+  private uncompressedSize = 0;
+  private compressedSize = 0;
+  private closed = false;
+  private compressionWriter: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  private compressionDrain: Promise<void> | null = null;
+
+  private constructor(
+    private readonly zip: StreamingZipWriter,
+    private readonly nameBytes: Uint8Array,
+    private readonly method: ZipCompressionMethod,
+    private readonly offset: number,
+  ) {}
+
+  static async open(
+    zip: StreamingZipWriter,
+    name: string,
+    method: ZipCompressionMethod,
+    signal?: AbortSignal,
+  ): Promise<StreamingZipEntry> {
+    const nameBytes = utf8(name);
+    const offset = zip.position;
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    setUint32(localHeader, 0, 0x04034b50);
+    setUint16(localHeader, 4, 20);
+    setUint16(localHeader, 6, 0x0808);
+    setUint16(localHeader, 8, method);
+    setUint16(localHeader, 10, 0);
+    setUint16(localHeader, 12, 0);
+    setUint32(localHeader, 14, 0);
+    setUint32(localHeader, 18, 0);
+    setUint32(localHeader, 22, 0);
+    setUint16(localHeader, 26, nameBytes.length);
+    setUint16(localHeader, 28, 0);
+    localHeader.set(nameBytes, 30);
+    await zip.writeRaw(localHeader);
+
+    const entry = new StreamingZipEntry(zip, nameBytes, method, offset);
+    if (method === 8) {
+      const constructor = getRawCompressionStreamConstructor();
+      if (!constructor) throw new Error("DOCX_STREAMING_COMPRESSION_UNAVAILABLE");
+      const compression = new constructor("deflate-raw");
+      entry.compressionWriter = compression.writable.getWriter();
+      const reader = compression.readable.getReader();
+      entry.compressionDrain = (async () => {
+        while (true) {
+          throwIfExportAborted(signal);
+          const result = await reader.read();
+          if (result.done) return;
+          const chunk = result.value;
+          entry.compressedSize += chunk.byteLength;
+          await zip.writeRaw(chunk);
+        }
+      })();
+    }
+    return entry;
+  }
+
+  async writeBytes(bytes: Uint8Array): Promise<void> {
+    if (this.closed) throw new Error("DOCX_STREAMING_ENTRY_CLOSED");
+    throwIfExportAborted(this.zip.signal);
+    this.crc32.update(bytes);
+    this.uncompressedSize += bytes.byteLength;
+
+    if (this.compressionWriter) {
+      await this.compressionWriter.write(bytes);
+      return;
+    }
+
+    this.compressedSize += bytes.byteLength;
+    await this.zip.writeRaw(bytes);
+  }
+
+  async writeText(value: string): Promise<void> {
+    await this.writeBytes(utf8(value));
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return;
+    try {
+      if (this.compressionWriter) {
+        await this.compressionWriter.close();
+        await this.compressionDrain;
+      }
+      const descriptor = new Uint8Array(16);
+      setUint32(descriptor, 0, 0x08074b50);
+      setUint32(descriptor, 4, this.crc32.digest());
+      setUint32(descriptor, 8, this.compressedSize);
+      setUint32(descriptor, 12, this.uncompressedSize);
+      await this.zip.writeRaw(descriptor);
+      this.closed = true;
+      this.zip.record({
+        nameBytes: this.nameBytes,
+        method: this.method,
+        crc: this.crc32.digest(),
+        compressedSize: this.compressedSize,
+        uncompressedSize: this.uncompressedSize,
+        offset: this.offset,
+      });
+    } catch (cause) {
+      await this.abort(cause);
+      throw cause;
+    }
+  }
+
+  async abort(cause: unknown): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    try {
+      await this.compressionWriter?.abort(cause);
+    } catch {
+      // The temporary export file is discarded by the caller after this boundary.
+    }
+  }
+}
+
+class StreamingZipWriter {
+  private readonly entries: ZipEntryRecord[] = [];
+
+  constructor(
+    private readonly sink: ExportChunkSink,
+    readonly signal?: AbortSignal,
+  ) {}
+
+  get position(): number {
+    return this.sink.position;
+  }
+
+  async writeRaw(chunk: Uint8Array): Promise<void> {
+    await this.sink.write(chunk);
+  }
+
+  record(entry: ZipEntryRecord): void {
+    this.entries.push(entry);
+  }
+
+  async openEntry(name: string, method: ZipCompressionMethod): Promise<StreamingZipEntry> {
+    throwIfExportAborted(this.signal);
+    return StreamingZipEntry.open(this, name, method, this.signal);
+  }
+
+  async close(): Promise<void> {
+    throwIfExportAborted(this.signal);
+    const centralDirectoryOffset = this.position;
+    for (const entry of this.entries) {
+      const centralHeader = new Uint8Array(46 + entry.nameBytes.length);
+      setUint32(centralHeader, 0, 0x02014b50);
+      setUint16(centralHeader, 4, 20);
+      setUint16(centralHeader, 6, 20);
+      setUint16(centralHeader, 8, 0x0808);
+      setUint16(centralHeader, 10, entry.method);
+      setUint16(centralHeader, 12, 0);
+      setUint16(centralHeader, 14, 0);
+      setUint32(centralHeader, 16, entry.crc);
+      setUint32(centralHeader, 20, entry.compressedSize);
+      setUint32(centralHeader, 24, entry.uncompressedSize);
+      setUint16(centralHeader, 28, entry.nameBytes.length);
+      setUint16(centralHeader, 30, 0);
+      setUint16(centralHeader, 32, 0);
+      setUint16(centralHeader, 34, 0);
+      setUint16(centralHeader, 36, 0);
+      setUint32(centralHeader, 38, 0);
+      setUint32(centralHeader, 42, entry.offset);
+      centralHeader.set(entry.nameBytes, 46);
+      await this.writeRaw(centralHeader);
+    }
+
+    const centralDirectorySize = this.position - centralDirectoryOffset;
+    const endRecord = new Uint8Array(22);
+    setUint32(endRecord, 0, 0x06054b50);
+    setUint16(endRecord, 4, 0);
+    setUint16(endRecord, 6, 0);
+    setUint16(endRecord, 8, this.entries.length);
+    setUint16(endRecord, 10, this.entries.length);
+    setUint32(endRecord, 12, centralDirectorySize);
+    setUint32(endRecord, 16, centralDirectoryOffset);
+    setUint16(endRecord, 20, 0);
+    await this.writeRaw(endRecord);
+    await this.sink.flush();
+  }
+}
+
 const DOCX_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/avif": "avif",
   "image/gif": "gif",
@@ -933,9 +1221,36 @@ async function docxBodyXml(body: string, state: DocxRenderState, signal?: AbortS
   return content.join("");
 }
 
-function docxDocumentXml(title: string, content: string, options: ExportOptions): string {
+type DocxTextWriter = (value: string) => Promise<void>;
+
+async function streamDocxBodyXml(
+  body: string,
+  state: DocxRenderState,
+  writeText: DocxTextWriter,
+  signal?: AbortSignal,
+): Promise<void> {
+  const parsed = new DOMParser().parseFromString(`<div>${body}</div>`, "text/html");
+  const root = parsed.body.firstElementChild;
+  if (!root) return;
+
+  for (const [index, node] of Array.from(root.childNodes).entries()) {
+    throwIfExportAborted(signal);
+    await writeText(blockXml(node, state));
+    if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
+}
+
+function docxDocumentXmlPrefix(title: string): string {
   const titleParagraph = paragraphXml(runXml(title), "Title");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}${content}<w:sectPr>${docxPageLayoutXml(options)}</w:sectPr></w:body></w:document>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${titleParagraph}`;
+}
+
+function docxDocumentXmlSuffix(options: ExportOptions): string {
+  return `<w:sectPr>${docxPageLayoutXml(options)}</w:sectPr></w:body></w:document>`;
+}
+
+function docxDocumentXml(title: string, content: string, options: ExportOptions): string {
+  return docxDocumentXmlPrefix(title) + content + docxDocumentXmlSuffix(options);
 }
 
 function docxContentTypesXml(images: DocxImage[]): string {
@@ -959,6 +1274,18 @@ function docxRelationshipsXml(images: DocxImage[], links: DocxLink[]): string {
     ),
   ].join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`;
+}
+
+function docxPackageRelationshipsXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
+}
+
+function docxCorePropertiesXml(title: string): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Moyang Reader</dc:creator></cp:coreProperties>`;
+}
+
+function docxAppPropertiesXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Moyang Reader</Application></Properties>`;
 }
 
 export async function buildDocxExport(
@@ -1053,7 +1380,7 @@ export async function buildBatchDocxExport(
   );
 }
 
-export async function streamDocxExport(
+async function streamDocxExportWithJsZip(
   title: string,
   documents: HtmlExportDocument[],
   options: ExportOptions = defaultExportOptions,
@@ -1154,6 +1481,93 @@ export async function streamDocxExport(
       fail(cause);
     }
   });
+}
+
+async function writeStreamingDocxEntry(
+  zip: StreamingZipWriter,
+  name: string,
+  content: string | Uint8Array,
+  method: ZipCompressionMethod,
+  signal?: AbortSignal,
+): Promise<void> {
+  const entry = await zip.openEntry(name, method);
+  try {
+    if (typeof content === "string") await entry.writeText(content);
+    else await entry.writeBytes(content);
+    await entry.close();
+  } catch (cause) {
+    await entry.abort(cause);
+    throw cause;
+  }
+  throwIfExportAborted(signal);
+}
+
+async function streamDocxExportIncremental(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions,
+  writeChunk: (chunk: Uint8Array) => Promise<void>,
+  signal?: AbortSignal,
+): Promise<void> {
+  const sink = new ExportChunkSink(writeChunk, signal);
+  const zip = new StreamingZipWriter(sink, signal);
+  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  let documentEntry: StreamingZipEntry | null = null;
+
+  try {
+    documentEntry = await zip.openEntry("word/document.xml", 8);
+    await documentEntry.writeText(docxDocumentXmlPrefix(title));
+    for (const [index, document] of documents.entries()) {
+      throwIfExportAborted(signal);
+      const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(document.body), signal);
+      const pageBreak = index > 0 ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
+      await documentEntry.writeText(`${pageBreak}${paragraphXml(runXml(document.title), "Heading1")}`);
+      await streamDocxBodyXml(normalizedBody, state, (value) => documentEntry!.writeText(value), signal);
+      if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+    }
+    await documentEntry.writeText(docxDocumentXmlSuffix(options));
+    await documentEntry.close();
+    documentEntry = null;
+
+    await writeStreamingDocxEntry(zip, "_rels/.rels", docxPackageRelationshipsXml(), 8, signal);
+    await writeStreamingDocxEntry(zip, "word/styles.xml", docxStylesXml(), 8, signal);
+    await writeStreamingDocxEntry(zip, "word/header1.xml", docxHeaderXml(title), 8, signal);
+    await writeStreamingDocxEntry(zip, "word/footer1.xml", docxFooterXml(), 8, signal);
+    await writeStreamingDocxEntry(zip, "docProps/core.xml", docxCorePropertiesXml(title), 8, signal);
+    await writeStreamingDocxEntry(zip, "docProps/app.xml", docxAppPropertiesXml(), 8, signal);
+    await writeStreamingDocxEntry(zip, "[Content_Types].xml", docxContentTypesXml(state.images), 8, signal);
+    await writeStreamingDocxEntry(
+      zip,
+      "word/_rels/document.xml.rels",
+      docxRelationshipsXml(state.images, state.links),
+      8,
+      signal,
+    );
+
+    for (const [index, image] of state.images.entries()) {
+      throwIfExportAborted(signal);
+      await writeStreamingDocxEntry(zip, `word/media/image${index + 1}.${image.extension}`, image.bytes, 0, signal);
+    }
+    await zip.close();
+  } catch (cause) {
+    await documentEntry?.abort(cause);
+    throw cause;
+  }
+}
+
+export async function streamDocxExport(
+  title: string,
+  documents: HtmlExportDocument[],
+  options: ExportOptions = defaultExportOptions,
+  writeChunk: (chunk: Uint8Array) => Promise<void>,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!supportsRawDeflate()) {
+    await streamDocxExportWithJsZip(title, documents, options, writeChunk, signal);
+    return;
+  }
+
+  await streamDocxExportIncremental(title, documents, options, writeChunk, signal);
 }
 
 export async function buildBatchHtmlExportAsync(
