@@ -274,6 +274,51 @@ export async function writeBinaryFile(path: string, contents: Uint8Array): Promi
   }
 }
 
+export async function writeBinaryFileChunk(
+  path: string,
+  contents: Uint8Array,
+  append: boolean,
+  destinationPath: string,
+): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能写回本地文件。");
+  }
+
+  try {
+    await invoke("write_binary_file_chunk_raw", contents.slice().buffer, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        path: encodeURIComponent(path),
+        append: append ? "true" : "false",
+        destination: encodeURIComponent(destinationPath),
+      },
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    if (!message.includes("原始字节请求体")) throw cause;
+
+    await invoke("write_binary_file_chunk", {
+      path,
+      contents: Array.from(contents),
+      append,
+      destinationPath,
+    });
+  }
+}
+
+export async function commitBinaryFile(tempPath: string, destinationPath: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能写回本地文件。");
+  }
+
+  await invoke("commit_binary_file", { tempPath, destinationPath });
+}
+
+export async function discardBinaryFile(tempPath: string, destinationPath: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke("discard_binary_file", { path: tempPath, destinationPath });
+}
+
 export async function initialPaths(): Promise<OpenPath[]> {
   if (!isTauriRuntime()) return [];
   return invoke<OpenPath[]>("initial_paths");

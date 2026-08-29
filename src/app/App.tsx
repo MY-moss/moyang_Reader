@@ -44,6 +44,7 @@ import {
   chooseSavePath,
   chooseWorkspacePath,
   authorizeStoredPath,
+  commitBinaryFile,
   closeWindow,
   createMarkdownFile,
   createWorkspaceFolder,
@@ -62,6 +63,7 @@ import {
   openExternalUrl,
   renameWorkspaceEntry,
   deleteWorkspaceEntry,
+  discardBinaryFile,
   revealWorkspaceEntry,
   readBinaryFile,
   readAppSettings,
@@ -74,6 +76,7 @@ import {
   subscribeToCloseRequest,
   subscribeToOpenPaths,
   writeBinaryFile,
+  writeBinaryFileChunk,
   writeAppSettings,
   writeTextFile,
 } from "./bridge";
@@ -129,8 +132,8 @@ import { buildWikiLinkCandidates } from "./wiki-link-completion";
 import {
   BATCH_EXPORT_CHUNK_SIZE,
   BATCH_EXPORT_MAX_ESTIMATED_BYTES,
-  buildBatchDocxExport,
   buildBatchHtmlExport,
+  buildBatchHtmlExportAsync,
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
@@ -138,11 +141,13 @@ import {
   formatExportCancellationNotice,
   fileNameWithExtension,
   inlineLocalImages,
+  pathWithExportTempSuffix,
   pathWithExtension,
   pathWithNameSuffix,
   printHtmlDocument,
   summarizeExportFailures,
   shouldFlushBatchExport,
+  streamDocxExport,
 } from "./export";
 import {
   loadRecentFiles,
@@ -4438,15 +4443,44 @@ export function App() {
             if (!savePath) throw new Error("没有选择 HTML 保存位置。");
             const targetPath =
               expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "html") : savePath;
-            await writeTextFile(targetPath, buildBatchHtmlExport(volumeTitle, batch, exportOptions));
+            await writeTextFile(
+              targetPath,
+              await buildBatchHtmlExportAsync(volumeTitle, batch, exportOptions, controller.signal),
+            );
           } else {
             if (!savePath) throw new Error("没有选择 Word 保存位置。");
             const targetPath =
               expectedVolumeCount > 1 ? pathWithNameSuffix(savePath, ` - 第 ${volumeNumber} 卷`, "docx") : savePath;
-            await writeBinaryFile(
+            const tempPath = pathWithExportTempSuffix(
               targetPath,
-              await buildBatchDocxExport(volumeTitle, batch, exportOptions, controller.signal),
+              `${Date.now()}-${volumeNumber}-${Math.random().toString(36).slice(2, 10)}`,
             );
+            let committed = false;
+            try {
+              let hasWrittenChunk = false;
+              await streamDocxExport(
+                volumeTitle,
+                batch,
+                exportOptions,
+                (chunk) => {
+                  const append = hasWrittenChunk;
+                  hasWrittenChunk = true;
+                  return writeBinaryFileChunk(tempPath, chunk, append, targetPath);
+                },
+                controller.signal,
+              );
+              if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
+              await commitBinaryFile(tempPath, targetPath);
+              committed = true;
+            } finally {
+              if (!committed) {
+                try {
+                  await discardBinaryFile(tempPath, targetPath);
+                } catch {
+                  // Keep the original export error or cancellation notice visible.
+                }
+              }
+            }
           }
           writtenVolumes = volumeNumber;
           if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
@@ -4491,6 +4525,7 @@ export function App() {
               readBinaryFile,
               imageMimeType,
               fileSize,
+              controller.signal,
             );
             documents.push({ title: file.relativePath, body });
             estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;

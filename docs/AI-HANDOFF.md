@@ -1,3 +1,14 @@
+## 当前切片：#87 批量导出流式写入（2026-08-29，实施中）
+
+- 基线：从远程最新 `main@c22bbbd32104680994514549976ed17b2fc73602` 创建分支 `codex/issue-87-batch-export-2026-08-29`；原始工作区未修改。
+- 目标：让批量 Word 导出按分卷逐步写入，取消/失败时清理临时文件，保留现有分卷、失败清单和部分完成反馈。
+- 已实现：`src/app/export.ts` 增加逐文档转换、可取消的 HTML 构建和 JSZip 内部流；`src/app/App.tsx` 通过同目录隐藏临时文件接收 Word 分块并在完成后原子替换；`src/app/bridge.ts` 与 `src-tauri/src/commands.rs` 增加受授权目标约束的分块写入、提交和清理命令。
+- 安全边界：临时文件必须带固定标记、与最终文件位于同一目录，且最终路径必须已通过用户保存选择授权；不接受任意临时路径或把临时文件写入其他目录。
+- 本地验证：前端全量测试 60 个文件/231 个测试，Rust 测试 50/50；`npm run lint`、`npm run format:check`、`npm run build`、`cargo fmt --check`、`cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` 均通过。
+- 已知边界：单卷内 JSZip 结构和 XML 转换仍可能占用内存/前端线程；Worker 或原生归档生成是后续独立切片。#87 在残余问题完成前保持 open，不要在 PR 中写 `Closes #87`。
+- 发布边界：不为本开发切片创建 Release 或安装包；稳定批次再统一生成 Windows x64 资产并同步镜像。
+- 下一步：检查分支差异并提交；推送后创建一个关联 #87 的 PR，等待 Quality checks 全绿后合并；合并后补写实际 PR、合并 SHA、Issue 评论和最终交接记录，然后停止，不自动开启下一个功能。
+
 # AI 开发与交接流程
 
 ## v0.10.12 稳定发布结果（2026-08-29）

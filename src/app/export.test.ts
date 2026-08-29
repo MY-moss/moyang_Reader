@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import {
+  buildBatchHtmlExportAsync,
   buildBatchHtmlExport,
   buildBatchDocxExport,
   buildDocxExport,
@@ -15,11 +16,13 @@ import {
   fileNameWithExtension,
   inlineLocalImages,
   pathWithExtension,
+  pathWithExportTempSuffix,
   pathWithNameSuffix,
   printHtmlDocument,
   readImageDimensions,
   summarizeExportFailures,
   shouldFlushBatchExport,
+  streamDocxExport,
 } from "./export";
 
 function pngBytes(width: number, height: number): Uint8Array {
@@ -81,6 +84,7 @@ describe("document export helpers", () => {
     expect(fileNameWithExtension("笔记.markdown", "html")).toBe("笔记.html");
     expect(pathWithExtension("C:\\Notes\\笔记.md", "html")).toBe("C:\\Notes\\笔记.html");
     expect(pathWithNameSuffix("C:\\Notes\\笔记.docx", " - 导出", "docx")).toBe("C:\\Notes\\笔记 - 导出.docx");
+    expect(pathWithExportTempSuffix("C:\\Notes\\笔记.docx", "abc")).toBe("C:\\Notes\\.笔记.moyang-export-part-abc.tmp");
   });
 
   it("creates a standalone HTML document and normalizes reader-only links", () => {
@@ -247,6 +251,18 @@ describe("document export helpers", () => {
     expect(html).toContain("第二篇");
   });
 
+  it("builds batch HTML cooperatively and respects cancellation", async () => {
+    const controller = new AbortController();
+    const promise = buildBatchHtmlExportAsync(
+      "阅读库",
+      Array.from({ length: 4 }, (_, index) => ({ title: `第 ${index + 1} 篇.md`, body: "<p>正文</p>" })),
+      undefined,
+      controller.signal,
+    );
+    controller.abort();
+    await expect(promise).rejects.toThrow("EXPORT_CANCELLED");
+  });
+
   it("opens a generated HTML document in a temporary print frame", async () => {
     vi.useFakeTimers();
     const print = vi.fn();
@@ -344,6 +360,48 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("第一篇正文");
     expect(documentXml).toContain("第二篇正文");
     expect(documentXml).toContain("<w:pageBreakBefore/>");
+  });
+
+  it("streams a DOCX batch without returning one final archive buffer", async () => {
+    const chunks: Uint8Array[] = [];
+    await streamDocxExport(
+      "阅读库",
+      [
+        { title: "第一篇.md", body: "<p>第一篇正文</p>" },
+        { title: "第二篇.md", body: "<p>第二篇正文</p>" },
+      ],
+      undefined,
+      async (chunk) => {
+        chunks.push(chunk);
+      },
+    );
+
+    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(documentXml).toContain("第二篇正文");
+  });
+
+  it("stops DOCX streaming when the signal is aborted", async () => {
+    const controller = new AbortController();
+    await expect(
+      streamDocxExport(
+        "阅读库",
+        [{ title: "第一篇.md", body: "<p>第一篇正文</p>" }],
+        undefined,
+        async () => {
+          controller.abort();
+        },
+        controller.signal,
+      ),
+    ).rejects.toThrow("EXPORT_CANCELLED");
   });
 
   it("keeps ordered list numbers in DOCX exports", async () => {
