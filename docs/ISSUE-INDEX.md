@@ -35,7 +35,7 @@
 | ----------------------------------------------------------- | -------------------------------- | ------------------------- | ------------------------------------------------------- |
 | [#87](https://github.com/MY-moss/moyang_Reader/issues/87)   | 批量导出单卷驻留内存与可取消归档 | v0.11.0 稳定批次          | 已完成分块写入/取消清理；剩余 Worker/原生归档和单卷峰值 |
 | [#164](https://github.com/MY-moss/moyang_Reader/issues/164) | GFM 与 WYSIWYG 往返保真          | v0.11.0                   | 防止脚注、任务列表等内容静默丢失                        |
-| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试 | v0.11.0                   | 与 #164 配套，但各自独立验收                            |
+| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试 | v0.11.0                   | 本轮验收已完成，PR 合并后关闭；与 #164 保持独立         |
 | [#187](https://github.com/MY-moss/moyang_Reader/issues/187) | Windows 窄窗口与工具栏溢出       | v0.11.0                   | 以 900px 最小窗口为真实基线                             |
 | [#189](https://github.com/MY-moss/moyang_Reader/issues/189) | TypeScript/ESLint/Rust 质量门禁  | v0.11.0 发布前            | 先量化 fallout，再分批收紧                              |
 | [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计   | v0.11.0 发布前            | 发布/镜像工作流优先                                     |

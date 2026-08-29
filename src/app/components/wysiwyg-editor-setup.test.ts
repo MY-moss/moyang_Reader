@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { defaultValueCtx, Editor, editorViewCtx, rootCtx, serializerCtx } from "@milkdown/kit/core";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 
@@ -83,6 +83,46 @@ describe("wysiwyg editor setup", () => {
     } finally {
       await editor.destroy();
       root.remove();
+    }
+  });
+
+  it("debounces a local edit for 200ms and then emits the latest Markdown", async () => {
+    vi.useFakeTimers();
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    const updates: string[] = [];
+
+    const editor = Editor.make()
+      .config((ctx) => {
+        ctx.set(rootCtx, root);
+        ctx.set(defaultValueCtx, "# 标题\n\n正文。");
+      })
+      .use(buildWysiwygEditorPlugins())
+      .use(listener)
+      .config((ctx) => {
+        ctx.get(listenerCtx).markdownUpdated((_context, markdown) => updates.push(markdown));
+      });
+
+    try {
+      await editor.create();
+      const view = editor.ctx.get(editorViewCtx) as unknown as {
+        state: { tr: { insertText: (text: string, from: number, to?: number) => unknown } };
+        dispatch: (transaction: unknown) => void;
+      };
+
+      view.dispatch(view.state.tr.insertText("追加", 1));
+      expect(updates).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(199);
+      expect(updates).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toContain("追加");
+    } finally {
+      await editor.destroy();
+      root.remove();
+      vi.useRealTimers();
     }
   });
 });

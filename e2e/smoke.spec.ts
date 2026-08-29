@@ -500,13 +500,19 @@ test("inserts a heading from the wysiwyg slash menu", async ({ page }) => {
   await expect(overlay).toBeVisible();
   await expect(overlay.getByRole("option", { name: /标题 1/ })).toBeVisible();
 
+  // Arrow navigation must wrap through the same state used by Enter/Tab.
+  await page.keyboard.press("ArrowDown");
+  await expect(overlay.getByRole("option", { name: /标题 2/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowUp");
+  await expect(overlay.getByRole("option", { name: /标题 1/ })).toHaveAttribute("aria-selected", "true");
+
   await page.keyboard.press("Escape");
   await expect(overlay).toHaveCount(0);
   await page.keyboard.press("Backspace");
 
   await page.keyboard.type("/h1");
   await expect(overlay.getByRole("option", { name: /标题 1/ })).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
   await expect(overlay).toHaveCount(0);
 
   await page.keyboard.type("新标题");
