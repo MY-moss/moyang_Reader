@@ -20,14 +20,19 @@ import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 import { formatEditorDate } from "../editor-context-actions";
-import { filterSlashCommands, matchSlashTrigger, slashCommands, type SlashCommand } from "../slash-command-menu";
+import { filterSlashCommands, slashCommands, type SlashCommand } from "../slash-command-menu";
+import {
+  flushEditorMarkdownChange,
+  readCaretSlashTrigger,
+  readCaretWikiTrigger,
+  type EditorCompletionTrigger,
+} from "../editor-completion";
 import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import { ContextMenu } from "./ContextMenu";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
 import {
   filterWikiLinkCandidates,
   formatWikiLinkInsert,
-  matchWikiLinkTrigger,
   nextWikiCompletionIndex,
   wikiCompletionKeyAction,
   type WikiLinkCandidate,
@@ -61,7 +66,14 @@ type EditorViewInstance = {
       empty: boolean;
       from: number;
       to: number;
-      $from: { pos: number; parentOffset: number; parent: ParentNodeLike };
+      $from: {
+        pos: number;
+        parentOffset: number;
+        parent: {
+          type?: { name?: string };
+          textBetween: (from: number, to: number, blockSeparator?: string, leafText?: string) => string;
+        };
+      };
     };
     tr: {
       insertText: (text: string, from: number, to?: number) => unknown;
@@ -88,11 +100,6 @@ type DesktopE2eEditorView = {
 };
 
 type SerializerInstance = (doc: unknown) => string;
-
-type ParentNodeLike = {
-  type?: { name?: string };
-  textBetween: (from: number, to: number, blockSeparator?: string, leafText?: string) => string;
-};
 
 function markCurrentListItemsAsTasks(view: EditorViewInstance): boolean {
   const positions = new Set<number>();
@@ -128,15 +135,6 @@ function markCurrentListItemsAsTasks(view: EditorViewInstance): boolean {
   return true;
 }
 
-type CompletionOverlayKind = "wiki" | "slash";
-
-type EditorCompletionTrigger = {
-  kind: CompletionOverlayKind;
-  query: string;
-  from: number;
-  caret: number;
-};
-
 type CompletionOverlayState = EditorCompletionTrigger & {
   items: (WikiLinkCandidate | SlashCommand)[];
   activeIndex: number;
@@ -166,48 +164,6 @@ function slashCommandAction(command: SlashCommand) {
     case "divider":
       return callCommand(insertHrCommand.key);
   }
-}
-
-function readCaretWikiTrigger(view: EditorViewInstance): EditorCompletionTrigger | null {
-  const { selection } = view.state;
-  if (!selection.empty) return null;
-
-  const $from = selection.$from;
-  const parentName = $from.parent.type?.name ?? "";
-  if (parentName.includes("code")) return null;
-
-  const parentOffset = $from.parentOffset;
-  if (parentOffset <= 0) return null;
-
-  const start = Math.max(0, parentOffset - 128);
-  const textBefore = $from.parent.textBetween(start, parentOffset, undefined, "\ufffc");
-  const trigger = matchWikiLinkTrigger(textBefore);
-  if (!trigger) return null;
-
-  const absoluteStart = $from.pos - parentOffset + start;
-  const bracketStart = absoluteStart + textBefore.length - trigger.query.length - 2;
-  if (bracketStart < $from.pos - parentOffset) return null;
-
-  return { kind: "wiki", query: trigger.query, from: bracketStart, caret: $from.pos };
-}
-
-function readCaretSlashTrigger(view: EditorViewInstance): EditorCompletionTrigger | null {
-  const { selection } = view.state;
-  if (!selection.empty) return null;
-
-  const $from = selection.$from;
-  const parentName = $from.parent.type?.name ?? "";
-  if (parentName.includes("code")) return null;
-
-  const parentOffset = $from.parentOffset;
-  if (parentOffset <= 0) return null;
-
-  const textBefore = $from.parent.textBetween(0, parentOffset, undefined, "\ufffc");
-  const trigger = matchSlashTrigger(textBefore);
-  if (!trigger) return null;
-
-  // `/` 位于块首，`from` 即整个 `/查询` 片段的起点。
-  return { kind: "slash", query: trigger.query, from: $from.pos - parentOffset, caret: $from.pos };
 }
 
 function MilkdownSurface({
@@ -683,11 +639,12 @@ function MilkdownSurface({
       const serializer = serializerRef.current;
       if (view && serializer) {
         const markdown = serializer(view.state.doc);
-        if (markdown !== lastSyncedMarkdownRef.current) {
-          sourceSync.markEditorSource(markdown);
-          lastSyncedMarkdownRef.current = markdown;
-          onChangeRef.current(markdown);
-        }
+        lastSyncedMarkdownRef.current = flushEditorMarkdownChange(
+          markdown,
+          lastSyncedMarkdownRef.current,
+          sourceSync.markEditorSource,
+          onChangeRef.current,
+        );
       }
       if (desktopE2eInsertText && window.__moyangDesktopE2e?.insertWysiwygText === desktopE2eInsertText) {
         delete window.__moyangDesktopE2e.insertWysiwygText;
