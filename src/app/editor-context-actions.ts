@@ -1,4 +1,5 @@
 import type { EditorContextAction } from "./editor-context-menu";
+import { buildMarkdownTable } from "./editor-insertion";
 
 export type SourceEditorActionResult = {
   value: string;
@@ -186,14 +187,10 @@ export function applySourceEditorAction(
       return insertBlock(value, selectionStart, selectionEnd, "---", 3);
     case "insert-date":
       return replaceSelection(value, selectionStart, selectionEnd, formatEditorDate());
-    case "table":
-      return insertBlock(
-        value,
-        selectionStart,
-        selectionEnd,
-        "| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|  |  |  |",
-        2,
-      );
+    case "table": {
+      const table = buildMarkdownTable();
+      return insertBlock(value, selectionStart, selectionEnd, table.markdown, table.firstCellOffset);
+    }
     case "wikilink":
       return replaceSelection(
         value,

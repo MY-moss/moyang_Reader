@@ -26,7 +26,6 @@ describe("MarkdownWysiwygEditor", () => {
             documentKey="draft.md"
             ariaLabel="Markdown 所见即所得编辑器"
             onChange={vi.fn()}
-            onInsertLink={vi.fn()}
           />,
         );
       });

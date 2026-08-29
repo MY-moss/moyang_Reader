@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from "react";
 import type { Completion, CompletionSource } from "@codemirror/autocomplete";
 import { filterSlashCommands, matchSlashTrigger, slashCaretOffset, slashCommands } from "../slash-command-menu";
 import {
@@ -10,14 +10,18 @@ import {
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 import { applySourceEditorAction } from "../editor-context-actions";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import { applyEditorInsert, type EditorInsertKind, type EditorInsertRequest } from "../editor-insertion";
 import { ContextMenu } from "./ContextMenu";
+import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorInsertPopover";
+import { EditorToolbar } from "./EditorToolbar";
 
 type SourceEditorProps = {
   value: string;
   ariaLabel: string;
   onChange: (value: string) => void;
   onPaste?: (context: SourceEditorPasteContext) => boolean;
-  onInsertLink?: (context: SourceEditorLinkContext) => void;
+  requestedInsertKind?: EditorInsertKind | null;
+  onInsertRequestHandled?: () => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
   onFindText?: (text: string) => void;
@@ -41,19 +45,13 @@ export type SourceEditorPasteContext = {
   preventDefault: () => void;
 };
 
-export type SourceEditorLinkContext = {
-  selectionStart: number;
-  selectionEnd: number;
-  value: string;
-  replace: (value: string) => void;
-};
-
 export function SourceEditor({
   value,
   ariaLabel,
   onChange,
   onPaste,
-  onInsertLink,
+  requestedInsertKind,
+  onInsertRequestHandled,
   onUndo,
   onRedo,
   onFindText,
@@ -68,14 +66,18 @@ export function SourceEditor({
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const onPasteRef = useRef(onPaste);
-  const onInsertLinkRef = useRef(onInsertLink);
   const onUndoRef = useRef(onUndo);
   const onRedoRef = useRef(onRedo);
   const onFindTextRef = useRef(onFindText);
   const onStatusMessageRef = useRef(onStatusMessage);
   const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
+  const pendingInsertRef = useRef<{ selectionStart: number; selectionEnd: number; value: string } | null>(null);
+  const lastRequestedInsertRef = useRef<EditorInsertKind | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [insertOpen, setInsertOpen] = useState(false);
+  const [insertKind, setInsertKind] = useState<EditorInsertKind>("link");
+  const [insertInitialValues, setInsertInitialValues] = useState<EditorInsertInitialValues>({});
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -117,10 +119,6 @@ export function SourceEditor({
   }, [onPaste]);
 
   useEffect(() => {
-    onInsertLinkRef.current = onInsertLink;
-  }, [onInsertLink]);
-
-  useEffect(() => {
     onUndoRef.current = onUndo;
   }, [onUndo]);
 
@@ -136,7 +134,7 @@ export function SourceEditor({
     onStatusMessageRef.current = onStatusMessage;
   }, [onStatusMessage]);
 
-  const replaceSourceValue = (nextValue: string, selectionStart: number, selectionEnd: number) => {
+  const replaceSourceValue = useCallback((nextValue: string, selectionStart: number, selectionEnd: number) => {
     valueRef.current = nextValue;
     const view = viewRef.current;
     if (view) {
@@ -155,17 +153,97 @@ export function SourceEditor({
       textarea.focus();
       textarea.setSelectionRange(selectionStart, selectionEnd);
     });
-  };
+  }, []);
+
+  const readCurrentSelection = useCallback(() => {
+    const view = viewRef.current;
+    if (view) {
+      const selection = view.state.selection.main;
+      return {
+        selectionStart: selection.from,
+        selectionEnd: selection.to,
+        value: view.state.doc.toString(),
+      };
+    }
+
+    const textarea = fallbackRef.current;
+    return {
+      selectionStart: textarea?.selectionStart ?? 0,
+      selectionEnd: textarea?.selectionEnd ?? 0,
+      value: textarea?.value ?? valueRef.current,
+    };
+  }, []);
+
+  const openInsert = useCallback(
+    (kind: EditorInsertKind) => {
+      if (!viewRef.current && !fallbackRef.current) {
+        onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
+        return;
+      }
+      const selection = readCurrentSelection();
+      pendingInsertRef.current = selection;
+      setInsertKind(kind);
+      setInsertInitialValues({
+        label: selection.value.slice(selection.selectionStart, selection.selectionEnd).trim() || "链接文字",
+        alt: "",
+        rows: 3,
+        columns: 3,
+      });
+      setInsertOpen(true);
+      setContextMenu(null);
+    },
+    [readCurrentSelection],
+  );
+
+  const closeInsert = useCallback(() => {
+    pendingInsertRef.current = null;
+    setInsertOpen(false);
+  }, []);
+
+  const handleInsertRequest = useCallback(
+    (request: EditorInsertRequest) => {
+      const pending = pendingInsertRef.current;
+      if (!pending) return;
+
+      const current = readCurrentSelection();
+      if (current.value !== pending.value) {
+        onStatusMessageRef.current?.("正文内容已经变化，请重新打开插入面板，避免覆盖最新修改。");
+        closeInsert();
+        return;
+      }
+
+      const result = applyEditorInsert(pending.value, pending.selectionStart, pending.selectionEnd, request);
+      if (!result) {
+        onStatusMessageRef.current?.("插入内容无效，请检查输入后重试。");
+        return;
+      }
+
+      replaceSourceValue(result.value, result.selectionStart, result.selectionEnd);
+      closeInsert();
+    },
+    [closeInsert, readCurrentSelection, replaceSourceValue],
+  );
+
+  useEffect(() => {
+    if (!requestedInsertKind) {
+      lastRequestedInsertRef.current = null;
+      return;
+    }
+    if (lastRequestedInsertRef.current === requestedInsertKind) return;
+    lastRequestedInsertRef.current = requestedInsertKind;
+    openInsert(requestedInsertKind);
+    onInsertRequestHandled?.();
+  }, [onInsertRequestHandled, openInsert, requestedInsertKind]);
 
   const applyContextAction = (action: EditorContextAction) => {
     const target = contextMenu;
-    if (!target) return;
 
     const view = viewRef.current;
     const currentValue = view?.state.doc.toString() ?? valueRef.current;
     const selection = view?.state.selection.main;
-    const selectionStart = selection?.from ?? target.selectionStart;
-    const selectionEnd = selection?.to ?? target.selectionEnd;
+    const fallback = fallbackRef.current;
+    const selectionStart = selection?.from ?? target?.selectionStart ?? fallback?.selectionStart ?? 0;
+    const selectionEnd = selection?.to ?? target?.selectionEnd ?? fallback?.selectionEnd ?? selectionStart;
 
     if (action === "undo" || action === "redo") {
       (action === "undo" ? onUndoRef.current : onRedoRef.current)?.(containerRef.current);
@@ -247,39 +325,16 @@ export function SourceEditor({
     }
 
     if (action === "link") {
-      onInsertLinkRef.current?.({
-        selectionStart,
-        selectionEnd,
-        value: currentValue,
-        replace: (replacement) => {
-          replaceSourceValue(
-            `${currentValue.slice(0, selectionStart)}${replacement}${currentValue.slice(selectionEnd)}`,
-            selectionStart + replacement.length,
-            selectionStart + replacement.length,
-          );
-        },
-      });
-      setContextMenu(null);
+      openInsert("link");
       return;
     }
 
-    let insertionText: string | undefined;
-    if (action === "wikilink") {
-      insertionText = window.prompt("输入双链目标", "")?.trim();
-      if (!insertionText) {
-        setContextMenu(null);
-        return;
-      }
-    }
-    if (action === "image") {
-      insertionText = window.prompt("输入图片路径或 URL", "")?.trim();
-      if (!insertionText) {
-        setContextMenu(null);
-        return;
-      }
+    if (action === "wikilink" || action === "image" || action === "table") {
+      openInsert(action);
+      return;
     }
 
-    const result = applySourceEditorAction(currentValue, selectionStart, selectionEnd, action, insertionText);
+    const result = applySourceEditorAction(currentValue, selectionStart, selectionEnd, action);
     if (result) replaceSourceValue(result.value, result.selectionStart, result.selectionEnd);
     setContextMenu(null);
   };
@@ -404,25 +459,10 @@ export function SourceEditor({
               }),
               view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
               view.EditorView.domEventHandlers({
-                keydown: (event, editorView) => {
+                keydown: (event, _editorView) => {
                   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return false;
-                  const handler = onInsertLinkRef.current;
-                  if (!handler) return false;
-
                   event.preventDefault();
-                  const selection = editorView.state.selection.main;
-                  const currentValue = editorView.state.doc.toString();
-                  handler({
-                    selectionStart: selection.from,
-                    selectionEnd: selection.to,
-                    value: currentValue,
-                    replace: (nextValue) => {
-                      editorView.dispatch({
-                        changes: { from: selection.from, to: selection.to, insert: nextValue },
-                        selection: { anchor: selection.from + nextValue.length },
-                      });
-                    },
-                  });
+                  openInsert("link");
                   return true;
                 },
                 contextmenu: (event, editorView) => {
@@ -504,17 +544,28 @@ export function SourceEditor({
       createdView?.destroy();
       viewRef.current = null;
     };
-  }, [ariaLabel]);
+  }, [ariaLabel, openInsert]);
 
   if (loadFailed) {
     return (
-      <>
+      <div className="editor-surface source-editor-fallback-shell">
+        <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+        <EditorInsertPopover
+          open={insertOpen}
+          kind={insertKind}
+          initialValues={insertInitialValues}
+          onCancel={closeInsert}
+          onSubmit={handleInsertRequest}
+        />
         <textarea
           ref={fallbackRef}
           className="source-editor"
           aria-label={ariaLabel}
           value={value}
-          onChange={(event) => onChangeRef.current(event.target.value)}
+          onChange={(event) => {
+            valueRef.current = event.target.value;
+            onChangeRef.current(event.target.value);
+          }}
           onContextMenu={(event) => {
             event.preventDefault();
             setContextMenu({
@@ -550,12 +601,20 @@ export function SourceEditor({
             onClose={() => setContextMenu(null)}
           />
         )}
-      </>
+      </div>
     );
   }
 
   return (
     <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready}>
+      <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+      <EditorInsertPopover
+        open={insertOpen}
+        kind={insertKind}
+        initialValues={insertInitialValues}
+        onCancel={closeInsert}
+        onSubmit={handleInsertRequest}
+      />
       {!ready && <span className="source-editor-loading">正在加载编辑器…</span>}
       {contextMenu && (
         <ContextMenu

@@ -929,13 +929,58 @@ test("inserts a Markdown link from source mode", async ({ page }) => {
   await clickToolbarAction(page, "源文本");
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.press("Control+a");
-  page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("链接地址");
-    await dialog.accept("https://example.com");
-  });
   await editor.press("Control+k");
 
+  const insertDialog = page.getByRole("dialog", { name: "插入内容" });
+  await expect(insertDialog).toBeVisible();
+  await insertDialog.getByLabel("地址").fill("https://example.com");
+  await insertDialog.getByRole("button", { name: "插入到正文" }).click();
+
   await expectEditorText(editor, "[链接文字](https://example.com)");
+});
+
+test("uses the in-app insertion panel for WYSIWYG links and source images/tables", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "insert-panel-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("选择文字"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await page.locator(".wysiwyg-editor .editor p").selectText();
+  await page.locator(".wysiwyg-editor .editor-format-toolbar").getByRole("button", { name: "插入" }).click();
+
+  const wysiwygDialog = page.getByRole("dialog", { name: "插入内容" });
+  await expect(wysiwygDialog).toBeVisible();
+  await wysiwygDialog.getByLabel("地址").fill("https://example.com");
+  await wysiwygDialog.getByRole("button", { name: "插入到正文" }).click();
+
+  await clickToolbarAction(page, "源文本");
+  const source = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expectEditorText(source, "[选择文字](https://example.com)");
+
+  await source.press("Control+End");
+  const sourceToolbar = page.locator(".code-mirror-editor .editor-format-toolbar");
+  await sourceToolbar.getByRole("button", { name: "插入" }).click();
+  const sourceDialog = page.getByRole("dialog", { name: "插入内容" });
+  await sourceDialog.getByRole("tab", { name: "图片" }).click();
+  await sourceDialog.getByLabel("图片路径或 URL").fill("images/cover.png");
+  await sourceDialog.getByLabel("替代文字").fill("封面");
+  await sourceDialog.getByRole("button", { name: "插入到正文" }).click();
+  await expect.poll(async () => readEditorText(source)).toContain("![封面](images/cover.png)");
+
+  await source.press("Control+End");
+  await sourceToolbar.getByRole("button", { name: "插入" }).click();
+  await page.getByRole("dialog", { name: "插入内容" }).getByRole("tab", { name: "表格" }).click();
+  const tableDialog = page.getByRole("dialog", { name: "插入内容" });
+  await tableDialog.getByLabel("行数").fill("2");
+  await tableDialog.getByLabel("列数").fill("4");
+  await tableDialog.getByRole("button", { name: "插入到正文" }).click();
+  await expect.poll(async () => readEditorText(source)).toContain("列 4");
+  await expect(page.getByRole("dialog", { name: "插入内容" })).toHaveCount(0);
 });
 
 test("debounces in-document search and navigates highlighted matches", async ({ page }) => {

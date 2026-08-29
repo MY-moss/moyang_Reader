@@ -1,3 +1,13 @@
+## #321 原生编辑工具栏与插入面板（2026-08-29）
+
+- 基线：从已验证的 `b842cef` 等价代码树创建 `codex/editor-insert-toolbar-2026-08-29`；原始开发目录的未提交修改未触碰，隔离工作区位于项目内 `.codex-worktrees/editor-insert-toolbar-2026-08-29`。
+- 目标：把编辑格式、段落和链接/双链/图片/表格插入收敛为一致的应用内操作，修复图片 alt 误用路径、固定 3×3 表格和 WYSIWYG `execCommand`/原生 prompt 问题。
+- 已实现：共享 `EditorToolbar`、`EditorInsertPopover` 和 `editor-insertion` 构造边界；WYSIWYG 使用 Milkdown 链接/图片/表格命令，源码模式使用统一 Markdown 生成；链接地址做危险协议拒绝，表格支持 2–8 行/列；命令面板和 `Ctrl+K` 改为请求编辑器面板。
+- 已验证：编辑器插入与上下文动作单测 11/11；lint、Prettier、TypeScript/Vite build；浏览器 E2E `inserts a Markdown link from source mode` 与 `in-app insertion panel` 2/2。构建只有仓库既有 chunk 体积提示。
+- 发布边界：这是用户可见编辑体验切片，合并后纳入下一个稳定 Windows x64 `v0.10.13`；本轮不创建 Release、不生成稳定安装包、不上传签名或镜像资产。
+- 已知边界：图片仍要求用户提供路径/URL，不在本切片实现资源选择器或复制上传；DOCX/PDF 仍只读；右键菜单的更深焦点循环仍由 #299 单独跟踪。
+- 下一步：完成一次代码审查和 PR #321 的 CI 门禁；合并后复核 Issue #321 状态并停止本切片。下一位 AI 必须重新检查 Issues 和最新 `main`，再从 Ready backlog 选择唯一事项。
+
 ## #165 WYSIWYG 组件行为测试（2026-08-29）
 
 - 基线：从已包含 #164 的 `main@b6f5687a91789f27cc6d03b972b40e8dee427b11` 等价代码树创建独立分支；原始开发目录的未提交改动未触碰。临时工作树位于项目内 `.codex-worktrees/issue-165-wysiwyg-tests-2026-08-29`，没有在项目父目录创建工作副本。
@@ -21,10 +31,10 @@
 
 ## Issue 治理已完成（2026-08-29）
 
-- 已复核 GitHub 全部 32 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构。
+- 已复核 GitHub 全部 32 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构；本轮另创建 #321 作为编辑器 Ready 切片。
 - 已归档 9 个有明确依据的历史汇总、重复、当前范围外或低优先级不计划项；未关闭仍有价值但尚未完成的事项。
 - Canonical index：[docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)；路线图入口：[docs/ROADMAP.md](./ROADMAP.md)。
-- 当前开放项：23 个（Must 8、Should 14、Could 1），开放 PR 需单独复核。
+- 当前开放项：24 个（Must 9、Should 14、Could 1），开放 PR 需单独复核。
 - 下一次开发必须先检查 Issues 和最新 main，只选择索引中具备完整 Ready 条件的一个垂直切片；完成后更新对应 Issue、代码/测试/文档和本交接文件，然后停止。
 - 本次治理没有修改产品代码、安装包、Release、密钥或镜像。
 
