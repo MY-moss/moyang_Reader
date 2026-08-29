@@ -62,6 +62,7 @@ export function loadDraftSnapshots(): DraftSnapshot[] {
     const seen = new Set<string>();
     return parsed
       .filter(isDraftSnapshot)
+      .filter((snapshot) => snapshot.draft !== snapshot.baseSource)
       .filter((snapshot) => {
         const key = comparablePath(snapshot.path);
         if (!key || seen.has(key)) return false;
