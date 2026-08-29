@@ -17,6 +17,7 @@ import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
+import { DraftRecoveryComparisonDialog } from "./components/DraftRecoveryComparisonDialog";
 import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
@@ -469,6 +470,14 @@ type CachedWorkspace = {
 
 type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
 
+type DraftComparisonRequest = {
+  snapshot: DraftSnapshot;
+  comparisonSource: string;
+  comparisonLabel: string;
+  currentDocumentModified: boolean;
+  isCurrentDocument: boolean;
+};
+
 type PendingAppSettingsWrite = {
   snapshot: AppSettingsSnapshot;
   localSaved: boolean;
@@ -575,6 +584,7 @@ export function App() {
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [draftComparison, setDraftComparison] = useState<DraftComparisonRequest | null>(null);
   const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -3302,6 +3312,43 @@ export function App() {
     setMode("source");
   }, [draftRecovery, updateSource]);
 
+  const previewCurrentDraft = useCallback(() => {
+    const snapshot = draftRecovery;
+    const current = documentStateRef.current;
+    if (!snapshot || !current || !isSameDocumentPath(current.path, snapshot.path)) return;
+
+    setDraftComparison({
+      snapshot,
+      comparisonSource: current.source,
+      comparisonLabel: "当前磁盘版本",
+      currentDocumentModified: current.modified,
+      isCurrentDocument: true,
+    });
+  }, [draftRecovery]);
+
+  const previewDraftSnapshot = useCallback(
+    (path: string) => {
+      const snapshot = draftSnapshots.find((item) => isSameDocumentPath(item.path, path));
+      if (!snapshot) return;
+
+      const current = documentStateRef.current;
+      const isCurrentDocument = Boolean(current && isSameDocumentPath(current.path, snapshot.path));
+      setDraftRecoveryOpen(false);
+      setDraftComparison({
+        snapshot,
+        comparisonSource: isCurrentDocument && current ? current.source : snapshot.baseSource,
+        comparisonLabel: isCurrentDocument ? "当前磁盘版本" : "草稿保存时的原文",
+        currentDocumentModified: Boolean(isCurrentDocument && current?.modified),
+        isCurrentDocument,
+      });
+    },
+    [draftSnapshots],
+  );
+
+  const closeDraftComparison = useCallback(() => {
+    setDraftComparison(null);
+  }, []);
+
   const discardDraft = useCallback(() => {
     if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });
   }, [draftRecovery]);
@@ -3325,6 +3372,18 @@ export function App() {
     },
     [confirmDocumentReplacement, openPath],
   );
+
+  const handleDraftComparisonAction = useCallback(() => {
+    const request = draftComparison;
+    if (!request) return;
+
+    setDraftComparison(null);
+    if (request.isCurrentDocument) {
+      recoverDraft();
+      return;
+    }
+    void openDraftSnapshot(request.snapshot.path);
+  }, [draftComparison, openDraftSnapshot, recoverDraft]);
 
   const requestDraftDiscardByPath = useCallback((path: string) => {
     setDraftRecoveryOpen(false);
@@ -4843,7 +4902,8 @@ export function App() {
           {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
             <DraftRecoveryNotice
               snapshot={draftRecovery}
-              onRecover={recoverDraft}
+              currentSource={documentState?.source ?? draftRecovery.baseSource}
+              onPreview={previewCurrentDraft}
               onLater={deferDraftRecovery}
               onDiscard={discardDraft}
             />
@@ -5076,9 +5136,24 @@ export function App() {
         <DraftRecoveryCenter
           snapshots={draftSnapshots}
           onOpen={(path) => void openDraftSnapshot(path)}
+          onPreview={previewDraftSnapshot}
           onDiscard={requestDraftDiscardByPath}
           onClearAll={clearAllDrafts}
           onClose={() => setDraftRecoveryOpen(false)}
+          activeDocumentPath={documentState?.path}
+          activeDocumentSource={documentState?.source}
+        />
+      )}
+      {draftComparison && (
+        <DraftRecoveryComparisonDialog
+          snapshot={draftComparison.snapshot}
+          comparisonSource={draftComparison.comparisonSource}
+          comparisonLabel={draftComparison.comparisonLabel}
+          currentDocumentModified={draftComparison.currentDocumentModified}
+          sourceChangedSinceDraft={draftComparison.comparisonSource !== draftComparison.snapshot.baseSource}
+          actionLabel={draftComparison.isCurrentDocument ? "恢复到编辑区" : "打开文档并查看"}
+          onAction={handleDraftComparisonAction}
+          onClose={closeDraftComparison}
         />
       )}
       {draftDiscardRequest && (

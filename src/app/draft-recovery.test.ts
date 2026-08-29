@@ -74,6 +74,20 @@ describe("draft recovery", () => {
     expect(loadDraftSnapshots()).toEqual([]);
   });
 
+  it("filters stale unchanged snapshots from the recovery center", () => {
+    localStorage.setItem(
+      "moyang-reader-drafts",
+      JSON.stringify([
+        { path: "C:/Notes/stale.md", draft: "same", baseSource: "same", savedAt: 2_000 },
+        { path: "C:/Notes/changed.md", draft: "new", baseSource: "old", savedAt: 1_000 },
+      ]),
+    );
+
+    expect(loadDraftSnapshots()).toEqual([
+      { path: "C:/Notes/changed.md", draft: "new", baseSource: "old", savedAt: 1_000 },
+    ]);
+  });
+
   it("keeps the serialized draft store under the storage budget", () => {
     for (let index = 0; index < 8; index += 1) {
       expect(
