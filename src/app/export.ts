@@ -102,6 +102,7 @@ export const BATCH_EXPORT_CHUNK_SIZE = 32;
 export const BATCH_EXPORT_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
 const EXPORT_YIELD_INTERVAL = 4;
 const EXPORT_STREAM_WRITE_CHUNK_BYTES = 256 * 1024;
+const DOCX_TEXT_WRITE_CHUNK_CHARS = 16 * 1024;
 
 export function shouldFlushBatchExport(documentCount: number, estimatedBytes: number): boolean {
   return documentCount >= BATCH_EXPORT_CHUNK_SIZE || estimatedBytes >= BATCH_EXPORT_MAX_ESTIMATED_BYTES;
@@ -308,7 +309,14 @@ class StreamingZipEntry {
   }
 
   async writeText(value: string): Promise<void> {
-    await this.writeBytes(utf8(value));
+    for (let offset = 0; offset < value.length;) {
+      let end = Math.min(value.length, offset + DOCX_TEXT_WRITE_CHUNK_CHARS);
+      const lastCodeUnit = value.charCodeAt(end - 1);
+      if (end < value.length && lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+      if (end <= offset) end = Math.min(value.length, offset + DOCX_TEXT_WRITE_CHUNK_CHARS);
+      await this.writeBytes(utf8(value.slice(offset, end)));
+      offset = end;
+    }
   }
 
   async close(): Promise<void> {
@@ -970,7 +978,9 @@ type DocxLink = {
 
 type DocxRenderState = {
   images: DocxImage[];
+  imageFingerprints: Map<string, number[]>;
   nextImageId: number;
+  nextDrawingId: number;
   links: DocxLink[];
   nextLinkId: number;
 };
@@ -986,11 +996,25 @@ function escapeXml(value: string): string {
 
 function runXml(value: string, properties = ""): string {
   if (!value) return "";
-  const content = value
-    .split(/\r?\n/)
-    .map((line, index) => `${index > 0 ? "<w:br/>" : ""}<w:t xml:space="preserve">${escapeXml(line)}</w:t>`)
-    .join("");
-  return `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}${content}</w:r>`;
+  const content: string[] = [];
+  for (const [index, line] of value.split(/\r?\n/).entries()) {
+    if (index > 0) content.push("<w:br/>");
+    if (!line) {
+      content.push('<w:t xml:space="preserve"></w:t>');
+      continue;
+    }
+
+    for (let offset = 0; offset < line.length;) {
+      let end = Math.min(line.length, offset + DOCX_TEXT_WRITE_CHUNK_CHARS);
+      const lastCodeUnit = line.charCodeAt(end - 1);
+      if (end < line.length && lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+      if (end <= offset) end = Math.min(line.length, offset + DOCX_TEXT_WRITE_CHUNK_CHARS);
+      content.push(`<w:t xml:space="preserve">${escapeXml(line.slice(offset, end))}</w:t>`);
+      offset = end;
+    }
+  }
+
+  return `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}${content.join("")}</w:r>`;
 }
 
 function imageExtension(contentType: string): string | null {
@@ -999,6 +1023,24 @@ function imageExtension(contentType: string): string | null {
 
 function isElementNode(node: Node): node is Element {
   return node.nodeType === 1;
+}
+
+function imageFingerprint(contentType: string, bytes: Uint8Array): string {
+  let first = 2166136261;
+  let second = 0x9e3779b9;
+  for (const byte of bytes) {
+    first = Math.imul(first ^ byte, 16777619);
+    second = Math.imul(second ^ byte, 2246822519);
+  }
+  return `${contentType}:${bytes.length}:${first >>> 0}:${second >>> 0}`;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
 }
 
 function imageXml(element: Element, state: DocxRenderState): string {
@@ -1013,21 +1055,33 @@ function imageXml(element: Element, state: DocxRenderState): string {
     const binary = atob(match[2]);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     const contentType = match[1].toLowerCase();
-    const relationshipId = `rId${state.nextImageId}`;
-    state.nextImageId += 1;
-    state.images.push({
-      bytes,
-      contentType,
-      extension,
-      relationshipId,
+    const fingerprint = imageFingerprint(contentType, bytes);
+    const candidates = state.imageFingerprints.get(fingerprint) ?? [];
+    let imageIndex = candidates.find((candidateIndex) => {
+      const candidate = state.images[candidateIndex];
+      return candidate?.contentType === contentType && sameBytes(candidate.bytes, bytes);
     });
+    if (imageIndex === undefined) {
+      imageIndex = state.images.length;
+      state.images.push({
+        bytes,
+        contentType,
+        extension,
+        relationshipId: `rId${state.nextImageId}`,
+      });
+      state.nextImageId += 1;
+      candidates.push(imageIndex);
+      state.imageFingerprints.set(fingerprint, candidates);
+    }
 
-    const imageId = state.images.length;
+    const image = state.images[imageIndex];
+    const imageId = state.nextDrawingId;
+    state.nextDrawingId += 1;
     const dimensions = readImageDimensions(bytes, contentType);
     const { cx, cy } = calculateDocxImageExtent(dimensions);
     const alt = element.getAttribute("alt") ?? "";
     const description = alt ? ` descr="${escapeXml(alt)}"` : "";
-    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${imageId}" name="图片 ${imageId}"${description}/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${imageId}" name="图片 ${imageId}"${description}/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${imageId}" name="图片 ${imageId}"${description}/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${imageId}" name="图片 ${imageId}"${description}/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${image.relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   } catch {
     return runXml("[图片无法读取]");
   }
@@ -1294,7 +1348,14 @@ export async function buildDocxExport(
   options: ExportOptions = defaultExportOptions,
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
-  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const state: DocxRenderState = {
+    images: [],
+    imageFingerprints: new Map(),
+    nextImageId: 1,
+    nextDrawingId: 1,
+    links: [],
+    nextLinkId: 1,
+  };
   const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(body), signal);
   throwIfExportAborted(signal);
   const content = await docxBodyXml(normalizedBody, state, signal);
@@ -1349,7 +1410,14 @@ async function prepareBatchDocxArchive(
   options: ExportOptions = defaultExportOptions,
   signal?: AbortSignal,
 ): Promise<JSZip> {
-  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const state: DocxRenderState = {
+    images: [],
+    imageFingerprints: new Map(),
+    nextImageId: 1,
+    nextDrawingId: 1,
+    links: [],
+    nextLinkId: 1,
+  };
   let content = "";
   for (const [index, document] of documents.entries()) {
     throwIfExportAborted(signal);
@@ -1511,7 +1579,14 @@ async function streamDocxExportIncremental(
 ): Promise<void> {
   const sink = new ExportChunkSink(writeChunk, signal);
   const zip = new StreamingZipWriter(sink, signal);
-  const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
+  const state: DocxRenderState = {
+    images: [],
+    imageFingerprints: new Map(),
+    nextImageId: 1,
+    nextDrawingId: 1,
+    links: [],
+    nextLinkId: 1,
+  };
   let documentEntry: StreamingZipEntry | null = null;
 
   try {

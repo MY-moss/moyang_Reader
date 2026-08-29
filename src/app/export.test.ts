@@ -348,6 +348,25 @@ describe("document export helpers", () => {
     expect(zip.file("word/media/image2.svg")).not.toBeNull();
   });
 
+  it("reuses identical image resources while keeping each drawing addressable", async () => {
+    const image = dataUrl("image/png", pngBytes(320, 160));
+    const bytes = await buildBatchDocxExport("重复图片", [
+      { title: "第一篇.md", body: `<p><img src="${image}" alt="第一处"/></p>` },
+      { title: "第二篇.md", body: `<p><img src="${image}" alt="第二处"/></p>` },
+    ]);
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+
+    expect(documentXml?.match(/r:embed="rId1"/g)).toHaveLength(2);
+    expect(documentXml).toContain('docPr id="1"');
+    expect(documentXml).toContain('docPr id="2"');
+    expect(relationshipsXml).toContain('Target="media/image1.png"');
+    expect(relationshipsXml).not.toContain('Target="media/image2.png"');
+    expect(zip.file("word/media/image1.png")).not.toBeNull();
+    expect(zip.file("word/media/image2.png")).toBeNull();
+  });
+
   it("builds a paginated DOCX package for a batch of documents", async () => {
     const bytes = await buildBatchDocxExport("阅读库", [
       { title: "第一篇.md", body: "<p>第一篇正文</p>" },
@@ -388,6 +407,29 @@ describe("document export helpers", () => {
     const documentXml = await zip.file("word/document.xml")?.async("string");
     expect(chunks.length).toBeGreaterThan(0);
     expect(documentXml).toContain("第二篇正文");
+  });
+
+  it("splits long DOCX text into bounded XML text nodes", async () => {
+    const longText = "长文本块需要保持原样并且不能让单次编码无限增长。".repeat(8_000);
+    const chunks: Uint8Array[] = [];
+    await streamDocxExport("长文档", [{ title: "长文档.md", body: `<p>${longText}</p>` }], undefined, async (chunk) => {
+      chunks.push(chunk);
+    });
+
+    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const textNodeCount = documentXml?.match(/<w:t xml:space="preserve">/g)?.length ?? 0;
+
+    expect(textNodeCount).toBeGreaterThan(1);
+    expect(documentXml).toContain(longText.slice(0, 80));
+    expect(documentXml).toContain(longText.slice(-80));
   });
 
   it("streams DOCX images and relationships as a valid package", async () => {

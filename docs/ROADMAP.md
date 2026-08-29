@@ -7,7 +7,7 @@
 - not planned / duplicate 只表示当前入口归档，不代表相关专项全部完成；专项状态以对应 Issue 验收为准。
 - 后续“继续开发”只从该索引中具备目标、非目标、验收、依赖、风险和回滚条件的 Ready 项选择。
 
-## #226 Actions SHA 固定与前端定时审计（当前切片）
+## #226 Actions SHA 固定与前端定时审计（已完成）
 
 - 目标：把 CI、Rust 审计、Windows Release 和 Cloudflare 镜像依赖从可变 tag/branch 收敛到已核验的提交 SHA，并缩短前端生产依赖漏洞发现窗口。
 - 实现边界：固定 `actions/checkout`、`actions/setup-node`、`dtolnay/rust-toolchain`、`Swatinem/rust-cache`、`rustsec/audit-check`、`tauri-apps/tauri-action` 和 `cloudflare/wrangler-action`；新增独立每周前端生产依赖审计；新增可复用的浮动 Action 引用检查和测试。
@@ -15,6 +15,7 @@
 - 非目标：不升级依赖、不购买或接入代码签名证书、不重写 Release/Cloudflare 业务逻辑、不生成安装包或 Release。
 - 验收：本地 Action 引用检查、定时审计工作流语法与测试通过；安全切片按 T3 运行完整质量门禁并在 PR 中列出每个 SHA 来源。
 - 发布：安全/CI 供应链切片不单独发布 Windows 安装包；待后续稳定功能批次统一生成安装包、签名、manifest 和镜像。
+- 合并：[PR #337](https://github.com/MY-moss/moyang_Reader/pull/337) 已 squash 合并为 `main@828a7409736e7e811858aedda92372e664d7dd0c`；Windows Quality checks、Frontend audit 和 Rust audit 均通过，#226 已标记 completed。
 
 # Moyang Reader 版本路线
 
@@ -80,6 +81,14 @@
 - 验收：真实 Windows desktop smoke 1/1 通过；夹具报告 48 篇、Markdown `1,884,816` 字节、1 个 `228,143` 字节图片资源，上下文面板交互 `2ms`、渲染事件循环最大间隔 `66ms`、取消延迟 `97ms`、Working Set 从 `47,038,464` 到 `48,058,368` 字节。取消和最终目标为目录的失败模拟均清理临时文件；这些数字仅作本机趋势基线。
 - 非目标：不改变生产导出格式、分卷/取消语义、PDF/HTML 内容、更新器、版本号或 Release；不把测试夹具写入用户工作区，不以本机一次测量替代多设备性能承诺。
 - Issue/发布：#87 保持 open，后续只需在更大真实图片、长单块内容和重复基准矩阵下补充趋势证据，再决定是否关闭；本轮不生成安装包或 Release。
+
+## #87 单卷 DOCX 峰值收敛（本轮当前切片，2026-08-29）
+
+- 目标：在不改变 Word 内容、分卷、取消和临时文件提交语义的前提下，降低单卷超长文本和重复图片造成的瞬时驻留。
+- 实现：连续文本按有限大小 XML 文本节点生成，流式 ZIP 条目按有限字符片段编码；同内容同类型图片通过有界指纹和字节校验复用一个媒体资源，同时为每个绘图保留独立 `docPr` ID、替代文字和关系引用。
+- 非目标：不改写 PDF/打印、HTML/Markdown 语义、文件落盘授权或 Worker 协议；复杂表格/嵌套 HTML block 的完全流式转换和磁盘级图片读取留给后续专项。
+- 验收：导出定向测试 32/32、Worker 测试 4/4、lint、格式和生产构建通过；真实 Windows desktop smoke 12/12 通过，当前基准为 48 篇、1 个 228,143 字节图片、事件循环最大间隔 79ms、取消延迟 227ms、Working Set 49,233,920 → 49,758,208 字节。数据仅作同机趋势证据。
+- 发布/状态：本切片不单独生成安装包或 Release；#87 保持 open，待更大真实图片、复杂长块和重复基准矩阵继续验收。
 
 ## #189 TypeScript/Rust 质量门禁首个垂直切片（2026-08-29）
 
