@@ -121,16 +121,16 @@ npm run desktop
 
 ## 后续版本路线
 
-1. v0.9.0：完成三栏工作区、多阅读库并存、Markdown 所见即所得编辑和 Windows 无控制台启动。
-2. v0.9.5：已发布三栏目录跳转、侧栏滚动和窄屏布局，并支持左右侧栏调宽与快捷键。
-3. v0.10.1：已发布大库搜索性能验收和撤回阅读位置修复。
-4. v0.10.2：已发布紧凑窗口可用性；#187 的完整响应式断点验收继续保持 open。
-5. v0.10.3：已发布首次使用教程和设置持久化修复，并提供 Windows x64 安装包与自动更新 manifest。
-6. v0.10.4：已发布工作区新建笔记/文件夹、空目录显示和基础编辑上下文菜单。
-7. v0.10.5：已发布文件/文件夹打开、重命名、删除、路径管理和正文编辑系统动作，Windows x64 安装包与更新 manifest 已在线。
-8. v0.10：嵌入、块引用、属性和关系图筛选。
-9. v0.11：Worker/分批导出、PDF/Word 模板和分享体验。
-10. v0.12：Windows 镜像巡检、更新器回归和发布稳定性。
-11. v1.0：Windows x64 核心能力冻结，进入长期维护。
+1. v0.10.13：当前稳定版本，已交付草稿差异预览、原生编辑工具栏、窄窗口完善和 Windows x64 发布资产。
+2. v0.11.0：稳定性与体验双轨交替，依次完成批量导出验收、统一通知、类型门禁、拖放反馈、发布条件项和右键键盘体验。
+3. v1.0：Windows x64 核心能力冻结，进入长期维护；跨平台、云同步和脚本插件仍不在当前范围。
 
-详细需求、交互契约、版本映射和 AI 接手流程见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。
+详细需求、交互契约和版本映射见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+
+## AI 快速接手
+
+任何新聊天只需使用下面一句话；当前任务只以 [`docs/NEXT.md`](docs/NEXT.md) 为准，流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，版本摘要见 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。
+
+```text
+继续开发 Moyang Reader。严格读取并执行 docs/NEXT.md 中的唯一下一步，遵循 docs/AI-WORKFLOW.md，完成一个垂直切片、测试、PR 和交接后停止，不自动开始下一项。
+```

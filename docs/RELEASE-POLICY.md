@@ -69,7 +69,7 @@ Cloudflare 镜像只由 `.github/workflows/mirror-release.yml` 负责，并由 R
 
 准备发布 `vX.Y.Z` 时，按以下顺序执行：
 
-1. 检查 Issues、PR、CHANGELOG 和 `docs/AI-HANDOFF.md`，确认没有遗漏的阻塞问题。
+1. 检查 Issues、PR、CHANGELOG、`docs/NEXT.md` 和 `docs/AI-HANDOFF.md`，确认唯一下一步、当前风险与稳定批次没有遗漏阻塞问题。
 2. 在同一个发布提交中同步修改 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 的版本号。
 3. 更新 CHANGELOG、README/路线图和交接文档中的稳定基线。
 4. 运行前端、Rust、浏览器桌面 E2E、发布检查和 Release 测试。
