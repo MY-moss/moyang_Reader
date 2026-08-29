@@ -67,6 +67,8 @@
 
 ## AI 交接检查
 
-- [ ] `docs/AI-HANDOFF.md` 已更新为短交接
+- [ ] `docs/NEXT.md` 已整体更新，且只包含一个 READY/Blocked 下一步
+- [ ] 本切片结果已追加到当前版本的 `docs/handoff/vX.Y.md`
+- [ ] `docs/AI-HANDOFF.md` 的稳定摘要和外部风险已按需更新
 - [ ] 交接包含分支、SHA、完成内容、验证、限制、回滚和唯一下一步
 - [ ] 本切片完成后将停止，不自动开启下一批

@@ -1,3 +1,22 @@
+# Moyang Reader 版本路线
+
+## v0.11.0 双轨稳定批次（2026-08-30）
+
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@0c83f80e552db67e9a6e68e758f9fccf588c854c`，PR #339 已完成复杂 DOCX 块增量序列化。
+- 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
+- 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
+
+| 顺序 | Issue    | 切片                             | 完成标准/依赖                                                       |
+| ---- | -------- | -------------------------------- | ------------------------------------------------------------------- |
+| 1    | #87      | 批量 DOCX 最终 Windows 三轮矩阵  | 交互门槛、内存趋势、DOCX 可读和取消/失败清理全部通过后关闭          |
+| 2    | #234     | 统一右上角通知栈                 | 最多三条、队列不丢失、错误常驻、更新操作保留且正文零位移            |
+| 3    | #189     | 类型感知 TypeScript/ESLint 门禁  | 首批低噪声异步规则阻断，真实 fallout 清理且完整 Quality checks 通过 |
+| 4    | #301     | 文件拖放状态和失败反馈           | 浏览器与 Tauri hover/cancel/drop 状态闭环，混合类型有明确通知       |
+| 5    | #241/#51 | 更新、镜像和 Authenticode 条件项 | 有外部条件则实机验收；无凭据/证书则记录限制并移出 milestone         |
+| 6    | #299     | 右键菜单键盘导航与焦点归还       | 五类入口统一 Tab/方向键循环、关闭归还和失效触发器回退               |
+
+外部发布条件不得被伪造：Cloudflare Secrets、旧版本安装环境或 Authenticode 证书缺失时，#241/#51 保持开放并记录准确阻塞，但不阻塞 #299 或其他已完成切片。下一位 AI 只执行 [`NEXT.md`](NEXT.md) 中的唯一 READY 事项。
+
 ## Issue 治理索引（2026-08-29）
 
 当前 Issue 的统一分类、标题/正文格式、25 个可执行事项和 9 个归档事项见 [docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)。
@@ -17,7 +36,7 @@
 - 发布：安全/CI 供应链切片不单独发布 Windows 安装包；待后续稳定功能批次统一生成安装包、签名、manifest 和镜像。
 - 合并：[PR #337](https://github.com/MY-moss/moyang_Reader/pull/337) 已 squash 合并为 `main@828a7409736e7e811858aedda92372e664d7dd0c`；Windows Quality checks、Frontend audit 和 Rust audit 均通过，#226 已标记 completed。
 
-# Moyang Reader 版本路线
+## v0.10 历史路线详情
 
 ## #187 Windows 窄窗口与工具栏可发现性（本轮已完成）
 
@@ -292,6 +311,6 @@
 - 功能分支和交接文档及时推送，方便审查和接手。
 - 多个完整切片可以合并为稳定批次，但每个用户功能 minor 版本至少生成一次 Release、安装包、签名和镜像；重要 Bug 或更新/安全修复可以单独生成 patch Release。
 - 每个稳定批次都验证 GitHub Release、Cloudflare 镜像、manifest、SHA-256、签名和旧版本自动更新。
-- 版本分类、目标版本和是否发布必须在 PR 模板与 `docs/AI-HANDOFF.md` 中明确；纯文档、测试和内部工具改动可以不发布。
+- 版本分类、目标版本和是否发布必须在 PR 模板、`docs/NEXT.md` 与 `docs/AI-HANDOFF.md` 中明确；纯文档、测试和内部工具改动可以不发布。
 
 版本号选择和发布交付物的唯一规则见 [`docs/RELEASE-POLICY.md`](RELEASE-POLICY.md)。
