@@ -9,6 +9,7 @@
 - 已知边界：本轮不改变 Tauri 三栏职责、面板宽度持久化或图标体系；真实 Windows DPI/系统字体若有新问题另开复现 Issue。
 - 当前状态：PR #328 已合并，main 为 `4e7e9e4430e52602e85a01bfc71ae184eb92b483`；#187 已自动关闭，状态原因为 `completed`。
 - 下一步：本切片到此停止；下一位 AI 必须重新检查 Issues 和最新 `main`，再从 Ready backlog 选择唯一事项。
+
 ## #323 草稿恢复差异预览与多段差异清晰度（2026-08-29）
 
 - 基线：从已验证的 `origin/main@b83b92e` 创建 `codex/draft-recovery-clarity-2026-08-29`；原始开发目录的未提交修改未触碰，临时工作树位于项目内 `.codex-worktrees/draft-recovery-clarity-2026-08-29`。
