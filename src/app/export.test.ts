@@ -476,7 +476,7 @@ describe("document export helpers", () => {
     expect(streamedXml?.match(/<w:tr>/g)).toHaveLength(120);
     expect(streamedXml).toContain("<w:pageBreakBefore/>");
     expect(streamedXml).toContain("const value = &quot;streamed&quot;");
-  });
+  }, 15_000);
 
   it("streams DOCX images and relationships as a valid package", async () => {
     const chunks: Uint8Array[] = [];

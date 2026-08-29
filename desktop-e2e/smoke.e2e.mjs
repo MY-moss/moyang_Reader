@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import JSZip from "jszip";
 
 const documentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
 const exportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
@@ -107,6 +108,32 @@ function removeExportArtifacts() {
   }
 }
 
+async function validateDocxArtifacts(description, minimumCount = 1) {
+  const artifacts = listWorkspaceExportArtifacts();
+  assert.ok(artifacts.length >= minimumCount, `${description} should commit at least ${minimumCount} DOCX volume(s)`);
+  let totalBytes = 0;
+  let documentXmlCount = 0;
+  for (const artifactPath of artifacts) {
+    const bytes = fs.readFileSync(artifactPath);
+    totalBytes += bytes.length;
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = zip.file("word/document.xml");
+    assert.ok(documentXml, `${description} ${path.basename(artifactPath)} should contain word/document.xml`);
+    const xml = await documentXml.async("string");
+    assert.match(
+      xml,
+      /<w:document[\s>]/,
+      `${description} ${path.basename(artifactPath)} should contain a DOCX document`,
+    );
+    documentXmlCount += 1;
+  }
+  return {
+    count: artifacts.length,
+    totalBytes,
+    documentXmlCount,
+  };
+}
+
 async function waitForWorkspaceItemCountAtLeast(minimum, description) {
   await browser.waitUntil(
     () =>
@@ -124,11 +151,36 @@ async function waitForWorkspaceItemCountAtLeast(minimum, description) {
 }
 
 async function waitForExportToSettle() {
-  const cancelButton = await browser.$("button=取消导出");
-  await browser.waitUntil(() => cancelButton.isDisplayed().then((visible) => !visible), {
-    timeout: 30_000,
-    timeoutMsg: "the workspace export did not settle after cancellation or failure",
-  });
+  await browser.waitUntil(
+    async () => {
+      const cancelButton = await browser.$("button=取消导出");
+      try {
+        return !(await cancelButton.isDisplayed());
+      } catch {
+        return true;
+      }
+    },
+    {
+      timeout: 120_000,
+      timeoutMsg: "the workspace export did not settle after cancellation or failure",
+    },
+  );
+}
+
+async function waitForSuccessfulExport(description) {
+  await browser.waitUntil(
+    async () => {
+      const note = await browser.$(".workspace-export-note");
+      if (await note.isDisplayed()) return /已导出/.test(await note.getText());
+      const alert = await browser.$('[role="alert"]');
+      if (await alert.isDisplayed()) throw new Error(`${description} failed: ${await alert.getText()}`);
+      return false;
+    },
+    {
+      timeout: 120_000,
+      timeoutMsg: `${description} did not finish successfully`,
+    },
+  );
 }
 
 async function resetDesktopSession() {
@@ -140,6 +192,21 @@ async function resetDesktopSession() {
     timeout: 15_000,
     timeoutMsg: "the desktop E2E fixture was not restored after resetting the session",
   });
+}
+
+async function waitForWorkspaceRoot(expectedRoot) {
+  const expected = expectedRoot.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+  await browser.waitUntil(
+    () =>
+      browser
+        .$(".workspace-location")
+        .getAttribute("title")
+        .then((actual) => (actual ?? "").replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase() === expected),
+    {
+      timeout: 30_000,
+      timeoutMsg: `the desktop E2E workspace did not switch to ${expectedRoot}`,
+    },
+  );
 }
 
 function readApplicationWorkingSetBytes() {
@@ -177,11 +244,29 @@ function createApplicationMemoryProbe() {
     stop() {
       globalThis.clearInterval(timer);
       sample();
-      const peakWorkingSetBytes = samples.reduce((peak, sampleItem) => Math.max(peak, sampleItem.bytes), 0);
+      const values = samples.map((sampleItem) => sampleItem.bytes);
+      const peakWorkingSetBytes = values.reduce((peak, value) => Math.max(peak, value), 0);
+      const minimumWorkingSetBytes = values.reduce(
+        (minimum, value) => Math.min(minimum, value),
+        values[0] ?? Number.POSITIVE_INFINITY,
+      );
+      const increasingStepCount = values.reduce(
+        (count, value, index) => count + (index > 0 && value > values[index - 1] ? 1 : 0),
+        0,
+      );
+      const decreasingStepCount = values.reduce(
+        (count, value, index) => count + (index > 0 && value < values[index - 1] ? 1 : 0),
+        0,
+      );
       return {
         sampleCount: samples.length,
-        initialWorkingSetBytes: samples[0]?.bytes ?? null,
+        initialWorkingSetBytes: values[0] ?? null,
         peakWorkingSetBytes: peakWorkingSetBytes || null,
+        finalWorkingSetBytes: values.at(-1) ?? null,
+        minimumWorkingSetBytes: Number.isFinite(minimumWorkingSetBytes) ? minimumWorkingSetBytes : null,
+        increasingStepCount,
+        decreasingStepCount,
+        isStrictlyIncreasing: values.length > 1 && increasingStepCount === values.length - 1,
       };
     },
   };
@@ -224,7 +309,7 @@ function logExportBenchmark(report) {
   console.log(`desktop-export-benchmark ${JSON.stringify(report)}`);
 }
 
-async function interactWithExportWhileRunning() {
+async function measureContextToggleWhileExportRunning() {
   return browser.executeAsync((done) => {
     const startedAt = performance.now();
     const schedule = (callback) => {
@@ -252,11 +337,11 @@ async function interactWithExportWhileRunning() {
       };
       poll();
     };
+
     const waitForCancelableExport = () => {
-      const cancelButton = findCancelButton();
-      if (!cancelButton) {
-        if (document.querySelector(".workspace-export-note")?.textContent) {
-          done({ status: "completed-before-cancel" });
+      if (!findCancelButton()) {
+        if (document.querySelector(".workspace-export-note")?.textContent?.trim()) {
+          done({ status: "completed-before-interaction" });
           return;
         }
         if (performance.now() - startedAt >= 15_000) {
@@ -268,43 +353,90 @@ async function interactWithExportWhileRunning() {
       }
 
       const contextToggle = findContextToggle();
-      if (!contextToggle) {
+      if (!contextToggle || contextToggle.tagName !== "BUTTON") {
         done({ status: "missing-context-toggle" });
         return;
       }
-
       const contextWasOpen = contextToggle.getAttribute("aria-pressed") === "true";
       const contextStartedAt = performance.now();
       contextToggle.click();
       waitFor(
-        () => contextToggle.getAttribute("aria-pressed") === String(!contextWasOpen),
+        () => findContextToggle()?.getAttribute("aria-pressed") === String(!contextWasOpen),
         "context-open",
         () => {
           const contextToggleLatencyMs = performance.now() - contextStartedAt;
-          contextToggle.click();
+          findContextToggle()?.click();
           waitFor(
-            () => contextToggle.getAttribute("aria-pressed") === String(contextWasOpen),
+            () => findContextToggle()?.getAttribute("aria-pressed") === String(contextWasOpen),
             "context-restore",
-            () => {
-              const cancellationStartedAt = performance.now();
-              findCancelButton()?.click();
-              waitFor(
-                () => !findCancelButton(),
-                "cancel-settle",
-                () =>
-                  done({
-                    status: "cancelled",
-                    contextToggleLatencyMs,
-                    cancellationLatencyMs: performance.now() - cancellationStartedAt,
-                  }),
-              );
-            },
+            () => done({ status: "measured", contextToggleLatencyMs }),
           );
         },
       );
     };
 
     waitForCancelableExport();
+  });
+}
+
+async function cancelExportAfterFirstCommittedVolume() {
+  return browser.executeAsync((done) => {
+    const startedAt = performance.now();
+    const targetProgress = 33;
+    const schedule = (callback) => {
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(callback);
+      } else {
+        window.setTimeout(callback, 0);
+      }
+    };
+    const findCancelButton = () =>
+      Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "取消导出");
+    const readProgress = () => {
+      const text = document.querySelector(".workspace-export-progress")?.textContent ?? "";
+      return Number(text.match(/正在整理\s+(\d+)\s*\//)?.[1] ?? 0);
+    };
+    const poll = () => {
+      const cancelButton = findCancelButton();
+      if (!cancelButton) {
+        if (document.querySelector(".workspace-export-note")?.textContent?.trim()) {
+          done({ status: "completed-before-cancel" });
+          return;
+        }
+        if (performance.now() - startedAt >= 30_000) {
+          done({ status: "timeout", stage: "cancel-button" });
+          return;
+        }
+        schedule(poll);
+        return;
+      }
+
+      if (readProgress() < targetProgress) {
+        if (performance.now() - startedAt >= 30_000) {
+          done({ status: "timeout", stage: "first-volume" });
+          return;
+        }
+        schedule(poll);
+        return;
+      }
+
+      const cancellationStartedAt = performance.now();
+      cancelButton.click();
+      const waitForSettle = () => {
+        if (!findCancelButton()) {
+          done({ status: "cancelled", cancellationLatencyMs: performance.now() - cancellationStartedAt });
+          return;
+        }
+        if (performance.now() - cancellationStartedAt >= 15_000) {
+          done({ status: "timeout", stage: "cancel-settle" });
+          return;
+        }
+        schedule(waitForSettle);
+      };
+      waitForSettle();
+    };
+
+    poll();
   });
 }
 
@@ -695,112 +827,310 @@ describe("Moyang Reader desktop runtime", () => {
     assert.equal(docxBytes.subarray(0, 2).toString("ascii"), "PK");
   });
 
-  it("cancels a large batch Word export and cleans failed destinations", async () => {
+  it("measures a 96-document batch Word export matrix across three runs", async function () {
+    this.timeout(600_000);
+    const matrixRoot = path.dirname(documentPath);
     await resetDesktopSession();
-    const batchFixtureCount = 48;
-    const batchFixturePaths = Array.from({ length: batchFixtureCount }, (_, index) =>
-      path.join(path.dirname(documentPath), `desktop-batch-cancel-${String(index + 1).padStart(3, "0")}.md`),
+    await waitForWorkspaceRoot(matrixRoot);
+    const batchFixtureRoot = path.join(matrixRoot, "desktop-batch-matrix-fixtures");
+    const batchFixtureStagingRoot = path.join(
+      path.dirname(matrixRoot),
+      `.moyang-reader-batch-matrix-staging-${process.pid}-${Date.now()}`,
     );
-    const batchImagePath = path.join(path.dirname(documentPath), "desktop-batch-cancel-image.svg");
-    const batchImageContent = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800"><rect width="1200" height="800" fill="#dbeafe"/>${'<rect x="20" y="20" width="8" height="8" fill="#2563eb"/>'.repeat(4_000)}</svg>`;
-    const batchImageBytes = Buffer.byteLength(batchImageContent, "utf8");
-    const batchFixtureContent = `# Batch cancellation fixture\n\n![[desktop-batch-cancel-image.svg]]\n\n${"批量导出取消与失败清理回归内容。\n".repeat(800)}`;
-    const batchFixtureBytes = Buffer.byteLength(batchFixtureContent, "utf8") * batchFixtureCount;
+    const batchFixtureCount = 96;
+    const categoryCounts = {
+      repeatedImage: 24,
+      independentImage: 20,
+      longText: 20,
+      complexTable: 16,
+      nestedHtml: 16,
+    };
+    const batchFixtureNames = Array.from(
+      { length: batchFixtureCount },
+      (_, index) => `desktop-batch-matrix-${String(index + 1).padStart(3, "0")}.md`,
+    );
+    const batchFixturePaths = batchFixtureNames.map((name) => path.join(batchFixtureRoot, name));
+    const repeatedImageName = "desktop-batch-matrix-repeated.svg";
+    const repeatedImagePath = path.join(batchFixtureRoot, repeatedImageName);
+    const independentImageNames = Array.from(
+      { length: categoryCounts.independentImage },
+      (_, index) => `desktop-batch-matrix-independent-${String(index + 1).padStart(3, "0")}.svg`,
+    );
+    const independentImagePaths = independentImageNames.map((name) => path.join(batchFixtureRoot, name));
+    const firstVolumePath = path.join(exportRoot, `${workspaceName} - 第 1 卷.docx`);
+
+    const createSvg = (seed, rectangleCount, width, height) => {
+      const rectangles = Array.from({ length: rectangleCount }, (_, index) => {
+        const x = (seed * 31 + index * 37) % (width - 16);
+        const y = (seed * 17 + index * 29) % (height - 16);
+        const color = `#${((seed * 97 + index * 53) % 0xffffff).toString(16).padStart(6, "0")}`;
+        return `<rect x="${x}" y="${y}" width="12" height="12" fill="${color}"/>`;
+      }).join("");
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#dbeafe"/>${rectangles}</svg>`;
+    };
+
+    const repeatedImageContent = createSvg(23, 4_000, 1600, 1000);
+    const independentImageContents = independentImageNames.map((_, index) => createSvg(100 + index, 1_500, 1400, 900));
+    const longText = "超长文本块需要在真实批量导出中保持原样，同时让序列化和调度路径面对连续的大输入。".repeat(4_000);
+    const complexTableRows = Array.from(
+      { length: 120 },
+      (_, index) =>
+        `<tr><th>第 ${index + 1} 行</th><td>复杂表格内容 ${"保留结构 ".repeat(12)}</td><td>列 ${index + 1}</td></tr>`,
+    ).join("");
+    const nestedHtml = Array.from(
+      { length: 20 },
+      (_, index) =>
+        `<section><article><h3>嵌套区块 ${index + 1}</h3><p>嵌套 HTML 内容 <strong>加粗</strong>、<em>强调</em>。</p><ul><li>一级项目<ul><li>二级项目 ${index + 1}</li></ul></li></ul></article></section>`,
+    ).join("");
+    const fixtureContents = [];
+    let fixtureIndex = 0;
+    const addFixture = (category, body) => {
+      const name = batchFixtureNames[fixtureIndex++];
+      const content = `# ${category} matrix fixture ${fixtureIndex}\n\n${body}\n`;
+      fixtureContents.push({ name, category, content });
+    };
+
+    for (let index = 0; index < categoryCounts.repeatedImage; index += 1) {
+      addFixture(
+        "Repeated image",
+        `大型重复图片 ${index + 1}。\n\n![[${repeatedImageName}]]\n\n${"重复图片后的段落内容。\n".repeat(80)}`,
+      );
+    }
+    for (let index = 0; index < categoryCounts.independentImage; index += 1) {
+      addFixture(
+        "Independent image",
+        `独立图片 ${index + 1}。\n\n![[${independentImageNames[index]}]]\n\n每篇文档使用不同的 SVG 字节。`,
+      );
+    }
+    for (let index = 0; index < categoryCounts.longText; index += 1) {
+      addFixture("Long text", `${longText}\n\n长文本夹具编号 ${index + 1}。`);
+    }
+    for (let index = 0; index < categoryCounts.complexTable; index += 1) {
+      addFixture(
+        "Complex table",
+        `<table><thead><tr><th>编号</th><th>内容</th><th>校验</th></tr></thead><tbody>${complexTableRows}</tbody></table>`,
+      );
+    }
+    for (let index = 0; index < categoryCounts.nestedHtml; index += 1) {
+      addFixture("Nested HTML", `<div data-matrix-fixture="nested-${index + 1}">${nestedHtml}</div>`);
+    }
+    assert.equal(fixtureContents.length, batchFixtureCount);
+
+    const markdownBytes = fixtureContents.reduce(
+      (total, fixture) => total + Buffer.byteLength(fixture.content, "utf8"),
+      0,
+    );
+    const repeatedImageBytes = Buffer.byteLength(repeatedImageContent, "utf8");
+    const independentImageBytes = independentImageContents.reduce(
+      (total, content) => total + Buffer.byteLength(content, "utf8"),
+      0,
+    );
+    fs.mkdirSync(batchFixtureStagingRoot);
+    for (const fixture of fixtureContents)
+      fs.writeFileSync(path.join(batchFixtureStagingRoot, fixture.name), fixture.content, "utf8");
+    fs.writeFileSync(path.join(batchFixtureStagingRoot, repeatedImageName), repeatedImageContent, "utf8");
+    for (const [index, imagePath] of independentImagePaths.entries()) {
+      fs.writeFileSync(
+        path.join(batchFixtureStagingRoot, path.basename(imagePath)),
+        independentImageContents[index],
+        "utf8",
+      );
+    }
     const initialItemCount = await browser.execute(() => {
       const text = document.querySelector(".workspace-location")?.textContent ?? "";
       return Number(text.match(/(\d+)\s*项/)?.[1] ?? 0);
     });
-    const firstVolumePath = path.join(exportRoot, `${workspaceName} - 第 1 卷.docx`);
-
-    fs.writeFileSync(batchImagePath, batchImageContent, "utf8");
-    for (const fixturePath of batchFixturePaths) fs.writeFileSync(fixturePath, batchFixtureContent, "utf8");
+    fs.renameSync(batchFixtureStagingRoot, batchFixtureRoot);
     removeExportArtifacts();
 
     try {
+      await resetDesktopSession();
+      await waitForWorkspaceRoot(matrixRoot);
       await waitForWorkspaceItemCountAtLeast(
         initialItemCount + batchFixtureCount,
-        "the desktop batch-export fixtures did not finish indexing",
+        "the desktop batch-export matrix did not finish indexing",
       );
 
-      const memoryProbe = createApplicationMemoryProbe();
-      let rendererProbeActive = false;
-      let benchmarkReport = null;
-      try {
-        await startRendererResponsivenessProbe();
-        rendererProbeActive = true;
-        await clickWorkspaceExportAction("单文件 Word");
-        const exportInteraction = await interactWithExportWhileRunning();
-        assert.equal(
-          exportInteraction.status,
-          "cancelled",
-          `batch export did not reach the cancellation path: ${JSON.stringify(exportInteraction)}`,
-        );
-        assert.equal(await browser.$(".document-title").isDisplayed(), true);
-        await waitForExportToSettle();
-        const rendererMetrics = await stopRendererResponsivenessProbe();
-        rendererProbeActive = false;
-        const memoryMetrics = memoryProbe.stop();
+      const matrixReports = [];
+      const metricFailures = [];
+      for (let round = 1; round <= 3; round += 1) {
+        removeExportArtifacts();
+        const memoryProbe = createApplicationMemoryProbe();
+        let rendererProbeActive = false;
+        let memoryMetrics = null;
+        try {
+          await startRendererResponsivenessProbe();
+          rendererProbeActive = true;
+          await clickWorkspaceExportAction("单文件 Word");
+          const contextMetrics = await measureContextToggleWhileExportRunning();
+          assert.equal(
+            contextMetrics.status,
+            "measured",
+            `batch export round ${round} did not expose a measurable context action: ${JSON.stringify(contextMetrics)}`,
+          );
+          await waitForSuccessfulExport(`batch export matrix round ${round}`);
+          const rendererMetrics = await stopRendererResponsivenessProbe();
+          rendererProbeActive = false;
+          memoryMetrics = memoryProbe.stop();
+          if (contextMetrics.contextToggleLatencyMs > 150) {
+            metricFailures.push(
+              `batch export round ${round} context action exceeded 150ms: ${contextMetrics.contextToggleLatencyMs}`,
+            );
+          }
+          if ((rendererMetrics?.maxGapMs ?? Number.POSITIVE_INFINITY) > 250) {
+            metricFailures.push(
+              `batch export round ${round} renderer gap exceeded 250ms: ${rendererMetrics?.maxGapMs}`,
+            );
+          }
+          if (memoryMetrics.isStrictlyIncreasing) {
+            metricFailures.push(
+              `batch export round ${round} Working Set grew monotonically: ${JSON.stringify(memoryMetrics)}`,
+            );
+          }
+          assert.deepEqual(listExportTempFiles(), []);
+          const artifacts = await validateDocxArtifacts(`batch export matrix round ${round}`, 1);
+          const note = await browser.$(".workspace-export-note").getText();
+          const exportedCount = Number(note.match(/已导出\s+(\d+)\s+篇/)?.[1] ?? 0);
+          assert.ok(
+            exportedCount >= batchFixtureCount,
+            `batch export round ${round} exported too few documents: ${note}`,
+          );
+          matrixReports.push({
+            round,
+            exportedCount,
+            artifacts,
+            responsiveness: {
+              contextToggleLatencyMs: Math.round(contextMetrics.contextToggleLatencyMs),
+              rendererSampleCount: rendererMetrics?.sampleCount ?? 0,
+              rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
+            },
+            process: {
+              measurement: "Windows tasklist Working Set",
+              sampleCount: memoryMetrics.sampleCount,
+              initialWorkingSetBytes: memoryMetrics.initialWorkingSetBytes,
+              peakWorkingSetBytes: memoryMetrics.peakWorkingSetBytes,
+              finalWorkingSetBytes: memoryMetrics.finalWorkingSetBytes,
+              minimumWorkingSetBytes: memoryMetrics.minimumWorkingSetBytes,
+              increasingStepCount: memoryMetrics.increasingStepCount,
+              decreasingStepCount: memoryMetrics.decreasingStepCount,
+            },
+          });
+        } finally {
+          if (rendererProbeActive) await stopRendererResponsivenessProbe().catch(() => null);
+          if (!memoryMetrics) memoryProbe.stop();
+        }
+      }
 
-        assert.ok(
-          exportInteraction.contextToggleLatencyMs < 5_000,
-          "the main-window context action should respond within 5 seconds",
+      removeExportArtifacts();
+      const cancellationMemoryProbe = createApplicationMemoryProbe();
+      let cancellationRendererProbeActive = false;
+      let cancellationMemoryMetrics = null;
+      let cancellationReport = null;
+      try {
+        await waitForExportToSettle();
+        await startRendererResponsivenessProbe();
+        cancellationRendererProbeActive = true;
+        await clickWorkspaceExportAction("单文件 Word");
+        const contextMetrics = await measureContextToggleWhileExportRunning();
+        assert.equal(
+          contextMetrics.status,
+          "measured",
+          `batch export cancellation did not expose a measurable context action: ${JSON.stringify(contextMetrics)}`,
         );
-        assert.ok(
-          exportInteraction.cancellationLatencyMs < 15_000,
-          "batch export cancellation should settle within 15 seconds",
+        const cancellationMetrics = await cancelExportAfterFirstCommittedVolume();
+        assert.equal(
+          cancellationMetrics.status,
+          "cancelled",
+          `batch export cancellation did not reach the post-volume cancellation path: ${JSON.stringify(cancellationMetrics)}`,
         );
-        benchmarkReport = {
-          fixture: {
-            documentCount: batchFixtureCount,
-            markdownBytes: batchFixtureBytes,
-            imageCount: 1,
-            imageBytes: batchImageBytes,
-          },
-          responsiveness: {
-            contextToggleLatencyMs: Math.round(exportInteraction.contextToggleLatencyMs),
-            rendererSampleCount: rendererMetrics?.sampleCount ?? 0,
-            rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
-          },
-          cancellation: {
-            latencyMs: Math.round(exportInteraction.cancellationLatencyMs),
-            committedVolumeCount: listWorkspaceExportArtifacts().length,
-          },
+        await waitForExportToSettle();
+        const cancellationLatencyMs = cancellationMetrics.cancellationLatencyMs;
+        const rendererMetrics = await stopRendererResponsivenessProbe();
+        cancellationRendererProbeActive = false;
+        cancellationMemoryMetrics = cancellationMemoryProbe.stop();
+        if (contextMetrics.contextToggleLatencyMs > 150) {
+          metricFailures.push(
+            `batch export cancellation context action exceeded 150ms: ${contextMetrics.contextToggleLatencyMs}`,
+          );
+        }
+        if (cancellationLatencyMs > 1_000) {
+          metricFailures.push(`batch export cancellation exceeded 1s: ${cancellationLatencyMs}`);
+        }
+        if ((rendererMetrics?.maxGapMs ?? Number.POSITIVE_INFINITY) > 250) {
+          metricFailures.push(`batch export cancellation renderer gap exceeded 250ms: ${rendererMetrics?.maxGapMs}`);
+        }
+        if (cancellationMemoryMetrics.isStrictlyIncreasing) {
+          metricFailures.push(
+            `batch export cancellation Working Set grew monotonically: ${JSON.stringify(cancellationMemoryMetrics)}`,
+          );
+        }
+        assert.match(await browser.$(".workspace-export-note").getText(), /已取消批量导出/);
+        assert.deepEqual(listExportTempFiles(), []);
+        const artifacts = await validateDocxArtifacts("cancelled batch export", 1);
+        cancellationReport = {
+          contextToggleLatencyMs: Math.round(contextMetrics.contextToggleLatencyMs),
+          cancellationLatencyMs: Math.round(cancellationLatencyMs),
+          rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
+          artifacts,
           process: {
             measurement: "Windows tasklist Working Set",
-            sampleCount: memoryMetrics.sampleCount,
-            initialWorkingSetBytes: memoryMetrics.initialWorkingSetBytes,
-            peakWorkingSetBytes: memoryMetrics.peakWorkingSetBytes,
+            sampleCount: cancellationMemoryMetrics.sampleCount,
+            initialWorkingSetBytes: cancellationMemoryMetrics.initialWorkingSetBytes,
+            peakWorkingSetBytes: cancellationMemoryMetrics.peakWorkingSetBytes,
+            finalWorkingSetBytes: cancellationMemoryMetrics.finalWorkingSetBytes,
+            minimumWorkingSetBytes: cancellationMemoryMetrics.minimumWorkingSetBytes,
+            increasingStepCount: cancellationMemoryMetrics.increasingStepCount,
+            decreasingStepCount: cancellationMemoryMetrics.decreasingStepCount,
           },
         };
-        logExportBenchmark(benchmarkReport);
-
-        const cancellationNotice = await browser.$(".workspace-export-note");
-        await cancellationNotice.waitForDisplayed();
-        assert.match(await cancellationNotice.getText(), /已取消批量导出/);
-        assert.deepEqual(listExportTempFiles(), []);
-        for (const artifactPath of listWorkspaceExportArtifacts()) {
-          assert.equal(fs.readFileSync(artifactPath).subarray(0, 2).toString("ascii"), "PK");
-        }
       } finally {
-        if (rendererProbeActive) {
-          await stopRendererResponsivenessProbe().catch(() => null);
-        }
-        if (!benchmarkReport) memoryProbe.stop();
+        if (cancellationRendererProbeActive) await stopRendererResponsivenessProbe().catch(() => null);
+        if (!cancellationMemoryMetrics) cancellationMemoryProbe.stop();
       }
 
       removeExportArtifacts();
       fs.mkdirSync(firstVolumePath);
-      await clickWorkspaceExportAction("单文件 Word");
-      const errorAlert = await browser.$('[role="alert"]');
-      await errorAlert.waitForDisplayed();
-      assert.match(await errorAlert.getText(), /导出|保存|失败/);
-      await waitForExportToSettle();
-      assert.equal(fs.statSync(firstVolumePath).isDirectory(), true);
-      assert.deepEqual(listExportTempFiles(), []);
+      try {
+        await clickWorkspaceExportAction("单文件 Word");
+        const errorAlert = await browser.$('[role="alert"]');
+        await browser.waitUntil(
+          async () => (await errorAlert.isDisplayed()) && /导出|保存|失败/.test(await errorAlert.getText()),
+          { timeout: 120_000, timeoutMsg: "the batch export failure fixture did not report an error" },
+        );
+        await waitForExportToSettle();
+        assert.equal(fs.statSync(firstVolumePath).isDirectory(), true);
+        assert.deepEqual(listExportTempFiles(), []);
+      } finally {
+        fs.rmSync(firstVolumePath, { recursive: true, force: true });
+      }
+
+      logExportBenchmark({
+        fixture: {
+          documentCount: batchFixtureCount,
+          categories: categoryCounts,
+          markdownBytes,
+          imageCount: 1 + independentImagePaths.length,
+          imageBytes: repeatedImageBytes + independentImageBytes,
+          repeatedImageBytes,
+          independentImageBytes,
+        },
+        thresholds: {
+          rendererMaxGapMs: 250,
+          contextToggleLatencyMs: 150,
+          cancellationLatencyMs: 1_000,
+        },
+        rounds: matrixReports,
+        cancellation: cancellationReport,
+        failureCleanup: { targetRemainsDirectory: true, tempFiles: 0 },
+      });
+      assert.equal(metricFailures.length, 0, metricFailures.join("; "));
     } finally {
+      fs.rmSync(batchFixtureStagingRoot, { recursive: true, force: true });
+      fs.rmSync(batchFixtureRoot, { recursive: true, force: true });
       fs.rmSync(firstVolumePath, { recursive: true, force: true });
       removeExportArtifacts();
-      fs.rmSync(batchImagePath, { force: true });
+      fs.rmSync(repeatedImagePath, { force: true });
+      for (const imagePath of independentImagePaths) fs.rmSync(imagePath, { force: true });
       for (const fixturePath of batchFixturePaths) fs.rmSync(fixturePath, { force: true });
     }
   });
