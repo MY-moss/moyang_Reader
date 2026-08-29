@@ -1,3 +1,15 @@
+## #87 当前切片：批量 DOCX 归档 Worker 与预算边界（2026-08-29）
+
+- 基线：从已验证的远程 `main@b83b92e0ffcdc9df85dcf343c88a61ceb8fc1c4d` 创建 `codex/export-memory-2026-08-29`；原始开发目录的未提交修改未触碰，隔离工作树位于项目内 `.codex-worktrees/export-memory-2026-08-29`。
+- 目标：把大批量 DOCX 的 XML/JSZip 准备从前端主线程移出，并在加入下一篇文档前执行预算判断，同时保持现有格式、分卷、取消、失败清理和原子写入语义。
+- 已实现：8 篇文档或单篇估算正文达到 2 MiB 时按需加载 module Worker；Worker 通过逐块确认把归档块交给现有 Tauri 分块写入；Worker 在写出首块前失败会回退现有主线程流；批次正文去除一次中间数组合并；DOM 节点判断改为不依赖 `HTMLElement` 构造器，使 Worker 可解析。
+- 取消/失败：主线程取消会终止 Worker；写出首块后失败继续交给现有隐藏临时文件、提交/清理边界；Worker 未写出任何字节前的兼容性错误不会污染目标文件。
+- 基线证据：原路径在 `prepareBatchDocxArchive` 中先完成全部文档 XML、图片登记和 JSZip 结构准备，再开始 `generateInternalStream`；8 篇中等文本样本的现有前端定向基准约 0.2 秒。当前没有把该数字当作跨机器 SLA，后续实机应继续记录峰值内存和取消延迟。
+- 已验证：Worker 客户端/导出定向测试 2 个文件、32 项通过；`npm run lint`、`npm run format:check`、`npm run build` 通过；复用该构建的 Windows 桌面 smoke 11/11 通过，包含真实 PDF/HTML/Word 导出；测试服务仍有既有 tauri-driver/清理诊断警告。构建新增按需 `docx-export.worker` 资源，主页面启动路径不加载它。
+- 发布边界：本切片不创建 Release、不生成稳定 Windows x64 安装包、不上传签名、manifest 或 Cloudflare 镜像；待稳定批次统一发布。
+- 未完成：#87 的真实 Windows 大批次峰值内存/取消延迟仍需桌面实机数据；本切片不写 `Closes #87`。若 Worker 在目标 WebView 不可用，现有主线程路径仍是回退路径。
+- 下一位 AI：先检查最新 Issues、开放 PR 和 `main`，确认本切片已合并后，再从 Ready backlog 选择唯一事项；不要重复 #87 已完成的 Worker/预算切片，也不要在本分支继续扩展 UI、PDF 或更新器。
+
 ## #323 草稿恢复差异预览（2026-08-29）
 
 - 基线：从已验证的远程 `main` 等价代码树创建 `codex/draft-recovery-2026-08-29`；原始开发目录的未提交修改未触碰，临时工作树位于项目内 `.codex-worktrees/draft-recovery-2026-08-29`。
@@ -7,7 +19,7 @@
 - 已验证：草稿差异、草稿过滤、恢复提示和差异对话框定向测试 4 个文件/13 项通过；lint、格式检查、TypeScript、前端构建通过；恢复中心浏览器 E2E 通过。构建仅保留仓库已有的 chunk 体积提示。
 - 发布边界：这是恢复体验修复切片，不单独创建 Release、不生成稳定 Windows x64 安装包、不上传签名、manifest 或镜像资产；合并后纳入下一个稳定补丁批次。
 - 已知边界：当前使用轻量 changed-window 预览，不引入大型 diff 依赖；复杂多段变更仍以有限窗口展示，不提供完整二进制比较；恢复前仍由用户决定是否保存。
-- 下一步：完成本分支唯一 PR 的质量门禁并合并，复核 #323 状态后停止；下一位 AI 必须重新检查 Issues 和最新 `main`，再从 Ready backlog 选择唯一事项。
+- 状态：PR #324 已合并到 `main@120390d3`，#323 已关闭为 `completed`；后续如需三方合并应另开独立 Issue，不在本切片扩展。
 
 ## #321 原生编辑工具栏与插入面板（2026-08-29）
 
@@ -42,16 +54,16 @@
 
 ## Issue 治理已完成（2026-08-29）
 
-- 已复核 GitHub 全部 32 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构；本轮另创建 #321 作为编辑器 Ready 切片。
+- 已复核 GitHub 当前 21 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构；#321、#323、#164、#165 已完成并关闭。
 - 已归档 9 个有明确依据的历史汇总、重复、当前范围外或低优先级不计划项；未关闭仍有价值但尚未完成的事项。
 - Canonical index：[docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)；路线图入口：[docs/ROADMAP.md](./ROADMAP.md)。
-- 当前开放项：25 个（Must 10、Should 14、Could 1），开放 PR 需单独复核。
+- 当前开放项：21 个（Must 6、Should 14、Could 1），开放 PR 需单独复核；#87 是当前 Ready 性能切片。
 - 下一次开发必须先检查 Issues 和最新 main，只选择索引中具备完整 Ready 条件的一个垂直切片；完成后更新对应 Issue、代码/测试/文档和本交接文件，然后停止。
 - 本次治理没有修改产品代码、安装包、Release、密钥或镜像。
 
 # AI 开发与交接流程
 
-## 已完成切片：#87 批量导出流式写入与取消清理（2026-08-29）
+## #87 前一切片：批量导出流式写入与取消清理（2026-08-29）
 
 - 基线：从远程 `main@c22bbbd32104680994514549976ed17b2fc73602` 创建功能分支；原始工作区未修改。
 - 目标：降低批量 Word/HTML 导出对窗口响应和峰值内存的影响，并确保取消或失败不会留下半成品目标文件。
@@ -59,7 +71,7 @@
 - 合并结果：PR [#315](https://github.com/MY-moss/moyang_Reader/pull/315) 已 squash 合并为 `main@ef8076376615e23de785cb48eb5695cb6d8586d6`；push CI run `33223041845` 的 Quality checks 全绿，前置格式失败 run `33221769319`、`33222661564` 已定位为同步文件时产生的 Windows 换行/尾部空行并修复。
 - 本地验证：前端全量测试 60 个文件/231 个测试、Rust 测试 50/50；lint、Prettier、前端构建、Rust fmt、clippy，以及远程浏览器 smoke、Windows desktop smoke、依赖审计和发布预检均通过。
 - 安全边界：临时文件必须带固定标记、与最终文件位于同一目录，且最终路径必须已通过用户保存选择授权；不接受任意临时路径或将临时文件写入其他目录。
-- Issue 状态：#87 已完成本轮分块写入、取消清理和响应性改进，但仍保持 open。单卷内 JSZip 结构和 XML 转换仍可能驻留内存或占用前端线程；Worker/原生归档生成和进一步降低单卷驻留属于下一独立切片，不要写 `Closes #87`。
+- Issue 状态：#87 已完成本节记录的分块写入、取消清理和响应性改进，但仍保持 open；单卷内 JSZip 结构和 XML 转换的前台线程/峰值问题由本文件顶部的当前 Worker 切片继续处理，不要写 `Closes #87`。
 - 发布边界：本切片不创建 Release、不生成稳定安装包、签名、manifest 或 Cloudflare 镜像；待稳定 Windows x64 补丁批次统一发布。
 - 下一位 AI：先重新检查 Issues 和 `main@ef8076376615e23de785cb48eb5695cb6d8586d6`，再从 #87 残余性能切片、#190 或其他更高优先级 Ready 事项中选择一个；保持一个主题、一个分支、一个 PR，完成后停止并更新交接文档。
 

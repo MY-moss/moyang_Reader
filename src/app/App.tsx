@@ -138,6 +138,7 @@ import {
   buildDocxExport,
   buildHtmlExport,
   copyRichText,
+  estimateBatchExportDocumentBytes,
   formatExportFailureReport,
   formatExportCancellationNotice,
   fileNameWithExtension,
@@ -148,8 +149,8 @@ import {
   printHtmlDocument,
   summarizeExportFailures,
   shouldFlushBatchExport,
-  streamDocxExport,
 } from "./export";
+import { streamDocxExportWithWorker } from "./docx-export-worker-client";
 import {
   loadRecentFiles,
   MAX_MOUNTED_WORKSPACES,
@@ -4517,7 +4518,7 @@ export function App() {
             let committed = false;
             try {
               let hasWrittenChunk = false;
-              await streamDocxExport(
+              await streamDocxExportWithWorker(
                 volumeTitle,
                 batch,
                 exportOptions,
@@ -4586,8 +4587,16 @@ export function App() {
               fileSize,
               controller.signal,
             );
-            documents.push({ title: file.relativePath, body });
-            estimatedDocumentBytes += (body.length + file.relativePath.length) * 2;
+            const document = { title: file.relativePath, body };
+            const documentEstimate = estimateBatchExportDocumentBytes(document);
+            if (
+              documents.length > 0 &&
+              shouldFlushBatchExport(documents.length, estimatedDocumentBytes + documentEstimate)
+            ) {
+              await flushDocuments();
+            }
+            documents.push(document);
+            estimatedDocumentBytes += documentEstimate;
             exported += 1;
             if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();
           } catch (cause) {

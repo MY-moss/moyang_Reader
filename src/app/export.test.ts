@@ -10,6 +10,7 @@ import {
   BATCH_EXPORT_MAX_ESTIMATED_BYTES,
   calculateDocxImageExtent,
   copyRichText,
+  estimateBatchExportDocumentBytes,
   formatExportCancellationNotice,
   formatExportFailureReport,
   htmlToPlainText,
@@ -387,6 +388,10 @@ describe("document export helpers", () => {
     const documentXml = await zip.file("word/document.xml")?.async("string");
     expect(chunks.length).toBeGreaterThan(0);
     expect(documentXml).toContain("第二篇正文");
+  });
+
+  it("estimates batch document memory using UTF-16 source storage", () => {
+    expect(estimateBatchExportDocumentBytes({ title: "标题", body: "正文" })).toBe(8);
   });
 
   it("stops DOCX streaming when the signal is aborted", async () => {
