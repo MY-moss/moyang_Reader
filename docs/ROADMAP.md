@@ -7,6 +7,15 @@
 - not planned / duplicate 只表示当前入口归档，不代表相关专项全部完成；专项状态以对应 Issue 验收为准。
 - 后续“继续开发”只从该索引中具备目标、非目标、验收、依赖、风险和回滚条件的 Ready 项选择。
 
+## #226 Actions SHA 固定与前端定时审计（当前切片）
+
+- 目标：把 CI、Rust 审计、Windows Release 和 Cloudflare 镜像依赖从可变 tag/branch 收敛到已核验的提交 SHA，并缩短前端生产依赖漏洞发现窗口。
+- 实现边界：固定 `actions/checkout`、`actions/setup-node`、`dtolnay/rust-toolchain`、`Swatinem/rust-cache`、`rustsec/audit-check`、`tauri-apps/tauri-action` 和 `cloudflare/wrangler-action`；新增独立每周前端生产依赖审计；新增可复用的浮动 Action 引用检查和测试。
+- 安全边界：每个固定引用保留版本/来源注释；审计安装使用 `npm ci --ignore-scripts`；不改变现有最小权限、签名 Secret 注入或镜像凭据，不把任何凭据写入仓库。
+- 非目标：不升级依赖、不购买或接入代码签名证书、不重写 Release/Cloudflare 业务逻辑、不生成安装包或 Release。
+- 验收：本地 Action 引用检查、定时审计工作流语法与测试通过；安全切片按 T3 运行完整质量门禁并在 PR 中列出每个 SHA 来源。
+- 发布：安全/CI 供应链切片不单独发布 Windows 安装包；待后续稳定功能批次统一生成安装包、签名、manifest 和镜像。
+
 # Moyang Reader 版本路线
 
 ## #187 Windows 窄窗口与工具栏可发现性（本轮已完成）

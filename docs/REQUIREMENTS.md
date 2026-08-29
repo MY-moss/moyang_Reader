@@ -68,6 +68,20 @@
 
 - 当前代码执行 `npm run lint` 无 warning/error，`npm run build` 的 TypeScript 项目引用检查通过；新增显式 `any` 或未使用变量时，ESLint 必须以非零状态失败。
 - 当前应用和 Node 配置执行严格未使用、`switch` 穿透与模块语义检查通过；Rust Windows 目标 metadata 能在 `rust-version = "1.88"` 下解析。
+
+## v0.11.0 发布供应链门禁（#226）
+
+- `.github/workflows` 中的第三方 GitHub Action 必须固定到 40 位提交 SHA；每个固定引用必须保留可核验的版本或来源注释。
+- `ci.yml`、`release.yml`、`mirror-release.yml` 和 `rust-audit.yml` 必须使用同一组已核验的 Action 提交，不得用可变 tag 或 branch 代替。
+- 前端生产依赖必须有独立的每周定时审计，并支持 `workflow_dispatch` 手动重跑；审计只针对随安装包发布的生产依赖，开发工具漏洞继续由 Dependabot 和既有质量门禁跟踪。
+- 工作流仓库变更必须运行浮动引用检查；发现第三方 `uses:` 不是 40 位 SHA 或缺少版本/来源注释时，检查以非零状态失败。
+- 本切片不改变发布权限、签名 Secret 注入范围或任何 Secret 内容；不得把凭据写入仓库、日志和文档。
+
+### v0.11.0 发布供应链验收场景
+
+- 对所有工作流执行 Action 引用检查，第三方引用全部通过 SHA 和注释校验，本地伪造浮动引用样例必须被拒绝。
+- 定时前端审计工作流能够在每周计划和手动触发时安装锁定依赖并执行 `npm audit --omit=dev --audit-level=high`；安装阶段不执行生命周期脚本。
+- CI、Release、镜像和 Rust 审计工作流的权限声明与 Secret 使用范围不扩大；Action SHA 来源在 PR 中逐项列出。
 - CI 的 Rust 最低版本步骤缺少 manifest 字段或工具链不满足约束时必须失败并显示原因；该步骤不重复完整编译。
 
 ## v0.9.0 必须完成
