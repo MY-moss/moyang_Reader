@@ -1,12 +1,19 @@
-## 当前切片：#87 单卷 DOCX 峰值收敛（待提交）
+## 当前切片：#87 复杂 DOCX 块增量序列化（待提交）
+
+- 基线：远程 `main@7ca9961b16fdf467374902f1a2c8ccbe5ad1babc`；开发分支为 `codex/export-block-stream-2026-08-29`，原始开发目录的未提交改动未触碰。
+- 目标：让 raw-DEFLATE 流式 DOCX 路径边遍历边写出段落、列表、表格、引用和链接，避免复杂单块先生成完整 XML，同时保持内容、换行、分卷、取消、失败清理和临时文件授权不变。
+- 方案：保留缓冲导出和 JSZip 回退作为兼容基线；新增异步 inline/block/table 遍历器，按有限 XML 片段写入 `word/document.xml`，在表格行和节点边界执行取消检查与调度让出。
+- 验证计划：导出定向测试必须证明复杂块的流式 XML 与缓冲 XML 一致，并覆盖 120 行表格；随后运行相关 Worker、lint、格式和 Windows desktop smoke。
+- 已知限制：HTML 仍需先由 WebView DOMParser 解析，图片解码/转换和复杂 DOM 本身的内存仍属于 #87 后续观测范围；没有改 Worker 协议、PDF/打印或用户文档同步。#87 继续保持 open。
+- 发布边界：本切片不创建安装包、签名、`latest.json`、GitHub Release 或 Cloudflare 镜像；待 #87 达到稳定验收后按 Windows x64 发布策略统一处理。
+- 下一步：完成本分支定向验证，提交、推送并创建一个关联 #87 的 PR；远程检查通过后合并并更新本段，随后停止，不自动开启下一切片。
+
+## 已完成切片：#87 单卷 DOCX 峰值收敛（2026-08-29）
 
 - 基线：远程 `main@828a7409736e7e811858aedda92372e664d7dd0c`；开发分支为 `codex/export-single-volume-2026-08-29`，原始开发目录的未提交改动未触碰。
-- 目标：降低单卷 Word 导出对超长文本和重复图片的瞬时内存占用，同时保持内容、换行、分卷、取消、失败清理和临时文件授权不变。
-- 已实现：连续文本按有限大小 XML 文本节点生成；流式 ZIP 文本条目按有限字符片段编码；同内容同类型图片经指纹和字节校验复用单个媒体条目，每个绘图仍使用独立 `docPr` ID 和关系引用。
-- 验证：导出/Worker 定向测试 36/36、lint、格式和生产构建通过；真实 Windows desktop smoke 12/12 通过。当前桌面趋势为 48 篇、1 个 228,143 字节图片、事件循环最大间隔 79ms、取消延迟 227ms、Working Set 49,233,920 → 49,758,208 字节；测试结束已清理夹具。
-- 已知限制：复杂表格或嵌套 HTML block 仍可能在单个 `blockXml` 转换时短暂生成较大 XML；没有改 Worker 协议、PDF/打印或用户文档同步。#87 继续保持 open。
-- 发布边界：本切片不创建安装包、签名、`latest.json`、GitHub Release 或 Cloudflare 镜像；待 #87 达到稳定验收后按 Windows x64 发布策略统一处理。
-- 下一步：提交本分支、推送并创建一个关联 #87 的 PR；远程检查通过后合并并更新本段，随后停止，不自动开启下一切片。
+- 合并结果：PR [#338](https://github.com/MY-moss/moyang_Reader/pull/338) 已 squash 合并为 `main@7ca9961b16fdf467374902f1a2c8ccbe5ad1babc`；Quality checks run `33258714173` 全部成功。
+- 已实现：连续文本按有限大小 XML 文本节点和流式写入片段处理；同内容同类型图片复用单个媒体资源，同时保留独立绘图 ID 和关系引用。
+- 验证：导出/Worker 定向测试 36/36、lint、格式、构建和 Windows desktop smoke 12/12 通过；#87 未关闭，复杂块增量序列化由当前切片继续完成。
 
 ## 已完成切片：#226 Actions SHA 固定与前端定时审计
 
@@ -18,11 +25,11 @@
 
 ## 当前发布状态（2026-08-29）
 
-- 当前远程主线：`main@828a7409736e7e811858aedda92372e664d7dd0c`，版本文件仍为 `0.10.13`；PR [#337](https://github.com/MY-moss/moyang_Reader/pull/337) 已合并，#87 的单卷峰值收敛正在当前分支继续推进。
+- 当前远程主线：`main@7ca9961b16fdf467374902f1a2c8ccbe5ad1babc`，版本文件仍为 `0.10.13`；PR [#338](https://github.com/MY-moss/moyang_Reader/pull/338) 已合并，#87 的复杂 DOCX 块增量序列化正在当前分支继续推进。
 - 当前稳定 Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开；Windows x64 安装包 5,046,081 字节，SHA-256 `2bd6097e9952e7c6c74365a4a1751290470586a16e28b54df8e4a994b642782f`；签名文件 428 字节，SHA-256 `7b031ce4636b48d1774d118c4a6b2cbcff716bccb4038a07d072ff760088482c`。
 - 草稿恢复差异预览（#323）已随本版本发布：恢复前可查看当前版本与草稿的新增/移除行、字符变化和有限差异；无差异时显示“无需恢复”，恢复只进入编辑区，必须显式保存。
 - Cloudflare Pages 的 `latest.json`、安装包和签名已在线核验且哈希与 GitHub 一致；Release 自动镜像 job `33245475550` 仍因 Cloudflare Actions Secret 缺失失败，因此自动同步门禁保持未全绿。
-- 下一步：完成当前 #87 单卷峰值收敛切片的单一 PR；合并和交接后再重新检查 Issues，不自动进入下一项或单独发布安装包。
+- 下一步：完成当前 #87 复杂块增量序列化切片的单一 PR；合并和交接后再重新检查 Issues，不自动进入下一项或单独发布安装包。
 
 ## 已完成切片：#87 Windows 桌面批量导出响应性与授权边界（2026-08-29）
 
