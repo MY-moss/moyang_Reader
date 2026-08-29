@@ -1,17 +1,16 @@
-## 当前切片：#87 批量导出流式写入（2026-08-29，实施中）
-
-- 基线：从远程最新 `main@c22bbbd32104680994514549976ed17b2fc73602` 创建分支 `codex/issue-87-batch-export-2026-08-29`；原始工作区未修改。
-- 目标：让批量 Word 导出按分卷逐步写入，取消/失败时清理临时文件，保留现有分卷、失败清单和部分完成反馈。
-- 已实现：`src/app/export.ts` 增加逐文档转换、可取消的 HTML 构建和 JSZip 内部流；`src/app/App.tsx` 通过同目录隐藏临时文件接收 Word 分块并在完成后原子替换；`src/app/bridge.ts` 与 `src-tauri/src/commands.rs` 增加受授权目标约束的分块写入、提交和清理命令。
-- 安全边界：临时文件必须带固定标记、与最终文件位于同一目录，且最终路径必须已通过用户保存选择授权；不接受任意临时路径或把临时文件写入其他目录。
-- 本地验证：前端全量测试 60 个文件/231 个测试，Rust 测试 50/50；`npm run lint`、`npm run format:check`、`npm run build`、`cargo fmt --check`、`cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings` 均通过。
-- 已知边界：单卷内 JSZip 结构和 XML 转换仍可能占用内存/前端线程；Worker 或原生归档生成是后续独立切片。#87 在残余问题完成前保持 open，不要在 PR 中写 `Closes #87`。
-- 发布边界：不为本开发切片创建 Release 或安装包；稳定批次再统一生成 Windows x64 资产并同步镜像。
-- 下一步：检查分支差异并提交；推送后创建一个关联 #87 的 PR，等待 Quality checks 全绿后合并；合并后补写实际 PR、合并 SHA、Issue 评论和最终交接记录，然后停止，不自动开启下一个功能。
-
 # AI 开发与交接流程
 
-## v0.10.12 稳定发布结果（2026-08-29）
+## 已完成切片：#87 批量导出流式写入与取消清理（2026-08-29）
+
+- 基线：从远程 `main@c22bbbd32104680994514549976ed17b2fc73602` 创建功能分支；原始工作区未修改。
+- 目标：降低批量 Word/HTML 导出对窗口响应和峰值内存的影响，并确保取消或失败不会留下半成品目标文件。
+- 已实现：批量 Word 导出按分卷逐文档构建；JSZip 内部流分块写入用户选择目录中的隐藏临时文件，完成后原子替换最终文件；取消/失败清理临时文件。图片读取、Markdown 转换、HTML 批量构建和 ZIP 写入增加取消检查与有限调度让出。Tauri 分块写入、提交和清理命令增加最终路径授权、临时文件标记和同目录约束。
+- 合并结果：PR [#315](https://github.com/MY-moss/moyang_Reader/pull/315) 已 squash 合并为 `main@ef8076376615e23de785cb48eb5695cb6d8586d6`；push CI run `33223041845` 的 Quality checks 全绿，前置格式失败 run `33221769319`、`33222661564` 已定位为同步文件时产生的 Windows 换行/尾部空行并修复。
+- 本地验证：前端全量测试 60 个文件/231 个测试、Rust 测试 50/50；lint、Prettier、前端构建、Rust fmt、clippy，以及远程浏览器 smoke、Windows desktop smoke、依赖审计和发布预检均通过。
+- 安全边界：临时文件必须带固定标记、与最终文件位于同一目录，且最终路径必须已通过用户保存选择授权；不接受任意临时路径或将临时文件写入其他目录。
+- Issue 状态：#87 已完成本轮分块写入、取消清理和响应性改进，但仍保持 open。单卷内 JSZip 结构和 XML 转换仍可能驻留内存或占用前端线程；Worker/原生归档生成和进一步降低单卷驻留属于下一独立切片，不要写 `Closes #87`。
+- 发布边界：本切片不创建 Release、不生成稳定安装包、签名、manifest 或 Cloudflare 镜像；待稳定 Windows x64 补丁批次统一发布。
+- 下一位 AI：先重新检查 Issues 和 `main@ef8076376615e23de785cb48eb5695cb6d8586d6`，再从 #87 残余性能切片、#190 或其他更高优先级 Ready 事项中选择一个；保持一个主题、一个分支、一个 PR，完成后停止并更新交接文档。## v0.10.12 稳定发布结果（2026-08-29）
 
 - 发布范围：PR #305 已合并，Issue #169 已标记 completed；版本 PR #306 已合并到 `main@0e8d0bf6b14753953c9b988f07c2ddc08e5476d6`，内容为大型工作区枚举边界、生成目录过滤、单次列表 IPC 和文件树窗口化渲染。
 - GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开；Release run `33207011251` 的 Windows 构建/发布 job `98970518793` 成功。
@@ -22,7 +21,7 @@
 - 当前基线：PR #309 已合并为 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，Issue #168 已标记 completed；Quality checks run `33213057443` 全绿，包含浏览器 smoke、Windows desktop smoke、Rust tests 和发布预检。
 - 最新合并：PR #311 已 squash 合并为 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，Issue #181 已标记 `completed`；Quality checks run `33216115439` 全绿，包含前端、浏览器、Windows desktop、Rust 和发布预检。
 - 最新合并：PR #313 已 squash 合并为 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed`，Issue #182 已标记 `completed`；Quality checks run `33218342844` 全绿，包含前端、浏览器、Windows desktop、Rust 和发布预检。
-- 下一步：从最新 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed` 重新检查 Issues，再从 Ready backlog 选择 #87、#190 或其他更高优先级的独立切片；不要重复 #168/#169/#181/#182/#307，也不要为本次性能修复立即单独打包，待与既有稳定性修复一起进入稳定补丁批次再发布。
+- 下一步：从最新 `main@ef8076376615e23de785cb48eb5695cb6d8586d6` 重新检查 Issues，再从 #87 残余性能切片、#190 或其他更高优先级的独立事项中选择一个；不要重复 PR #315，也不要为本切片立即单独打包，待稳定补丁批次再发布。
 
 ## #182 已完成：渲染模式文内搜索高亮优化（2026-08-29）
 
