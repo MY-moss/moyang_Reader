@@ -104,4 +104,3 @@ describe("binary bridge", () => {
     });
   });
 });
-
