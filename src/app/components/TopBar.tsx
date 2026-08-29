@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type {
   DocumentKind,
   ExportMargin,
@@ -162,8 +162,6 @@ export function TopBar({
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const settingsMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const toolbarRef = useRef<HTMLElement>(null);
-  const [toolbarHasOverflow, setToolbarHasOverflow] = useState(false);
   useEffect(() => {
     const menuRefs = [moreMenuRef, settingsMenuRef, exportMenuRef];
     const closeMenus = () => {
@@ -194,41 +192,6 @@ export function TopBar({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, []);
-  useLayoutEffect(() => {
-    const toolbar = toolbarRef.current;
-    if (!toolbar) return;
-
-    const updateOverflow = () => {
-      setToolbarHasOverflow(toolbar.scrollWidth > toolbar.clientWidth + 1);
-    };
-
-    const frameId = window.requestAnimationFrame(updateOverflow);
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateOverflow);
-    resizeObserver?.observe(toolbar);
-    window.addEventListener("resize", updateOverflow);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateOverflow);
-    };
-  }, [
-    canEdit,
-    copyFeedback,
-    documentKind,
-    draftCount,
-    externallyModified,
-    fileName,
-    focusMode,
-    locale,
-    mode,
-    modified,
-    rightPanelOpen,
-    searchOpen,
-    sidebarCollapsed,
-    updateStatus,
-    workspaceLimitReached,
-    workspaceOpen,
-  ]);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
   const closeDropdownMenus = () => {
@@ -321,12 +284,7 @@ export function TopBar({
         )}
       </div>
 
-      <nav
-        ref={toolbarRef}
-        className={"toolbar" + (toolbarHasOverflow ? " has-overflow" : "")}
-        title={toolbarHasOverflow ? "还有更多操作，可横向滚动" : undefined}
-        aria-label="文档操作"
-      >
+      <nav className="toolbar" aria-label="文档操作">
         <button
           type="button"
           className="toolbar-button"
@@ -358,7 +316,7 @@ export function TopBar({
         )}
         <button
           type="button"
-          className="toolbar-button"
+          className="toolbar-button toolbar-optional"
           onClick={() => {
             dismissTopbarOverlays();
             onQuickOpen();
@@ -370,7 +328,7 @@ export function TopBar({
         {fileName && canEdit && (
           <button
             type="button"
-            className="toolbar-button editor-mode-button"
+            className="toolbar-button editor-mode-button toolbar-optional"
             onClick={() => {
               dismissTopbarOverlays();
               onToggleMode();
@@ -386,7 +344,7 @@ export function TopBar({
         {draftCount > 0 && (
           <button
             type="button"
-            className="toolbar-button recovery-button"
+            className="toolbar-button recovery-button toolbar-optional"
             onClick={onOpenRecovery}
             title="查看未保存草稿"
           >
@@ -415,7 +373,7 @@ export function TopBar({
         </button>
         <button
           type="button"
-          className="toolbar-button focus-button"
+          className="toolbar-button focus-button toolbar-optional"
           onClick={onToggleFocusMode}
           disabled={!fileName}
           title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
@@ -435,6 +393,17 @@ export function TopBar({
               <div className="toolbar-overflow-actions">
                 <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
                   {t("action.commands")}
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => {
+                    dismissTopbarOverlays();
+                    onQuickOpen();
+                  }}
+                  title="快速打开文档 (Ctrl+P)"
+                >
+                  {t("action.quickOpen")}
                 </button>
                 <button
                   type="button"
@@ -464,6 +433,23 @@ export function TopBar({
                   title="复制当前文档内容"
                 >
                   {copyFeedback ? t("action.copied") : t("action.copy")}
+                </button>
+                {draftCount > 0 && (
+                  <button type="button" className="toolbar-button recovery-button" onClick={onOpenRecovery}>
+                    {t("action.drafts")} {draftCount}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="toolbar-button focus-button"
+                  onClick={() => {
+                    dismissTopbarOverlays();
+                    onToggleFocusMode();
+                  }}
+                  disabled={!fileName}
+                  title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
+                >
+                  {focusMode ? t("action.exitFocus") : t("action.focus")}
                 </button>
               </div>
             </div>
