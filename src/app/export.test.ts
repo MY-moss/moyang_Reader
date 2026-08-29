@@ -80,6 +80,25 @@ function dataUrl(contentType: string, bytes: Uint8Array): string {
   return `data:${contentType};base64,${btoa(String.fromCharCode(...bytes))}`;
 }
 
+async function streamedDocumentXml(
+  title: string,
+  documents: Array<{ title: string; body: string }>,
+): Promise<string | undefined> {
+  const chunks: Uint8Array[] = [];
+  await streamDocxExport(title, documents, undefined, async (chunk) => {
+    chunks.push(chunk);
+  });
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const zip = await JSZip.loadAsync(bytes);
+  return zip.file("word/document.xml")?.async("string");
+}
+
 describe("document export helpers", () => {
   it("keeps the directory while changing the export extension", () => {
     expect(fileNameWithExtension("笔记.markdown", "html")).toBe("笔记.html");
@@ -430,6 +449,33 @@ describe("document export helpers", () => {
     expect(textNodeCount).toBeGreaterThan(1);
     expect(documentXml).toContain(longText.slice(0, 80));
     expect(documentXml).toContain(longText.slice(-80));
+  });
+
+  it("streams complex DOCX blocks without changing the document XML", async () => {
+    const rows = Array.from(
+      { length: 120 },
+      (_, index) => `<tr><th>第 ${index + 1} 行</th><td>表格内容 ${"保留结构 ".repeat(12)}</td></tr>`,
+    ).join("");
+    const body = [
+      "<h2>复杂块</h2>",
+      '<p>普通段落 <strong>加粗</strong>、<em>斜体</em> 和 <a href="https://example.com">外链</a>。</p>',
+      "<ul><li>一级<ul><li>二级</li></ul></li></ul>",
+      "<blockquote>引用内容<br/>第二行</blockquote>",
+      '<pre><code>const value = "streamed";</code></pre>',
+      `<div data-page-break="true"><p>分页后的内容</p></div>`,
+      `<table><tbody>${rows}</tbody></table>`,
+      "<hr/>",
+    ].join("");
+    const documents = [{ title: "复杂块.md", body }];
+    const buffered = await buildBatchDocxExport("复杂块测试", documents);
+    const bufferedZip = await JSZip.loadAsync(buffered);
+    const bufferedXml = await bufferedZip.file("word/document.xml")?.async("string");
+    const streamedXml = await streamedDocumentXml("复杂块测试", documents);
+
+    expect(streamedXml).toBe(bufferedXml);
+    expect(streamedXml?.match(/<w:tr>/g)).toHaveLength(120);
+    expect(streamedXml).toContain("<w:pageBreakBefore/>");
+    expect(streamedXml).toContain("const value = &quot;streamed&quot;");
   });
 
   it("streams DOCX images and relationships as a valid package", async () => {

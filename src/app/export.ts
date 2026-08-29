@@ -994,13 +994,13 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function runXml(value: string, properties = ""): string {
-  if (!value) return "";
-  const content: string[] = [];
+function* docxRunXmlParts(value: string, properties = ""): Generator<string> {
+  if (!value) return;
+  yield `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}`;
   for (const [index, line] of value.split(/\r?\n/).entries()) {
-    if (index > 0) content.push("<w:br/>");
+    if (index > 0) yield "<w:br/>";
     if (!line) {
-      content.push('<w:t xml:space="preserve"></w:t>');
+      yield '<w:t xml:space="preserve"></w:t>';
       continue;
     }
 
@@ -1009,12 +1009,15 @@ function runXml(value: string, properties = ""): string {
       const lastCodeUnit = line.charCodeAt(end - 1);
       if (end < line.length && lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
       if (end <= offset) end = Math.min(line.length, offset + DOCX_TEXT_WRITE_CHUNK_CHARS);
-      content.push(`<w:t xml:space="preserve">${escapeXml(line.slice(offset, end))}</w:t>`);
+      yield `<w:t xml:space="preserve">${escapeXml(line.slice(offset, end))}</w:t>`;
       offset = end;
     }
   }
+  yield "</w:r>";
+}
 
-  return `<w:r>${properties ? `<w:rPr>${properties}</w:rPr>` : ""}${content.join("")}</w:r>`;
+function runXml(value: string, properties = ""): string {
+  return Array.from(docxRunXmlParts(value, properties)).join("");
 }
 
 function imageExtension(contentType: string): string | null {
@@ -1249,6 +1252,230 @@ function blockXml(node: Node, state: DocxRenderState, listDepth = 0): string {
   );
 }
 
+type DocxInlineWriter = (value: string) => Promise<void>;
+
+async function streamDocxRun(value: string, properties: string, writeText: DocxInlineWriter): Promise<boolean> {
+  let written = false;
+  for (const part of docxRunXmlParts(value, properties)) {
+    await writeText(part);
+    written = true;
+  }
+  return written;
+}
+
+async function streamInlineXml(
+  node: Node,
+  state: DocxRenderState,
+  writeText: DocxInlineWriter,
+  inheritedProperties = "",
+  signal?: AbortSignal,
+): Promise<boolean> {
+  throwIfExportAborted(signal);
+  if (node.nodeType === 3) return streamDocxRun(node.nodeValue ?? "", inheritedProperties, writeText);
+  if (!isElementNode(node)) return false;
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === "br") {
+    await writeText("<w:r><w:br/></w:r>");
+    return true;
+  }
+  if (tag === "img") {
+    await writeText(imageXml(node, state));
+    return true;
+  }
+
+  let properties = inheritedProperties;
+  if (tag === "strong" || tag === "b") properties += "<w:b/>";
+  if (tag === "em" || tag === "i") properties += "<w:i/>";
+  if (tag === "u") properties += '<w:u w:val="single"/>';
+  if (tag === "code" || tag === "kbd")
+    properties += '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:shd w:fill="F0EEE9"/>';
+  if (tag === "a") properties += '<w:color w:val="28655F"/><w:u w:val="single"/>';
+
+  if (tag === "a") {
+    const target = node.getAttribute("href") ?? "";
+    if (!isExternalDocxLink(target)) {
+      let written = false;
+      for (const child of node.childNodes) {
+        written = (await streamInlineXml(child, state, writeText, properties, signal)) || written;
+      }
+      return written;
+    }
+
+    const relationshipId = `rIdLink${state.nextLinkId}`;
+    state.nextLinkId += 1;
+    state.links.push({ relationshipId, target });
+    await writeText(`<w:hyperlink r:id="${relationshipId}">`);
+    for (const child of node.childNodes) {
+      await streamInlineXml(child, state, writeText, properties, signal);
+    }
+    await writeText("</w:hyperlink>");
+    return true;
+  }
+
+  let written = false;
+  for (const child of node.childNodes) {
+    written = (await streamInlineXml(child, state, writeText, properties, signal)) || written;
+  }
+  return written;
+}
+
+async function streamParagraphXml(
+  children: Iterable<Node>,
+  state: DocxRenderState,
+  writeText: DocxInlineWriter,
+  style?: string,
+  extraProperties = "",
+  leadingText?: string,
+  signal?: AbortSignal,
+  inheritedProperties = "",
+): Promise<void> {
+  const properties =
+    style || extraProperties ? `<w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ""}${extraProperties}</w:pPr>` : "";
+  await writeText(`<w:p>${properties}`);
+  let written = false;
+  if (leadingText) written = await streamDocxRun(leadingText, "", writeText);
+  for (const child of children) {
+    written = (await streamInlineXml(child, state, writeText, inheritedProperties, signal)) || written;
+  }
+  if (!written) await writeText("<w:r><w:t></w:t></w:r>");
+  await writeText("</w:p>");
+}
+
+async function streamTableXml(
+  table: Element,
+  state: DocxRenderState,
+  writeText: DocxInlineWriter,
+  signal?: AbortSignal,
+): Promise<void> {
+  const rows = Array.from(table.querySelectorAll("tr"));
+  const columnCount = Math.max(1, ...rows.map((row) => row.querySelectorAll(":scope > th, :scope > td").length));
+  const grid = Array.from({ length: columnCount }, () => '<w:gridCol w:w="2200"/>').join("");
+  await writeText(
+    '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="D9D5CC"/><w:left w:val="single" w:sz="4" w:color="D9D5CC"/><w:bottom w:val="single" w:sz="4" w:color="D9D5CC"/><w:right w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideH w:val="single" w:sz="4" w:color="D9D5CC"/><w:insideV w:val="single" w:sz="4" w:color="D9D5CC"/></w:tblBorders></w:tblPr><w:tblGrid>' +
+      grid +
+      "</w:tblGrid>",
+  );
+
+  for (const [rowIndex, row] of rows.entries()) {
+    throwIfExportAborted(signal);
+    await writeText("<w:tr>");
+    const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td"));
+    for (const cell of cells) {
+      throwIfExportAborted(signal);
+      const isHeader = cell.tagName.toLowerCase() === "th";
+      await writeText('<w:tc><w:tcPr><w:tcW w:w="2200" w:type="dxa"/></w:tcPr><w:p>');
+      let written = false;
+      for (const child of cell.childNodes) {
+        written = (await streamInlineXml(child, state, writeText, isHeader ? "<w:b/>" : "", signal)) || written;
+      }
+      if (!written) await writeText("<w:r><w:t></w:t></w:r>");
+      await writeText("</w:p></w:tc>");
+    }
+    await writeText("</w:tr>");
+    if ((rowIndex + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
+  }
+  await writeText("</w:tbl>");
+}
+
+async function streamBlockXml(
+  node: Node,
+  state: DocxRenderState,
+  writeText: DocxInlineWriter,
+  listDepth = 0,
+  signal?: AbortSignal,
+): Promise<void> {
+  throwIfExportAborted(signal);
+  if (!isElementNode(node)) {
+    if (node.nodeType === 3 && node.textContent?.trim()) {
+      await streamParagraphXml([node], state, writeText, undefined, "", undefined, signal);
+    }
+    return;
+  }
+
+  const tag = node.tagName.toLowerCase();
+  if (node.getAttribute("data-page-break") === "true") {
+    await writeText(paragraphXml("", "Normal", "<w:pageBreakBefore/>"));
+  }
+  if (tag === "table") {
+    await streamTableXml(node, state, writeText, signal);
+    return;
+  }
+  if (tag === "ul" || tag === "ol") {
+    for (const child of node.children) await streamBlockXml(child, state, writeText, listDepth, signal);
+    return;
+  }
+  if (tag === "li") {
+    const parentTag = node.parentElement?.tagName.toLowerCase();
+    const orderedIndex =
+      parentTag === "ol" && node.parentElement
+        ? Array.from(node.parentElement.children)
+            .filter((child) => child.tagName.toLowerCase() === "li")
+            .indexOf(node) + 1
+        : 0;
+    const listIndent = listDepth > 0 ? `<w:ind w:left="${listDepth * 720}" w:hanging="360"/>` : "";
+    await streamParagraphXml(
+      Array.from(node.childNodes).filter(
+        (child) => !(isElementNode(child) && ["ul", "ol"].includes(child.tagName.toLowerCase())),
+      ),
+      state,
+      writeText,
+      "Normal",
+      listIndent,
+      parentTag === "ol" ? `${orderedIndex}. ` : "• ",
+      signal,
+    );
+    for (const child of node.children) {
+      if (["ul", "ol"].includes(child.tagName.toLowerCase())) {
+        await streamBlockXml(child, state, writeText, listDepth + 1, signal);
+      }
+    }
+    return;
+  }
+  if (/^h[1-6]$/.test(tag)) {
+    await streamParagraphXml(node.childNodes, state, writeText, `Heading${tag.slice(1)}`, "", undefined, signal);
+    return;
+  }
+  if (tag === "pre") {
+    await streamParagraphXml(
+      node.childNodes,
+      state,
+      writeText,
+      "CodeBlock",
+      "",
+      undefined,
+      signal,
+      '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/>',
+    );
+    return;
+  }
+  if (tag === "blockquote") {
+    await streamParagraphXml(node.childNodes, state, writeText, "Quote", "", undefined, signal, "<w:i/>");
+    return;
+  }
+  if (tag === "hr") {
+    await writeText(
+      paragraphXml("", "Normal", '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="D9D5CC"/></w:pBdr>'),
+    );
+    return;
+  }
+  if (tag === "img") {
+    await writeText("<w:p>");
+    await writeText(imageXml(node, state));
+    await writeText("</w:p>");
+    return;
+  }
+
+  const blockChildren = Array.from(node.children).filter((child) =>
+    /^(p|div|section|article|h[1-6]|ul|ol|table|blockquote|pre|hr)$/i.test(child.tagName),
+  );
+  if (blockChildren.length > 0) {
+    for (const child of blockChildren) await streamBlockXml(child, state, writeText, 0, signal);
+    return;
+  }
+  await streamParagraphXml(node.childNodes, state, writeText, undefined, "", undefined, signal);
+}
+
 function docxStylesXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="等线"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="6D716B"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading5"><w:name w:val="heading 5"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading6"><w:name w:val="heading 6"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
 }
@@ -1275,12 +1502,10 @@ async function docxBodyXml(body: string, state: DocxRenderState, signal?: AbortS
   return content.join("");
 }
 
-type DocxTextWriter = (value: string) => Promise<void>;
-
 async function streamDocxBodyXml(
   body: string,
   state: DocxRenderState,
-  writeText: DocxTextWriter,
+  writeText: DocxInlineWriter,
   signal?: AbortSignal,
 ): Promise<void> {
   const parsed = new DOMParser().parseFromString(`<div>${body}</div>`, "text/html");
@@ -1289,7 +1514,7 @@ async function streamDocxBodyXml(
 
   for (const [index, node] of Array.from(root.childNodes).entries()) {
     throwIfExportAborted(signal);
-    await writeText(blockXml(node, state));
+    await streamBlockXml(node, state, writeText, 0, signal);
     if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
   }
 }
