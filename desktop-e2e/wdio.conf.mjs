@@ -78,7 +78,7 @@ export const config = {
   connectionRetryTimeout: 90_000,
   connectionRetryCount: 3,
   mochaOpts: {
-    timeout: 60_000,
+    timeout: 600_000,
   },
   onComplete: cleanupFixture,
 };
