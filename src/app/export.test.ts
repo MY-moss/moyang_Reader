@@ -390,6 +390,63 @@ describe("document export helpers", () => {
     expect(documentXml).toContain("第二篇正文");
   });
 
+  it("streams DOCX images and relationships as a valid package", async () => {
+    const chunks: Uint8Array[] = [];
+    const image = dataUrl("image/png", pngBytes(320, 160));
+    await streamDocxExport(
+      "流式图片",
+      [
+        {
+          title: "图片文档.md",
+          body: `<p><a href="https://example.com">官网</a><img src="${image}" alt="封面"/></p>`,
+        },
+      ],
+      undefined,
+      async (chunk) => {
+        chunks.push(chunk);
+      },
+    );
+
+    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const zip = await JSZip.loadAsync(bytes);
+    const documentXml = await zip.file("word/document.xml")?.async("string");
+    const relationshipsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+
+    expect(documentXml).toContain('r:embed="rId1"');
+    expect(documentXml).toContain('<w:hyperlink r:id="rIdLink1">');
+    expect(relationshipsXml).toContain('Target="https://example.com"');
+    expect(zip.file("word/media/image1.png")).not.toBeNull();
+  });
+
+  it("falls back to the JSZip stream when raw DEFLATE is unavailable", async () => {
+    vi.stubGlobal("CompressionStream", undefined);
+    const chunks: Uint8Array[] = [];
+
+    try {
+      await streamDocxExport("兼容回退", [{ title: "回退.md", body: "<p>仍可导出</p>" }], undefined, async (chunk) => {
+        chunks.push(chunk);
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const zip = await JSZip.loadAsync(bytes);
+    expect(await zip.file("word/document.xml")?.async("string")).toContain("仍可导出");
+  });
+
   it("estimates batch document memory using UTF-16 source storage", () => {
     expect(estimateBatchExportDocumentBytes({ title: "标题", body: "正文" })).toBe(8);
   });
