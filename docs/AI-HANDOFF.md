@@ -1,3 +1,14 @@
+## #164 GFM/WYSIWYG 保真边界（2026-08-29）
+
+- 基线：从远程 `main@9cdd39309f83631388425af9c2df3a35bffc8243` 创建独立分支；原始开发目录的未提交改动未触碰。
+- 目标：锁定 Milkdown GFM 所见即所得编辑的可安全回写范围，避免 Markdown 在模式切换或保存时静默丢失结构。
+- 已实现：安全检查新增 TOML frontmatter、行内数学、行内/块级原始 HTML、Callout 的源码回退；保留既有 YAML frontmatter、嵌入、块 ID 和数学边界保护。GFM 任务列表、删除线、表格、脚注和 autolink 增加真实 Milkdown 序列化回归测试。
+- 已验证：`markdown-editor-support` 与 `wysiwyg-editor-setup` 定向测试 7/7；`npm run lint`、`npm run format:check`、`npm run build` 和现有 GFM 规范化 E2E 1/1 通过。构建仅有仓库已有的 chunk 体积提示。
+- 发布边界：这是编辑器保真/测试切片，不单独创建 Release、安装包、签名、`latest.json` 或 Cloudflare 镜像；待稳定 Windows x64 批次统一发布。
+- 环境维护：原始开发目录中被重复 Tauri debug 构建累积的 `src-tauri/target`（约 64.292 GB，主要为 37.42 GB incremental 缓存）已确认是可再生且被 `.gitignore` 忽略的生成物，已清理；源码、Git 历史和用户文件未删除。后续桌面构建前后应关注该目录，避免重复 debug 构建缓存再次失控。
+- Issue 状态：#164 的 GFM 回归与安全回退验收已覆盖；WYSIWYG 组件级行为、外部修改和未保存交互仍归 #165 等独立事项，不混入本切片。
+- 下一位 AI：先检查最新 Issues 和 `main`，若 PR 合并后从最高优先级 Ready 项选择一个独立切片；保持一个主题、一个分支、一个 PR，完成交接后停止。
+
 ## Issue 治理已完成（2026-08-29）
 
 - 已复核 GitHub 全部 32 个开放 Issue，并统一为 [MoSCoW][Priority][Category] 标题和标准验收结构。
