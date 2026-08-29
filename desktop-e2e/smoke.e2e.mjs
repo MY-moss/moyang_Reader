@@ -195,13 +195,21 @@ async function resetDesktopSession() {
 }
 
 async function waitForWorkspaceRoot(expectedRoot) {
-  const expected = expectedRoot.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+  const comparableWorkspacePath = (value) => {
+    const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+    try {
+      return fs.realpathSync.native(value).replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+    } catch {
+      return normalized;
+    }
+  };
+  const expected = comparableWorkspacePath(expectedRoot);
   await browser.waitUntil(
     () =>
       browser
         .$(".workspace-location")
         .getAttribute("title")
-        .then((actual) => (actual ?? "").replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase() === expected),
+        .then((actual) => comparableWorkspacePath(actual ?? "") === expected),
     {
       timeout: 30_000,
       timeoutMsg: `the desktop E2E workspace did not switch to ${expectedRoot}`,
