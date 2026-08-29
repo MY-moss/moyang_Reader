@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "test:e2e:desktop": "node scripts/test-desktop-e2e.mjs",
     "test:watch": "vitest",
-    "test:release": "node --test scripts/release-check.test.mjs scripts/prepare-mirror.test.mjs",
+    "test:release": "node --test scripts/release-check.test.mjs scripts/prepare-mirror.test.mjs scripts/check-action-pins.test.mjs",
+    "check:actions": "node scripts/check-action-pins.mjs",
     "tauri": "tauri",
     "release:check": "node scripts/release-check.mjs"
   },

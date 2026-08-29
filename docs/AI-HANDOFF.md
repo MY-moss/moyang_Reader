@@ -1,3 +1,11 @@
+## 当前切片：#226 Actions SHA 固定与前端定时审计
+
+- 基线：远程 `main@805f5dcb8094dfd23d796beee645d4a338caf7c2`；开发分支为 `codex/actions-sha-audit-2026-08-29`，原始开发目录的未提交改动未触碰。
+- 目标：固定 CI、Rust 审计、Windows Release 和 Cloudflare 镜像工作流的第三方 Action，并增加每周前端生产依赖审计与浮动引用阻断检查。
+- 已核验来源：`actions/checkout@v4`、`actions/setup-node@v7`、`dtolnay/rust-toolchain@stable`、`Swatinem/rust-cache@v2`、`rustsec/audit-check@v2.0.0`、`tauri-apps/tauri-action@v1` 和 `cloudflare/wrangler-action@v3` 的提交 SHA 均从各自公开 GitHub ref/commit 核验；完整映射记录在对应 PR。
+- 实现边界：新增 `scripts/check-action-pins.mjs` 及测试；CI、Release、镜像和 Rust 审计工作流执行检查；新增 `.github/workflows/frontend-audit.yml`，定时执行生产依赖审计且安装阶段禁用生命周期脚本。
+- 发布边界：不改变产品功能、发布权限、签名 Secret 或镜像凭据，不生成安装包/Release；本切片完成后需在 #226 留下验证摘要，再从最新 `main` 选择下一项 Ready 任务。
+
 ## 当前发布状态（2026-08-29）
 
 - 当前远程主线：`main@4e31ad7653f9449214a2736dd390fc0eea795e10`，版本文件仍为 `0.10.13`；PR [#335](https://github.com/MY-moss/moyang_Reader/pull/335) 已合并并完成 #87 本轮桌面验收。

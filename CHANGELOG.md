@@ -13,6 +13,8 @@
 - #87：批量导出开始和逐文档处理之间增加轻量调度让出，使取消按钮、上下文面板等窗口交互可以及时响应；Windows desktop smoke 同步记录取消延迟、渲染事件循环和 Working Set 趋势。
 - #189：将 TypeScript/ESLint 的显式 `any` 和未使用变量提升为阻断错误，并在两个 TypeScript 配置中固化未使用、`switch` 穿透和模块语义检查。
 - #189：为 Windows x64 Cargo 工程声明 Rust `1.88` 最低版本，并在 CI 编译门禁前增加轻量兼容性预检；不改变用户可见功能或构建产物。
+- #226：将 CI、Rust 审计、Windows Release 和 Cloudflare 镜像工作流中的第三方 Action 固定到已核验的提交 SHA，并保留对应版本注释。
+- #226：新增每周前端生产依赖审计和可手动触发的审计工作流；增加浮动 Action 引用检查，防止后续工作流重新漂移。
 
 本切片不改变 Markdown/HTML/Word 转换语义、分卷上限、临时文件提交和取消清理；单个复杂 HTML 块仍可能短暂生成较大的 XML 片段，Issue #87 继续保持 open，不在开发切片中生成安装包。真实 Windows 桌面取消/失败清理和主窗口交互基线已通过 smoke 验收。
 
