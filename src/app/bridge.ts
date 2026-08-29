@@ -352,4 +352,3 @@ export async function subscribeToFileDrop(onPaths: (paths: string[]) => void): P
     if (event.payload.type === "drop") onPaths(event.payload.paths);
   });
 }
-
