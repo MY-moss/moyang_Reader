@@ -167,6 +167,15 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 - 预计文件：`.github/workflows/release.yml`、`scripts/release-check.mjs`、`scripts/release-check.test.mjs`、`docs/RELEASE-POLICY.md`、`docs/UPDATE.md`。
 - 测试：T3；完整质量门禁、一次安装包构建和在线更新链路验证。
 
+### R4：TypeScript/Rust 质量门禁首个切片（#189，T1，目标 v0.11.0）
+
+- 目标：把显式 `any`、未使用变量、TypeScript 未使用/`switch`/模块语义和 Rust 最低版本约束固化为阻断门禁。
+- 非目标：不启用高噪声实验规则，不大范围重构业务逻辑，不混入 Actions SHA、签名、更新器或 Release 资产。
+- 验收：当前代码 `npm run lint`、`npm run build` 和 Rust metadata 通过；CI 在 Rust 编译前输出 `rustc` 与 `rust-version` 并在不重复编译的情况下失败清晰。
+- 预计文件：`eslint.config.mjs`、`tsconfig.app.json`、`tsconfig.node.json`、`src-tauri/Cargo.toml`、`.github/workflows/ci.yml`、需求/路线/交接文档。
+- 测试：T1；配置定向检查、前端 lint/build、Rust metadata，随后由一次 PR Quality checks 覆盖完整回归。
+- 本轮边界：只完成上述首个配置门禁切片；#189 不因该切片提前关闭，后续类型感知规则和 fallout 另行 Ready。
+
 ## 任务上下文模板
 
 复制以下模板作为任务开始记录；不要把整份仓库或整份日志附在后面。

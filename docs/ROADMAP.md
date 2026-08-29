@@ -72,6 +72,15 @@
 - 非目标：不改变生产导出格式、分卷/取消语义、PDF/HTML 内容、更新器、版本号或 Release；不把测试夹具写入用户工作区，不以本机一次测量替代多设备性能承诺。
 - Issue/发布：#87 保持 open，后续只需在更大真实图片、长单块内容和重复基准矩阵下补充趋势证据，再决定是否关闭；本轮不生成安装包或 Release。
 
+## #189 TypeScript/Rust 质量门禁首个垂直切片（2026-08-29）
+
+- 目标：把已量化通过的 TypeScript/ESLint 约束和 Rust 最低版本约束固化为可持续门禁，降低后续 AI/贡献者引入回归的概率。
+- 已实现：ESLint 将显式 `any` 与未使用变量设为阻断错误；应用与 Node tsconfig 启用未使用、`switch` 穿透和模块语义约束；Cargo 声明 `rust-version = "1.88"`；Windows CI 在 Rust 编译门禁前输出并验证工具链兼容性。
+- 基线：现有代码显式 `any` 为 0、ESLint warning/error 为 0；严格 TypeScript 试运行无错误；Windows 依赖解析最高 Rust 要求为 1.88。以上是配置切片基线，不表示所有未来依赖都永久保持该版本。
+- 验收：本地 ESLint、TypeScript build、Cargo metadata 和后续完整 PR Quality checks 通过；CI 兼容性步骤不新增重复编译。
+- 非目标：不启用所有高噪声实验规则，不大范围重构业务代码，不改变用户可见功能，不处理 Actions SHA、签名、更新器或 Release。
+- 状态：#189 保持 open，后续类型感知规则、真实 fallout 清理和更细的 Rust 工具链固定仍需独立切片；本切片不创建安装包或 Release。
+
 ## v0.10.13 发布记录（2026-08-29）
 
 - GitHub Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开，tag 指向 `main@5c016e2ddf71c589de3191383b3595af4c6e7705`。
