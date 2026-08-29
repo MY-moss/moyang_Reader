@@ -496,4 +496,3 @@ describe("document export helpers", () => {
     expect(contentTypesXml).toContain("/word/footer1.xml");
   });
 });
-
