@@ -29,7 +29,7 @@ import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent"
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";
 import { RelationGraph } from "./components/RelationGraph";
-import { SourceEditor, type SourceEditorLinkContext, type SourceEditorPasteContext } from "./components/SourceEditor";
+import { SourceEditor, type SourceEditorPasteContext } from "./components/SourceEditor";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -257,6 +257,7 @@ import {
   type EditorHistoryState,
 } from "./editor-history";
 import { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";
+import type { EditorInsertKind } from "./editor-insertion";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -549,6 +550,7 @@ export function App() {
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
   const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
   const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
   const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
@@ -3006,22 +3008,20 @@ export function App() {
     };
   }, [workspacePath, workspaceQuery, workspaceRevision]);
 
-  const handleInsertLink = useCallback((context?: SourceEditorLinkContext) => {
-    const url = window.prompt("输入链接地址", "https://");
-    if (!url?.trim()) return;
+  const requestEditorInsert = useCallback(
+    (kind: EditorInsertKind) => {
+      const currentDocument = documentStateRef.current;
+      if (!currentDocument || !isEditableDocument(currentDocument.kind) || mode === "rendered") {
+        setSettingsNotice("请先进入编辑模式，再使用插入工具。");
+        return;
+      }
+      setRequestedInsertKind(kind);
+    },
+    [mode],
+  );
 
-    if (context) {
-      const selectedText = context.value.slice(context.selectionStart, context.selectionEnd).trim() || "链接文字";
-      context.replace(`[${selectedText}](${url.trim()})`);
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim()) {
-      document.execCommand("createLink", false, url.trim());
-    } else {
-      setSettingsNotice("请先在所见即所得编辑器中选择链接文字，再按 Ctrl+K。");
-    }
+  const handleEditorInsertRequestHandled = useCallback(() => {
+    setRequestedInsertKind(null);
   }, []);
 
   // Keep the mode transition in one place so toolbar and keyboard shortcuts cannot drift apart.
@@ -3128,9 +3128,9 @@ export function App() {
         toggleReadingEditing();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {
-        if (mode === "wysiwyg") {
+        if (mode === "wysiwyg" || mode === "source") {
           event.preventDefault();
-          handleInsertLink();
+          requestEditorInsert("link");
         }
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
@@ -3169,9 +3169,9 @@ export function App() {
   }, [
     focusMode,
     handleChooseWorkspace,
-    handleInsertLink,
     mode,
     openSelectedFile,
+    requestEditorInsert,
     saveDocument,
     setReadingZoom,
     toggleReadingEditing,
@@ -4209,7 +4209,7 @@ export function App() {
           redoEditor();
           break;
         case "link":
-          handleInsertLink();
+          requestEditorInsert("link");
           break;
         case "context":
           setRightPanelOpen((current) => !current);
@@ -4221,8 +4221,8 @@ export function App() {
     },
     [
       handleChooseWorkspace,
-      handleInsertLink,
       openSelectedFile,
+      requestEditorInsert,
       redoEditor,
       saveDocument,
       toggleReadingEditing,
@@ -4919,7 +4919,8 @@ export function App() {
                 documentKey={documentState.path}
                 ariaLabel="Markdown 所见即所得编辑器"
                 onChange={(value) => void updateSource(value)}
-                onInsertLink={() => handleInsertLink()}
+                requestedInsertKind={requestedInsertKind}
+                onInsertRequestHandled={handleEditorInsertRequestHandled}
                 onFindText={handleFindEditorText}
                 canUndo={canUndo}
                 canRedo={canRedo}
@@ -4936,7 +4937,8 @@ export function App() {
               ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
               onChange={(value) => void updateSource(value)}
               onPaste={handleSourcePaste}
-              onInsertLink={handleInsertLink}
+              requestedInsertKind={requestedInsertKind}
+              onInsertRequestHandled={handleEditorInsertRequestHandled}
               onFindText={handleFindEditorText}
               canUndo={canUndo}
               canRedo={canRedo}

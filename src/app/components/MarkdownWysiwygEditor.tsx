@@ -3,6 +3,7 @@ import { defaultValueCtx, Editor, editorViewCtx, rootCtx, serializerCtx } from "
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import {
   insertImageCommand,
+  toggleLinkCommand,
   toggleEmphasisCommand,
   toggleInlineCodeCommand,
   toggleStrongCommand,
@@ -16,6 +17,7 @@ import {
 } from "@milkdown/kit/preset/commonmark";
 import { insertTableCommand, toggleStrikethroughCommand } from "@milkdown/kit/preset/gfm";
 import { callCommand, replaceAll } from "@milkdown/kit/utils";
+import { TextSelection } from "@milkdown/kit/prose/state";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
@@ -29,7 +31,16 @@ import {
 } from "../editor-completion";
 import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import { ContextMenu } from "./ContextMenu";
+import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorInsertPopover";
+import { EditorToolbar } from "./EditorToolbar";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import {
+  buildMarkdownImage,
+  buildMarkdownLink,
+  buildMarkdownWikiLink,
+  type EditorInsertKind,
+  type EditorInsertRequest,
+} from "../editor-insertion";
 import {
   filterWikiLinkCandidates,
   formatWikiLinkInsert,
@@ -43,7 +54,8 @@ type MarkdownWysiwygEditorProps = {
   documentKey: string;
   ariaLabel: string;
   onChange: (markdown: string) => void;
-  onInsertLink: () => void;
+  requestedInsertKind?: EditorInsertKind | null;
+  onInsertRequestHandled?: () => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
   onFindText?: (text: string) => void;
@@ -78,6 +90,7 @@ type EditorViewInstance = {
     tr: {
       insertText: (text: string, from: number, to?: number) => unknown;
       delete: (from: number, to: number) => unknown;
+      setSelection: (selection: unknown) => unknown;
       setNodeMarkup: (pos: number, type?: unknown, attrs?: Record<string, unknown>) => unknown;
     };
   };
@@ -171,7 +184,8 @@ function MilkdownSurface({
   documentKey,
   ariaLabel,
   onChange,
-  onInsertLink,
+  requestedInsertKind,
+  onInsertRequestHandled,
   onUndo,
   onRedo,
   onFindText,
@@ -195,8 +209,13 @@ function MilkdownSurface({
   const onRedoRef = useRef(onRedo);
   const onFindTextRef = useRef(onFindText);
   const onStatusMessageRef = useRef(onStatusMessage);
+  const pendingInsertSelectionRef = useRef<{ from: number; to: number; selectedText: string } | null>(null);
+  const lastRequestedInsertRef = useRef<EditorInsertKind | null>(null);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
+  const [insertOpen, setInsertOpen] = useState(false);
+  const [insertKind, setInsertKind] = useState<EditorInsertKind>("link");
+  const [insertInitialValues, setInsertInitialValues] = useState<EditorInsertInitialValues>({});
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -287,6 +306,125 @@ function MilkdownSurface({
     editable?.setAttribute("aria-label", ariaLabel);
     editable?.setAttribute("aria-multiline", "true");
   }, [ariaLabel, loading]);
+
+  const openInsert = useCallback((kind: EditorInsertKind) => {
+    const view = viewRef.current;
+    if (!view) {
+      onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
+      return;
+    }
+
+    const { from, to } = view.state.selection;
+    const selectedText = view.state.doc.textBetween(from, to, "\n").trim();
+    pendingInsertSelectionRef.current = { from, to, selectedText };
+    setInsertKind(kind);
+    setInsertInitialValues({
+      label: selectedText || "链接文字",
+      alt: "",
+      rows: 3,
+      columns: 3,
+    });
+    setInsertOpen(true);
+    setContextMenu(null);
+    completionRef.current = null;
+    setCompletion(null);
+  }, []);
+
+  const closeInsert = useCallback(() => {
+    pendingInsertSelectionRef.current = null;
+    setInsertOpen(false);
+  }, []);
+
+  const handleInsertRequest = useCallback(
+    (request: EditorInsertRequest) => {
+      const editor = getRef.current();
+      const view = viewRef.current;
+      const pending = pendingInsertSelectionRef.current;
+      if (!editor || !view || !pending) return;
+
+      const docSize = (view.state.doc as unknown as { content?: { size?: number } }).content?.size;
+      const from = Math.max(1, Math.min(pending.from, docSize ?? pending.from));
+      const to = Math.max(from, Math.min(pending.to, docSize ?? pending.to));
+      const restoreSelection = () => {
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc as never, from, to)));
+      };
+
+      try {
+        switch (request.kind) {
+          case "link": {
+            if (!buildMarkdownLink(request.label, request.href, request.title)) {
+              onStatusMessageRef.current?.("链接文字或地址无效，请检查后重试。");
+              return;
+            }
+            const keepSelectedText = pending.selectedText === request.label && from !== to;
+            if (!keepSelectedText) {
+              restoreSelection();
+              view.dispatch(view.state.tr.insertText(request.label, from, to));
+              view.dispatch(
+                view.state.tr.setSelection(
+                  TextSelection.create(view.state.doc as never, from, from + request.label.length),
+                ),
+              );
+            } else {
+              restoreSelection();
+            }
+            editor.action(
+              callCommand(toggleLinkCommand.key, {
+                href: request.href.trim(),
+                title: request.title?.trim() || undefined,
+              }),
+            );
+            break;
+          }
+          case "wikilink": {
+            const markdown = buildMarkdownWikiLink(request.target, request.alias);
+            if (!markdown) {
+              onStatusMessageRef.current?.("双链目标不能为空，请检查后重试。");
+              return;
+            }
+            restoreSelection();
+            view.dispatch(view.state.tr.insertText(markdown, from, to));
+            break;
+          }
+          case "image": {
+            if (!buildMarkdownImage(request.src, request.alt, request.title)) {
+              onStatusMessageRef.current?.("图片路径或 URL 无效，请检查后重试。");
+              return;
+            }
+            restoreSelection();
+            editor.action(
+              callCommand(insertImageCommand.key, {
+                src: request.src.trim(),
+                alt: request.alt.trim(),
+                title: request.title?.trim() || undefined,
+              }),
+            );
+            break;
+          }
+          case "table":
+            restoreSelection();
+            editor.action(callCommand(insertTableCommand.key, { row: request.rows, col: request.columns }));
+            break;
+        }
+        view.focus();
+        closeInsert();
+      } catch {
+        onStatusMessageRef.current?.("插入失败，当前内容没有被覆盖，请切换源码模式继续操作。");
+      }
+    },
+    [closeInsert],
+  );
+
+  useEffect(() => {
+    if (!requestedInsertKind) {
+      lastRequestedInsertRef.current = null;
+      return;
+    }
+    if (lastRequestedInsertRef.current === requestedInsertKind) return;
+    lastRequestedInsertRef.current = requestedInsertKind;
+    openInsert(requestedInsertKind);
+    onInsertRequestHandled?.();
+  }, [onInsertRequestHandled, openInsert, requestedInsertKind]);
 
   const applyCompletionItem = useCallback((item: WikiLinkCandidate | SlashCommand) => {
     const view = viewRef.current;
@@ -408,29 +546,12 @@ function MilkdownSurface({
       }
 
       if (action === "link") {
-        onInsertLink();
-        setContextMenu(null);
+        openInsert("link");
         return;
       }
 
-      if (action === "wikilink") {
-        const target = window.prompt("输入双链目标", "");
-        if (target?.trim()) {
-          view.dispatch(
-            view.state.tr.insertText(`[[${target.trim()}]]`, view.state.selection.from, view.state.selection.to),
-          );
-        }
-        view.focus();
-        setContextMenu(null);
-        return;
-      }
-
-      if (action === "image") {
-        const target = window.prompt("输入图片路径或 URL", "");
-        if (target?.trim()) {
-          editor.action(callCommand(insertImageCommand.key, { src: target.trim(), alt: target.trim() }));
-        }
-        view.focus();
+      if (action === "wikilink" || action === "image" || action === "table") {
+        openInsert(action);
         setContextMenu(null);
         return;
       }
@@ -472,9 +593,6 @@ function MilkdownSurface({
         case "code-block":
           editor.action(callCommand(createCodeBlockCommand.key));
           break;
-        case "table":
-          editor.action(callCommand(insertTableCommand.key, { row: 3, col: 3 }));
-          break;
         case "horizontal-rule":
           editor.action(callCommand(insertHrCommand.key));
           break;
@@ -482,7 +600,7 @@ function MilkdownSurface({
       view.focus();
       setContextMenu(null);
     },
-    [contextMenu, onInsertLink],
+    [contextMenu, openInsert],
   );
 
   const editorContextGroups = editorContextMenuGroups.map((group) => ({
@@ -672,7 +790,7 @@ function MilkdownSurface({
       onKeyDown={(event) => {
         if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
         event.preventDefault();
-        onInsertLink();
+        openInsert("link");
       }}
     >
       {loading && <div className="wysiwyg-loading">正在准备所见即所得编辑器…</div>}
@@ -681,6 +799,14 @@ function MilkdownSurface({
           所见即所得编辑器初始化失败，内容未被修改。请切换到“源文本”模式继续编辑。
         </div>
       )}
+      <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+      <EditorInsertPopover
+        open={insertOpen}
+        kind={insertKind}
+        initialValues={insertInitialValues}
+        onCancel={closeInsert}
+        onSubmit={handleInsertRequest}
+      />
       <Milkdown />
       {completion && (
         <div

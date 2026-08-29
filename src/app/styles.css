@@ -71,6 +71,18 @@ a:focus-visible {
   color: var(--accent-deep);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .app-shell {
   --sidebar-width: 260px;
   --context-width: 320px;
@@ -2844,6 +2856,285 @@ html.pane-resizing * {
   text-decoration: underline;
   text-decoration-thickness: 2px;
 }
+.editor-surface {
+  position: relative;
+  min-width: 0;
+}
+.editor-format-toolbar {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-strong) 91%, transparent);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ink) 8%, transparent);
+  backdrop-filter: blur(14px);
+}
+.editor-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.editor-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  flex: 0 0 auto;
+  background: var(--line);
+}
+.editor-toolbar-spacer {
+  min-width: 8px;
+  flex: 1;
+}
+.editor-toolbar-button,
+.editor-toolbar-select {
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.editor-toolbar-button {
+  padding: 0 8px;
+}
+.editor-toolbar-button-icon,
+.editor-toolbar-format-button {
+  width: 30px;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+.editor-toolbar-format-button:nth-child(2) {
+  font-style: italic;
+}
+.editor-toolbar-format-button:nth-child(3) {
+  text-decoration: line-through;
+}
+.editor-toolbar-button:hover:not(:disabled),
+.editor-toolbar-button:focus-visible,
+.editor-toolbar-select:hover,
+.editor-toolbar-select:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  outline: 0;
+}
+.editor-toolbar-button:disabled {
+  background: transparent;
+}
+.editor-toolbar-select-wrap {
+  display: inline-flex;
+  min-width: 0;
+}
+.editor-toolbar-select {
+  max-width: 126px;
+  padding: 0 24px 0 8px;
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+  color: var(--ink);
+}
+.editor-toolbar-insert-button {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--line));
+  background: var(--accent);
+  color: #fffdf8;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.editor-toolbar-insert-button:hover:not(:disabled),
+.editor-toolbar-insert-button:focus-visible {
+  border-color: var(--accent-deep);
+  background: var(--accent-deep);
+  color: #fffdf8;
+}
+.editor-insert-popover {
+  position: absolute;
+  z-index: 45;
+  top: 56px;
+  left: 0;
+  width: min(430px, calc(100% - 16px));
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 98%, var(--canvas));
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--ink) 20%, transparent);
+}
+.editor-insert-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 13px;
+}
+.editor-insert-eyebrow {
+  color: var(--accent-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.editor-insert-header h2 {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.editor-insert-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+.editor-insert-close:hover,
+.editor-insert-close:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  outline: 0;
+}
+.editor-insert-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--canvas) 68%, transparent);
+}
+.editor-insert-tabs button {
+  min-width: 0;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+.editor-insert-tabs button:hover,
+.editor-insert-tabs button:focus-visible,
+.editor-insert-tabs button.is-active {
+  background: var(--surface-strong);
+  color: var(--accent-deep);
+  outline: 0;
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.editor-insert-tabs button.is-active {
+  font-weight: 750;
+}
+.editor-insert-fields {
+  display: grid;
+  gap: 10px;
+}
+.editor-insert-field {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+.editor-insert-field em {
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+}
+.editor-insert-field input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 7px 9px;
+  font-size: 12px;
+}
+.editor-insert-field input::placeholder {
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+}
+.editor-insert-field input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: 0;
+}
+.editor-insert-number-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.editor-insert-hint {
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.editor-insert-error {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.editor-insert-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.editor-insert-actions button {
+  min-height: 32px;
+  border-radius: 7px;
+  padding: 0 11px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.editor-insert-cancel {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+.editor-insert-submit {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fffdf8;
+}
+.editor-insert-cancel:hover,
+.editor-insert-cancel:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  outline: 0;
+}
+.editor-insert-submit:hover,
+.editor-insert-submit:focus-visible {
+  border-color: var(--accent-deep);
+  background: var(--accent-deep);
+  outline: 0;
+}
+.source-editor-fallback-shell {
+  width: min(960px, calc(100% - 96px));
+  min-height: calc(100vh - 150px);
+  margin: 0 auto;
+}
+.source-editor-fallback-shell .source-editor {
+  width: 100%;
+  min-height: calc(100vh - 212px);
+  margin: 0;
+  padding: 36px 0 86px;
+}
 .source-editor {
   display: block;
   width: min(960px, calc(100% - 96px));
@@ -4232,6 +4523,13 @@ html.pane-resizing * {
     background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
     box-shadow: var(--shadow-soft);
   }
+  .wysiwyg-editor .editor-format-toolbar {
+    margin: -22px -32px 28px;
+  }
+  .wysiwyg-editor .editor-insert-popover {
+    top: 74px;
+    left: 26px;
+  }
   .wysiwyg-editor .milkdown {
     min-height: 480px;
   }
@@ -4554,6 +4852,15 @@ html.pane-resizing * {
     width: calc(100% - 48px);
     padding: 38px 30px 88px;
   }
+  .wysiwyg-editor .editor-format-toolbar {
+    margin: -20px -14px 24px;
+  }
+  .wysiwyg-editor .editor-insert-popover {
+    left: 12px;
+  }
+  .source-editor-fallback-shell {
+    width: calc(100% - 48px);
+  }
   .wysiwyg-editor .editor h1 {
     font-size: 36px;
   }
@@ -4594,6 +4901,25 @@ html.pane-resizing * {
   }
   .wysiwyg-editor {
     padding: 32px 18px 72px;
+  }
+  .editor-format-toolbar {
+    gap: 3px;
+    padding: 6px;
+  }
+  .editor-toolbar-button-wide {
+    display: none;
+  }
+  .editor-toolbar-select {
+    max-width: 112px;
+  }
+  .editor-insert-popover,
+  .wysiwyg-editor .editor-insert-popover {
+    top: 86px;
+    left: 8px;
+    width: calc(100% - 16px);
+  }
+  .source-editor-fallback-shell {
+    width: calc(100% - 32px);
   }
   .wysiwyg-editor .editor {
     font-size: 16px;

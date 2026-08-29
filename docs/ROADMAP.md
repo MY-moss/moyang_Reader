@@ -1,13 +1,22 @@
 ## Issue 治理索引（2026-08-29）
 
-当前 Issue 的统一分类、标题/正文格式、23 个可执行事项和 9 个归档事项见 [docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)。
+当前 Issue 的统一分类、标题/正文格式、24 个可执行事项和 9 个归档事项见 [docs/ISSUE-INDEX.md](./ISSUE-INDEX.md)。
 
-- 开放 Issue：23 个；其中 Must 8 个、Should 14 个、Could 1 个。
+- 开放 Issue：24 个；其中 Must 9 个、Should 14 个、Could 1 个。
 - 归档 Issue：9 个；原因分别为历史汇总、重复、当前范围外或当前不计划。
 - not planned / duplicate 只表示当前入口归档，不代表相关专项全部完成；专项状态以对应 Issue 验收为准。
 - 后续“继续开发”只从该索引中具备目标、非目标、验收、依赖、风险和回滚条件的 Ready 项选择。
 
 # Moyang Reader 版本路线
+
+## #321 当前切片：原生编辑工具栏与插入体验（2026-08-29）
+
+- 目标：让 Markdown/WYSIWYG 与 TXT 源文本编辑器都有可发现的格式、段落和插入入口，链接、双链、图片和表格使用应用内轻量面板完成，不再依赖浏览器原生输入弹窗。
+- 实现：新增共享 `EditorToolbar` 与 `EditorInsertPopover`；WYSIWYG 链接使用 Milkdown 原生命令，图片路径与替代文字分开，表格支持 2–8 行/列；源码模式复用同一组 Markdown 构造函数，保留已有右键菜单和快捷键。
+- 保真与安全：Markdown 仍是真源；未知内容不由本切片静默删除；插入目标拒绝 `javascript:`、`vbscript:` 和危险 `data:` 目的地；用户未保存的正文变化不会被面板提交覆盖。
+- 验证：编辑器插入单测、上下文动作单测、lint、格式检查、TypeScript/Vite 构建，以及链接/图片/表格浏览器 E2E 均通过。
+- 非目标：不实现资源管理器、图片复制上传、表格高级布局、DOCX/PDF 原格式回写或新的重量级依赖。
+- 发布：这是可见的编辑体验切片，合并后纳入下一个稳定 Windows x64 `v0.10.13` 批次；在稳定发布门禁前不单独生成安装包、Release 或镜像。
 
 ## #165 已完成本轮切片：WYSIWYG 组件行为测试（2026-08-29）
 
