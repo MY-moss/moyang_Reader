@@ -1,13 +1,14 @@
 ## #187 Windows 窄窗口与工具栏可发现性（2026-08-29）
 
-- 基线：从本地已同步的 `origin/main@b83b92e` 等价代码树创建 `codex/narrow-layout-2026-08-29`；远程主线在提交前需以 GitHub 当前 `main` 为准，原始开发目录的未提交修改未触碰，临时工作树位于项目内 `.codex-worktrees/narrow-layout-2026-08-29`。
-- 目标：以 Windows 最小窗口 `720px` 及 `960/1180px` 关键宽度为基线，保证核心操作可见、次要操作可通过明确的“更多”入口访问，正文和工具栏不产生意外横向滚动。
+- 基线：以 Windows x64 最小窗口 `720px` 和 `960/1180px` 关键宽度为验收基线；原始开发目录未触碰，临时工作树位于项目内 `.codex-worktrees/narrow-layout-2026-08-29`。
+- 目标：保证核心操作在窄窗口保持可见，次要操作可以通过明确的“更多”入口访问，正文和工具栏不产生意外横向滚动。
 - 实现：窄窗口固定保留打开、侧栏、上下文、搜索和“更多”；快速打开、编辑模式、草稿和专注动作补入“更多”；工具栏空间不足时自动换行；移除仅适用于 640/360 的旧断点和横向滚动提示逻辑，保留单一 720px 浏览器回退布局。
-- 验收：待运行 390px 回退、720/960/1180px 关键宽度浏览器 E2E，以及 lint、format、TypeScript、build 和一个 Windows desktop smoke；已有编辑器、搜索、导出、面板和右键路径不改动。
+- 验收：390px 回退以及 720/960/1180px 关键宽度的浏览器测试通过；编辑器、搜索、导出、面板和右键路径无回归；Windows 桌面冒烟测试通过。
+- 已验证：本地 lint、格式检查、TypeScript、构建、定向浏览器测试和 Windows desktop smoke 均通过；PR #328 的 Quality checks run `33242777865` 成功，合并后的 main Quality checks run `33243109176` 成功。
 - 发布边界：这是 UI 稳定性切片，不单独创建 Release、Windows x64 安装包、签名、`latest.json` 或 Cloudflare 镜像；纳入下一稳定批次。
 - 已知边界：本轮不改变 Tauri 三栏职责、面板宽度持久化或图标体系；真实 Windows DPI/系统字体若有新问题另开复现 Issue。
-- 下一步：完成本分支唯一 PR 的质量门禁，合并后关闭 #187；随后停止当前任务，下一位 AI 必须重新检查 Issues 和最新 `main`，再选择新的 Ready 切片。
-
+- 当前状态：PR #328 已合并，main 为 `4e7e9e4430e52602e85a01bfc71ae184eb92b483`；#187 已自动关闭，状态原因为 `completed`。
+- 下一步：本切片到此停止；下一位 AI 必须重新检查 Issues 和最新 `main`，再从 Ready backlog 选择唯一事项。
 ## #323 草稿恢复差异预览与多段差异清晰度（2026-08-29）
 
 - 基线：从已验证的 `origin/main@b83b92e` 创建 `codex/draft-recovery-clarity-2026-08-29`；原始开发目录的未提交修改未触碰，临时工作树位于项目内 `.codex-worktrees/draft-recovery-clarity-2026-08-29`。
