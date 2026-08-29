@@ -189,7 +189,6 @@ a:focus-visible {
   flex: 0 1 auto;
   gap: 6px;
   min-width: 0;
-  position: relative;
 }
 .toolbar-button {
   border: 1px solid var(--line);
@@ -4024,7 +4023,7 @@ html.pane-resizing * {
   box-shadow: 0 12px 24px rgba(50, 114, 105, 0.26);
 }
 
-@media (max-width: 1180px) {
+@media screen and (max-width: 1180px) {
   .topbar {
     gap: 14px;
     padding-inline: 18px;
@@ -4035,35 +4034,12 @@ html.pane-resizing * {
   .toolbar {
     flex: 1 1 auto;
     max-width: 100%;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
     gap: 4px;
-    padding-bottom: 2px;
-    scrollbar-width: none;
   }
-  .toolbar::-webkit-scrollbar {
+  .toolbar-optional {
     display: none;
-  }
-  .toolbar.has-overflow::before {
-    position: absolute;
-    z-index: 2;
-    top: 50%;
-    right: 4px;
-    color: var(--accent-deep);
-    content: "›";
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1;
-    pointer-events: none;
-    transform: translateY(-50%);
-  }
-  .toolbar.has-overflow::after {
-    position: absolute;
-    z-index: 1;
-    inset: 0 0 0 auto;
-    width: 28px;
-    background: linear-gradient(90deg, transparent, var(--surface-strong) 78%);
-    content: "";
-    pointer-events: none;
   }
   .toolbar-button,
   .toolbar-overflow {
@@ -4081,7 +4057,7 @@ html.pane-resizing * {
   }
 }
 
-@media (max-width: 840px) {
+@media screen and (max-width: 840px) {
   .topbar {
     flex-wrap: wrap;
     gap: 10px 14px;
@@ -4202,7 +4178,7 @@ html.pane-resizing * {
   }
 }
 
-@media (max-width: 640px) {
+@media screen and (max-width: 720px) {
   .workspace-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -4294,18 +4270,16 @@ html.pane-resizing * {
   }
 }
 
-@media (max-width: 360px) {
+@media screen and (max-width: 720px) {
   .toolbar {
-    flex-wrap: wrap;
-    overflow: visible;
     row-gap: 6px;
   }
   .toolbar-overflow-panel {
-    top: 190px;
-    max-height: min(calc(100dvh - 206px), 440px);
+    top: 168px;
+    max-height: min(calc(100dvh - 184px), 640px);
   }
   .toolbar-overflow-panel .settings-menu-panel {
-    max-height: min(calc(100dvh - 410px), 260px);
+    max-height: min(calc(100dvh - 390px), 420px);
   }
 }
 
@@ -5124,7 +5098,7 @@ html.pane-resizing * {
   }
 }
 
-@media screen and (max-width: 640px) {
+@media screen and (max-width: 720px) {
   .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);

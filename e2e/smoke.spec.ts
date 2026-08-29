@@ -184,7 +184,7 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 
-  const quickOpenTrigger = page.locator('button[title="快速打开文档 (Ctrl+P)"]');
+  const quickOpenTrigger = page.locator('.toolbar > button[title="快速打开文档 (Ctrl+P)"]');
   await quickOpenTrigger.click();
   await expect(page.getByRole("dialog", { name: "快速打开" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "快速打开文档" })).toBeFocused();
@@ -1319,7 +1319,7 @@ test("keeps the reader inside a narrow viewport when long inline content wraps",
   expect(metrics.articleScrollWidth).toBe(metrics.articleClientWidth);
 });
 
-test("shows a cue when compact toolbar actions overflow", async ({ page }) => {
+test("keeps compact toolbar actions discoverable without horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 820 });
   await page.goto("/");
 
@@ -1332,15 +1332,55 @@ test("shows a cue when compact toolbar actions overflow", async ({ page }) => {
   await page.locator('button[title="隐藏侧栏 (Ctrl+Shift+B)"]').click();
 
   const toolbar = page.locator(".toolbar");
-  await expect(toolbar).toHaveClass(/has-overflow/);
-  await expect(toolbar).toHaveAttribute("title", "还有更多操作，可横向滚动");
-  const toolbarMetrics = await toolbar.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
+  await expect(toolbar.locator(".toolbar-overflow-trigger")).toBeVisible();
+  const metrics = await page.evaluate(() => ({
+    viewportWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    toolbarClientWidth: document.querySelector(".toolbar")?.clientWidth ?? 0,
+    toolbarScrollWidth: document.querySelector(".toolbar")?.scrollWidth ?? 0,
   }));
-  expect(toolbarMetrics.scrollWidth).toBeGreaterThan(toolbarMetrics.clientWidth);
-  const overflowCue = await toolbar.evaluate((element) => getComputedStyle(element, "::before").content);
-  expect(overflowCue).toBe('"›"');
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.toolbarScrollWidth).toBe(metrics.toolbarClientWidth);
+
+  await openMoreMenu(page);
+  await expect(
+    page.locator(".toolbar-overflow-panel").getByRole("button", { name: "快速打开", exact: true }),
+  ).toBeVisible();
+});
+
+test("keeps core actions visible and secondary actions in More at Windows widths", async ({ page }) => {
+  for (const width of [720, 960, 1180]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.goto("/");
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `windows-width-${width}.md`,
+      mimeType: "text/markdown",
+      buffer: Buffer.from(`# Windows width ${width}\n\nKeep the reader usable in a compact window.`),
+    });
+    await expect(page.getByRole("heading", { name: `Windows width ${width}` })).toBeVisible();
+
+    const toolbar = page.locator(".toolbar");
+    await expect(toolbar.locator(".toolbar-overflow-trigger")).toBeVisible();
+    await expect(toolbar.locator(":scope > .toolbar-optional")).toHaveCount(3);
+    await expect(toolbar.locator(":scope > .toolbar-optional").first()).toBeHidden();
+
+    const metrics = await page.evaluate(() => ({
+      viewportWidth: document.documentElement.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      toolbarClientWidth: document.querySelector(".toolbar")?.clientWidth ?? 0,
+      toolbarScrollWidth: document.querySelector(".toolbar")?.scrollWidth ?? 0,
+    }));
+    expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+    expect(metrics.toolbarScrollWidth).toBe(metrics.toolbarClientWidth);
+
+    await openMoreMenu(page);
+    await expect(
+      page.locator(".toolbar-overflow-panel").getByRole("button", { name: "快速打开", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".toolbar-overflow-panel").getByRole("button", { name: "专注", exact: true }),
+    ).toBeVisible();
+  }
 });
 
 test("keeps topbar overlays mutually exclusive", async ({ page }) => {
