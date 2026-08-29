@@ -31,18 +31,14 @@
 
 ### Must：核心阅读、编辑、稳定性与发布
 
-| Issue                                                       | 主题                               | 计划                      | 备注                                                    |
-| ----------------------------------------------------------- | ---------------------------------- | ------------------------- | ------------------------------------------------------- |
-| [#87](https://github.com/MY-moss/moyang_Reader/issues/87)   | 批量导出单卷驻留内存与可取消归档   | v0.11.0 稳定批次          | 已完成分块写入/取消清理；剩余 Worker/原生归档和单卷峰值 |
-| [#164](https://github.com/MY-moss/moyang_Reader/issues/164) | GFM 与 WYSIWYG 往返保真            | v0.11.0                   | 防止脚注、任务列表等内容静默丢失                        |
-| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试   | v0.11.0                   | 本轮验收已完成，PR 合并后关闭；与 #164 保持独立         |
-| [#321](https://github.com/MY-moss/moyang_Reader/issues/321) | 原生格式工具栏与链接/图片/表格插入 | v0.10.13 稳定批次         | 已完成；PR #322 已合并，后续资源管理另行切片            |
-| [#323](https://github.com/MY-moss/moyang_Reader/issues/323) | 草稿恢复前显示当前版本与草稿差异   | v0.10.13 稳定批次         | 当前 Ready 切片；不自动合并、不自动写回磁盘             |
-| [#187](https://github.com/MY-moss/moyang_Reader/issues/187) | Windows 窄窗口与工具栏溢出         | v0.11.0                   | 以 900px 最小窗口为真实基线                             |
-| [#189](https://github.com/MY-moss/moyang_Reader/issues/189) | TypeScript/ESLint/Rust 质量门禁    | v0.11.0 发布前            | 先量化 fallout，再分批收紧                              |
-| [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计     | v0.11.0 发布前            | 发布/镜像工作流优先                                     |
-| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归   | 下一稳定 Windows x64 发布 | 依赖真实安装环境和发布条件                              |
-| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 发布前            | 两个验收块，必要时拆两个 PR                             |
+| Issue                                                       | 主题                             | 计划                      | 备注                                                 |
+| ----------------------------------------------------------- | -------------------------------- | ------------------------- | ---------------------------------------------------- |
+| [#87](https://github.com/MY-moss/moyang_Reader/issues/87)   | 批量导出单卷驻留内存与可取消归档 | v0.11.0 稳定批次          | 已实现分块写入、预算和 Worker 回退；剩余实机峰值数据 |
+| [#187](https://github.com/MY-moss/moyang_Reader/issues/187) | Windows 窄窗口与工具栏溢出       | v0.11.0                   | 以 900px 最小窗口为真实基线                          |
+| [#189](https://github.com/MY-moss/moyang_Reader/issues/189) | TypeScript/ESLint/Rust 质量门禁  | v0.11.0 发布前            | 先量化 fallout，再分批收紧                           |
+| [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计   | v0.11.0 发布前            | 发布/镜像工作流优先                                  |
+| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归 | 下一稳定 Windows x64 发布 | 依赖真实安装环境和发布条件                           |
+| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验 | v0.11.0 发布前            | 两个验收块，必要时拆两个 PR                          |
 
 ### Should：明显改善高频体验和可维护性
 
@@ -68,6 +64,15 @@
 | Issue                                                       | 主题                       | 计划      | 重新进入条件                 |
 | ----------------------------------------------------------- | -------------------------- | --------- | ---------------------------- |
 | [#111](https://github.com/MY-moss/moyang_Reader/issues/111) | 轻量中英双语 i18n 与错误码 | v1.0 后段 | 核心功能稳定且有真实语言需求 |
+
+### 已完成并关闭（不计入开放 backlog）
+
+| Issue                                                       | 主题                               | 结果                 |
+| ----------------------------------------------------------- | ---------------------------------- | -------------------- |
+| [#164](https://github.com/MY-moss/moyang_Reader/issues/164) | GFM 与 WYSIWYG 往返保真            | 已完成并关闭         |
+| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试   | 已完成并关闭         |
+| [#321](https://github.com/MY-moss/moyang_Reader/issues/321) | 原生格式工具栏与链接/图片/表格插入 | PR #322 已合并并关闭 |
+| [#323](https://github.com/MY-moss/moyang_Reader/issues/323) | 草稿恢复前显示当前版本与草稿差异   | PR #324 已合并并关闭 |
 
 ## 3. 已归档 Issue
 
@@ -102,7 +107,7 @@
 
 ## 5. 维护记录
 
-- 2026-08-29：盘点 32 个开放 Issue。
-- 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
+- 2026-08-29：复核 GitHub 当前 21 个开放 Issue。
+- 2026-08-29：统一开放 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：25 个可执行 Issue，9 个已归档，开放 PR 需单独复核；#321 已完成，#323 是本轮新增 Ready 切片。
+- 当前结果：21 个开放 Issue（Must 6、Should 14、Could 1），9 个已归档，4 个专项已完成并关闭；#87 是当前 Ready 性能切片。

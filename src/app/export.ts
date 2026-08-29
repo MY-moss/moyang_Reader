@@ -584,6 +584,10 @@ export type HtmlExportDocument = {
   body: string;
 };
 
+export function estimateBatchExportDocumentBytes(document: HtmlExportDocument): number {
+  return (document.title.length + document.body.length) * 2;
+}
+
 export function buildBatchHtmlExport(
   title: string,
   documents: HtmlExportDocument[],
@@ -705,7 +709,11 @@ function imageExtension(contentType: string): string | null {
   return DOCX_IMAGE_EXTENSIONS[contentType] ?? null;
 }
 
-function imageXml(element: HTMLElement, state: DocxRenderState): string {
+function isElementNode(node: Node): node is Element {
+  return node.nodeType === 1;
+}
+
+function imageXml(element: Element, state: DocxRenderState): string {
   const source = element.getAttribute("src") ?? "";
   const match = source.match(/^data:([^;,]+);base64,(.+)$/);
   const extension = match ? imageExtension(match[1].toLowerCase()) : null;
@@ -743,10 +751,10 @@ function isExternalDocxLink(value: string): boolean {
 }
 
 function inlineXml(node: Node, state: DocxRenderState, inheritedProperties = ""): string {
-  if (node.nodeType === Node.TEXT_NODE) {
+  if (node.nodeType === 3) {
     return runXml(node.nodeValue ?? "", inheritedProperties);
   }
-  if (!(node instanceof HTMLElement)) return "";
+  if (!isElementNode(node)) return "";
 
   const tag = node.tagName.toLowerCase();
   if (tag === "br") return "<w:r><w:br/></w:r>";
@@ -784,7 +792,7 @@ function paragraphXml(content: string, style?: string, extraProperties = ""): st
   return `<w:p>${properties}${content || "<w:r><w:t></w:t></w:r>"}</w:p>`;
 }
 
-function tableXml(table: HTMLElement, state: DocxRenderState): string {
+function tableXml(table: Element, state: DocxRenderState): string {
   const rows = Array.from(table.querySelectorAll("tr"));
   const columnCount = Math.max(1, ...rows.map((row) => row.querySelectorAll(":scope > th, :scope > td").length));
   const grid = Array.from({ length: columnCount }, () => '<w:gridCol w:w="2200"/>').join("");
@@ -807,12 +815,13 @@ function tableXml(table: HTMLElement, state: DocxRenderState): string {
 }
 
 function blockXml(node: Node, state: DocxRenderState, listDepth = 0): string {
-  if (!(node instanceof HTMLElement)) {
-    return node.nodeType === Node.TEXT_NODE && node.textContent?.trim() ? paragraphXml(runXml(node.textContent)) : "";
+  if (!isElementNode(node)) {
+    return node.nodeType === 3 && node.textContent?.trim() ? paragraphXml(runXml(node.textContent)) : "";
   }
 
   const tag = node.tagName.toLowerCase();
-  const pageBreakPrefix = node.dataset.pageBreak === "true" ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
+  const pageBreakPrefix =
+    node.getAttribute("data-page-break") === "true" ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
   if (tag === "table") return pageBreakPrefix + tableXml(node, state);
   if (tag === "ul" || tag === "ol") {
     return (
@@ -831,7 +840,7 @@ function blockXml(node: Node, state: DocxRenderState, listDepth = 0): string {
             .indexOf(node) + 1
         : 0;
     const content = Array.from(node.childNodes)
-      .filter((child) => !(child instanceof HTMLElement && ["ul", "ol"].includes(child.tagName.toLowerCase())))
+      .filter((child) => !(isElementNode(child) && ["ul", "ol"].includes(child.tagName.toLowerCase())))
       .map((child) => inlineXml(child, state))
       .join("");
     const nested = Array.from(node.children)
@@ -1014,19 +1023,17 @@ async function prepareBatchDocxArchive(
   signal?: AbortSignal,
 ): Promise<JSZip> {
   const state: DocxRenderState = { images: [], links: [], nextImageId: 1, nextLinkId: 1 };
-  const content: string[] = [];
+  let content = "";
   for (const [index, document] of documents.entries()) {
     throwIfExportAborted(signal);
     const normalizedBody = await normalizeDocxImageSources(normalizeExportLinks(document.body), signal);
     const pageBreak = index > 0 ? paragraphXml("", "Normal", "<w:pageBreakBefore/>") : "";
-    content.push(
-      `${pageBreak}${paragraphXml(runXml(document.title), "Heading1")}${await docxBodyXml(normalizedBody, state, signal)}`,
-    );
+    content += `${pageBreak}${paragraphXml(runXml(document.title), "Heading1")}${await docxBodyXml(normalizedBody, state, signal)}`;
     if ((index + 1) % EXPORT_YIELD_INTERVAL === 0) await yieldToExportScheduler();
   }
 
   throwIfExportAborted(signal);
-  return createDocxArchive(title, content.join(""), options, state, signal);
+  return createDocxArchive(title, content, options, state, signal);
 }
 
 export async function buildBatchDocxExport(
