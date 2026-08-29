@@ -29,6 +29,32 @@ function diffPrefix(line: DraftDiffLine): string {
   return " ";
 }
 
+function recoveryDecision(
+  hasChanges: boolean,
+  sourceChangedSinceDraft: boolean,
+  isCurrentDocument: boolean,
+): { tone: "neutral" | "ready" | "warning"; title: string; description: string } {
+  if (!hasChanges) {
+    return {
+      tone: "neutral",
+      title: "无需恢复",
+      description: "草稿与当前版本内容相同，不需要恢复。",
+    };
+  }
+  if (sourceChangedSinceDraft && isCurrentDocument) {
+    return {
+      tone: "warning",
+      title: "建议先核对",
+      description: "草稿保存后原文件又发生了变化；请确认两边内容后，再恢复到编辑区。",
+    };
+  }
+  return {
+    tone: "ready",
+    title: "存在未保存内容",
+    description: "如果这些内容需要保留，可以恢复到编辑区；点击“保存”后才会写回原文件。",
+  };
+}
+
 export function DraftRecoveryComparisonDialog({
   snapshot,
   comparisonSource,
@@ -43,6 +69,7 @@ export function DraftRecoveryComparisonDialog({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const comparison = buildDraftComparison(comparisonSource, snapshot.draft);
   const isCurrentDocument = comparisonLabel === "当前磁盘版本";
+  const decision = recoveryDecision(comparison.hasChanges, sourceChangedSinceDraft, isCurrentDocument);
 
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
 
@@ -82,6 +109,11 @@ export function DraftRecoveryComparisonDialog({
             的差异。恢复只会替换当前编辑区，确认后仍需点击“保存”才会写回原文件。
           </p>
 
+          <div className={`draft-comparison-decision ${decision.tone}`} data-testid="draft-comparison-decision">
+            <strong>{decision.title}</strong>
+            <span>{decision.description}</span>
+          </div>
+
           <div className="draft-comparison-stats" aria-label="草稿变更摘要">
             <div>
               <span>新增行</span>
@@ -94,6 +126,10 @@ export function DraftRecoveryComparisonDialog({
             <div>
               <span>字符变化</span>
               <strong>{signedNumber(comparison.characterDelta)}</strong>
+            </div>
+            <div>
+              <span>变更区域</span>
+              <strong>{comparison.changeHunkCount}</strong>
             </div>
             <div>
               <span>草稿保存</span>
@@ -133,6 +169,11 @@ export function DraftRecoveryComparisonDialog({
             )}
           </div>
           {comparison.truncated && <p className="draft-comparison-footnote">文档较长，仅显示差异附近的有限内容。</p>}
+          {!comparison.precise && (
+            <p className="draft-comparison-footnote">
+              文档较长，已使用快速差异摘要；恢复前建议打开编辑区再次确认全文。
+            </p>
+          )}
         </div>
 
         <footer className="quick-open-footer draft-comparison-actions">

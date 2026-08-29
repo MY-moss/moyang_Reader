@@ -84,6 +84,9 @@ export function DraftRecoveryCenter({
                 );
                 const characterDelta =
                   comparison.characterDelta > 0 ? `+${comparison.characterDelta}` : comparison.characterDelta;
+                const diffSummary = comparison.hasChanges
+                  ? `草稿差异：+${comparison.addedLineCount} 行 / −${comparison.removedLineCount} 行 · ${comparison.changeHunkCount} 个区域 · 字符 ${characterDelta}${comparison.precise ? "" : " · 快速摘要"}`
+                  : "当前版本与草稿相同 · 无需恢复";
 
                 return (
                   <>
@@ -98,10 +101,7 @@ export function DraftRecoveryCenter({
                       <small>
                         {formatDraftRecoveryTime(snapshot.savedAt)} · {draftPreview(snapshot.draft)}
                       </small>
-                      <small className="draft-recovery-diff-summary">
-                        草稿差异：+{comparison.addedLineCount} 行 / −{comparison.removedLineCount} 行 · 字符{" "}
-                        {characterDelta}
-                      </small>
+                      <small className="draft-recovery-diff-summary">{diffSummary}</small>
                     </button>
                     <div className="draft-recovery-actions">
                       <button
