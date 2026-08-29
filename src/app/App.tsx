@@ -149,6 +149,7 @@ import {
   printHtmlDocument,
   summarizeExportFailures,
   shouldFlushBatchExport,
+  yieldToExportScheduler,
 } from "./export";
 import { streamDocxExportWithWorker } from "./docx-export-worker-client";
 import {
@@ -4428,6 +4429,7 @@ export function App() {
       setWorkspaceExportFailures([]);
       setWorkspaceExportNotice(null);
       setError(null);
+      await yieldToExportScheduler();
 
       if (format === "pdf") {
         const files = workspaceExportFiles.filter(
@@ -4598,6 +4600,7 @@ export function App() {
             documents.push(document);
             estimatedDocumentBytes += documentEstimate;
             exported += 1;
+            await yieldToExportScheduler();
             if (shouldFlushBatchExport(documents.length, estimatedDocumentBytes)) await flushDocuments();
           } catch (cause) {
             recordSkippedFile(file.relativePath, cause instanceof Error ? cause.message : "读取失败");

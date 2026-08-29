@@ -64,6 +64,7 @@ pub struct AccessRegistry {
     read_entries: Mutex<Vec<PathBuf>>,
     write_entries: Mutex<Vec<PathBuf>>,
     workspace_entries: Mutex<Vec<PathBuf>>,
+    export_entries: Mutex<Vec<PathBuf>>,
 }
 
 struct ActiveWorkspaceWatcher {
@@ -1018,6 +1019,10 @@ impl AccessRegistry {
         register_access_entry(&self.write_entries, path)
     }
 
+    pub(crate) fn register_export_path(&self, path: &Path) -> Result<(), String> {
+        register_access_entry(&self.export_entries, path)
+    }
+
     pub(crate) fn is_read_allowed(&self, path: &Path) -> bool {
         is_access_allowed(&self.read_entries, path)
     }
@@ -1028,6 +1033,20 @@ impl AccessRegistry {
 
     pub(crate) fn is_workspace_allowed(&self, path: &Path) -> bool {
         is_access_allowed(&self.workspace_entries, path)
+    }
+
+    pub(crate) fn is_export_allowed(&self, path: &Path) -> bool {
+        let Ok(normalized) = normalize_access_path(path) else {
+            return false;
+        };
+        self.export_entries
+            .lock()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .any(|entry| export_path_matches(entry, &normalized))
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -1403,7 +1422,7 @@ pub async fn choose_save_path(
             .and_then(|name| name.to_str())
             .ok_or_else(|| "桌面测试无法解析导出文件名。".to_string())?;
         let path = PathBuf::from(export_root).join(file_name);
-        return register_selected_path(access, Some(FilePath::Path(path)), false);
+        return register_selected_export_path(access.inner(), Some(FilePath::Path(path)));
     }
 
     let selected = tauri::async_runtime::spawn_blocking(move || {
@@ -1426,7 +1445,29 @@ pub async fn choose_save_path(
     })
     .await
     .map_err(|error| format!("打开保存位置选择器失败：{error}"))?;
-    register_selected_path(access, selected, false)
+    register_selected_export_path(access.inner(), selected)
+}
+
+fn register_selected_export_path(
+    access: &AccessRegistry,
+    selected: Option<FilePath>,
+) -> Result<Option<String>, String> {
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|_| "系统返回的选择路径不可访问。".to_string())?;
+    if path.is_dir() {
+        return Err("导出保存位置必须是文件。".to_string());
+    }
+    let path_string = path
+        .to_str()
+        .ok_or_else(|| "选择的路径包含无法处理的字符。".to_string())?
+        .to_string();
+    access.register_path(&path)?;
+    access.register_export_path(&path)?;
+    Ok(Some(path_string))
 }
 
 fn register_selected_path(
@@ -3156,7 +3197,7 @@ pub async fn write_text_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !is_write_allowed_for_new_path(&access, &path) {
+    if !is_export_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
     }
     run_blocking("保存文本文件", move || {
@@ -3176,7 +3217,7 @@ pub async fn write_binary_file(
     access: State<'_, AccessRegistry>,
 ) -> Result<(), String> {
     let path = PathBuf::from(path);
-    if !is_write_allowed_for_new_path(&access, &path) {
+    if !is_export_write_allowed_for_new_path(&access, &path) {
         return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
     }
     run_blocking("保存二进制文件", move || {
@@ -3197,7 +3238,7 @@ pub async fn write_binary_file_chunk(
     let destination_path = PathBuf::from(destination_path);
     validate_export_stream_temp_path(&path)?;
     validate_export_stream_parent(&path, &destination_path)?;
-    if !is_write_allowed_for_new_path(&access, &destination_path) {
+    if !is_export_write_allowed_for_new_path(&access, &destination_path) {
         return Err("拒绝写入未通过用户文件选择的临时导出文件。请重新选择保存位置。".to_string());
     }
     run_blocking("写入二进制导出分块", move || {
@@ -3436,7 +3477,7 @@ pub async fn write_binary_file_chunk_raw(
     )?;
     validate_export_stream_temp_path(&path)?;
     validate_export_stream_parent(&path, &destination_path)?;
-    if !is_write_allowed_for_new_path(&access, &destination_path) {
+    if !is_export_write_allowed_for_new_path(&access, &destination_path) {
         return Err("拒绝写入未通过用户文件选择的临时导出文件。请重新选择保存位置。".to_string());
     }
     let append = request
@@ -3468,7 +3509,7 @@ pub async fn commit_binary_file(
     if !temp_path.is_file() {
         return Err("临时导出文件不存在或已被清理。".to_string());
     }
-    if !is_write_allowed_for_new_path(&access, &destination_path) {
+    if !is_export_write_allowed_for_new_path(&access, &destination_path) {
         return Err("拒绝提交未通过用户选择的导出路径。请重新选择保存位置。".to_string());
     }
     run_blocking("完成二进制导出", move || {
@@ -3488,7 +3529,7 @@ pub async fn discard_binary_file(
     let destination_path = PathBuf::from(destination_path);
     validate_export_stream_temp_path(&path)?;
     validate_export_stream_parent(&path, &destination_path)?;
-    if !is_write_allowed_for_new_path(&access, &destination_path) {
+    if !is_export_write_allowed_for_new_path(&access, &destination_path) {
         return Err("拒绝清理未通过用户选择的临时导出文件。".to_string());
     }
     run_blocking("清理临时导出文件", move || {
@@ -3518,6 +3559,53 @@ fn is_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
         }
         candidate = parent;
     }
+}
+
+fn is_export_write_allowed_for_new_path(access: &AccessRegistry, path: &Path) -> bool {
+    is_write_allowed_for_new_path(access, path) || access.is_export_allowed(path)
+}
+
+fn export_path_matches(selected: &Path, candidate: &Path) -> bool {
+    if access_path_key(selected) == access_path_key(candidate) {
+        return true;
+    }
+
+    let Some(selected_parent) = selected.parent() else {
+        return false;
+    };
+    let Some(candidate_parent) = candidate.parent() else {
+        return false;
+    };
+    if access_path_key(selected_parent) != access_path_key(candidate_parent) {
+        return false;
+    }
+
+    let Some(selected_extension) = selected.extension().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let Some(candidate_extension) = candidate.extension().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    if !selected_extension.eq_ignore_ascii_case(candidate_extension) {
+        return false;
+    }
+
+    let Some(selected_stem) = selected.file_stem().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let Some(candidate_stem) = candidate.file_stem().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let Some(volume_number) = candidate_stem
+        .strip_prefix(&format!("{selected_stem} - 第 "))
+        .and_then(|value| value.strip_suffix(" 卷"))
+    else {
+        return false;
+    };
+
+    !volume_number.is_empty()
+        && volume_number.bytes().all(|byte| byte.is_ascii_digit())
+        && !volume_number.starts_with('0')
 }
 
 fn validate_export_stream_temp_path(path: &Path) -> Result<(), String> {
@@ -3674,11 +3762,12 @@ mod tests {
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
         create_workspace_note_inner, decode_ipc_path, decode_text, delete_workspace_entry_inner,
         duplicate_workspace_entry_inner, extract_markdown_links, extract_tags, extract_title,
-        extract_wiki_links, has_pdf_header, index_workspace_inner, is_supported_document_path,
-        is_supported_text_path, is_write_allowed_for_new_path, list_workspace_files_inner,
-        normalize_access_path, path_exists_inner, persistent_search_index_path,
-        prune_search_entries, read_text_file_inner, refresh_workspace_inner,
-        rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
+        extract_wiki_links, has_pdf_header, index_workspace_inner,
+        is_export_write_allowed_for_new_path, is_supported_document_path, is_supported_text_path,
+        is_write_allowed_for_new_path, list_workspace_files_inner, normalize_access_path,
+        path_exists_inner, persistent_search_index_path, prune_search_entries,
+        read_text_file_inner, refresh_workspace_inner, rename_workspace_entry_inner,
+        search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, sorted_workspace_listing, source_search_tokens,
         touch_indexed_file, transfer_workspace_entry_inner, validate_export_stream_parent,
@@ -3889,6 +3978,53 @@ mod tests {
         ));
 
         fs::remove_dir_all(root).expect("remove explicit new file access directory");
+    }
+
+    #[test]
+    fn allows_only_selected_export_volumes() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-export-access-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let selected = root.join("reading-library.docx");
+        fs::create_dir_all(&root).expect("create export access directory");
+
+        let access = AccessRegistry::default();
+        access
+            .register_path(&selected)
+            .expect("register selected export path");
+        access
+            .register_export_path(&selected)
+            .expect("register export volume scope");
+
+        assert!(is_export_write_allowed_for_new_path(&access, &selected));
+        assert!(is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("reading-library - 第 1 卷.docx")
+        ));
+        assert!(is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("reading-library - 第 12 卷.docx")
+        ));
+        assert!(!is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("reading-library - 第 0 卷.docx")
+        ));
+        assert!(!is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("reading-library - 第 1 卷.pdf")
+        ));
+        assert!(!is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("other-library - 第 1 卷.docx")
+        ));
+        assert!(!is_export_write_allowed_for_new_path(
+            &access,
+            &root.join("nested").join("reading-library - 第 1 卷.docx")
+        ));
+
+        fs::remove_dir_all(root).expect("remove export access directory");
     }
 
     #[test]

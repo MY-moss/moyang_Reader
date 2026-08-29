@@ -1,7 +1,9 @@
+import { execFileSync } from "node:child_process";
 import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 
 const documentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
 const exportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
@@ -126,6 +128,183 @@ async function waitForExportToSettle() {
   await browser.waitUntil(() => cancelButton.isDisplayed().then((visible) => !visible), {
     timeout: 30_000,
     timeoutMsg: "the workspace export did not settle after cancellation or failure",
+  });
+}
+
+async function resetDesktopSession() {
+  await browser.execute(() => window.localStorage.clear());
+  await browser.refresh();
+  const title = await browser.$(".document-title");
+  await title.waitForDisplayed();
+  await browser.waitUntil(() => title.getText().then((text) => text.includes("desktop-e2e.md")), {
+    timeout: 15_000,
+    timeoutMsg: "the desktop E2E fixture was not restored after resetting the session",
+  });
+}
+
+function readApplicationWorkingSetBytes() {
+  if (process.platform !== "win32") return null;
+
+  try {
+    const output = execFileSync("tasklist.exe", ["/FI", "IMAGENAME eq moyang-reader.exe", "/FO", "CSV", "/NH"], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const values = output
+      .split(/\r?\n/)
+      .filter((line) => /^"moyang-reader\.exe"/i.test(line))
+      .flatMap((line) => line.match(/"[^"]*"/g) ?? [])
+      .map((value) => value.slice(1, -1));
+    const memoryValues = values
+      .filter((_, index) => index % 5 === 4)
+      .map((value) => Number(value.replace(/[^0-9]/g, "")) * 1024)
+      .filter((value) => Number.isFinite(value) && value > 0);
+    return memoryValues.length > 0 ? Math.max(...memoryValues) : null;
+  } catch {
+    return null;
+  }
+}
+
+function createApplicationMemoryProbe() {
+  const samples = [];
+  const sample = () => {
+    const bytes = readApplicationWorkingSetBytes();
+    if (bytes !== null) samples.push({ at: performance.now(), bytes });
+  };
+  sample();
+  const timer = globalThis.setInterval(sample, 250);
+  return {
+    stop() {
+      globalThis.clearInterval(timer);
+      sample();
+      const peakWorkingSetBytes = samples.reduce((peak, sampleItem) => Math.max(peak, sampleItem.bytes), 0);
+      return {
+        sampleCount: samples.length,
+        initialWorkingSetBytes: samples[0]?.bytes ?? null,
+        peakWorkingSetBytes: peakWorkingSetBytes || null,
+      };
+    },
+  };
+}
+
+async function startRendererResponsivenessProbe() {
+  await browser.execute(() => {
+    const key = "__moyangDesktopE2eResponsivenessProbe";
+    const previous = window[key];
+    if (previous) window.clearInterval(previous.timer);
+    const startedAt = window.performance.now();
+    const state = { startedAt, sampleCount: 0, maxGapMs: 0, lastTickAt: startedAt };
+    const timer = window.setInterval(() => {
+      const now = window.performance.now();
+      state.sampleCount += 1;
+      state.maxGapMs = Math.max(state.maxGapMs, now - state.lastTickAt);
+      state.lastTickAt = now;
+    }, 50);
+    window[key] = { state, timer };
+  });
+}
+
+async function stopRendererResponsivenessProbe() {
+  return browser.execute(() => {
+    const key = "__moyangDesktopE2eResponsivenessProbe";
+    const probe = window[key];
+    if (!probe) return null;
+    window.clearInterval(probe.timer);
+    const durationMs = window.performance.now() - probe.state.startedAt;
+    delete window[key];
+    return {
+      durationMs,
+      sampleCount: probe.state.sampleCount,
+      maxGapMs: probe.state.maxGapMs,
+    };
+  });
+}
+
+function logExportBenchmark(report) {
+  console.log(`desktop-export-benchmark ${JSON.stringify(report)}`);
+}
+
+async function interactWithExportWhileRunning() {
+  return browser.executeAsync((done) => {
+    const startedAt = performance.now();
+    const schedule = (callback) => {
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(callback);
+      } else {
+        window.setTimeout(callback, 0);
+      }
+    };
+    const findCancelButton = () =>
+      Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "取消导出");
+    const findContextToggle = () => document.querySelector('button[aria-keyshortcuts="Control+Shift+R"]');
+    const waitFor = (predicate, stage, callback) => {
+      const waitStartedAt = performance.now();
+      const poll = () => {
+        if (predicate()) {
+          callback();
+          return;
+        }
+        if (performance.now() - waitStartedAt >= 15_000) {
+          done({ status: "timeout", stage });
+          return;
+        }
+        schedule(poll);
+      };
+      poll();
+    };
+    const waitForCancelableExport = () => {
+      const cancelButton = findCancelButton();
+      if (!cancelButton) {
+        if (document.querySelector(".workspace-export-note")?.textContent) {
+          done({ status: "completed-before-cancel" });
+          return;
+        }
+        if (performance.now() - startedAt >= 15_000) {
+          done({ status: "timeout", stage: "cancel-button" });
+          return;
+        }
+        schedule(waitForCancelableExport);
+        return;
+      }
+
+      const contextToggle = findContextToggle();
+      if (!contextToggle) {
+        done({ status: "missing-context-toggle" });
+        return;
+      }
+
+      const contextWasOpen = contextToggle.getAttribute("aria-pressed") === "true";
+      const contextStartedAt = performance.now();
+      contextToggle.click();
+      waitFor(
+        () => contextToggle.getAttribute("aria-pressed") === String(!contextWasOpen),
+        "context-open",
+        () => {
+          const contextToggleLatencyMs = performance.now() - contextStartedAt;
+          contextToggle.click();
+          waitFor(
+            () => contextToggle.getAttribute("aria-pressed") === String(contextWasOpen),
+            "context-restore",
+            () => {
+              const cancellationStartedAt = performance.now();
+              findCancelButton()?.click();
+              waitFor(
+                () => !findCancelButton(),
+                "cancel-settle",
+                () =>
+                  done({
+                    status: "cancelled",
+                    contextToggleLatencyMs,
+                    cancellationLatencyMs: performance.now() - cancellationStartedAt,
+                  }),
+              );
+            },
+          );
+        },
+      );
+    };
+
+    waitForCancelableExport();
   });
 }
 
@@ -517,17 +696,23 @@ describe("Moyang Reader desktop runtime", () => {
   });
 
   it("cancels a large batch Word export and cleans failed destinations", async () => {
-    const batchFixtureCount = 96;
+    await resetDesktopSession();
+    const batchFixtureCount = 48;
     const batchFixturePaths = Array.from({ length: batchFixtureCount }, (_, index) =>
       path.join(path.dirname(documentPath), `desktop-batch-cancel-${String(index + 1).padStart(3, "0")}.md`),
     );
-    const batchFixtureContent = `# Batch cancellation fixture\n\n${"批量导出取消与失败清理回归内容。\n".repeat(1_600)}`;
+    const batchImagePath = path.join(path.dirname(documentPath), "desktop-batch-cancel-image.svg");
+    const batchImageContent = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800"><rect width="1200" height="800" fill="#dbeafe"/>${'<rect x="20" y="20" width="8" height="8" fill="#2563eb"/>'.repeat(4_000)}</svg>`;
+    const batchImageBytes = Buffer.byteLength(batchImageContent, "utf8");
+    const batchFixtureContent = `# Batch cancellation fixture\n\n![[desktop-batch-cancel-image.svg]]\n\n${"批量导出取消与失败清理回归内容。\n".repeat(800)}`;
+    const batchFixtureBytes = Buffer.byteLength(batchFixtureContent, "utf8") * batchFixtureCount;
     const initialItemCount = await browser.execute(() => {
       const text = document.querySelector(".workspace-location")?.textContent ?? "";
       return Number(text.match(/(\d+)\s*项/)?.[1] ?? 0);
     });
     const firstVolumePath = path.join(exportRoot, `${workspaceName} - 第 1 卷.docx`);
 
+    fs.writeFileSync(batchImagePath, batchImageContent, "utf8");
     for (const fixturePath of batchFixturePaths) fs.writeFileSync(fixturePath, batchFixtureContent, "utf8");
     removeExportArtifacts();
 
@@ -537,19 +722,70 @@ describe("Moyang Reader desktop runtime", () => {
         "the desktop batch-export fixtures did not finish indexing",
       );
 
-      await clickWorkspaceExportAction("单文件 Word");
-      const cancelButton = await browser.$("button=取消导出");
-      await cancelButton.waitForDisplayed();
-      assert.equal(await browser.$(".document-title").isDisplayed(), true);
-      await cancelButton.click();
-      await waitForExportToSettle();
+      const memoryProbe = createApplicationMemoryProbe();
+      let rendererProbeActive = false;
+      let benchmarkReport = null;
+      try {
+        await startRendererResponsivenessProbe();
+        rendererProbeActive = true;
+        await clickWorkspaceExportAction("单文件 Word");
+        const exportInteraction = await interactWithExportWhileRunning();
+        assert.equal(
+          exportInteraction.status,
+          "cancelled",
+          `batch export did not reach the cancellation path: ${JSON.stringify(exportInteraction)}`,
+        );
+        assert.equal(await browser.$(".document-title").isDisplayed(), true);
+        await waitForExportToSettle();
+        const rendererMetrics = await stopRendererResponsivenessProbe();
+        rendererProbeActive = false;
+        const memoryMetrics = memoryProbe.stop();
 
-      const cancellationNotice = await browser.$(".workspace-export-note");
-      await cancellationNotice.waitForDisplayed();
-      assert.match(await cancellationNotice.getText(), /已取消批量导出/);
-      assert.deepEqual(listExportTempFiles(), []);
-      for (const artifactPath of listWorkspaceExportArtifacts()) {
-        assert.equal(fs.readFileSync(artifactPath).subarray(0, 2).toString("ascii"), "PK");
+        assert.ok(
+          exportInteraction.contextToggleLatencyMs < 5_000,
+          "the main-window context action should respond within 5 seconds",
+        );
+        assert.ok(
+          exportInteraction.cancellationLatencyMs < 15_000,
+          "batch export cancellation should settle within 15 seconds",
+        );
+        benchmarkReport = {
+          fixture: {
+            documentCount: batchFixtureCount,
+            markdownBytes: batchFixtureBytes,
+            imageCount: 1,
+            imageBytes: batchImageBytes,
+          },
+          responsiveness: {
+            contextToggleLatencyMs: Math.round(exportInteraction.contextToggleLatencyMs),
+            rendererSampleCount: rendererMetrics?.sampleCount ?? 0,
+            rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
+          },
+          cancellation: {
+            latencyMs: Math.round(exportInteraction.cancellationLatencyMs),
+            committedVolumeCount: listWorkspaceExportArtifacts().length,
+          },
+          process: {
+            measurement: "Windows tasklist Working Set",
+            sampleCount: memoryMetrics.sampleCount,
+            initialWorkingSetBytes: memoryMetrics.initialWorkingSetBytes,
+            peakWorkingSetBytes: memoryMetrics.peakWorkingSetBytes,
+          },
+        };
+        logExportBenchmark(benchmarkReport);
+
+        const cancellationNotice = await browser.$(".workspace-export-note");
+        await cancellationNotice.waitForDisplayed();
+        assert.match(await cancellationNotice.getText(), /已取消批量导出/);
+        assert.deepEqual(listExportTempFiles(), []);
+        for (const artifactPath of listWorkspaceExportArtifacts()) {
+          assert.equal(fs.readFileSync(artifactPath).subarray(0, 2).toString("ascii"), "PK");
+        }
+      } finally {
+        if (rendererProbeActive) {
+          await stopRendererResponsivenessProbe().catch(() => null);
+        }
+        if (!benchmarkReport) memoryProbe.stop();
       }
 
       removeExportArtifacts();
@@ -564,6 +800,7 @@ describe("Moyang Reader desktop runtime", () => {
     } finally {
       fs.rmSync(firstVolumePath, { recursive: true, force: true });
       removeExportArtifacts();
+      fs.rmSync(batchImagePath, { force: true });
       for (const fixturePath of batchFixturePaths) fs.rmSync(fixturePath, { force: true });
     }
   });
