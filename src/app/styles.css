@@ -1004,9 +1004,41 @@ a:focus-visible {
 .draft-comparison-intro strong {
   color: var(--ink);
 }
+.draft-comparison-decision {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+.draft-comparison-decision strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+.draft-comparison-decision span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.draft-comparison-decision.ready {
+  border-color: color-mix(in srgb, #4eaa82 52%, var(--line));
+  background: color-mix(in srgb, #4eaa82 10%, var(--surface));
+}
+.draft-comparison-decision.ready strong {
+  color: #23634f;
+}
+.draft-comparison-decision.warning {
+  border-color: color-mix(in srgb, var(--accent-warm) 58%, var(--line));
+  background: color-mix(in srgb, var(--accent-warm) 10%, var(--surface-strong));
+}
+.draft-comparison-decision.warning strong {
+  color: color-mix(in srgb, var(--accent-warm) 78%, var(--ink));
+}
 .draft-comparison-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -3804,6 +3836,9 @@ html.pane-resizing * {
   :root:not([data-theme]) .draft-recovery-diff-summary {
     color: #a8d9c5 !important;
   }
+  :root:not([data-theme]) .draft-comparison-decision.ready strong {
+    color: #9bd8ba;
+  }
   :root:not([data-theme]) .draft-comparison-stats .draft-comparison-added,
   :root:not([data-theme]) .draft-diff-line.added,
   :root:not([data-theme]) .draft-diff-line.added .draft-diff-marker {
@@ -3911,6 +3946,9 @@ html.pane-resizing * {
 }
 :root[data-theme="dark"] .draft-recovery-diff-summary {
   color: #a8d9c5 !important;
+}
+:root[data-theme="dark"] .draft-comparison-decision.ready strong {
+  color: #9bd8ba;
 }
 :root[data-theme="dark"] .draft-comparison-stats .draft-comparison-added,
 :root[data-theme="dark"] .draft-diff-line.added,

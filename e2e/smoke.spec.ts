@@ -151,6 +151,7 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   await page.getByRole("button", { name: "查看 recovery-note.md 草稿差异" }).click();
   const comparisonDialog = page.getByRole("dialog", { name: "恢复前查看差异" });
   await expect(comparisonDialog).toContainText("新增行");
+  await expect(comparisonDialog).toContainText("存在未保存内容");
   await expect(comparisonDialog).toContainText("未保存内容");
   await page.keyboard.press("Escape");
   await expect(comparisonDialog).toHaveCount(0);
