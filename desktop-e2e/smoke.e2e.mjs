@@ -77,6 +77,58 @@ async function waitForExport(pathname, description) {
   );
 }
 
+function listWorkspaceExportArtifacts() {
+  if (!fs.existsSync(exportRoot)) return [];
+  return fs
+    .readdirSync(exportRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.startsWith(workspaceName) && entry.name.endsWith(".docx"))
+    .map((entry) => path.join(exportRoot, entry.name));
+}
+
+function listExportTempFiles() {
+  if (!fs.existsSync(exportRoot)) return [];
+  return fs
+    .readdirSync(exportRoot, { withFileTypes: true })
+    .filter((entry) => entry.name.includes(".moyang-export-part-") && entry.name.endsWith(".tmp"))
+    .map((entry) => path.join(exportRoot, entry.name));
+}
+
+function removeExportArtifacts() {
+  if (!fs.existsSync(exportRoot)) return;
+  for (const entry of fs.readdirSync(exportRoot, { withFileTypes: true })) {
+    if (
+      (entry.name.startsWith(workspaceName) && entry.name.endsWith(".docx")) ||
+      entry.name.includes(".moyang-export-part-")
+    ) {
+      fs.rmSync(path.join(exportRoot, entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
+async function waitForWorkspaceItemCountAtLeast(minimum, description) {
+  await browser.waitUntil(
+    () =>
+      browser
+        .execute(() => {
+          const text = document.querySelector(".workspace-location")?.textContent ?? "";
+          return Number(text.match(/(\d+)\s*项/)?.[1] ?? -1);
+        })
+        .then((count) => count >= minimum),
+    {
+      timeout: 30_000,
+      timeoutMsg: description,
+    },
+  );
+}
+
+async function waitForExportToSettle() {
+  const cancelButton = await browser.$("button=取消导出");
+  await browser.waitUntil(() => cancelButton.isDisplayed().then((visible) => !visible), {
+    timeout: 30_000,
+    timeoutMsg: "the workspace export did not settle after cancellation or failure",
+  });
+}
+
 async function workspaceEntryExists(selector, text = "") {
   return browser.execute(
     (entrySelector, expectedText) => {
@@ -462,6 +514,58 @@ describe("Moyang Reader desktop runtime", () => {
     await waitForExport(docxExportPath, "the real Tauri Word export");
     const docxBytes = fs.readFileSync(docxExportPath);
     assert.equal(docxBytes.subarray(0, 2).toString("ascii"), "PK");
+  });
+
+  it("cancels a large batch Word export and cleans failed destinations", async () => {
+    const batchFixtureCount = 96;
+    const batchFixturePaths = Array.from({ length: batchFixtureCount }, (_, index) =>
+      path.join(path.dirname(documentPath), `desktop-batch-cancel-${String(index + 1).padStart(3, "0")}.md`),
+    );
+    const batchFixtureContent = `# Batch cancellation fixture\n\n${"批量导出取消与失败清理回归内容。\n".repeat(1_600)}`;
+    const initialItemCount = await browser.execute(() => {
+      const text = document.querySelector(".workspace-location")?.textContent ?? "";
+      return Number(text.match(/(\d+)\s*项/)?.[1] ?? 0);
+    });
+    const firstVolumePath = path.join(exportRoot, `${workspaceName} - 第 1 卷.docx`);
+
+    for (const fixturePath of batchFixturePaths) fs.writeFileSync(fixturePath, batchFixtureContent, "utf8");
+    removeExportArtifacts();
+
+    try {
+      await waitForWorkspaceItemCountAtLeast(
+        initialItemCount + batchFixtureCount,
+        "the desktop batch-export fixtures did not finish indexing",
+      );
+
+      await clickWorkspaceExportAction("单文件 Word");
+      const cancelButton = await browser.$("button=取消导出");
+      await cancelButton.waitForDisplayed();
+      assert.equal(await browser.$(".document-title").isDisplayed(), true);
+      await cancelButton.click();
+      await waitForExportToSettle();
+
+      const cancellationNotice = await browser.$(".workspace-export-note");
+      await cancellationNotice.waitForDisplayed();
+      assert.match(await cancellationNotice.getText(), /已取消批量导出/);
+      assert.deepEqual(listExportTempFiles(), []);
+      for (const artifactPath of listWorkspaceExportArtifacts()) {
+        assert.equal(fs.readFileSync(artifactPath).subarray(0, 2).toString("ascii"), "PK");
+      }
+
+      removeExportArtifacts();
+      fs.mkdirSync(firstVolumePath);
+      await clickWorkspaceExportAction("单文件 Word");
+      const errorAlert = await browser.$('[role="alert"]');
+      await errorAlert.waitForDisplayed();
+      assert.match(await errorAlert.getText(), /导出|保存|失败/);
+      await waitForExportToSettle();
+      assert.equal(fs.statSync(firstVolumePath).isDirectory(), true);
+      assert.deepEqual(listExportTempFiles(), []);
+    } finally {
+      fs.rmSync(firstVolumePath, { recursive: true, force: true });
+      removeExportArtifacts();
+      for (const fixturePath of batchFixturePaths) fs.rmSync(fixturePath, { force: true });
+    }
   });
 
   it("reloads an unmodified document after an external workspace change", async () => {
