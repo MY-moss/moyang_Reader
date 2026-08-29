@@ -4649,10 +4649,6 @@ export function App() {
         onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={toggleReadingEditing}
         onCycleMode={toggleDocumentMode}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={undoEditor}
-        onRedo={redoEditor}
         rightPanelOpen={rightPanelOpen}
         onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
@@ -5107,3 +5103,4 @@ export function App() {
     </div>
   );
 }
+

@@ -224,16 +224,6 @@ a:focus-visible {
 .focus-button {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
 }
-.toolbar-history {
-  display: flex;
-  gap: 4px;
-}
-.toolbar-history .toolbar-button {
-  min-width: 34px;
-  padding-inline: 8px;
-  font-size: 18px;
-  line-height: 1;
-}
 .recovery-button {
   border-color: color-mix(in srgb, var(--accent-warm) 58%, var(--line));
   color: #9b532f;
@@ -4932,3 +4922,4 @@ html.pane-resizing * {
     margin: 16px auto 36px;
   }
 }
+
