@@ -57,6 +57,19 @@
 - 桌面 smoke 必须记录夹具文档数、Markdown 字节数、图片数量/字节数、上下文面板交互延迟、渲染线程最大事件循环间隔、取消延迟和 Windows Working Set 峰值；这些数据用于同机趋势回归，不作为所有设备的固定承诺。
 - 本补充同时验收导出路径授权边界和调度让出修复；不改变 DOCX、HTML、PDF、分卷、内容转换或版本发布语义。
 
+## v0.11.0 TypeScript/Rust 质量门禁首个切片（#189）
+
+- ESLint 必须将 `@typescript-eslint/no-explicit-any` 和未使用变量从允许/告警提升为阻断错误；当前代码基线不得新增误报。
+- `tsconfig.app.json` 和 `tsconfig.node.json` 必须启用未使用局部/参数、`switch` 穿透检查；应用配置同时启用 `verbatimModuleSyntax`，与现有严格类型检查保持一致。
+- `src-tauri/Cargo.toml` 必须声明与当前 Windows x64 依赖解析一致的最低 Rust 版本；本基线为 `1.88`。CI 必须在编译门禁前输出实际工具链和 manifest 最低版本，并通过 Cargo metadata 兼容性检查。
+- 本切片只改变静态质量约束和 CI 预检，不改变用户文档、编辑器、导出、更新器或 Release 资产；已有业务行为必须通过现有质量门禁。
+
+### v0.11.0 质量门禁验收场景
+
+- 当前代码执行 `npm run lint` 无 warning/error，`npm run build` 的 TypeScript 项目引用检查通过；新增显式 `any` 或未使用变量时，ESLint 必须以非零状态失败。
+- 当前应用和 Node 配置执行严格未使用、`switch` 穿透与模块语义检查通过；Rust Windows 目标 metadata 能在 `rust-version = "1.88"` 下解析。
+- CI 的 Rust 最低版本步骤缺少 manifest 字段或工具链不满足约束时必须失败并显示原因；该步骤不重复完整编译。
+
 ## v0.9.0 必须完成
 
 1. 三栏职责明确：左侧工作区导航，中间阅读/编辑，右侧上下文。

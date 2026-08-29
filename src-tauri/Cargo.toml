@@ -4,6 +4,7 @@ version = "0.10.13"
 description = "A fast local document reader"
 authors = ["Moyang"]
 edition = "2021"
+rust-version = "1.88"
 
 [lib]
 name = "moyang_reader_lib"

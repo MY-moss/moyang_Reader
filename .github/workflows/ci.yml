@@ -42,6 +42,18 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify Rust minimum version
+        shell: pwsh
+        run: |
+          $manifest = Get-Content src-tauri/Cargo.toml -Raw
+          $minimum = [regex]::Match($manifest, '(?m)^rust-version\s*=\s*"([^"]+)"').Groups[1].Value
+          if (-not $minimum) {
+            throw "src-tauri/Cargo.toml must declare rust-version"
+          }
+          Write-Host "Rust toolchain: $(rustc --version)"
+          Write-Host "Manifest minimum Rust version: $minimum"
+          cargo metadata --manifest-path src-tauri/Cargo.toml --locked --no-deps --format-version 1 --filter-platform x86_64-pc-windows-msvc | Out-Null
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:

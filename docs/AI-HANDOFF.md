@@ -1,19 +1,29 @@
 ## 当前发布状态（2026-08-29）
 
-- 本次 INTAKE 确认的远程主线基线为 `main@4bdd0c8e4f727566ca0a0c23af95a4e2cc6979d1`，版本文件仍为 `0.10.13`；本切片在独立分支完成，待创建一个 PR 后合并。
+- 当前远程主线：`main@4e31ad7653f9449214a2736dd390fc0eea795e10`，版本文件仍为 `0.10.13`；PR [#335](https://github.com/MY-moss/moyang_Reader/pull/335) 已合并并完成 #87 本轮桌面验收。
 - 当前稳定 Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开；Windows x64 安装包 5,046,081 字节，SHA-256 `2bd6097e9952e7c6c74365a4a1751290470586a16e28b54df8e4a994b642782f`；签名文件 428 字节，SHA-256 `7b031ce4636b48d1774d118c4a6b2cbcff716bccb4038a07d072ff760088482c`。
 - 草稿恢复差异预览（#323）已随本版本发布：恢复前可查看当前版本与草稿的新增/移除行、字符变化和有限差异；无差异时显示“无需恢复”，恢复只进入编辑区，必须显式保存。
 - Cloudflare Pages 的 `latest.json`、安装包和签名已在线核验且哈希与 GitHub 一致；Release 自动镜像 job `33245475550` 仍因 Cloudflare Actions Secret 缺失失败，因此自动同步门禁保持未全绿。
-- 下一步：审查本切片变更、提交并推送 `codex/export-responsiveness-2026-08-29`，创建一个关联 #87 的 PR；Quality checks 通过且无冲突时合并，随后在本文件和 Issue 留下短交接并停止，不自动进入下一项或单独发布安装包。
+- 下一步：从最新 `main` 继续处理 #189 的首个质量门禁切片；完成一个 PR、更新本文件和对应 Issue 后停止，不自动进入下一项或单独发布安装包。
 
-## 当前待合并切片：#87 Windows 桌面批量导出响应性与授权边界（2026-08-29）
+## 已完成切片：#87 Windows 桌面批量导出响应性与授权边界（2026-08-29）
 
 - 状态：生产修复、针对性 Rust/前端测试和真实 Windows Tauri smoke 均完成；本段记录的是单一垂直切片，不等同于关闭整个 #87。
 - 工作范围：`src-tauri/src/commands.rs` 收紧精确导出目标和同目录 ` - 第 N 卷` 分卷授权；`src/app/App.tsx` 在导出开始及逐文档处理间让出调度；`desktop-e2e/smoke.e2e.mjs` 增加可操作性、取消清理和本机趋势基准；同步更新需求、路线、工作流和变更记录。
 - 验收结果：Rust 定向授权测试通过，Rust library `51 passed`；前端导出定向测试 `30 passed`；真实 Windows desktop smoke `1/1` 通过。夹具为 48 篇 Markdown、1,884,816 字节文本和 228,143 字节 SVG；上下文面板交互 2ms、渲染事件循环最大间隔 66ms、取消延迟 97ms；Working Set 47,038,464 → 48,058,368 字节。以上为本机趋势数据，不是跨设备承诺。
 - 失败路径：取消和目标路径为目录的提交失败均确认没有残留 `.moyang-export-part-*.tmp`；已提交分卷必须以 `PK` 开头。测试夹具、导出产物和失败模拟目录都在 smoke 结束时清理。
-- 发布边界：本切片不生成安装包、签名、`latest.json`、GitHub Release 或 Cloudflare 镜像；稳定批次再按 `docs/RELEASE-POLICY.md` 发布。#87 继续保持 open，后续仅在更大真实图片、长单块内容和重复矩阵有明确缺口时再开新切片。
-- 下一位 AI：先检查本段和 #87；完成 checkpoint/PR/合并后更新本文件与 Issue，确认没有未完成要求即停止。不要顺手处理 #104、更新器、镜像 Secret 或其他产品功能。
+- 合并结果：PR [#335](https://github.com/MY-moss/moyang_Reader/pull/335) 已 squash 合并为 `main@4e31ad7653f9449214a2736dd390fc0eea795e10`；Quality checks run `33254080852` 全绿，#87 已追加验收摘要但继续保持 open。
+- 发布边界：本切片不生成安装包、签名、`latest.json`、GitHub Release 或 Cloudflare 镜像；稳定批次再按 `docs/RELEASE-POLICY.md` 发布。#87 后续仅在更大真实图片、长单块内容和重复矩阵有明确缺口时再开新切片。
+- 下一位 AI：先检查最新 `main` 和开放 Issues，从 Ready backlog 选择唯一切片；不要重复 #335、#87 桌面验收或顺手处理更新器、镜像 Secret 和其他产品功能。
+
+## 当前切片：#189 TypeScript/Rust 质量门禁首个垂直切片（2026-08-29）
+
+- 基线：`main@4e31ad7653f9449214a2736dd390fc0eea795e10`；功能分支为 `codex/quality-gates-2026-08-29`，原始开发目录的未提交改动未触碰。
+- 目标：把显式 `any`、未使用变量、TypeScript 未使用/`switch`/模块语义和 Rust 最低版本约束固化为阻断门禁，降低后续 AI/贡献者回归风险。
+- 已实现：ESLint 将显式 `any` 与未使用变量设为 error；两个 tsconfig 启用未使用、`switch` 穿透检查，应用配置启用 `verbatimModuleSyntax`；Cargo 声明 `rust-version = "1.88"`；Windows CI 增加不重复编译的 Rust metadata 兼容性预检。
+- 基线证据：显式 `any` 为 0、ESLint warning/error 为 0；严格 TypeScript 试运行通过；Windows 依赖解析最高 Rust 要求为 1.88；本地 lint、TypeScript build 和 metadata 通过。
+- 发布边界：只改变静态质量约束和 CI 预检，不改变用户可见功能；#189 不因本切片提前关闭，后续类型感知规则和 fallout 另行切片；不生成安装包或 Release。
+- 交接：完成本分支的定向验证和一次 PR Quality checks 后，更新本段与 #189，若全绿且无真实冲突则合并并停止，不自动进入下一事项。
 
 ## 已完成切片：#87 单卷 DOCX 增量归档（2026-08-29）
 
