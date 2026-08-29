@@ -1,21 +1,22 @@
 ## 当前发布状态（2026-08-29）
 
-- 当前主线：`main@5c016e2ddf71c589de3191383b3595af4c6e7705`，版本文件已统一为 `0.10.13`。
+- 当前主线：`main@85adbae647aa580b05207afe46c7c69015f9a5bc`，版本文件仍为 `0.10.13`；#87 的本轮性能切片已合并但尚未进入稳定 Release。
 - 当前稳定 Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开；Windows x64 安装包 5,046,081 字节，SHA-256 `2bd6097e9952e7c6c74365a4a1751290470586a16e28b54df8e4a994b642782f`；签名文件 428 字节，SHA-256 `7b031ce4636b48d1774d118c4a6b2cbcff716bccb4038a07d072ff760088482c`。
 - 草稿恢复差异预览（#323）已随本版本发布：恢复前可查看当前版本与草稿的新增/移除行、字符变化和有限差异；无差异时显示“无需恢复”，恢复只进入编辑区，必须显式保存。
 - Cloudflare Pages 的 `latest.json`、安装包和签名已在线核验且哈希与 GitHub 一致；Release 自动镜像 job `33245475550` 仍因 Cloudflare Actions Secret 缺失失败，因此自动同步门禁保持未全绿。
-- 下一步：#87 的单卷 DOCX 增量归档切片已在本交接之后开始；完成本切片的 PR、质量检查和 Windows 导出回归后停止，不自动进入下一项或单独发布安装包。
+- 下一步：#87 的单卷 DOCX 增量归档切片已由 PR #332 合并；#87 仍需真实 Windows 批量导出/取消/失败清理验收后才能关闭。当前切片到此停止，不自动进入下一项或单独发布安装包。
 
-## 当前开发切片：#87 单卷 DOCX 增量归档（2026-08-29）
+## 已完成切片：#87 单卷 DOCX 增量归档（2026-08-29）
 
 - 基线：从 `main@0c6138f1f85ca47e1acca5e5b9ed9372445548ca` 创建 `codex/batch-export-memory-2026-08-29`；原始开发目录的 29 个未提交改动未触碰，隔离工作树位于项目内 `.codex-worktrees/batch-export-memory-2026-08-29`。
 - 根因：前置切片虽已把 JSZip 内部流分块写入临时文件，但 `prepareBatchDocxArchive` 仍先拼接整卷 `document.xml`、图片和 JSZip 条目；Worker 只转移线程，不降低该峰值。
 - 实现：新增轻量 ZIP 流写入器；`word/document.xml` 以文档块写入，XML 通过 raw DEFLATE，图片按原始字节写入；中央目录、数据描述符、图片关系和超链接关系在归档结束时补齐。`buildDocxExport` 和不支持 raw DEFLATE 的环境继续走 JSZip。
 - 保持不变：Markdown/HTML/Word 转换、分卷上限、保存路径授权、同目录临时文件、原子提交、取消/失败清理和失败清单均不改；复杂单个 HTML 块尚未细分。
-- 已验证：导出定向测试 31/31、`npm run build` 和 `npm run lint` 通过；合成同环境基准（32 篇约 16 MiB 高变化文本）堆峰值从约 82.8 MiB 降至约 75.0 MiB，属于趋势测量，不是设备承诺。临时基准文件只用于本地测量，不纳入提交。
-- 待验证：`npm run format:check`、前端全量测试、PR Quality、Windows 桌面真实批量 Word 导出和取消/失败清理；未完成前不要关闭 #87，也不要创建 Release。
+- 已验证：导出定向测试 31/31、前端全量测试 66 个文件/262 项、`npm run format:check`、`npm run build` 和 `npm run lint` 均通过；合成同环境基准（32 篇约 16 MiB 高变化文本）堆峰值从约 82.8 MiB 降至约 75.0 MiB，属于趋势测量，不是设备承诺。临时基准文件只用于本地测量，不纳入提交。
+- 合并结果：PR [#332](https://github.com/MY-moss/moyang_Reader/pull/332) 已 squash 合并为 `main@85adbae647aa580b05207afe46c7c69015f9a5bc`；PR Quality checks run `33248063932` 全部成功，push run `33248078709` 为并发去重后的 skipped，不代表失败。
+- 验收边界：真实 Windows 桌面批量 Word 导出、取消/失败清理仍是 #87 的剩余验收，不在本切片中虚报完成；因此 #87 保持 open。
 - 回滚：回滚本分支/PR 即可；无数据迁移，导出目标仍通过现有临时文件提交边界保护。
-- 下一位 AI：先查看本段、#87、开放 PR 和最新 `main`；只继续本切片的验证/修复，完成一个 PR 后更新本文件并停止。不要再创建第二个 #87 分支，不要同时处理 #104、发布镜像或其他 Issue。
+- 下一位 AI：先查看本段、#87、开放 PR 和最新 `main`；如果继续 #87，只做剩余 Windows 验收或其独立修复，不要重做已合并的增量归档。完成一个 PR 后更新本文件并停止；不要同时处理 #104、发布镜像或其他 Issue。
 
 ## #187 Windows 窄窗口与工具栏可发现性（2026-08-29）
 
