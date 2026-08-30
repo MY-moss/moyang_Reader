@@ -1124,6 +1124,59 @@ test("uses the in-app insertion panel for WYSIWYG links and source images/tables
   await expect(page.getByRole("dialog", { name: "插入内容" })).toHaveCount(0);
 });
 
+test("keeps the insert panel near the caret without hijacking a long-document viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "long-insert-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(
+      [
+        "# 长文档插入定位",
+        "",
+        ...Array.from(
+          { length: 80 },
+          (_, index) => `第 ${index + 1} 段正文，用于验证插入面板在长文档中部不会把阅读位置拉回顶部。`,
+        ),
+      ].join("\n\n"),
+    ),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  const contentArea = page.locator(".content-area");
+  await expect
+    .poll(() => contentArea.evaluate((element) => element.scrollHeight), { timeout: 5_000 })
+    .toBeGreaterThan(1_500);
+
+  const middleParagraph = page.locator(".wysiwyg-editor .editor p").nth(40);
+  await middleParagraph.scrollIntoViewIfNeeded();
+  await middleParagraph.click();
+  const scrollTopBeforeOpen = await contentArea.evaluate((element) => element.scrollTop);
+  expect(scrollTopBeforeOpen).toBeGreaterThan(100);
+
+  await page.keyboard.press("Control+k");
+  const insertDialog = page.getByRole("dialog", { name: "插入内容" });
+  await expect(insertDialog).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await insertDialog.boundingBox();
+      const viewport = page.viewportSize();
+      if (!box || !viewport) return false;
+      return box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height;
+    })
+    .toBe(true);
+  expect(await contentArea.evaluate((element) => element.scrollTop)).toBe(scrollTopBeforeOpen);
+
+  await contentArea.evaluate((element) => {
+    element.scrollTop += 80;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect(insertDialog).toHaveCount(0);
+  await expect(editable).toBeFocused();
+});
+
 test("debounces in-document search and navigates highlighted matches", async ({ page }) => {
   await page.goto("/");
 

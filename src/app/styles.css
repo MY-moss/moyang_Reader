@@ -27,6 +27,14 @@
   --radius: 5px;
 }
 
+.editor-insert-popover.is-floating {
+  position: fixed;
+  z-index: 90;
+  width: min(430px, calc(100vw - 24px));
+  max-height: min(560px, calc(100dvh - 24px));
+  overflow-y: auto;
+}
+
 * {
   box-sizing: border-box;
 }
