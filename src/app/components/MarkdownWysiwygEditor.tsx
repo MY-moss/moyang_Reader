@@ -21,6 +21,7 @@ import { TextSelection } from "@milkdown/kit/prose/state";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { createEditorSourceSyncTracker } from "../markdown-editor-support";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
+import type { EditorInsertAnchor } from "../editor-insert-position";
 import { formatEditorDate } from "../editor-context-actions";
 import { filterSlashCommands, slashCommands, type SlashCommand } from "../slash-command-menu";
 import {
@@ -67,7 +68,7 @@ type MarkdownWysiwygEditorProps = {
 
 type EditorViewInstance = {
   focus: () => void;
-  coordsAtPos: (pos: number) => { top: number; bottom: number; left: number };
+  coordsAtPos: (pos: number) => { top: number; bottom: number; left: number } | null;
   dispatch: (transaction: unknown) => void;
   state: {
     doc: {
@@ -228,6 +229,7 @@ function MilkdownSurface({
   const [insertOpen, setInsertOpen] = useState(false);
   const [insertKind, setInsertKind] = useState<EditorInsertKind>("link");
   const [insertInitialValues, setInsertInitialValues] = useState<EditorInsertInitialValues>({});
+  const [insertAnchor, setInsertAnchor] = useState<EditorInsertAnchor | null>(null);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -319,6 +321,33 @@ function MilkdownSurface({
     editable?.setAttribute("aria-multiline", "true");
   }, [ariaLabel, loading]);
 
+  const focusEditorPreservingViewport = useCallback(() => {
+    const view = viewRef.current;
+    const container = containerRef.current;
+    if (!view || !container) return;
+
+    const viewport = captureEditorViewport(container.closest<HTMLElement>(".content-area"), container);
+    view.focus();
+    restoreEditorViewport(viewport);
+    window.requestAnimationFrame(() => restoreEditorViewport(viewport));
+  }, []);
+
+  const restorePendingInsertSelection = useCallback(() => {
+    const view = viewRef.current;
+    const pending = pendingInsertSelectionRef.current;
+    if (!view || !pending) return;
+
+    const docSize = (view.state.doc as unknown as { content?: { size?: number } }).content?.size;
+    const from = Math.max(1, Math.min(pending.from, docSize ?? pending.from));
+    const to = Math.max(from, Math.min(pending.to, docSize ?? pending.to));
+    const container = containerRef.current;
+    const viewport = container ? captureEditorViewport(container.closest<HTMLElement>(".content-area"), container) : [];
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc as never, from, to)));
+    view.focus();
+    restoreEditorViewport(viewport);
+    window.requestAnimationFrame(() => restoreEditorViewport(viewport));
+  }, []);
+
   const openInsert = useCallback((kind: EditorInsertKind) => {
     const view = viewRef.current;
     if (!view) {
@@ -328,6 +357,18 @@ function MilkdownSurface({
 
     const { from, to } = view.state.selection;
     const selectedText = view.state.doc.textBetween(from, to, "\n").trim();
+    let anchor: EditorInsertAnchor | null = null;
+    try {
+      const coords = view.coordsAtPos(to);
+      if (coords) anchor = { left: coords.left, top: coords.top, bottom: coords.bottom };
+    } catch {
+      // A detached or not-yet-painted ProseMirror view has no usable caret rect.
+    }
+    if (!anchor) {
+      const bounds = containerRef.current?.getBoundingClientRect();
+      if (bounds) anchor = { left: bounds.left + 24, top: bounds.top + 24, bottom: bounds.top + 48 };
+    }
+
     pendingInsertSelectionRef.current = { from, to, selectedText };
     setInsertKind(kind);
     setInsertInitialValues({
@@ -336,16 +377,22 @@ function MilkdownSurface({
       rows: 3,
       columns: 3,
     });
+    setInsertAnchor(anchor);
     setInsertOpen(true);
     setContextMenu(null);
     completionRef.current = null;
     setCompletion(null);
   }, []);
 
-  const closeInsert = useCallback(() => {
-    pendingInsertSelectionRef.current = null;
-    setInsertOpen(false);
-  }, []);
+  const closeInsert = useCallback(
+    (restoreSelection = true) => {
+      if (restoreSelection) restorePendingInsertSelection();
+      pendingInsertSelectionRef.current = null;
+      setInsertAnchor(null);
+      setInsertOpen(false);
+    },
+    [restorePendingInsertSelection],
+  );
 
   const handleInsertRequest = useCallback(
     (request: EditorInsertRequest) => {
@@ -418,13 +465,13 @@ function MilkdownSurface({
             editor.action(callCommand(insertTableCommand.key, { row: request.rows, col: request.columns }));
             break;
         }
-        view.focus();
-        closeInsert();
+        focusEditorPreservingViewport();
+        closeInsert(false);
       } catch {
         onStatusMessageRef.current?.("插入失败，当前内容没有被覆盖，请切换源码模式继续操作。");
       }
     },
-    [closeInsert],
+    [closeInsert, focusEditorPreservingViewport],
   );
 
   useEffect(() => {
@@ -682,6 +729,10 @@ function MilkdownSurface({
       let left = 0;
       try {
         const coords = view.coordsAtPos(trigger.caret);
+        if (!coords) {
+          closeCompletion();
+          return;
+        }
         const bounds = container.getBoundingClientRect();
         top = coords.bottom - bounds.top + 4;
         left = Math.max(0, coords.left - bounds.left);
@@ -834,6 +885,8 @@ function MilkdownSurface({
         open={insertOpen}
         kind={insertKind}
         initialValues={insertInitialValues}
+        anchor={insertAnchor}
+        scrollContainerRef={containerRef}
         onCancel={closeInsert}
         onSubmit={handleInsertRequest}
       />
