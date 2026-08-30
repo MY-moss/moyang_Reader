@@ -6,9 +6,9 @@
 
 - 本轮开发基线：`main@0e85cbc0d9f6507f8dc0fcf08f748cac77d7b9cd`；#299 分支从该等价文件树继续。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 上一切片 PR：[#347](https://github.com/MY-moss/moyang_Reader/pull/347) 完成 #346，已合并；本轮 #299 已完成代码、测试和文档，PR/合并 SHA 以对应 GitHub 记录为准。
+- 上一切片 PR：[#344](https://github.com/MY-moss/moyang_Reader/pull/344)，用于完成 #301；已合并，Issue 已按 completed 关闭。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 本轮 #299 右键菜单焦点循环、关闭归还和稳定导航已完成本地验收；合并并关闭 Issue 后，唯一下一步为 #119 axe/WCAG AA Windows UI 基线，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 本轮 #299 右键菜单焦点循环、关闭归还和稳定导航已完成代码与本地验收；合并并关闭 Issue 后，唯一下一步为 #119 axe/WCAG AA Windows UI 基线，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -66,13 +66,13 @@
 
 ## 本轮 #346 交接
 
-- 基线：远程 `main@3b82408d67772f75cb75ec5eca702e8ec014abc1`；分支：`codex/draft-compare-2026-08-30`；独立 worktree。
-- Issue：[#346](https://github.com/MY-moss/moyang_Reader/issues/346)；本轮目标是恢复前明确比较“当前文件”和“本机草稿”，不是引入版本历史或三方合并。
+- 基线：远程 `main@55c09e94db26ed41aeb418dc3926ef012beb1b42`；分支：`codex/draft-compare-2026-08-30`；独立 worktree。
+- PR：[#347](https://github.com/MY-moss/moyang_Reader/pull/347)；Issue：[#346](https://github.com/MY-moss/moyang_Reader/issues/346)；本轮目标是恢复前明确比较“当前文件”和“本机草稿”，不是引入版本历史或三方合并。
 - 变更：桌面端恢复中心和当前文档提示读取当前磁盘版本；异步加载/失败禁止恢复；浏览器回退明确标注为草稿保存时的原文；增加来源卡片、差异统计、换行等价判断、重试和过期请求保护；恢复仍只进入编辑区，显式保存后才写盘。
 - 验证：定向前端单测 4 文件/13 项、TypeScript build、format、git diff 检查、生产构建、浏览器恢复中心 E2E 1/1、Windows desktop targeted smoke 1/1 均通过。
 - 风险与回滚：T2；只读当前文件并改变恢复前确认 UI，无数据迁移、更新器、签名、发布或镜像影响；回退本切片 PR 即可恢复旧行为。
 - 发布：本轮不生成安装包、Tag、Release 或镜像；纳入后续稳定 `v0.11.0` 批次。
-- 完成后唯一下一步：合并并关闭 #299，然后执行 [`NEXT.md`](NEXT.md) 中的 #119；不自动开始下一项。
+- 当前唯一下一步：执行 [`NEXT.md`](NEXT.md) 中的 #119；不自动开始下一项。
 
 ## 本轮 #299 交接
 
