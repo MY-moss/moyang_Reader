@@ -4,20 +4,20 @@
 
 ## 当前基线（2026-08-30）
 
-- 本轮开发基线：`main@4ca46c52e92bce6353667f0632db40613df4424b`。
+- 本轮开发基线：`main@2ae4836895f314ef40d65e0e29d5aa194e0d1000`。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 上一切片 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)，用于关闭 #87；已完成，最终状态以 GitHub 为准。
+- 上一切片 PR：[#344](https://github.com/MY-moss/moyang_Reader/pull/344)，用于完成 #301；已合并，Issue 已按 completed 关闭。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：#301 文件拖放状态和失败反馈；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 当前唯一下一步：#299 右键菜单焦点循环和焦点归还；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
 1. #87：批量导出最终矩阵与 Issue 闭环（本轮 PR #341）。
 2. #234：统一右上角通知栈。
 3. #189：类型感知 TypeScript/ESLint 门禁。
-4. #301：文件拖放状态与失败反馈。
+4. #301：文件拖放状态与失败反馈（已完成，PR #344）。
 5. #241/#51：更新实机验证、镜像与 Authenticode 条件项。
-6. #299：右键菜单键盘导航和焦点归还。
+6. #299：右键菜单键盘导航和焦点归还（当前 READY）。
 
 每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
 
@@ -50,6 +50,17 @@
 - 回滚：回退本切片 PR；不需要数据迁移，不生成安装包、Tag、Release 或镜像。
 - 验证：`npm test -- --run` 270/270、`npm run lint`、`npm run check:type-aware` 3/3、`npm run format:check`、TypeScript build、Rust fmt/clippy/tests 51、发布预检和 Actions 固定检查通过。
 - 交接：PR/CI 合并完成后将 #189 标记 completed；下一位 AI 只执行 [`NEXT.md`](NEXT.md) 中的 #301，不自动扩展范围。
+
+## 本轮 #301 交接
+
+- 基线：远程 `main@89b812af8b331e909a744686628b9abb6b3a4ee3`；分支：`codex/drag-drop-feedback-2026-08-30`；独立 worktree。
+- PR：[#344](https://github.com/MY-moss/moyang_Reader/pull/344)；Issue：[#301](https://github.com/MY-moss/moyang_Reader/issues/301)。
+- 结果：合并提交 `2ae4836895f314ef40d65e0e29d5aa194e0d1000`；Issue 已以 completed 关闭。
+- 范围：浏览器和 Windows Tauri 原生拖放覆盖 enter/over/leave/drop 生命周期；支持、混合、不支持和未知类型有轻量反馈；重复、跳过和失败有可关闭通知；未改变文件识别、工作区导入、标签页或编辑语义。
+- 验证：本地全量单测 70 文件/275 项、Lint、format、TypeScript build、前端 build、浏览器拖放 E2E 和 Windows desktop 原生拖放 E2E 1/1 通过；Quality `run_id=33303742441` 第 2 次运行全步骤成功。第 1 次失败为既有 #87 批量导出第 3 轮基准抖动，未修改该无关功能。
+- 变更：新增 `FileDropOverlay`、拖放分类 helper 和 Tauri 生命周期映射；补充需求、CHANGELOG、浏览器与桌面 smoke。
+- 发布：本切片不生成 Windows 安装包、Tag、Release 或镜像，结果并入 `v0.11.0` 稳定批次。
+- 下一唯一任务：#299 右键菜单键盘导航与焦点归还；不自动开始。
 
 ## 已知条件与风险
 
