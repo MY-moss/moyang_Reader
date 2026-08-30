@@ -1,3 +1,5 @@
+import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
+
 export function decodeHeadingAnchor(anchor: string): string {
   try {
     return decodeURIComponent(anchor);
@@ -21,11 +23,12 @@ export function scrollHeadingInContainer(
   article: HTMLElement | null,
   behavior: ScrollBehavior = "smooth",
 ): boolean {
+  const resolvedBehavior = resolveProgrammaticScrollBehavior(behavior);
   const target = findHeadingInArticle(article, anchor);
   if (!target) return false;
 
   if (!contentArea) {
-    target.scrollIntoView({ behavior, block: "start" });
+    target.scrollIntoView({ behavior: resolvedBehavior, block: "start" });
     return true;
   }
 
@@ -36,7 +39,7 @@ export function scrollHeadingInContainer(
 
   contentArea.scrollTo({
     top: Math.min(maxScrollTop, Math.max(0, targetTop)),
-    behavior,
+    behavior: resolvedBehavior,
   });
   return true;
 }

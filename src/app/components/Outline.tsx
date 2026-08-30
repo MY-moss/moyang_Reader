@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { resolveProgrammaticScrollBehavior } from "../scroll-behavior";
 import type { TocItem } from "../types";
 
 type OutlineProps = {
@@ -11,7 +12,10 @@ export function Outline({ items, activeId = null, onNavigate }: OutlineProps) {
   const activeLinkRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
-    activeLinkRef.current?.scrollIntoView({ block: "nearest" });
+    activeLinkRef.current?.scrollIntoView({
+      behavior: resolveProgrammaticScrollBehavior("auto"),
+      block: "nearest",
+    });
   }, [activeId]);
 
   return (
