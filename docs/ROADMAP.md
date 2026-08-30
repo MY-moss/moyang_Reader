@@ -50,7 +50,6 @@
 - 验收：共享 ContextMenu 单测覆盖禁用项跳过、Tab/Shift+Tab、方向键、重渲染稳定和失效触发器回退；浏览器键盘 E2E 覆盖标签页、阅读区和编辑器；Windows targeted desktop smoke 覆盖文件树入口；lint、format、build、全量单测和浏览器 E2E 通过。
 - 边界：不改变菜单业务动作、Markdown/TXT 编辑语义、更新器、发布资产或跨平台范围；本切片不创建安装包、Tag、Release 或镜像。
 - 下一步：合并并关闭 #299 后，唯一 READY 事项切换为 #119；不自动开始下一项。
-
 ## #226 Actions SHA 固定与前端定时审计（已完成）
 
 - 目标：把 CI、Rust 审计、Windows Release 和 Cloudflare 镜像依赖从可变 tag/branch 收敛到已核验的提交 SHA，并缩短前端生产依赖漏洞发现窗口。
