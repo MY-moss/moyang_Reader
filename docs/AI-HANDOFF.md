@@ -4,35 +4,38 @@
 
 ## 当前基线（2026-08-31）
 
-- 当前主线：`main@999b2254c259e1145eabc94374772e1e135913f1`；#172、#357 与 #375 已合并。
+- 最新工程修复分支：`codex/build-cache-guard-2026-08-31`；已恢复 Tauri/Cargo 构建目标外置到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`，并阻止仓库内 `CARGO_TARGET_DIR` 误配置造成 `src-tauri/target` 膨胀；本轮不生成安装包或 Release。
+- 当前主线：`main@52acd223d7ca0fb251f143bfc02820eecc88337e`；#172、#357、#358 与 #375 已合并。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一功能切片：[#374](https://github.com/MY-moss/moyang_Reader/pull/374) 完成 #172，合并提交为 `c187edcf39798b16d9610b5b8fdda6e22532086c`；Issue #172 已关闭。
 - 上一工程切片：[#375](https://github.com/MY-moss/moyang_Reader/pull/375) 完成工作区空间治理，合并提交为 `c3f5c8ce1967f2649a47337ca699aedca48fd1e8`。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：#358 插入浮层跟随光标/视口，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 当前唯一下一步：完成 PR #379 的构建缓存防膨胀修复，详细契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 当前顺序
 
 1. #172：reduced-motion 程序化滚动（已完成，PR #374）。
 2. #375：工作区空间治理（已完成，PR #375）。
 3. #357：右键菜单 fixed 定位修复（已完成，PR #377）。
-4. #358：插入浮层跟随光标/视口（当前唯一 READY）。
-5. #360/#369：工作区树操作异步化与回收站/上一版本保护。
-6. #359：撤销历史从全量快照收敛为稳定粒度。
-7. #361–#366：视觉、粘贴、插入和确认交互小切片。
-8. #367/#368/#371/#372：知识库体验与本机数据迁移候选。
+4. #358：插入浮层跟随光标/视口（已完成，PR #380）。
+5. #379：构建缓存防膨胀回归修复（当前工程切片）。
+6. #360：工作区树操作异步化。
+7. #369：回收站删除与保存上一版本保护。
+8. #359：撤销历史从全量快照收敛为稳定粒度。
+9. #361–#366：视觉、粘贴、插入和确认交互小切片。
+10. #367/#368/#371/#372：知识库体验与本机数据迁移候选。
 
 其中 #241/#51 是外部发布条件项；当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不按列表自动并行开发。
 
 每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
 
-## 当前进行中：#358 插入浮层跟随光标/视口
+## 当前进行中：PR #379 构建缓存防膨胀修复
 
-- 分支：`codex/insert-popover-viewport-2026-08-31`，基于 `origin/main@999b2254c259e1145eabc94374772e1e135913f1`；PR [#380](https://github.com/MY-moss/moyang_Reader/pull/380)，远程提交 `f0fab00a222eaf74a5f788921e33a08a97b1993c`。
-- 结果：插入面板通过 portal 使用视口内 fixed 定位；锚点取 Milkdown/CodeMirror 当前光标；输入框使用 `preventScroll`；编辑器滚动关闭过期面板；取消时恢复原选区和阅读位置。
-- 验证：定位单测 4/4；相关回归单测 13/13；lint、format、TypeScript/Vite build；长文档定位 E2E 1/1；既有链接、图片和表格插入 E2E 2/2。
-- 边界：不改变 Markdown 输出、插入语义、右键菜单、持久化、更新器或发布资产；不创建安装包、Tag、Release 或镜像。
-- 当前状态：实现完成，等待 CI `run_id=33338843402`；PR 合并并关闭 #358 后，再把 `NEXT.md` 切换到下一项，不在本切片内继续扩展。
+- 分支：`codex/build-cache-guard-2026-08-31`；基于合并后的 `main@52acd223d7ca0fb251f143bfc02820eecc88337e`；PR [#379](https://github.com/MY-moss/moyang_Reader/pull/379) 正在修复格式和主线偏差。
+- 结果：恢复 Tauri/Cargo 构建目标外置到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`，并阻止仓库内 `CARGO_TARGET_DIR` 误配置造成 `src-tauri/target` 膨胀。
+- 验证：上一轮功能/路径测试通过；远程失败根因已确认是 13 个文件格式不通过，本轮将补齐格式检查并重新运行 Quality checks。
+- 边界：不改变用户文档内容、更新器、签名或发布资产；不创建安装包、Tag、Release 或镜像。
+- 当前状态：等待修复提交和 CI；PR 合并后再将 `NEXT.md` 切换到下一项，不在本切片内继续扩展。
 
 ## 最近完成
 

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveSharedCargoTargetDir } from "../scripts/shared-cargo-target.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configuredDocumentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
@@ -16,9 +17,7 @@ const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
 const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
 const ownsExportRoot = !configuredExportRoot;
 const applicationPath = path.join(
-  projectRoot,
-  "src-tauri",
-  "target",
+  resolveSharedCargoTargetDir(projectRoot),
   "debug",
   process.platform === "win32" ? "moyang-reader.exe" : "moyang-reader",
 );

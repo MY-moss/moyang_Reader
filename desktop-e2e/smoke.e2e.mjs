@@ -320,6 +320,7 @@ function logExportBenchmark(report) {
 async function measureContextToggleWhileExportRunning() {
   return browser.executeAsync((done) => {
     const startedAt = performance.now();
+    let renderPasses = 0;
     const schedule = (callback) => {
       if (typeof window.requestAnimationFrame === "function") {
         window.requestAnimationFrame(callback);
@@ -347,6 +348,11 @@ async function measureContextToggleWhileExportRunning() {
     };
 
     const waitForCancelableExport = () => {
+      if (renderPasses < 2) {
+        renderPasses += 1;
+        schedule(waitForCancelableExport);
+        return;
+      }
       if (!findCancelButton()) {
         if (document.querySelector(".workspace-export-note")?.textContent?.trim()) {
           done({ status: "completed-before-interaction" });

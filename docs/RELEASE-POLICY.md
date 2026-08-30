@@ -91,9 +91,9 @@ npm run test:e2e
 npm run test:e2e:desktop
 npm run release:check -- --version=vX.Y.Z
 npm run test:release
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml
+npm run rust -- fmt --manifest-path src-tauri/Cargo.toml -- --check
+npm run rust -- clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+npm run rust -- test --manifest-path src-tauri/Cargo.toml
 ```
 
 确认 `main` 已包含发布提交且 CI 通过后，再推送 tag：

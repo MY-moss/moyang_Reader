@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@999b2254c259e1145eabc94374772e1e135913f1`，PR #377 已完成 #357。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@52acd223d7ca0fb251f143bfc02820eecc88337e`，PR #377 已完成 #357，PR #380 已完成 #358。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -19,15 +19,25 @@
 | 9    | #172     | reduced-motion 程序化滚动（已完成）   | PR #374；目录、锚点和阅读边界尊重 Windows 减少动画偏好                     |
 | 10   | #375     | 工作区空间治理（已完成）              | PR #375；限制生成物、复用依赖和安全回收工作树                              |
 | 11   | #357     | 右键菜单 fixed 定位修复（已完成）     | PR #377；脱离 content-area containing block，位置、裁剪和滚动稳定性通过    |
-| 12   | #358     | 插入浮层跟随光标/视口（PR #380 / CI） | 长文档中部定位、焦点 preventScroll 和滚动稳定性通过后关闭                  |
+| 12   | #358     | 插入浮层跟随光标/视口（已完成）       | PR #380；长文档中部定位、焦点 preventScroll 和滚动稳定性通过               |
+| 13   | #379     | 构建缓存防膨胀回归修复（当前工程）    | 修正格式/主线偏差后，Quality checks 和目标路径验证通过                     |
 
-## #358 插入浮层跟随光标/视口（PR #380 / CI 进行中）
+## #358 插入浮层跟随光标/视口（已完成）
 
 - 用户价值：长文档中部插入链接、图片或表格时，面板出现在当前光标附近，不把阅读位置拉回文首。
 - 实现：面板通过 portal 脱离编辑器包含块并使用 fixed 视口定位；Milkdown/CodeMirror 提供光标坐标；视口边缘自动翻转/夹紧；输入框防止聚焦滚动；内容区滚动关闭过期锚点；取消恢复选区和视口。
 - 验收：定位单测 4/4、相关回归单测 13/13、lint、format、TypeScript/Vite build、长文档 E2E 1/1、链接/图片/表格回归 E2E 2/2 通过。
 - 边界：不改变插入语义、Markdown 真源、右键菜单、持久化、更新器或发布资产；不单独生成安装包、Tag、Release 或镜像。
-- 当前状态：PR [#380](https://github.com/MY-moss/moyang_Reader/pull/380) 已创建；远程提交 `f0fab00a222eaf74a5f788921e33a08a97b1993c` 的 push CI `run_id=33338843402` 进行中；合并后关闭 #358 并切换 `NEXT.md`，不在本切片继续扩展。
+- 当前状态：PR [#380](https://github.com/MY-moss/moyang_Reader/pull/380) 已 squash 合并为 `main@52acd223d7ca0fb251f143bfc02820eecc88337e`；Issue #358 已以 `completed` 关闭；不在本切片继续扩展。
+
+## #379 构建缓存防膨胀回归修复（当前工程切片）
+
+- 用户价值：避免 Windows 开发、测试和发布把 Cargo/Tauri target 写回项目或在多个 worktree 中重复占用数 GB。
+- 实现：恢复 `npm run desktop`、`npm run tauri -- <args>` 和 `npm run rust -- <args>` 包装；默认使用项目外共享缓存，并重定向仓库内错误的 `CARGO_TARGET_DIR`。
+- 范围：CI、Windows desktop smoke 和发布前 Rust 检查复用同一缓存边界；修复 PR #379 与最新 `main@52acd223d7ca0fb251f143bfc02820eecc88337e` 的主线/格式偏差。
+- 验收：包装器测试、路径边界测试、lint、format、TypeScript/build、Rust fmt/clippy/tests 和 Quality checks 全部通过；项目内不生成 `src-tauri/target`。
+- 发布：不单独生成安装包、Tag、Release 或镜像；合并后纳入下一稳定 Windows x64 批次。
+- 回滚：回退 PR #379；不删除用户缓存，不触碰源码和用户笔记。
 
 ## #119 axe/WCAG AA Windows UI 基线（本轮已完成，2026-08-30）
 

@@ -31,7 +31,7 @@
 
 ### v0.11.0 milestone 顺序
 
-`#172 → #375 → #357 → #358 → #360/#369 → #359 → #361–#366 → #367/#368/#371/#372`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
+`#172 → #375 → #357 → #358 → #379 → #360 → #369 → #359 → #361–#366 → #367/#368/#371/#372`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
 
 ## 2. 当前可执行 backlog
 
@@ -51,7 +51,7 @@
 | [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归   | v0.11.0 第 5 阶段（条件） | 依赖 Cloudflare Secrets、真实旧版本安装环境和发布条件                       |
 | [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 第 5 阶段（条件） | SemVer 校验已完成；剩余 Authenticode 证书或限制说明                         |
 | [#357](https://github.com/MY-moss/moyang_Reader/issues/357) | 右键菜单 fixed 定位与内容区包含块  | v0.11.x                   | 已完成；PR #377 已合并，Issue 已以 completed 关闭                           |
-| [#358](https://github.com/MY-moss/moyang_Reader/issues/358) | 插入浮层跟随光标/视口              | v0.11.x 当前切片          | PR #380 / CI 进行中；长文档中部定位、焦点和滚动稳定性已本地验收             |
+| [#358](https://github.com/MY-moss/moyang_Reader/issues/358) | 插入浮层跟随光标/视口              | v0.11.x                   | 已完成；PR #380 已合并，Issue 已以 completed 关闭                           |
 | [#359](https://github.com/MY-moss/moyang_Reader/issues/359) | 撤销历史全量快照与编辑粒度         | v0.11.x                   | 大文档驻留与 Ctrl+Z 粒度稳定性                                              |
 | [#360](https://github.com/MY-moss/moyang_Reader/issues/360) | 工作区树操作异步化                 | v0.11.x                   | 与 #369 分开验收、可共用底层命令改造                                        |
 
@@ -128,4 +128,4 @@
 - 2026-08-29：盘点 32 个开放 Issue。
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：26 个开放可执行 Issue（Must 5、Should 19、Could 2），9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#357 已完成（PR #377），#119 已完成（PR #350），#190 已完成（PR #351）；#375 为已合并的工程治理 PR，下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
+- 当前结果：25 个开放可执行 Issue（Must 4、Should 19、Could 2），9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#357 已完成（PR #377），#358 已完成（PR #380），#119 已完成（PR #350），#190 已完成（PR #351）；#375 为已合并的工程治理 PR，下一工程切片为 PR #379，随后进入 #360。
