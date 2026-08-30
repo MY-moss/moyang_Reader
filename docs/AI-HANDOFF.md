@@ -106,5 +106,3 @@
 - `docs/handoff/v0.10.md`、`v0.9-and-earlier.md`：只读历史摘要。
 - `docs/ROADMAP.md`：版本目标和跨切片顺序。
 - `docs/ISSUE-INDEX.md`：Issue 分类、Ready 状态与治理规则。
-
-
