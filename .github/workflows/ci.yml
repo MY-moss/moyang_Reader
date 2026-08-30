@@ -80,6 +80,9 @@ jobs:
       - name: Frontend build
         run: npm run build
 
+      - name: Check build artifacts
+        run: npm run check:build-artifacts
+
       - name: Install Playwright browser
         run: npx playwright install chromium
 
