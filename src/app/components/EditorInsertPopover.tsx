@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   buildMarkdownImage,
   buildMarkdownLink,
@@ -7,6 +8,11 @@ import {
   type EditorInsertKind,
   type EditorInsertRequest,
 } from "../editor-insertion";
+import {
+  calculateEditorInsertPosition,
+  type EditorInsertAnchor,
+  type EditorInsertPosition,
+} from "../editor-insert-position";
 
 export type EditorInsertInitialValues = {
   label?: string;
@@ -36,6 +42,8 @@ type EditorInsertPopoverProps = {
   open: boolean;
   kind: EditorInsertKind;
   initialValues?: EditorInsertInitialValues;
+  anchor?: EditorInsertAnchor | null;
+  scrollContainerRef?: { readonly current: HTMLElement | null };
   onCancel: () => void;
   onSubmit: (request: EditorInsertRequest) => void;
 };
@@ -74,12 +82,33 @@ function invalidMessage(kind: EditorInsertKind): string {
   }
 }
 
-export function EditorInsertPopover({ open, kind, initialValues, onCancel, onSubmit }: EditorInsertPopoverProps) {
+function focusWithoutScroll(element: HTMLElement | null): void {
+  if (!element) return;
+  try {
+    element.focus({ preventScroll: true });
+  } catch {
+    element.focus();
+  }
+}
+
+export function EditorInsertPopover({
+  open,
+  kind,
+  initialValues,
+  anchor,
+  scrollContainerRef,
+  onCancel,
+  onSubmit,
+}: EditorInsertPopoverProps) {
   const popoverRef = useRef<HTMLElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [activeKind, setActiveKind] = useState<EditorInsertKind>(kind);
   const [form, setForm] = useState<EditorInsertForm>(() => createForm(initialValues));
   const [error, setError] = useState<string | null>(null);
+  const [position, setPosition] = useState<EditorInsertPosition>({ left: 12, top: 12 });
+  const anchorLeft = anchor?.left;
+  const anchorTop = anchor?.top;
+  const anchorBottom = anchor?.bottom;
   const initialLabel = initialValues?.label ?? "";
   const initialHref = initialValues?.href ?? "";
   const initialTitle = initialValues?.title ?? "";
@@ -123,9 +152,48 @@ export function EditorInsertPopover({ open, kind, initialValues, onCancel, onSub
 
   useEffect(() => {
     if (!open) return;
-    const timer = window.setTimeout(() => firstInputRef.current?.focus(), 0);
+    const timer = window.setTimeout(() => focusWithoutScroll(firstInputRef.current), 0);
     return () => window.clearTimeout(timer);
   }, [activeKind, open]);
+
+  const reposition = useCallback(() => {
+    const popover = popoverRef.current;
+    if (!popover) return;
+    const rect = popover.getBoundingClientRect();
+    setPosition(
+      calculateEditorInsertPosition(
+        anchorLeft === undefined || anchorTop === undefined || anchorBottom === undefined
+          ? null
+          : { left: anchorLeft, top: anchorTop, bottom: anchorBottom },
+        rect.width,
+        rect.height,
+        window.innerWidth,
+        window.innerHeight,
+      ),
+    );
+  }, [anchorBottom, anchorLeft, anchorTop]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    reposition();
+  }, [activeKind, open, reposition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleResize = () => reposition();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [open, reposition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const owner = scrollContainerRef?.current;
+    const target: Document | HTMLElement = owner?.closest<HTMLElement>(".content-area") ?? owner ?? document;
+    const handleScroll = () => onCancel();
+    const options: AddEventListenerOptions = { capture: target === document, passive: true };
+    target.addEventListener("scroll", handleScroll, options);
+    return () => target.removeEventListener("scroll", handleScroll, options);
+  }, [onCancel, open, scrollContainerRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -180,10 +248,11 @@ export function EditorInsertPopover({ open, kind, initialValues, onCancel, onSub
     onSubmit(request);
   };
 
-  return (
+  const popover = (
     <section
       ref={popoverRef}
-      className="editor-insert-popover"
+      className="editor-insert-popover is-floating"
+      style={{ left: position.left, top: position.top }}
       role="dialog"
       aria-modal="false"
       aria-labelledby="editor-insert-title"
@@ -317,4 +386,7 @@ export function EditorInsertPopover({ open, kind, initialValues, onCancel, onSub
       </form>
     </section>
   );
+
+  if (typeof document !== "undefined" && document.body) return createPortal(popover, document.body);
+  return popover;
 }
