@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@c3f5c8ce1967f2649a47337ca699aedca48fd1e8`，PR #374 已完成 #172，PR #375 已完成工作区空间治理。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@c32c34991b25f11cf4890ad793dbdbc065e46872`，PR #377 已完成 #357。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -18,7 +18,8 @@
 | 8    | #119     | axe/WCAG AA Windows UI 基线（已完成） | PR #350；核心页面扫描、主题对比度和 Windows 键盘/读屏手动清单              |
 | 9    | #172     | reduced-motion 程序化滚动（已完成）   | PR #374；目录、锚点和阅读边界尊重 Windows 减少动画偏好                     |
 | 10   | #375     | 工作区空间治理（已完成）              | PR #375；限制生成物、复用依赖和安全回收工作树                              |
-| 11   | #357     | 右键菜单 fixed 定位修复（当前 Ready） | 脱离 content-area containing block；位置、裁剪和滚动稳定性通过后关闭       |
+| 11   | #357     | 右键菜单 fixed 定位修复（已完成）     | PR #377；脱离 content-area containing block，位置、裁剪和滚动稳定性通过    |
+| 12   | #358     | 插入浮层跟随光标/视口（当前 Ready）   | 长文档中部定位、焦点 preventScroll 和滚动稳定性通过后关闭                  |
 
 ## #119 axe/WCAG AA Windows UI 基线（本轮已完成，2026-08-30）
 
@@ -304,9 +305,17 @@
 - 合并：PR [#351](https://github.com/MY-moss/moyang_Reader/pull/351) 已合并，合并提交为 `e7a08d655d952201eeae58e77624284cdf52bf1d`；Issue [#190](https://github.com/MY-moss/moyang_Reader/issues/190) 已以 completed 关闭。
 - 发布：本切片不单独生成安装包、Tag、Release 或镜像；纳入 v0.11.0 Windows x64 稳定批次。
 
+## v0.11.0 当前正确性切片：右键菜单 viewport 定位（#357）
+
+- 目标：让阅读区、WYSIWYG 和源文本编辑器中的共享右键菜单脱离 `.content-area` 的 `container-type` containing block，保持视口坐标、边缘 clamp 和滚动稳定。
+- 实现：PR #377 将 `ContextMenu` 通过 React portal 渲染到 `document.body`；未改变菜单动作、焦点归还、键盘导航或持久化语义。
+- 验证：相关组件单测 5 文件/16 项、lint、一次前端构建、格式检查和右键定位/正文滚动浏览器 E2E 1/1 通过；远程 Quality checks `run_id=33331543322`、`job_id=99310836649` 成功。
+- 结果：PR [#377](https://github.com/MY-moss/moyang_Reader/pull/377) 已合并为 `main@c32c34991b25f11cf4890ad793dbdbc065e46872`；Issue [#357](https://github.com/MY-moss/moyang_Reader/issues/357) 已以 completed 关闭；不单独生成安装包、Tag、Release 或镜像。
+- 回滚：回退 PR #377；下一唯一 READY 事项为 #358。
+
 ## 下一 Ready 选择
 
-- 当前 Ready：#357 右键菜单 fixed 定位修复；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
+- 当前 Ready：#358 插入浮层跟随光标/视口；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
 - 发布收尾：如需让静态镜像 workflow 变绿，维护者配置 `CLOUDFLARE_API_TOKEN`（Pages 写入权限）和 `CLOUDFLARE_ACCOUNT_ID` 后重跑 v0.10.10；镜像凭据不写入仓库或交接上下文。
 
 ## 平台范围收敛
