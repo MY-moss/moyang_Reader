@@ -8,7 +8,7 @@
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一切片 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)，用于关闭 #87；已完成，最终状态以 GitHub 为准。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：#234 统一通知层；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 当前唯一下一步：#189 类型感知 TypeScript/ESLint 门禁；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -23,6 +23,8 @@
 
 ## 最近完成
 
+- #234 已在 PR #342 实施统一固定通知视口：设置/更新反馈最多三条 FIFO，支持独立关闭，info/success 六秒自动关闭，error/action 常驻；正文无布局位移。
+- #234 本地门禁通过：270 个单测、50 条浏览器 E2E、Windows desktop E2E 12/12、lint、format、build；PR Quality checks 以 GitHub 最终 required checks 为准。
 - #87 最终 Windows 矩阵已在 PR #341 实施：96 篇文档（重复图片 24、独立图片 20、长文本 20、复杂表格 16、嵌套 HTML 16），成功导出连续 3 轮。
 - 三轮 renderer 最大间隔为 77/80/76ms，上下文交互为 3/6/6ms；三轮各生成 5 个可解析 DOCX，Working Set 均非单调增长。
 - 取消路径确认延迟 50ms、renderer 最大间隔 78ms、生成 2 个可解析 DOCX；取消和目标目录失败后临时文件均为 0。
@@ -30,6 +32,14 @@
 - PR #339 的合并提交为 `0c83f80`：复杂 DOCX 段落、列表、表格、引用和链接改为增量序列化。
 - PR #338 已合并为 `main@7ca9961`：超长文本分块和重复图片媒体复用。
 - PR #337 已完成 GitHub Actions SHA 固定和前端定时依赖审计；PR #336 已完成 #189 首个门禁切片。
+
+## 本轮 #234 交接
+
+- 分支：`codex/notification-layer-2026-08-30`；独立 worktree，基于 `origin/main@33c798c`。
+- PR：[#342](https://github.com/MY-moss/moyang_Reader/pull/342)；Issue：[#234](https://github.com/MY-moss/moyang_Reader/issues/234)。
+- 风险：T2；无安全、权限、数据迁移、发布资产或持久化语义变化。回滚为回退 PR #342。
+- 变更：`src/app/notification-queue.ts`、`src/app/components/NotificationViewport.tsx`、`src/app/App.tsx` 与样式、单测和窄窗口 E2E；UpdateNotice 共用固定视口。
+- 完成后唯一下一步：#189；不自动开始。
 
 ## 已知条件与风险
 

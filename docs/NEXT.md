@@ -5,62 +5,52 @@
 ## 核验状态
 
 - 最近核验：2026-08-30
-- 本切片开发基线：`main@33c798cbf34df74b9e0a46f324c4303226f8b36f0`
+- 上一切片：#234；PR #342，完成后不再启动本项以外的任务
 - 稳定版本：`v0.10.13`
 - 当前 milestone：`v0.11.0`
-- 相关 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)（#87 收尾；已完成）
-- 当前状态：READY（#341 已完成，执行本项）
+- 当前状态：READY（#234 已完成本地验收，待合并状态以 GitHub 为准）
 
-## 唯一下一步：#234 设置反馈通知：可关闭、可堆叠且不挤动阅读布局
+## 唯一下一步：#189 加强 TypeScript/ESLint/Rust 质量门禁与版本约束
 
-- Issue：[#234](https://github.com/MY-moss/moyang_Reader/issues/234)
-- 优先级：Should / P3
-- 风险级别：T2（前端状态、布局、键盘与无障碍回归）
+- Issue：[#189](https://github.com/MY-moss/moyang_Reader/issues/189)
+- 优先级：Must / P2
+- 风险级别：T2（质量配置、真实 fallout 与完整门禁回归）
 - 版本分类：不单独发布；验收结果进入 `v0.11.0`
 
 ### 用户价值
 
-设置保存、导入导出、语言切换和更新反馈应清晰可见、可关闭、可连续排队，同时不推动阅读区布局。
+把类型安全和异步误用从“依赖自觉”变成低噪声、可复现的 CI 强制约束，降低后续回归概率。
 
 ### 本切片范围
 
-- 建立应用内统一通知状态与右上角通知栈，覆盖设置反馈和现有 `UpdateNotice`。
-- 同一视口最多显示 3 条，超出部分按 FIFO 排队；通知可单条关闭。
-- info/success 6 秒自动关闭；error 和需要用户行动的通知保持显示，直到处理或关闭。
-- 保持通知位于同一视口、不产生 body 或阅读布局位移，并提供正确的状态/警告语义与键盘可达性。
+- 仅在 `src` 的类型感知 ESLint 配置中评估并启用低噪声规则：`no-floating-promises`、`await-thenable`、`no-misused-promises`。
+- 先量化现有 fallout，再逐项清理真实问题；保留已完成的 `any`、未使用变量、TypeScript 基础严格项和 Rust 版本约束。
+- `scripts` 与 `desktop-e2e` 继续使用非类型感知配置，避免扩大无关范围。
 
 ### 非目标
 
-- 不引入第三方通知库，不重写全局错误处理或更新器业务逻辑。
-- 不改变设置、导入导出、语言偏好、文档保存和阅读内容语义。
-- 不同时实现拖放、类型门禁、发布资产、云端部署或数据迁移。
+- 不一次性启用所有高噪声实验规则，不为过门禁大范围改写业务逻辑。
+- 不删除现有 lint、TypeScript、Rust、发布预检或 CI 检查。
+- 不改变用户可见功能，不创建安装包、Tag、Release，不做数据迁移或云端部署。
 
 ### 验收标准
 
-- [ ] 设置成功、失败、导入导出和语言切换反馈均进入统一通知层。
-- [ ] 最多 3 条可见，额外通知 FIFO 排队；每条通知可关闭且关闭不会误伤其他通知。
-- [ ] info/success 约 6 秒自动关闭；error/行动通知保持显示并提供行动或关闭入口。
-- [ ] `UpdateNotice` 使用同一视口和布局约束，不出现重复通知或 body/阅读区位移。
-- [ ] 状态/警告角色、名称、焦点顺序和键盘操作符合现有无障碍约定。
-- [ ] 补充组件/状态单测、设置回归测试和窄窗口键盘 E2E；相关 lint、format、unit、build、browser E2E 及 Quality checks 全绿。
-
-### 预计修改范围
-
-- `src/app/App.tsx`、现有通知组件与样式、相关设置/更新组件。
-- `src/app/components/*test*`、设置测试和窄窗口 desktop E2E。
-- 同步：`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、Issue #234。
+- [ ] `src` 新增显式 `any`、未使用变量和上述三项异步误用会被阻断；既有代码无误报堆积。
+- [ ] 类型感知 ESLint 使用与当前 TypeScript 项目引用一致的 parser/project 配置，脚本和 desktop-e2e 边界清晰。
+- [ ] TypeScript build、前端单测、Rust fmt/clippy/test、发布预检与 PR Quality checks 全绿。
+- [ ] 补充规则探针或等价回归测试，记录 fallout 数量、修复边界和可回滚点。
 
 ### 依赖、风险与回滚
 
-- 依赖：现有 React/Tauri 桌面运行时、键盘可操作的 Windows x64 E2E。
-- 风险：队列竞态、自动关闭计时器、窄窗口遮挡和焦点归还；不改变持久化数据。
-- 回滚：回退单一 #234 PR；无数据迁移、无安装包和发布资产影响。
+- 依赖：现有 `tsconfig`、ESLint、Cargo、GitHub Actions 版本和上一切片的基础门禁。
+- 风险：类型感知配置可能暴露历史异步问题；必须先量化，再按小批次启用并验证。
+- 回滚：按规则批次回退单一 PR；不得删除原有质量检查。
 
 ## 完成后
 
 1. 把结果追加到 `docs/handoff/v0.11.md`，并更新 `docs/AI-HANDOFF.md`。
-2. 将本文件整体替换为 #189“类型感知 TypeScript/ESLint 门禁”的 READY 契约。
-3. 更新 #234、PR 和 CI 单行记录，然后停止，不自动开始 #189。
+2. 若 Issue 仍有未完成 fallout，只归档已完成边界，不把未验收内容写成完成。
+3. 更新 #189、PR 和 CI 单行记录，然后停止，不自动开始 #301。
 4. 除非本文件明确要求稳定发布，不创建安装包、Tag 或 Release。
 
 ## 快速触发
