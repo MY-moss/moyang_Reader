@@ -292,9 +292,18 @@
 - 验收：文件/文件夹属性弹层信息正确且遵循焦点契约；标签页关闭当前/其他/右侧/全部能复用未保存保护；Markdown WYSIWYG 与源文本都能从右键打开当前文档搜索；前端、Rust 和 Windows 桌面既有 CRUD 不回归。
 - 发布：PR #287、版本 PR #288 已合并到 `main@8d957327e09d8dba10cd5a5a144cfc4787dfc64c`；v0.10.8 Windows x64 Release 已公开，安装包、签名和 `latest.json` 均已上传并核验。PR #290 已合并资产名映射修复；镜像代码已通过手动运行验证，待补齐仓库 Secrets 后单独重跑，不重复生成安装包。
 
+## v0.11.0 当前性能切片：首屏按需加载与大文档渐进挂载（#190）
+
+- 目标：让普通文档不承担 KaTeX CSS 的首屏成本，让大文档先显示可阅读内容，再按需完成剩余挂载。
+- 非目标：不改变 Markdown 解析、双链语义、导出结果、编辑器语义或现有 CodeMirror/Milkdown 懒加载边界。
+- 实现：公式文档首次需要时动态加载 KaTeX CSS；大 HTML 首块立即挂载，后续按 requestAnimationFrame 渐进挂载；搜索、目录和锚点跳转在需要时揭示剩余内容。
+- 验证：定向单测 11/11、lint、类型规则探针 3/3、format、一次生产 build、构建产物检查、性能浏览器 E2E 2/2 和相关回归 E2E 4/4 通过；远程 Quality checks `run_id=33322595846` 和依赖审计 `run_id=33322611814` 均成功。
+- 合并：PR [#351](https://github.com/MY-moss/moyang_Reader/pull/351) 已合并，合并提交为 `e7a08d655d952201eeae58e77624284cdf52bf1d`；Issue [#190](https://github.com/MY-moss/moyang_Reader/issues/190) 已以 completed 关闭。
+- 发布：本切片不单独生成安装包、Tag、Release 或镜像；纳入 v0.11.0 Windows x64 稳定批次。
+
 ## 下一 Ready 选择
 
-- 当前 Ready：#87 本轮切片已完成但 Issue 仍 open；下一切片先从最新 Issues 复核，再在 #87 残余性能切片、#190 中选择一个满足 Ready 条件的事项；#241 仍需先满足外部验证条件。
+- 当前 Ready：#172 reduced-motion 程序化滚动；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
 - 发布收尾：如需让静态镜像 workflow 变绿，维护者配置 `CLOUDFLARE_API_TOKEN`（Pages 写入权限）和 `CLOUDFLARE_ACCOUNT_ID` 后重跑 v0.10.10；镜像凭据不写入仓库或交接上下文。
 
 ## 平台范围收敛
