@@ -13,6 +13,7 @@ import type { Root as HastRoot } from "hast";
 import type { PhrasingContent, Root } from "mdast";
 import type { RenderedMarkdown } from "../app/types";
 import { collectToc, escapeHtml, readingStats, textContent } from "./text";
+import { ensureKatexStyles } from "./katex-styles";
 
 const wikiPattern = /(!?)\[\[([^\]]+)\]\]/g;
 
@@ -111,9 +112,11 @@ export async function renderMarkdown(source: string, options: RenderOptions = {}
   const processor = options.allowRemoteResources ? remoteMarkdownProcessor : localMarkdownProcessor;
   const tree = processor.parse(source);
   const processed = (await processor.run(tree)) as HastRoot;
+  const html = processor.stringify(processed);
+  if (html.includes('class="katex')) await ensureKatexStyles();
 
   return {
-    html: processor.stringify(processed),
+    html,
     toc: collectToc(processed),
     ...readingStats(processed.children.map(textContent).join(" ")),
   };

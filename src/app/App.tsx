@@ -28,7 +28,7 @@ import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
 import { PaneResizeHandle } from "./components/PaneResizeHandle";
 import { PrintPreview } from "./components/PrintPreview";
-import { ProgressiveReaderContent } from "./components/ProgressiveReaderContent";
+import { ProgressiveReaderContent, type ProgressiveReaderContentHandle } from "./components/ProgressiveReaderContent";
 import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";
 import { RelationGraph } from "./components/RelationGraph";
@@ -139,6 +139,7 @@ import {
 } from "./reading-zoom";
 import { reorderTabs } from "./tab-order";
 import { checkMarkdownEditorSafety } from "./markdown-editor-support";
+import { shouldUseProgressiveReader } from "./progressive-render";
 import { buildWikiLinkCandidates } from "./wiki-link-completion";
 import {
   BATCH_EXPORT_CHUNK_SIZE,
@@ -363,11 +364,21 @@ function resolveWikiPath(basePath: string, target: string): string | null {
   return /\.[A-Za-z0-9]+$/.test(resolved) ? resolved : `${resolved}.md`;
 }
 
-function scrollToHeading(anchor: string, contentArea: HTMLElement | null, article: HTMLElement | null): void {
+function scrollToHeading(
+  anchor: string,
+  contentArea: HTMLElement | null,
+  article: HTMLElement | null,
+  onMissing?: () => void,
+): void {
   let attempts = 0;
+  let requestedReveal = false;
   const attempt = () => {
     if (scrollHeadingInContainer(anchor, contentArea, article)) return;
-    if (attempts >= 4) return;
+    if (!requestedReveal) {
+      requestedReveal = true;
+      onMissing?.();
+    }
+    if (attempts >= 30) return;
     attempts += 1;
     window.requestAnimationFrame(attempt);
   };
@@ -549,6 +560,7 @@ function isContextMenuKeyboardEvent(event: ReactKeyboardEvent<HTMLElement>): boo
 export function App() {
   const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
+  const [progressiveReaderReadyHtml, setProgressiveReaderReadyHtml] = useState<string | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
   const [sourceDraft, setSourceDraft] = useState("");
   const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));
@@ -640,6 +652,7 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
+  const progressiveReaderRef = useRef<ProgressiveReaderContentHandle>(null);
   const searchHighlightRef = useRef<{
     root: HTMLElement;
     contentKey: string;
@@ -684,6 +697,9 @@ export function App() {
   const settingsCloseInFlightRef = useRef(false);
   const draftComparisonRequestIdRef = useRef(0);
   const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
+  const renderedHtml = documentState?.rendered.html ?? "";
+  const progressiveReaderReady =
+    !shouldUseProgressiveReader(renderedHtml) || progressiveReaderReadyHtml === renderedHtml;
 
   const notify = useCallback((message: string, level: NotificationLevel = "success") => {
     const trimmedMessage = message.trim();
@@ -815,11 +831,25 @@ export function App() {
         setMode("rendered");
         return;
       }
+      if (!progressiveReaderReady) {
+        progressiveReaderRef.current?.revealAll();
+        return;
+      }
       pendingHeadingRef.current = null;
-      scrollToHeading(item.id, contentAreaRef.current, articleRef.current);
+      scrollToHeading(item.id, contentAreaRef.current, articleRef.current, () =>
+        progressiveReaderRef.current?.revealAll(),
+      );
     },
-    [mode],
+    [mode, progressiveReaderReady],
   );
+
+  const revealProgressiveReader = useCallback(() => {
+    progressiveReaderRef.current?.revealAll();
+  }, []);
+
+  const handleProgressiveReaderReady = useCallback((html: string) => {
+    setProgressiveReaderReadyHtml(html);
+  }, []);
 
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
     const next = { ...preferencesRef.current, ...changes };
@@ -1245,7 +1275,7 @@ export function App() {
       window.clearTimeout(timer);
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
-  }, [documentState?.path, documentState?.rendered.html, mode]);
+  }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady]);
 
   useEffect(() => {
     const path = documentState?.path;
@@ -1287,6 +1317,7 @@ export function App() {
     const candidates = readingHeadingCandidatesRef.current;
     const canTrackHeadings =
       mode === "rendered" &&
+      progressiveReaderReady &&
       documentState?.kind !== "pdf" &&
       documentState?.kind !== "image" &&
       Boolean(article && contentArea);
@@ -1348,7 +1379,14 @@ export function App() {
       candidates.clear();
       if (readingHeadingObserverRef.current === observer) readingHeadingObserverRef.current = null;
     };
-  }, [documentState?.kind, documentState?.path, documentState?.rendered.html, mode, setReadingHeading]);
+  }, [
+    documentState?.kind,
+    documentState?.path,
+    documentState?.rendered.html,
+    mode,
+    progressiveReaderReady,
+    setReadingHeading,
+  ]);
 
   useEffect(() => {
     const contentArea = contentAreaRef.current;
@@ -1369,16 +1407,16 @@ export function App() {
       contentArea.removeEventListener("scroll", update);
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
-  }, [documentState?.path, documentState?.rendered.html, mode, updateReadingRail]);
+  }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady, updateReadingRail]);
 
   useEffect(() => {
     if (mode !== "rendered") return;
     const pendingHeading = pendingHeadingRef.current;
-    if (!pendingHeading) return;
+    if (!pendingHeading || !progressiveReaderReady) return;
 
     pendingHeadingRef.current = null;
-    scrollToHeading(pendingHeading, contentAreaRef.current, articleRef.current);
-  }, [documentState?.path, documentState?.rendered.html, mode]);
+    scrollToHeading(pendingHeading, contentAreaRef.current, articleRef.current, revealProgressiveReader);
+  }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady, revealProgressiveReader]);
 
   useEffect(() => {
     if (documentState && mode === "rendered" && documentState.kind !== "pdf" && documentState.kind !== "image") return;
@@ -4272,14 +4310,15 @@ export function App() {
           return;
         }
         void handleSelectTab(path).then(() => {
-          if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
+          if (rawAnchor)
+            scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current, revealProgressiveReader);
         });
         return;
       }
 
       const target = safeDecode(href);
       if (target.startsWith("#")) {
-        scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current);
+        scrollToHeading(target.slice(1), contentAreaRef.current, articleRef.current, revealProgressiveReader);
         return;
       }
 
@@ -4311,10 +4350,11 @@ export function App() {
         return;
       }
       void handleSelectTab(path).then(() => {
-        if (rawAnchor) scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current);
+        if (rawAnchor)
+          scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current, revealProgressiveReader);
       });
     },
-    [documentState, handleSelectTab, linkIndex, workspaceIndex],
+    [documentState, handleSelectTab, linkIndex, revealProgressiveReader, workspaceIndex],
   );
 
   const handleReaderClick = useCallback(
@@ -4438,8 +4478,17 @@ export function App() {
 
   useEffect(() => {
     const root = articleRef.current;
-    const contentKey = documentState?.rendered.html ?? "";
+    const contentKey = renderedHtml;
     if (!root || mode !== "rendered") {
+      searchHighlightRef.current?.controller.dispose();
+      searchHighlightRef.current = null;
+      setSearchResultCount(0);
+      setSearchResultIndex(0);
+      return;
+    }
+
+    if (!progressiveReaderReady) {
+      if (debouncedSearchQuery.trim()) revealProgressiveReader();
       searchHighlightRef.current?.controller.dispose();
       searchHighlightRef.current = null;
       setSearchResultCount(0);
@@ -4463,13 +4512,14 @@ export function App() {
     const count = searchHighlightRef.current.controller.update(debouncedSearchQuery);
     setSearchResultCount(count);
     setSearchResultIndex((current) => (count ? Math.min(current, count - 1) : 0));
-  }, [debouncedSearchQuery, documentState?.rendered.html, mode]);
+  }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, revealProgressiveReader]);
 
   useEffect(() => {
     if (mode !== "rendered") return;
+    if (!progressiveReaderReady) return;
     const target = searchHighlightRef.current?.controller.setActive(searchResultIndex);
     target?.scrollIntoView({ block: "center" });
-  }, [debouncedSearchQuery, documentState?.rendered.html, mode, searchResultIndex]);
+  }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, searchResultIndex]);
 
   useEffect(() => {
     return () => {
@@ -4515,7 +4565,7 @@ export function App() {
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.clear();
     };
-  }, [documentState?.path, documentState?.rendered.html, mode]);
+  }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady]);
 
   const moveSearchResult = useCallback(
     (step: number) => {
@@ -5342,7 +5392,11 @@ export function App() {
                       <div className="print-document-title">{documentState.name}</div>
                     </header>
                   )}
-                  <ProgressiveReaderContent html={documentState.rendered.html} />
+                  <ProgressiveReaderContent
+                    ref={progressiveReaderRef}
+                    html={documentState.rendered.html}
+                    onReady={handleProgressiveReaderReady}
+                  />
                 </article>
               </div>
             )}

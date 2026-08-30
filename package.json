@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "test:release": "node --test scripts/release-check.test.mjs scripts/prepare-mirror.test.mjs scripts/check-action-pins.test.mjs",
     "check:actions": "node scripts/check-action-pins.mjs",
+    "check:build-artifacts": "node scripts/check-build-artifacts.mjs",
     "check:type-aware": "node scripts/check-type-aware-eslint.mjs",
     "tauri": "tauri",
     "release:check": "node scripts/release-check.mjs"

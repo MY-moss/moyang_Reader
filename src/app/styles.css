@@ -2997,6 +2997,13 @@ html.pane-resizing * {
   content-visibility: auto;
   contain-intrinsic-size: 960px;
 }
+.progressive-reader-loading {
+  margin: 18px 0;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
 .reading-width-narrow .reader-content {
   width: min(720px, calc(100% - 96px));
 }
