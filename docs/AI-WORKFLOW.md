@@ -33,6 +33,7 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 - 每个切片最多一次完整构建；仅稳定批次生成 Windows 安装包和 Release。
 - 禁止强制推送、覆盖脏工作区、提交 Secret、私钥、用户文档或构建产物。
 - `NEXT.md` 失效时先修正交接，不自行改选相邻 Issue。
+
 ## 本地空间与工作树卫生
 
 - 项目源码只保留一个真实的 `node_modules`。工作树必须使用 `npm run worktree:prepare -- <worktree-path>` 建立 junction；禁止在每个工作树再次执行 `npm install`，也禁止把依赖目录复制到项目外。
@@ -40,6 +41,7 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 - 清理器只认识明确的生成目录（`dist`、`coverage`、`test-results`、`playwright-report`、Vite/任务缓存和 Rust 目标），不会触碰源码、文档、用户笔记或主工作区 `node_modules`。
 - 工作树回收是额外动作：只有确认不再需要时才使用 `--apply --prune-worktrees`。脏工作树、包含 junction/符号链接的工作树会自动保留，不能使用 `git worktree remove --force`。
 - 资源管理器可能把 junction 目标重复计入“大小”。排查空间时以清理器的实际文件大小为准，并检查 `git worktree list --porcelain`；项目外出现的临时副本一律停止使用并记录路径。
+
 ## 阶段门禁
 
 ### INTAKE

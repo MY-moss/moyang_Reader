@@ -7,10 +7,7 @@ import { ensureSharedNodeModules } from "./prepare-worktree.mjs";
 
 test("refuses to prepare a path outside the managed worktree root", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-prepare-"));
-  assert.throws(
-    () => ensureSharedNodeModules(path.join(root, "outside"), root),
-    /\.codex-worktrees/,
-  );
+  assert.throws(() => ensureSharedNodeModules(path.join(root, "outside"), root), /\.codex-worktrees/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -21,10 +18,7 @@ test("does not overwrite a real dependency directory", () => {
   fs.mkdirSync(path.join(worktree, "node_modules"), { recursive: true });
   fs.writeFileSync(path.join(worktree, "node_modules", "keep.txt"), "keep");
 
-  assert.throws(
-    () => ensureSharedNodeModules(worktree, root),
-    /已有真实 node_modules/,
-  );
+  assert.throws(() => ensureSharedNodeModules(worktree, root), /已有真实 node_modules/);
   assert.equal(fs.existsSync(path.join(worktree, "node_modules", "keep.txt")), true);
   fs.rmSync(root, { recursive: true, force: true });
 });

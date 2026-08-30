@@ -146,10 +146,7 @@ export function collectGeneratedArtifacts(repositoryRoot, worktreeEntries = []) 
 }
 
 function hasChanges(worktreePath) {
-  return runGit(
-    ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all"],
-    worktreePath,
-  ).trim();
+  return runGit(["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all"], worktreePath).trim();
 }
 
 export function formatBytes(bytes) {
@@ -233,7 +230,9 @@ function main() {
       try {
         runGit(["worktree", "remove", "--", worktreePath]);
       } catch (error) {
-        failures.push(`${worktreePath}: 工作树移除失败，已保留；${error instanceof Error ? error.message : String(error)}`);
+        failures.push(
+          `${worktreePath}: 工作树移除失败，已保留；${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
     runGit(["worktree", "prune"]);

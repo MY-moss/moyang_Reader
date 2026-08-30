@@ -61,9 +61,7 @@ function main() {
   }
   const result = ensureSharedNodeModules(target, repositoryRoot);
   console.log(
-    result.status === "already-linked"
-      ? `已使用共享依赖：${result.path}`
-      : `已建立共享依赖 junction：${result.path}`,
+    result.status === "already-linked" ? `已使用共享依赖：${result.path}` : `已建立共享依赖 junction：${result.path}`,
   );
 }
 
