@@ -16,14 +16,12 @@
     "test:e2e:a11y": "playwright test e2e/a11y.spec.ts",
     "test:e2e:desktop": "node scripts/test-desktop-e2e.mjs",
     "test:watch": "vitest",
-    "test:workflow": "node --test scripts/cleanup-workspace.test.mjs scripts/prepare-worktree.test.mjs",
-    "test:release": "node --test scripts/release-check.test.mjs scripts/prepare-mirror.test.mjs scripts/check-action-pins.test.mjs",
+    "test:workflow": "node --test scripts/cleanup-workspace.test.mjs scripts/prepare-worktree.test.mjs",    "test:release": "node --test scripts/release-check.test.mjs scripts/prepare-mirror.test.mjs scripts/check-action-pins.test.mjs",
     "check:actions": "node scripts/check-action-pins.mjs",
     "check:build-artifacts": "node scripts/check-build-artifacts.mjs",
     "check:type-aware": "node scripts/check-type-aware-eslint.mjs",
     "cleanup:workspace": "node scripts/cleanup-workspace.mjs",
-    "worktree:prepare": "node scripts/prepare-worktree.mjs",
-    "tauri": "tauri",
+    "worktree:prepare": "node scripts/prepare-worktree.mjs",    "tauri": "tauri",
     "release:check": "node scripts/release-check.mjs"
   },
   "dependencies": {
