@@ -15,6 +15,7 @@ import { EmptyState } from "./components/EmptyState";
 import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
 import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
+import { FileDropOverlay } from "./components/FileDropOverlay";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { DraftRecoveryComparisonDialog } from "./components/DraftRecoveryComparisonDialog";
@@ -81,6 +82,7 @@ import {
   writeBinaryFileChunk,
   writeAppSettings,
   writeTextFile,
+  type FileDropEvent,
 } from "./bridge";
 import type { Update } from "@tauri-apps/plugin-updater";
 import {
@@ -268,6 +270,13 @@ import {
 } from "./editor-history";
 import { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";
 import type { EditorInsertKind } from "./editor-insertion";
+import {
+  classifyFileDropPaths,
+  hasFileDragPayload,
+  idleFileDropState,
+  type FileDropSource,
+  type FileDropState,
+} from "./file-drop";
 
 function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -487,6 +496,13 @@ type DraftComparisonRequest = {
   isCurrentDocument: boolean;
 };
 
+type OpenPathsOutcome = {
+  openedCount: number;
+  failedCount: number;
+  duplicateCount: number;
+  cancelled: boolean;
+};
+
 type PendingAppSettingsWrite = {
   snapshot: AppSettingsSnapshot;
   localSaved: boolean;
@@ -568,6 +584,7 @@ export function App() {
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [fileDropState, setFileDropState] = useState<FileDropState>(idleFileDropState);
   const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
   const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
   const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
@@ -643,6 +660,9 @@ export function App() {
   const notificationSequenceRef = useRef(0);
   const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWritingPathsRef = useRef(new Set<string>());
+  const fileDropStateRef = useRef<FileDropState>(idleFileDropState);
+  const fileDropDepthRef = useRef(0);
+  const browserDropProcessingRef = useRef(false);
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
   const pendingHeadingRef = useRef<string | null>(null);
@@ -663,6 +683,22 @@ export function App() {
       message: trimmedMessage,
     };
     setNotifications((current) => appendNotification(current, notification));
+  }, []);
+
+  const updateFileDropState = useCallback((source: FileDropSource, support: FileDropState["support"]) => {
+    const next: FileDropState = { active: true, source, support };
+    const current = fileDropStateRef.current;
+    if (current.active && current.source === next.source && current.support === next.support) return;
+    fileDropStateRef.current = next;
+    setFileDropState(next);
+  }, []);
+
+  const resetFileDropState = useCallback(() => {
+    fileDropDepthRef.current = 0;
+    const current = fileDropStateRef.current;
+    if (!current.active) return;
+    fileDropStateRef.current = idleFileDropState;
+    setFileDropState(idleFileDropState);
   }, []);
 
   const dismissNotification = useCallback((id: number) => {
@@ -2219,13 +2255,19 @@ export function App() {
   }, [openPath, releaseDocumentResources, workspacePath]);
 
   const handleOpenPaths = useCallback(
-    async (paths: OpenPath[]) => {
+    async (paths: OpenPath[]): Promise<OpenPathsOutcome> => {
+      const cancelledOutcome = (): OpenPathsOutcome => ({
+        openedCount: 0,
+        failedCount: 0,
+        duplicateCount: 0,
+        cancelled: true,
+      });
       const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);
       const workspacePathToConfirm = workspacePaths.find((path) =>
         shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
       );
       if (workspacePathToConfirm && !confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {
-        return;
+        return cancelledOutcome();
       }
 
       const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
@@ -2234,13 +2276,19 @@ export function App() {
         : paths;
       const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
       if (!confirmDocumentReplacement(documentPaths, "打开新文档")) {
-        return;
+        return cancelledOutcome();
       }
 
       const seen = new Set<string>();
+      let openedCount = 0;
+      let failedCount = 0;
+      let duplicateCount = 0;
       for (const entry of pathsToProcess) {
         const key = `${entry.kind}:${normalizePathKey(entry.path)}`;
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          duplicateCount += 1;
+          continue;
+        }
         seen.add(key);
 
         try {
@@ -2249,13 +2297,18 @@ export function App() {
             : entry.path;
           if (entry.kind === "workspace") {
             await loadWorkspace(authorizedPath);
+            openedCount += 1;
           } else {
-            await openPath(authorizedPath);
+            if (await openPath(authorizedPath)) openedCount += 1;
+            else failedCount += 1;
           }
         } catch (cause) {
+          failedCount += 1;
           setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");
         }
       }
+
+      return { openedCount, failedCount, duplicateCount, cancelled: false };
     },
     [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
   );
@@ -2929,15 +2982,59 @@ export function App() {
 
     let active = true;
     let unlisten: (() => void) | null = null;
-    void subscribeToFileDrop((paths) => {
+    void subscribeToFileDrop((event: FileDropEvent) => {
       if (!active) return;
+
+      if (event.type === "enter") {
+        const paths = event.paths.map((path) => path.trim()).filter(Boolean);
+        const hasLikelyFile = paths.some((path) => /[\\/][^\\/]*\.[^\\/.]+$/.test(path));
+        updateFileDropState(
+          "native",
+          hasLikelyFile ? classifyFileDropPaths(paths, (path) => Boolean(documentKindFromPath(path))) : "unknown",
+        );
+        return;
+      }
+
+      if (event.type === "over") {
+        if (!fileDropStateRef.current.active) updateFileDropState("native", "unknown");
+        return;
+      }
+
+      if (event.type === "leave") {
+        resetFileDropState();
+        return;
+      }
+
+      const paths = [...event.paths];
+      resetFileDropState();
       void resolveOpenPaths(paths)
-        .then((entries) => {
-          if (active) return handleOpenPaths(entries);
-          return undefined;
+        .then(async (entries) => {
+          if (!active) return;
+          if (entries.length === 0) {
+            notify("拖入的路径中没有可打开的文件或阅读库。", "info");
+            return;
+          }
+
+          const outcome = await handleOpenPaths(entries);
+          if (!active || outcome.cancelled) return;
+
+          const skippedCount = Math.max(0, paths.length - entries.length);
+          if (outcome.openedCount > 0) notify(`已打开 ${outcome.openedCount} 个拖入项目。`);
+          if (outcome.duplicateCount > 0) {
+            notify(`已忽略 ${outcome.duplicateCount} 个重复路径。`, "info");
+          }
+          if (skippedCount > 0) {
+            notify(`已跳过 ${skippedCount} 个不支持或无法访问的路径。`, "info");
+          }
+          if (outcome.failedCount > 0) {
+            notify(`有 ${outcome.failedCount} 个拖入项目打开失败，请检查文件类型或权限。`, "error");
+          }
+          if (outcome.openedCount === 0 && outcome.failedCount === 0 && outcome.duplicateCount === 0) {
+            notify("没有打开任何项目。", "info");
+          }
         })
         .catch((cause) => {
-          if (active) setError(cause instanceof Error ? cause.message : "无法打开拖入的路径。");
+          if (active) notify(cause instanceof Error ? cause.message : "无法打开拖入的路径。", "error");
         });
     }).then((dispose) => {
       if (active) unlisten = dispose;
@@ -2947,8 +3044,9 @@ export function App() {
     return () => {
       active = false;
       unlisten?.();
+      resetFileDropState();
     };
-  }, [handleOpenPaths]);
+  }, [handleOpenPaths, notify, resetFileDropState, updateFileDropState]);
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
@@ -3857,48 +3955,88 @@ export function App() {
   }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
   const handleBrowserFiles = useCallback(
-    async (files: FileList | File[] | null | undefined) => {
-      const selectedFiles = Array.from(files ?? []);
-      if (selectedFiles.length === 0) return;
-      const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];
-      const unsupportedNames: string[] = [];
-      for (const file of selectedFiles) {
-        const kind = documentKindFromPath(file.name);
-        if (!kind) {
-          unsupportedNames.push(file.name);
-          continue;
-        }
-        supportedFiles.push({
-          file,
-          kind,
-          path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,
-        });
-      }
-      const unsupportedNotice =
-        unsupportedNames.length > 0
-          ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
-          : null;
-      if (supportedFiles.length === 0) {
-        if (unsupportedNotice) setError(unsupportedNotice);
-        return;
-      }
-      const nextPaths = supportedFiles.map((entry) => entry.path);
-      if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {
+    async (files: FileList | File[] | null | undefined, source: "picker" | "drop" = "picker") => {
+      if (browserDropProcessingRef.current) {
+        if (source === "drop") notify("正在处理上一批拖入文件，请稍后再试。", "info");
         return;
       }
 
-      for (const { file, kind, path } of supportedFiles) {
-        if (kind === "docx" || kind === "pdf" || kind === "image") {
-          await openBinary(path, new Uint8Array(await file.arrayBuffer()));
-        } else {
-          await openSource(path, await file.text());
+      const selectedFiles = Array.from(files ?? []);
+      if (selectedFiles.length === 0) return;
+
+      browserDropProcessingRef.current = true;
+      try {
+        const supportedFiles: Array<{ file: File; kind: DocumentKind; path: string }> = [];
+        const unsupportedNames: string[] = [];
+        const duplicateNames: string[] = [];
+        const seenFiles = new Set<File>();
+        for (const file of selectedFiles) {
+          if (seenFiles.has(file)) {
+            duplicateNames.push(file.name);
+            continue;
+          }
+          seenFiles.add(file);
+
+          const kind = documentKindFromPath(file.name);
+          if (!kind) {
+            unsupportedNames.push(file.name);
+            continue;
+          }
+          supportedFiles.push({
+            file,
+            kind,
+            path: `browser://${++browserDocumentSequenceRef.current}/${file.name}`,
+          });
         }
-      }
-      if (unsupportedNotice) {
-        setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));
+
+        const unsupportedNotice =
+          unsupportedNames.length > 0
+            ? `已跳过 ${unsupportedNames.length} 个不支持的文件：${unsupportedNames.join("、")}。支持 Markdown、文本、Word、PDF 和图片。`
+            : null;
+        if (supportedFiles.length === 0) {
+          if (unsupportedNotice) {
+            if (source === "drop") notify(unsupportedNotice, "info");
+            else setError(unsupportedNotice);
+          }
+          return;
+        }
+        const nextPaths = supportedFiles.map((entry) => entry.path);
+        if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {
+          return;
+        }
+
+        let openedCount = 0;
+        const failedNames: string[] = [];
+        for (const { file, kind, path } of supportedFiles) {
+          try {
+            const opened =
+              kind === "docx" || kind === "pdf" || kind === "image"
+                ? await openBinary(path, new Uint8Array(await file.arrayBuffer()))
+                : await openSource(path, await file.text());
+            if (opened) openedCount += 1;
+            else failedNames.push(file.name);
+          } catch {
+            failedNames.push(file.name);
+          }
+        }
+
+        if (source === "drop") {
+          if (openedCount > 0) notify(`已打开 ${openedCount} 个拖入文件。`);
+          if (duplicateNames.length > 0) {
+            notify(`已忽略 ${duplicateNames.length} 个重复文件。`, "info");
+          }
+          if (unsupportedNotice) notify(unsupportedNotice, "info");
+          if (failedNames.length > 0) {
+            notify(`有 ${failedNames.length} 个拖入文件打开失败：${failedNames.join("、")}。`, "error");
+          }
+        } else if (unsupportedNotice) {
+          setError((current) => (current ? `${current} ${unsupportedNotice}` : unsupportedNotice));
+        }
+      } finally {
+        browserDropProcessingRef.current = false;
       }
     },
-    [confirmDocumentReplacement, openBinary, openSource],
+    [confirmDocumentReplacement, notify, openBinary, openSource],
   );
 
   const handleSelectTab = useCallback(
@@ -3972,12 +4110,68 @@ export function App() {
     setOpenTabs((current) => reorderTabs(current, sourcePath, targetPath));
   }, []);
 
+  const handleBrowserDragEnter = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime() || !hasFileDragPayload(event.dataTransfer)) return;
+      event.preventDefault();
+      fileDropDepthRef.current += 1;
+      const names = Array.from(event.dataTransfer.files).map((file) => file.name);
+      updateFileDropState(
+        "browser",
+        names.length > 0 ? classifyFileDropPaths(names, (path) => Boolean(documentKindFromPath(path))) : "unknown",
+      );
+    },
+    [updateFileDropState],
+  );
+
+  const handleBrowserDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime()) return;
+      const hasFilePayload = hasFileDragPayload(event.dataTransfer);
+      if (!hasFilePayload && !fileDropStateRef.current.active) return;
+      event.preventDefault();
+      const names = Array.from(event.dataTransfer.files).map((file) => file.name);
+      if (hasFilePayload || !fileDropStateRef.current.active) {
+        updateFileDropState(
+          "browser",
+          names.length > 0
+            ? classifyFileDropPaths(names, (path) => Boolean(documentKindFromPath(path)))
+            : fileDropStateRef.current.support,
+        );
+      }
+    },
+    [updateFileDropState],
+  );
+
+  const handleBrowserDragLeave = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime() || !fileDropStateRef.current.active) return;
+      event.preventDefault();
+      fileDropDepthRef.current = Math.max(0, fileDropDepthRef.current - 1);
+      const relatedTarget = event.relatedTarget;
+      const remainsInside = relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget);
+      if (!remainsInside || fileDropDepthRef.current === 0) resetFileDropState();
+    },
+    [resetFileDropState],
+  );
+
+  const handleBrowserDragEnd = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime() || !fileDropStateRef.current.active) return;
+      event.preventDefault();
+      resetFileDropState();
+    },
+    [resetFileDropState],
+  );
+
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
+      if (isTauriRuntime() || !hasFileDragPayload(event.dataTransfer)) return;
       event.preventDefault();
-      void handleBrowserFiles(event.dataTransfer.files);
+      resetFileDropState();
+      void handleBrowserFiles(event.dataTransfer.files, "drop");
     },
-    [handleBrowserFiles],
+    [handleBrowserFiles, resetFileDropState],
   );
 
   const handleOpenReaderLink = useCallback(
@@ -4713,7 +4907,10 @@ export function App() {
           "--reading-zoom": `${preferences.readingZoom / 100}`,
         } as CSSProperties
       }
-      onDragOver={(event) => event.preventDefault()}
+      onDragEnter={handleBrowserDragEnter}
+      onDragOver={handleBrowserDragOver}
+      onDragLeave={handleBrowserDragLeave}
+      onDragEnd={handleBrowserDragEnd}
       onDrop={handleDrop}
     >
       <TopBar
@@ -4851,6 +5048,7 @@ export function App() {
           ) : null
         }
       />
+      <FileDropOverlay state={fileDropState} />
       <div className="navigation-strip">
         <Tabs
           tabs={openTabs}

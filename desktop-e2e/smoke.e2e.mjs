@@ -636,6 +636,50 @@ describe("Moyang Reader desktop runtime", () => {
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
   });
 
+  it("shows native drag feedback and opens a dropped Markdown file", async () => {
+    await resetDesktopSession();
+    const droppedFileName = "desktop-drag-drop.md";
+    const droppedFilePath = path.join(path.dirname(documentPath), droppedFileName);
+    fs.rmSync(droppedFilePath, { force: true });
+    fs.writeFileSync(droppedFilePath, "# Native drag drop\n\n桌面拖放内容。\n", "utf8");
+
+    const emitDragEvent = async (eventName, payload) => {
+      await browser.execute(
+        async ({ name, detail }) => {
+          const tauriEvent = window.__TAURI__?.event;
+          if (!tauriEvent?.emit) throw new Error("Tauri event API is unavailable");
+          await tauriEvent.emit(name, detail);
+        },
+        { name: eventName, detail: payload },
+      );
+    };
+
+    try {
+      const position = { x: 24, y: 24 };
+      await emitDragEvent("tauri://drag-enter", { paths: [droppedFilePath], position });
+      const overlay = await browser.$('[data-testid="file-drop-overlay"]');
+      await overlay.waitForDisplayed();
+      assert.equal(await overlay.getAttribute("data-drop-source"), "native");
+      assert.equal(await overlay.getAttribute("data-drop-support"), "supported");
+
+      await emitDragEvent("tauri://drag-over", { position });
+      await emitDragEvent("tauri://drag-drop", { paths: [droppedFilePath], position });
+
+      const title = await browser.$(".document-title");
+      await browser.waitUntil(() => title.getText().then((text) => text.includes(droppedFileName)), {
+        timeout: 15_000,
+        timeoutMsg: "the native dropped Markdown file was not opened",
+      });
+      await browser.waitUntil(() => overlay.isDisplayed().then((visible) => !visible), {
+        timeout: 5_000,
+        timeoutMsg: "the native drag overlay did not clear after drop",
+      });
+    } finally {
+      await resetDesktopSession().catch(() => undefined);
+      fs.rmSync(droppedFilePath, { force: true });
+    }
+  });
+
   it("manages workspace files and folders from context menus", async () => {
     const workspacePath = path.dirname(documentPath);
     const originalFileName = "context-managed.md";

@@ -1,18 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { invoke, listen } = vi.hoisted(() => ({
+const { invoke, listen, getCurrentWebview, onDragDropEvent } = vi.hoisted(() => ({
   invoke: vi.fn(),
   listen: vi.fn(),
+  getCurrentWebview: vi.fn(),
+  onDragDropEvent: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
+vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview }));
 
-import { commitBinaryFile, discardBinaryFile, fileMetadata, writeBinaryFile, writeBinaryFileChunk } from "./bridge";
+import {
+  commitBinaryFile,
+  discardBinaryFile,
+  fileMetadata,
+  subscribeToFileDrop,
+  writeBinaryFile,
+  writeBinaryFileChunk,
+} from "./bridge";
 
 describe("binary bridge", () => {
   beforeEach(() => {
     invoke.mockReset();
+    getCurrentWebview.mockReset();
+    onDragDropEvent.mockReset();
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
       value: {},
@@ -53,6 +65,27 @@ describe("binary bridge", () => {
       modifiedMs: 1_725_000_000_000,
     });
     expect(invoke).toHaveBeenCalledWith("file_metadata", { path: "C:\\Notes\\Today.md" });
+  });
+
+  it("forwards native drag lifecycle events without dropping enter or leave feedback", async () => {
+    const onEvent = vi.fn();
+    const unlisten = vi.fn();
+    getCurrentWebview.mockReturnValue({ onDragDropEvent });
+    onDragDropEvent.mockResolvedValue(unlisten);
+
+    await expect(subscribeToFileDrop(onEvent)).resolves.toBe(unlisten);
+    const handler = onDragDropEvent.mock.calls[0]?.[0] as (event: { payload: unknown }) => void;
+    handler({ payload: { type: "enter", paths: ["C:\\Notes\\today.md"], position: {} } });
+    handler({ payload: { type: "over", position: {} } });
+    handler({ payload: { type: "drop", paths: ["C:\\Notes\\today.md"], position: {} } });
+    handler({ payload: { type: "leave" } });
+
+    expect(onEvent.mock.calls.map(([event]) => event)).toEqual([
+      { type: "enter", paths: ["C:\\Notes\\today.md"] },
+      { type: "over" },
+      { type: "drop", paths: ["C:\\Notes\\today.md"] },
+      { type: "leave" },
+    ]);
   });
 
   it("streams export chunks with append metadata and commits the temporary file", async () => {
