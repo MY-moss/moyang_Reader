@@ -12,13 +12,13 @@
   --surface: #f8f6f0;
   --surface-strong: #fffdf8;
   --ink: #252a27;
-  --muted: #777b71;
+  --muted: #64695f;
   --line: #d9d3c7;
   --line-strong: #bcb5a8;
   --accent: #327269;
   --accent-deep: #1d5149;
   --accent-soft: #dcece6;
-  --accent-warm: #bd6945;
+  --accent-warm: #9b5438;
   --danger: #a94f3e;
   --search-hit: #f5d889;
   --search-hit-active: #e89a4f;
@@ -2493,7 +2493,7 @@ html.pane-resizing * {
   font-size: 9px;
 }
 .panel-kicker {
-  color: #8b8c80;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -4001,6 +4001,8 @@ html.pane-resizing * {
     --accent: #8fc3b8;
     --accent-deep: #a9d9cf;
     --accent-soft: #304844;
+    --accent-warm: #d58a69;
+    --danger: #e9a08c;
     --search-hit: #92722b;
     --search-hit-active: #bb7040;
   }
@@ -4116,6 +4118,7 @@ html.pane-resizing * {
   --accent: #8fc3b8;
   --accent-deep: #a9d9cf;
   --accent-soft: #304844;
+  --danger: #e9a08c;
   --search-hit: #92722b;
   --search-hit-active: #bb7040;
 }
@@ -4230,8 +4233,48 @@ html.pane-resizing * {
 :root[data-theme="dark"] {
   --line-strong: #53645d;
   --accent-warm: #d58a69;
+  --danger: #e9a08c;
   --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.2);
   --shadow-lifted: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+@media (forced-colors: active) {
+  :root {
+    color-scheme: normal;
+    --canvas: Canvas;
+    --surface: Canvas;
+    --surface-strong: Canvas;
+    --ink: CanvasText;
+    --muted: CanvasText;
+    --line: ButtonText;
+    --line-strong: ButtonText;
+    --accent: LinkText;
+    --accent-deep: LinkText;
+    --accent-soft: Canvas;
+    --accent-warm: LinkText;
+    --danger: CanvasText;
+    --search-hit: Highlight;
+    --search-hit-active: Highlight;
+  }
+
+  body,
+  .topbar,
+  .sidebar,
+  .content-area,
+  .context-sidebar,
+  .statusbar {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  a:focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 @keyframes empty-rise {

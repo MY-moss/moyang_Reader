@@ -83,7 +83,7 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install chromium
 
-      - name: Browser smoke test
+      - name: Browser and accessibility smoke test
         run: npm run test:e2e
 
       - name: Desktop smoke test

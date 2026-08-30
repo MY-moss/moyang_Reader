@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-08-30）
 
-- 本轮开发基线：`main@0e85cbc0d9f6507f8dc0fcf08f748cac77d7b9cd`；#299 分支从该等价文件树继续。
+- 本轮开发基线：`main@ee84be9949f71f2745118b52a89d889ce170106c`；#119 分支从该主线继续。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 上一切片 PR：[#347](https://github.com/MY-moss/moyang_Reader/pull/347) 完成 #346，已合并；本轮 #299 已完成代码、测试和文档，PR/合并 SHA 以对应 GitHub 记录为准。
+- 上一切片 PR：[#349](https://github.com/MY-moss/moyang_Reader/pull/349) 完成 #299，已合并；本轮 #119 已完成代码、测试和文档，PR/合并 SHA 以对应 GitHub 记录为准。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 本轮 #299 右键菜单焦点循环、关闭归还和稳定导航已完成本地验收；合并并关闭 Issue 后，唯一下一步为 #119 axe/WCAG AA Windows UI 基线，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 本轮 #119 axe/WCAG AA Windows UI 基线已完成本地与远程验收；合并并关闭 Issue 后，唯一下一步为 #190 首屏加载与大文档挂载，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -19,7 +19,8 @@
 5. #241/#51：更新实机验证、镜像与 Authenticode 条件项。
 6. #346：草稿恢复前核对当前磁盘版本（已完成，PR #347）。
 7. #299：右键菜单键盘导航和焦点归还（本轮已完成）。
-8. #119：axe/WCAG AA Windows UI 基线（下一 READY）。
+8. #119：axe/WCAG AA Windows UI 基线（已完成，PR #350）。
+9. #190：首屏加载与大文档挂载（下一 READY）。
 
 每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
 
@@ -82,6 +83,16 @@
 - 验证：共享菜单单测、浏览器键盘 E2E、Windows desktop 文件树 targeted smoke、全量单测、lint、format、TypeScript build 和生产 build 已通过；桌面回归优先发送真实 WebDriver Escape，嵌入 driver 未转发 keydown 时使用同一焦点目标的受控 DOM 回退；driver/mock-store 的既有环境警告不影响测试结果。
 - 发布：不创建安装包、Tag、Release 或镜像；本切片不涉及数据迁移、更新器、签名或跨平台范围。
 - 回滚：回退本切片 PR；下一位 AI 只执行 [`NEXT.md`](NEXT.md) 中的 #119，不自动开始下一项。
+
+## 本轮 #119 axe/WCAG AA Windows UI 基线
+
+- 基线：`main@ee84be9949f71f2745118b52a89d889ce170106c`；分支：`codex/a11y-baseline-2026-08-30`；独立 worktree。
+- Issue：[#119](https://github.com/MY-moss/moyang_Reader/issues/119)；PR：[#350](https://github.com/MY-moss/moyang_Reader/pull/350)。
+- 结果：空状态、阅读、快速打开和设置四个浏览器入口分别运行 axe；浅色/深色关键文字令牌执行 WCAG AA 对比度计算；Windows `forced-colors` 运行 axe 和实际 CSS 颜色探针；修正低对比度令牌并新增 Narrator/NVDA 手动清单。
+- 变更：新增 `test:e2e:a11y` 定向入口、`docs/ACCESSIBILITY-WINDOWS.md` 和高对比度 CSS 回退；没有新增运行时依赖、跨平台范围或用户文档同步。
+- 验证：`npm run lint`、`npm run format:check`、`npm run build`、`npm run test:e2e:a11y -- --reporter=line --workers=1`（6/6）通过；远程 `sha=c0bca3de57e00cee3bbe59b8956b9a3c9952b856 workflow=CI run_id=33320052388 conclusion=success last_changed_at=2026-08-30T15:43:13Z`。
+- 发布/回滚：不创建安装包、Tag、Release 或镜像；回退 PR #350 即可恢复原主题令牌和测试范围。真实 Narrator/NVDA 抽查保留在发布前清单，不声称自动化替代读屏认证。
+- 下一唯一任务：#190 首屏加载与大文档挂载；不自动开始。
 
 ## 已知条件与风险
 
