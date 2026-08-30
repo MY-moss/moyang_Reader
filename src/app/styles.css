@@ -1060,6 +1060,9 @@ a:focus-visible {
 .draft-recovery-open small {
   color: var(--accent-warm);
 }
+.draft-recovery-open .draft-recovery-source-note {
+  color: var(--muted);
+}
 .draft-recovery-diff-summary {
   color: var(--accent-deep) !important;
   font-weight: 650;
@@ -1132,6 +1135,67 @@ a:focus-visible {
 .draft-comparison-intro strong {
   color: var(--ink);
 }
+.draft-comparison-sources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.draft-comparison-source {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+}
+.draft-comparison-source.current {
+  border-left: 3px solid var(--accent-deep);
+}
+.draft-comparison-source.draft {
+  border-left: 3px solid var(--accent-warm);
+}
+.draft-comparison-source strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+.draft-comparison-source span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-comparison-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.draft-comparison-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.draft-comparison-key b {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.draft-comparison-key b.removed {
+  background: color-mix(in srgb, #c76c60 16%, transparent);
+  color: #ad5d4f;
+}
+.draft-comparison-key b.added {
+  background: color-mix(in srgb, #4eaa82 17%, transparent);
+  color: #2f7562;
+}
 .draft-comparison-decision {
   display: grid;
   gap: 3px;
@@ -1166,7 +1230,7 @@ a:focus-visible {
 }
 .draft-comparison-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1205,6 +1269,31 @@ a:focus-visible {
   color: color-mix(in srgb, var(--accent-warm) 78%, var(--ink));
   font-size: 11px;
   line-height: 1.5;
+}
+.draft-comparison-state {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.draft-comparison-state strong {
+  color: var(--ink);
+}
+.draft-comparison-state.error {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent-warm) 58%, var(--line));
+  background: color-mix(in srgb, var(--accent-warm) 10%, var(--surface-strong));
+}
+.draft-comparison-state .quiet-button {
+  justify-self: start;
+  padding: 5px 8px;
+  font-size: 10px;
 }
 .draft-comparison-preview {
   overflow: auto;
@@ -2722,6 +2811,9 @@ html.pane-resizing * {
 .draft-recovery-copy small {
   color: #8a7654;
   font-size: 10px;
+}
+.draft-recovery-copy .draft-recovery-source-note {
+  color: #6f6f64;
 }
 .external-change-notice strong {
   color: #5a451f;

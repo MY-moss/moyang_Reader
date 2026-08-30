@@ -22,6 +22,9 @@ describe("DraftRecoveryComparisonDialog", () => {
           }}
           comparisonSource="# Note\n\n原始内容"
           comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="ready"
+          comparisonError={null}
           currentDocumentModified={false}
           sourceChangedSinceDraft={false}
           actionLabel="恢复到编辑区"
@@ -61,6 +64,9 @@ describe("DraftRecoveryComparisonDialog", () => {
           }}
           comparisonSource={"# Note\n\n同样内容"}
           comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="ready"
+          comparisonError={null}
           currentDocumentModified={false}
           sourceChangedSinceDraft={false}
           actionLabel="恢复到编辑区"
@@ -96,6 +102,9 @@ describe("DraftRecoveryComparisonDialog", () => {
           }}
           comparisonSource={"# Note\n\n磁盘新内容"}
           comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="ready"
+          comparisonError={null}
           currentDocumentModified={false}
           sourceChangedSinceDraft={true}
           actionLabel="恢复到编辑区"
@@ -107,6 +116,86 @@ describe("DraftRecoveryComparisonDialog", () => {
 
     expect(container.textContent).toContain("建议先核对");
     expect(container.textContent).toContain("原文件又发生了变化");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("makes the two sources explicit and blocks recovery while reading", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onAction = vi.fn();
+
+    act(() => {
+      root.render(
+        <DraftRecoveryComparisonDialog
+          snapshot={{
+            path: "C:/Notes/note.md",
+            draft: "draft",
+            baseSource: "source",
+            savedAt: Date.now() - 60_000,
+          }}
+          comparisonSource={null}
+          comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="loading"
+          comparisonError={null}
+          currentDocumentModified={false}
+          sourceChangedSinceDraft={false}
+          actionLabel="恢复到编辑区"
+          onAction={onAction}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("当前版本");
+    expect(container.textContent).toContain("草稿");
+    expect(container.textContent).toContain("正在读取当前磁盘版本");
+    expect(container.querySelector<HTMLButtonElement>('[data-testid="draft-comparison-action"]')?.disabled).toBe(true);
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="draft-comparison-action"]')?.click());
+    expect(onAction).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("does not present a recovery action when the current version cannot be read", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onRetry = vi.fn();
+
+    act(() => {
+      root.render(
+        <DraftRecoveryComparisonDialog
+          snapshot={{
+            path: "C:/Notes/note.md",
+            draft: "draft",
+            baseSource: "source",
+            savedAt: Date.now() - 60_000,
+          }}
+          comparisonSource={null}
+          comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="unavailable"
+          comparisonError="文件不可访问。"
+          currentDocumentModified={false}
+          sourceChangedSinceDraft={false}
+          actionLabel="恢复到编辑区"
+          onAction={vi.fn()}
+          onRetry={onRetry}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("无法判断是否需要恢复");
+    expect(container.textContent).toContain("文件不可访问。");
+    expect(container.querySelector<HTMLButtonElement>('[data-testid="draft-comparison-action"]')?.disabled).toBe(true);
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="draft-comparison-retry"]')?.click());
+    expect(onRetry).toHaveBeenCalledOnce();
 
     act(() => root.unmount());
     container.remove();

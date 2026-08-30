@@ -33,6 +33,8 @@ describe("DraftRecoveryNotice", () => {
       (button) => button.textContent === "查看差异",
     );
     expect(previewButton).toBeTruthy();
+    expect(container.textContent).toContain("当前打开的是文件版本");
+    expect(previewButton?.getAttribute("aria-label")).toContain("当前文件与草稿");
     act(() => previewButton?.click());
     expect(onPreview).toHaveBeenCalledOnce();
     act(() => laterButton?.click());

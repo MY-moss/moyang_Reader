@@ -259,6 +259,7 @@ import {
   type DraftSnapshot,
   type DraftSaveResult,
 } from "./draft-recovery";
+import { areDraftSourcesEquivalent } from "./draft-recovery-diff";
 import {
   canRedoEditorChange,
   canUndoEditorChange,
@@ -490,10 +491,14 @@ type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
 
 type DraftComparisonRequest = {
   snapshot: DraftSnapshot;
-  comparisonSource: string;
+  comparisonSource: string | null;
   comparisonLabel: string;
+  comparisonIsCurrent: boolean;
+  comparisonStatus: "loading" | "ready" | "unavailable";
+  comparisonError: string | null;
   currentDocumentModified: boolean;
   isCurrentDocument: boolean;
+  sourceChangedSinceDraft: boolean;
 };
 
 type OpenPathsOutcome = {
@@ -672,6 +677,7 @@ export function App() {
   const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
+  const draftComparisonRequestIdRef = useRef(0);
   const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
 
   const notify = useCallback((message: string, level: NotificationLevel = "success") => {
@@ -3446,19 +3452,86 @@ export function App() {
     setMode("source");
   }, [draftRecovery, updateSource]);
 
+  const prepareDraftComparison = useCallback(
+    async (snapshot: DraftSnapshot, current: OpenDocument | null, isCurrentDocument: boolean) => {
+      const requestId = draftComparisonRequestIdRef.current + 1;
+      draftComparisonRequestIdRef.current = requestId;
+      const currentDocumentModified = Boolean(isCurrentDocument && current?.modified);
+      const isBrowserDocument = Boolean(isCurrentDocument && current?.path.startsWith("browser://"));
+
+      if (!isTauriRuntime() || isBrowserDocument) {
+        const comparisonSource = isCurrentDocument && current ? current.source : snapshot.baseSource;
+        setDraftComparison({
+          snapshot,
+          comparisonSource,
+          comparisonLabel: isCurrentDocument ? "当前打开版本（浏览器预览）" : "草稿保存时的原文（浏览器预览）",
+          comparisonIsCurrent: isCurrentDocument,
+          comparisonStatus: "ready",
+          comparisonError: null,
+          currentDocumentModified,
+          isCurrentDocument,
+          sourceChangedSinceDraft: !areDraftSourcesEquivalent(comparisonSource, snapshot.baseSource),
+        });
+        return;
+      }
+
+      setDraftComparison({
+        snapshot,
+        comparisonSource: null,
+        comparisonLabel: "当前磁盘版本",
+        comparisonIsCurrent: true,
+        comparisonStatus: "loading",
+        comparisonError: null,
+        currentDocumentModified,
+        isCurrentDocument,
+        sourceChangedSinceDraft: false,
+      });
+
+      try {
+        const path = isCurrentDocument && current ? current.path : await authorizeStoredPath(snapshot.path, false);
+        const kind = documentKindFromPath(path);
+        if (!kind || !isEditableDocument(kind)) {
+          throw new Error("只能比较 Markdown 或纯文本草稿。");
+        }
+        const comparisonSource = await readTextFile(path);
+        if (draftComparisonRequestIdRef.current !== requestId) return;
+
+        setDraftComparison({
+          snapshot,
+          comparisonSource,
+          comparisonLabel: "当前磁盘版本",
+          comparisonIsCurrent: true,
+          comparisonStatus: "ready",
+          comparisonError: null,
+          currentDocumentModified,
+          isCurrentDocument,
+          sourceChangedSinceDraft: !areDraftSourcesEquivalent(comparisonSource, snapshot.baseSource),
+        });
+      } catch (cause) {
+        if (draftComparisonRequestIdRef.current !== requestId) return;
+        setDraftComparison({
+          snapshot,
+          comparisonSource: null,
+          comparisonLabel: "当前磁盘版本",
+          comparisonIsCurrent: true,
+          comparisonStatus: "unavailable",
+          comparisonError: cause instanceof Error ? cause.message : "当前文件不可访问，请确认文件仍存在且有读取权限。",
+          currentDocumentModified,
+          isCurrentDocument,
+          sourceChangedSinceDraft: false,
+        });
+      }
+    },
+    [],
+  );
+
   const previewCurrentDraft = useCallback(() => {
     const snapshot = draftRecovery;
     const current = documentStateRef.current;
     if (!snapshot || !current || !isSameDocumentPath(current.path, snapshot.path)) return;
 
-    setDraftComparison({
-      snapshot,
-      comparisonSource: current.source,
-      comparisonLabel: "当前磁盘版本",
-      currentDocumentModified: current.modified,
-      isCurrentDocument: true,
-    });
-  }, [draftRecovery]);
+    void prepareDraftComparison(snapshot, current, true);
+  }, [draftRecovery, prepareDraftComparison]);
 
   const previewDraftSnapshot = useCallback(
     (path: string) => {
@@ -3468,20 +3541,23 @@ export function App() {
       const current = documentStateRef.current;
       const isCurrentDocument = Boolean(current && isSameDocumentPath(current.path, snapshot.path));
       setDraftRecoveryOpen(false);
-      setDraftComparison({
-        snapshot,
-        comparisonSource: isCurrentDocument && current ? current.source : snapshot.baseSource,
-        comparisonLabel: isCurrentDocument ? "当前磁盘版本" : "草稿保存时的原文",
-        currentDocumentModified: Boolean(isCurrentDocument && current?.modified),
-        isCurrentDocument,
-      });
+      void prepareDraftComparison(snapshot, current, isCurrentDocument);
     },
-    [draftSnapshots],
+    [draftSnapshots, prepareDraftComparison],
   );
 
   const closeDraftComparison = useCallback(() => {
+    draftComparisonRequestIdRef.current += 1;
     setDraftComparison(null);
   }, []);
+
+  const retryDraftComparison = useCallback(() => {
+    const request = draftComparison;
+    if (!request) return;
+    const current = documentStateRef.current;
+    const isCurrentDocument = Boolean(current && isSameDocumentPath(current.path, request.snapshot.path));
+    void prepareDraftComparison(request.snapshot, current, isCurrentDocument);
+  }, [draftComparison, prepareDraftComparison]);
 
   const discardDraft = useCallback(() => {
     if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });
@@ -3509,15 +3585,15 @@ export function App() {
 
   const handleDraftComparisonAction = useCallback(() => {
     const request = draftComparison;
-    if (!request) return;
+    if (!request || request.comparisonStatus !== "ready" || request.comparisonSource === null) return;
 
-    setDraftComparison(null);
+    closeDraftComparison();
     if (request.isCurrentDocument) {
       recoverDraft();
       return;
     }
     void openDraftSnapshot(request.snapshot.path);
-  }, [draftComparison, openDraftSnapshot, recoverDraft]);
+  }, [closeDraftComparison, draftComparison, openDraftSnapshot, recoverDraft]);
 
   const requestDraftDiscardByPath = useCallback((path: string) => {
     setDraftRecoveryOpen(false);
@@ -5427,10 +5503,14 @@ export function App() {
           snapshot={draftComparison.snapshot}
           comparisonSource={draftComparison.comparisonSource}
           comparisonLabel={draftComparison.comparisonLabel}
+          comparisonIsCurrent={draftComparison.comparisonIsCurrent}
+          comparisonStatus={draftComparison.comparisonStatus}
+          comparisonError={draftComparison.comparisonError}
           currentDocumentModified={draftComparison.currentDocumentModified}
-          sourceChangedSinceDraft={draftComparison.comparisonSource !== draftComparison.snapshot.baseSource}
-          actionLabel={draftComparison.isCurrentDocument ? "恢复到编辑区" : "打开文档并查看"}
+          sourceChangedSinceDraft={draftComparison.sourceChangedSinceDraft}
+          actionLabel={draftComparison.isCurrentDocument ? "恢复到编辑区" : "打开文档继续确认"}
           onAction={handleDraftComparisonAction}
+          onRetry={retryDraftComparison}
           onClose={closeDraftComparison}
         />
       )}

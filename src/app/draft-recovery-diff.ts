@@ -45,6 +45,10 @@ function withoutTerminalLineEnding(source: string): string {
   return source.endsWith("\n") ? source.slice(0, -1) : source;
 }
 
+export function areDraftSourcesEquivalent(left: string, right: string): boolean {
+  return withoutTerminalLineEnding(normalizeSource(left)) === withoutTerminalLineEnding(normalizeSource(right));
+}
+
 function pushOperation(operations: DiffOperation[], operation: DiffOperation): void {
   operations.push(operation);
 }
@@ -350,7 +354,7 @@ export function buildDraftComparison(baselineSource: string, draftSource: string
   const baselineLines = splitLines(baseline);
   const draftLines = splitLines(draft);
 
-  if (comparableBaseline === comparableDraft) {
+  if (areDraftSourcesEquivalent(baselineSource, draftSource)) {
     return {
       hasChanges: false,
       baselineLineCount: baselineLines.length,

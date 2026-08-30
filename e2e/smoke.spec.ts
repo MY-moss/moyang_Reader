@@ -148,16 +148,19 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   const draftTrigger = page.getByRole("button", { name: "草稿 1" });
   await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
   await expect(page.getByRole("button", { name: "关闭草稿恢复中心" })).toBeFocused();
-  await page.getByRole("button", { name: "查看 recovery-note.md 草稿差异" }).click();
+  await page.getByRole("button", { name: "查看 recovery-note.md 当前文件与草稿的差异" }).click();
   const comparisonDialog = page.getByRole("dialog", { name: "恢复前查看差异" });
   await expect(comparisonDialog).toContainText("新增行");
-  await expect(comparisonDialog).toContainText("存在未保存内容");
+  await expect(comparisonDialog).toContainText("还需要核对当前文件");
+  await expect(comparisonDialog).toContainText("草稿保存时的原文");
   await expect(comparisonDialog).toContainText("未保存内容");
   await page.keyboard.press("Escape");
   await expect(comparisonDialog).toHaveCount(0);
 
   await draftTrigger.click();
-  await expect(page.getByRole("button", { name: "打开 recovery-note.md 所在文档" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "打开 recovery-note.md 的当前文件（不会自动恢复草稿）" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
   const discardDialog = page.getByRole("dialog", { name: "丢弃草稿？" });

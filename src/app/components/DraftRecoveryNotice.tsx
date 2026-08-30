@@ -27,10 +27,18 @@ export function DraftRecoveryNotice({
       <span className="draft-recovery-copy">
         <strong>{snapshot.path.split(/[\\/]/).pop() ?? snapshot.path}</strong> 检测到上次未保存的草稿（
         {formatDraftRecoveryTime(snapshot.savedAt)}）。
+        <small className="draft-recovery-source-note">
+          当前打开的是文件版本；草稿保存在本机。先查看差异，再决定是否恢复。
+        </small>
         <small>{diffSummary}</small>
       </span>
       <div>
-        <button type="button" onClick={onPreview}>
+        <button
+          type="button"
+          data-testid="draft-recovery-preview"
+          aria-label="查看当前文件与草稿的差异并决定是否恢复"
+          onClick={onPreview}
+        >
           查看差异
         </button>
         <button type="button" className="notice-dismiss" onClick={onLater}>
