@@ -8,7 +8,7 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 
 ```text
 继续开发 Moyang Reader。先读取 docs/AI-WORKFLOW.md 和 docs/NEXT.md，只把 docs/NEXT.md 视为当前任务事实源；随后只读核对最新 origin/main、开放 PR 和对应 Issue。若文档与远端冲突，先修正交接，不要按过时状态开发。
-保护当前工作区的未提交改动，不在脏目录开发；从最新 origin/main 创建独立 codex/<scope>-<date> worktree 和分支。
+保护当前工作区的未提交改动，不在脏目录开发；从最新 origin/main 创建独立 codex/<scope>-<date> worktree 和分支。创建后运行 `npm run worktree:prepare -- <worktree-path>`，让工作树复用主工作区的依赖目录。
 严格完成 NEXT.md 中的一个垂直切片：确认 READY，实施最小变更，补测试，按风险级别验证，同步文档与 Issue，并创建 PR。门禁全绿且无安全、权限、发布或数据迁移风险时可以合并，否则停在 PR 等待确认。
 完成后把结果写入当前版本交接归档，将 NEXT.md 替换为下一个唯一任务，然后停止。除非 NEXT.md 明确要求稳定发布，否则不创建安装包、Tag 或 Release。不要粘贴完整源码、历史交接或 CI 日志，只报告路径、SHA、run_id、结论和阻塞。
 ```
@@ -33,6 +33,14 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 - 每个切片最多一次完整构建；仅稳定批次生成 Windows 安装包和 Release。
 - 禁止强制推送、覆盖脏工作区、提交 Secret、私钥、用户文档或构建产物。
 - `NEXT.md` 失效时先修正交接，不自行改选相邻 Issue。
+
+## 本地空间与工作树卫生
+
+- 项目源码只保留一个真实的 `node_modules`。工作树必须使用 `npm run worktree:prepare -- <worktree-path>` 建立 junction；禁止在每个工作树再次执行 `npm install`，也禁止把依赖目录复制到项目外。
+- 构建、测试和覆盖率目录都是可再生文件。开始新切片前先运行 `npm run cleanup:workspace` 预览；确认输出后使用 `npm run cleanup:workspace -- --apply --prune-targets` 清理生成物和 Rust 目标。
+- 清理器只认识明确的生成目录（`dist`、`coverage`、`test-results`、`playwright-report`、Vite/任务缓存和 Rust 目标），不会触碰源码、文档、用户笔记或主工作区 `node_modules`。
+- 工作树回收是额外动作：只有确认不再需要时才使用 `--apply --prune-worktrees`。脏工作树、包含 junction/符号链接的工作树会自动保留，不能使用 `git worktree remove --force`。
+- 资源管理器可能把 junction 目标重复计入“大小”。排查空间时以清理器的实际文件大小为准，并检查 `git worktree list --porcelain`；项目外出现的临时副本一律停止使用并记录路径。
 
 ## 阶段门禁
 

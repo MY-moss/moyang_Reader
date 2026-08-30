@@ -1,10 +1,13 @@
 node_modules/
 .npm-cache/
-dist/
+.codex-worktrees/
+.codex-cache/dist/
 coverage/
 test-results/
-.vite/
-src-tauri/target/
+playwright-report/.vite/
+.vite-temp/
+.turbo/
+.cache/src-tauri/target/
 src-tauri/gen/
 *.tsbuildinfo
 .idea/
