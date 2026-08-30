@@ -168,6 +168,74 @@ a:focus-visible {
   border-radius: var(--radius);
   box-shadow: var(--shadow-soft);
 }
+.file-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--accent-soft) 34%, transparent);
+  pointer-events: none;
+}
+.file-drop-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 18px 22px;
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, var(--accent-soft));
+  box-shadow: var(--shadow-lifted);
+  color: var(--ink);
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.file-drop-glyph {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 24px;
+  line-height: 1;
+}
+.file-drop-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.file-drop-card strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.file-drop-card span:not(.file-drop-glyph) {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.file-drop-overlay-supported .file-drop-card {
+  transform: translateY(-2px);
+}
+.file-drop-overlay-mixed .file-drop-card {
+  border-color: color-mix(in srgb, var(--accent-warm) 62%, var(--line));
+}
+.file-drop-overlay-mixed .file-drop-glyph,
+.file-drop-overlay-unsupported .file-drop-glyph {
+  background: color-mix(in srgb, var(--accent-warm) 18%, var(--surface));
+  color: var(--accent-warm);
+}
+.file-drop-overlay-unsupported {
+  background: color-mix(in srgb, var(--accent-warm) 10%, transparent);
+}
+.file-drop-overlay-unsupported .file-drop-card {
+  border-color: color-mix(in srgb, var(--accent-warm) 68%, var(--line));
+}
 .topbar {
   position: relative;
   z-index: 20;
@@ -4384,6 +4452,7 @@ html.pane-resizing * {
   .topbar,
   .navigation-strip,
   .notification-viewport,
+  .file-drop-overlay,
   .tab-strip,
   .sidebar,
   .pane-resize-handle,

@@ -842,6 +842,58 @@ test("rejects unsupported browser files instead of rendering them as markdown", 
   await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
 });
 
+test("shows browser drag feedback and reports a partial drop", async ({ page }) => {
+  await page.goto("/");
+
+  await page.evaluate(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["# Dragged note\n"], "dragged-note.md", { type: "text/markdown" }));
+    transfer.items.add(new File(["binary"], "unsupported.bin", { type: "application/octet-stream" }));
+    const shell = document.querySelector(".app-shell");
+    if (!shell) throw new Error("app shell was not found");
+    (window as typeof window & { __moyangDragTransfer?: DataTransfer }).__moyangDragTransfer = transfer;
+    shell.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    shell.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+
+  const overlay = page.getByTestId("file-drop-overlay");
+  await expect(overlay).toHaveAttribute("data-drop-support", "mixed");
+  await expect(overlay).toContainText("松开即可打开可识别文件");
+
+  await page.evaluate(() => {
+    const shell = document.querySelector(".app-shell");
+    if (!shell) throw new Error("app shell was not found");
+    const transfer = (window as typeof window & { __moyangDragTransfer?: DataTransfer }).__moyangDragTransfer;
+    if (!transfer) throw new Error("drag transfer was not stored");
+    shell.dispatchEvent(
+      new DragEvent("dragleave", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: transfer,
+        relatedTarget: document.body,
+      }),
+    );
+  });
+  await expect(overlay).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const shell = document.querySelector(".app-shell");
+    if (!shell) throw new Error("app shell was not found");
+    const transfer = (window as typeof window & { __moyangDragTransfer?: DataTransfer }).__moyangDragTransfer;
+    if (!transfer) throw new Error("drag transfer was not stored");
+    shell.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    shell.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    shell.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    delete (window as typeof window & { __moyangDragTransfer?: DataTransfer }).__moyangDragTransfer;
+  });
+
+  await expect(page.getByRole("heading", { name: "Dragged note" })).toBeVisible({ timeout: 15_000 });
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('[data-testid="notification-viewport"] [data-notification-level="info"]')).toContainText(
+    "已跳过 1 个不支持的文件",
+  );
+});
+
 test("protects unsaved browser edits before opening another document", async ({ page }) => {
   await page.goto("/");
 

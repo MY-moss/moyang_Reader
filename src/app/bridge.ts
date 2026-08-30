@@ -344,11 +344,22 @@ export async function subscribeToOpenPaths(onPaths: (paths: OpenPath[]) => void)
   return listen<OpenPath[]>("open-paths", (event) => onPaths(event.payload));
 }
 
-export async function subscribeToFileDrop(onPaths: (paths: string[]) => void): Promise<UnlistenFn | null> {
+export type FileDropEvent =
+  { type: "enter"; paths: string[] } | { type: "over" } | { type: "drop"; paths: string[] } | { type: "leave" };
+
+export async function subscribeToFileDrop(onEvent: (event: FileDropEvent) => void): Promise<UnlistenFn | null> {
   if (!isTauriRuntime()) return null;
 
   const { getCurrentWebview } = await import("@tauri-apps/api/webview");
   return getCurrentWebview().onDragDropEvent((event) => {
-    if (event.payload.type === "drop") onPaths(event.payload.paths);
+    if (event.payload.type === "enter") {
+      onEvent({ type: "enter", paths: event.payload.paths });
+    } else if (event.payload.type === "over") {
+      onEvent({ type: "over" });
+    } else if (event.payload.type === "drop") {
+      onEvent({ type: "drop", paths: event.payload.paths });
+    } else {
+      onEvent({ type: "leave" });
+    }
   });
 }
