@@ -1216,6 +1216,71 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
+test("stacks setting feedback without shifting the reading layout", async ({ page }) => {
+  await page.goto("/");
+  await openSettingsMenu(page);
+
+  const contentArea = page.locator(".content-area");
+  const before = await contentArea.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, height: rect.height, scrollTop: element.scrollTop };
+  });
+
+  await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.getByLabel("导出纸张").selectOption("letter");
+  await page.getByLabel("导出方向").selectOption("landscape");
+  await page.getByLabel("导出页边距").selectOption("compact");
+
+  const messages = page.locator(".notification-viewport .app-notification");
+  await expect(messages).toHaveCount(3);
+  await expect(messages.nth(0)).toContainText("正文宽度已更新");
+  await expect(messages.nth(1)).toContainText("导出纸张已更新");
+  await expect(messages.nth(2)).toContainText("导出方向已更新");
+  await expect(messages.nth(0)).toHaveAttribute("role", "status");
+
+  const after = await contentArea.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, height: rect.height, scrollTop: element.scrollTop };
+  });
+  expect(after).toEqual(before);
+  const viewport = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+  }));
+  expect(viewport.bodyScrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+
+  await messages
+    .nth(0)
+    .getByRole("button", { name: /关闭通知/ })
+    .click();
+  await expect(messages).toHaveCount(3);
+  await expect(messages.nth(2)).toContainText("导出页边距已更新");
+});
+
+test("dismisses setting feedback with the keyboard in a narrow window", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/");
+  await openSettingsMenu(page);
+
+  const contentArea = page.locator(".content-area");
+  const before = await contentArea.evaluate((element) => element.getBoundingClientRect().top);
+  await page.getByLabel("正文宽度").selectOption("wide");
+
+  const dismissButton = page.locator(".app-notification-dismiss").first();
+  await dismissButton.focus();
+  await expect(dismissButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".app-notification")).toHaveCount(0);
+
+  const after = await contentArea.evaluate((element) => element.getBoundingClientRect().top);
+  expect(after).toBe(before);
+  const viewport = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+  }));
+  expect(viewport.bodyScrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+});
+
 test("opens and closes the getting started guide from the empty state", async ({ page }) => {
   await page.goto("/");
 

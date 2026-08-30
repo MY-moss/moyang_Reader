@@ -36,6 +36,7 @@ import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsDialog";
 import { UpdateNotice } from "./components/UpdateNotice";
+import { NotificationViewport } from "./components/NotificationViewport";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
@@ -119,6 +120,12 @@ import type {
   WorkspaceSearchResult,
 } from "./types";
 import { DocumentCache } from "./document-cache";
+import {
+  appendNotification,
+  removeNotification,
+  type AppNotification,
+  type NotificationLevel,
+} from "./notification-queue";
 import { nextReaderModeAfterOpen } from "./reader-mode";
 import {
   READING_ZOOM_DEFAULT,
@@ -560,7 +567,7 @@ export function App() {
   const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
-  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
   const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
   const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
@@ -633,6 +640,7 @@ export function App() {
   const workspaceLoadRequestRef = useRef(0);
   const workspaceRefreshQueueRef = useRef<Promise<void>>(Promise.resolve());
   const workspaceReloadTimerRef = useRef<number | null>(null);
+  const notificationSequenceRef = useRef(0);
   const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWritingPathsRef = useRef(new Set<string>());
   const selfWrittenPathsRef = useRef(new Map<string, number>());
@@ -645,6 +653,21 @@ export function App() {
   const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
   const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
+
+  const notify = useCallback((message: string, level: NotificationLevel = "success") => {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+    const notification: AppNotification = {
+      id: ++notificationSequenceRef.current,
+      level,
+      message: trimmedMessage,
+    };
+    setNotifications((current) => appendNotification(current, notification));
+  }, []);
+
+  const dismissNotification = useCallback((id: number) => {
+    setNotifications((current) => removeNotification(current, id));
+  }, []);
 
   const setReadingHeading = useCallback((heading: ReadingHeading | null) => {
     const nextHeading = heading?.text ?? null;
@@ -799,19 +822,22 @@ export function App() {
     [],
   );
 
-  const handleDraftSaveResult = useCallback((result: DraftSaveResult): boolean => {
-    if (!result.ok) {
-      setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");
-      return false;
-    }
+  const handleDraftSaveResult = useCallback(
+    (result: DraftSaveResult): boolean => {
+      if (!result.ok) {
+        setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");
+        return false;
+      }
 
-    const snapshots = loadDraftSnapshots();
-    setDraftSnapshots(snapshots);
-    if (result.prunedCount > 0) {
-      setSettingsNotice(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`);
-    }
-    return true;
-  }, []);
+      const snapshots = loadDraftSnapshots();
+      setDraftSnapshots(snapshots);
+      if (result.prunedCount > 0) {
+        notify(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`, "info");
+      }
+      return true;
+    },
+    [notify],
+  );
 
   const resetEditorHistory = useCallback((documentKey: string, source: string) => {
     const nextHistory = createEditorHistory(documentKey, source);
@@ -931,17 +957,17 @@ export function App() {
     void (async () => {
       try {
         if (!(await flushAppSettings())) {
-          setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+          notify("设置尚未成功写入本机，请稍后重试关闭窗口。", "error");
           return;
         }
         await closeWindow();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+        notify(cause instanceof Error ? cause.message : "关闭窗口失败。", "error");
       } finally {
         settingsCloseInFlightRef.current = false;
       }
     })();
-  }, [flushAppSettings]);
+  }, [flushAppSettings, notify]);
 
   const exportPortableSettings = useCallback(async () => {
     try {
@@ -961,15 +987,15 @@ export function App() {
         const targetPath = await chooseSavePath("Moyang Reader - settings.json", "json");
         if (!targetPath) return;
         await writeTextFile(targetPath, serialized);
-        setSettingsNotice(`设置备份已保存：${fileNameFromPath(targetPath)}`);
+        notify(`设置备份已保存：${fileNameFromPath(targetPath)}`);
       } else {
         downloadText("Moyang Reader - settings.json", serialized, "application/json");
-        setSettingsNotice("设置备份已下载，不包含文档正文或私钥。");
+        notify("设置备份已下载，不包含文档正文或私钥。");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "设置备份导出失败。");
+      notify(cause instanceof Error ? cause.message : "设置备份导出失败。", "error");
     }
-  }, [locale, mountedWorkspaces, openTabs, preferences, theme, workspacePath]);
+  }, [locale, mountedWorkspaces, notify, openTabs, preferences, theme, workspacePath]);
 
   const importPortableSettings = useCallback(() => {
     const input = document.createElement("input");
@@ -995,14 +1021,14 @@ export function App() {
           saveLocale(bundle.locale);
           setTheme(bundle.theme);
           setMountedWorkspaces([...bundle.mountedWorkspaces]);
-          setSettingsNotice("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
+          notify("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
         })
         .catch((cause: unknown) => {
-          setError(cause instanceof Error ? cause.message : "设置备份导入失败。");
+          notify(cause instanceof Error ? cause.message : "设置备份导入失败。", "error");
         });
     };
     input.click();
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     documentStateRef.current = documentState;
@@ -1110,10 +1136,9 @@ export function App() {
   }, [preferences.allowRemoteResources]);
 
   useEffect(() => {
-    if (!settingsNotice) return;
-    const timer = window.setTimeout(() => setSettingsNotice(null), 6000);
-    return () => window.clearTimeout(timer);
-  }, [settingsNotice]);
+    if (settingsPersistenceStatus !== "error") return;
+    notify("设置未能保存到本机，请稍后重试。", "error");
+  }, [notify, settingsPersistenceStatus]);
 
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
@@ -1361,12 +1386,12 @@ export function App() {
       void (async () => {
         try {
           if (!(await flushAppSettings())) {
-            if (active) setError("设置尚未成功写入本机，请稍后重试关闭窗口。");
+            if (active) notify("设置尚未成功写入本机，请稍后重试关闭窗口。", "error");
             return;
           }
           await closeWindow();
         } catch (cause) {
-          if (active) setError(cause instanceof Error ? cause.message : "关闭窗口失败。");
+          if (active) notify(cause instanceof Error ? cause.message : "关闭窗口失败。", "error");
         } finally {
           settingsCloseInFlightRef.current = false;
         }
@@ -1385,7 +1410,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [flushAppSettings, handleDraftSaveResult]);
+  }, [flushAppSettings, handleDraftSaveResult, notify]);
 
   useEffect(() => {
     workspacePathRef.current = workspacePath;
@@ -1987,7 +2012,7 @@ export function App() {
         }
         setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe));
         if (kind === "markdown" && !editorSafety.safe) {
-          setSettingsNotice(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`);
+          notify(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`, "info");
         }
         if (stamp && !path.startsWith("browser://")) {
           documentCacheRef.current.set({
@@ -2007,7 +2032,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources, resetEditorHistory],
+    [notify, releaseDocumentResources, resetEditorHistory],
   );
 
   const openBinary = useCallback(
@@ -2444,13 +2469,13 @@ export function App() {
         }
 
         await refreshWorkspaceChanges(root, [oldAbsolutePath, renamedPath]);
-        setSettingsNotice(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);
+        notify(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);
         if (!reopenFailed) setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");
       }
     },
-    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
   );
 
   const handleDeleteWorkspaceEntry = useCallback(
@@ -2523,13 +2548,13 @@ export function App() {
         }
 
         await refreshWorkspaceChanges(root, [oldAbsolutePath]);
-        setSettingsNotice(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);
+        notify(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);
         if (!nextTabFailed) setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
       }
     },
-    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
   );
 
   const handleTransferWorkspaceEntry = useCallback(
@@ -2609,7 +2634,7 @@ export function App() {
         }
 
         await refreshWorkspaceChanges(root, [oldAbsolutePath, transferredPath]);
-        setSettingsNotice(
+        notify(
           `${mode === "move" ? "已移动" : "已复制"}${kind === "folder" ? "文件夹" : "文件"}：${fileNameFromPath(transferredPath)}`,
         );
         if (!reopenFailed) setError(null);
@@ -2619,41 +2644,47 @@ export function App() {
         return false;
       }
     },
-    [openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
   );
 
-  const handleCopyWorkspacePath = useCallback(async (entryPath: string) => {
-    const root = workspacePathRef.current;
-    if (!root || !isTauriRuntime()) {
-      setError("当前没有可复制的工作区路径。");
-      return;
-    }
+  const handleCopyWorkspacePath = useCallback(
+    async (entryPath: string) => {
+      const root = workspacePathRef.current;
+      if (!root || !isTauriRuntime()) {
+        setError("当前没有可复制的工作区路径。");
+        return;
+      }
 
-    try {
-      const path = workspaceEntryAbsolutePath(root, entryPath);
-      await copyPlainText(path);
-      setSettingsNotice("完整路径已复制到剪贴板。");
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "复制路径失败。");
-    }
-  }, []);
+      try {
+        const path = workspaceEntryAbsolutePath(root, entryPath);
+        await copyPlainText(path);
+        notify("完整路径已复制到剪贴板。");
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "复制路径失败。");
+      }
+    },
+    [notify],
+  );
 
-  const handleCopyWorkspaceRelativePath = useCallback(async (entryPath: string) => {
-    const relativePath = entryPath.replace(/[\\/]+/g, "\\").replace(/^\\+|\\+$/g, "");
-    if (!relativePath) {
-      setError("当前条目没有可复制的相对路径。");
-      return;
-    }
+  const handleCopyWorkspaceRelativePath = useCallback(
+    async (entryPath: string) => {
+      const relativePath = entryPath.replace(/[\\/]+/g, "\\").replace(/^\\+|\\+$/g, "");
+      if (!relativePath) {
+        setError("当前条目没有可复制的相对路径。");
+        return;
+      }
 
-    try {
-      await copyPlainText(relativePath);
-      setSettingsNotice("相对路径已复制到剪贴板。");
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "复制相对路径失败。");
-    }
-  }, []);
+      try {
+        await copyPlainText(relativePath);
+        notify("相对路径已复制到剪贴板。");
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "复制相对路径失败。");
+      }
+    },
+    [notify],
+  );
 
   const handleShowWorkspaceDetails = useCallback((details: WorkspaceEntryDetails) => {
     const root = workspacePathRef.current;
@@ -2678,13 +2709,13 @@ export function App() {
       try {
         const duplicatedPath = await duplicateWorkspaceEntry(root, entryPath, name);
         await refreshWorkspaceChanges(root, [duplicatedPath]);
-        setSettingsNotice(`已创建副本：${fileNameFromPath(duplicatedPath)}`);
+        notify(`已创建副本：${fileNameFromPath(duplicatedPath)}`);
         setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "无法创建工作区副本。");
       }
     },
-    [refreshWorkspaceChanges],
+    [notify, refreshWorkspaceChanges],
   );
 
   const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {
@@ -2702,21 +2733,24 @@ export function App() {
     }
   }, []);
 
-  const handleCopyWorkspaceName = useCallback(async (entryPath: string) => {
-    const name = fileNameFromPath(entryPath.replace(/[\\/]+$/, ""));
-    if (!name) {
-      setError("当前条目没有可复制的名称。");
-      return;
-    }
+  const handleCopyWorkspaceName = useCallback(
+    async (entryPath: string) => {
+      const name = fileNameFromPath(entryPath.replace(/[\\/]+$/, ""));
+      if (!name) {
+        setError("当前条目没有可复制的名称。");
+        return;
+      }
 
-    try {
-      await copyPlainText(name);
-      setSettingsNotice("名称已复制到剪贴板。");
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "复制名称失败。");
-    }
-  }, []);
+      try {
+        await copyPlainText(name);
+        notify("名称已复制到剪贴板。");
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "复制名称失败。");
+      }
+    },
+    [notify],
+  );
 
   const handleRefreshWorkspaceEntry = useCallback(
     async (entryPath: string) => {
@@ -2726,16 +2760,16 @@ export function App() {
         return;
       }
 
-      setSettingsNotice("正在刷新文件树…");
+      notify("正在刷新文件树…", "info");
       if (entryPath.trim()) {
         await refreshWorkspaceChanges(root, [workspaceEntryAbsolutePath(root, entryPath)]);
       } else {
         await loadWorkspace(root, true);
       }
-      setSettingsNotice("文件树已刷新。");
+      notify("文件树已刷新。");
       setError(null);
     },
-    [loadWorkspace, refreshWorkspaceChanges],
+    [loadWorkspace, notify, refreshWorkspaceChanges],
   );
 
   const openSelectedFile = useCallback(async () => {
@@ -3024,12 +3058,12 @@ export function App() {
     (kind: EditorInsertKind) => {
       const currentDocument = documentStateRef.current;
       if (!currentDocument || !isEditableDocument(currentDocument.kind) || mode === "rendered") {
-        setSettingsNotice("请先进入编辑模式，再使用插入工具。");
+        notify("请先进入编辑模式，再使用插入工具。", "info");
         return;
       }
       setRequestedInsertKind(kind);
     },
-    [mode],
+    [mode, notify],
   );
 
   const handleEditorInsertRequestHandled = useCallback(() => {
@@ -3042,7 +3076,7 @@ export function App() {
     if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
 
     if (currentDocument.kind === "markdown" && !checkMarkdownEditorSafety(sourceDraftRef.current).safe) {
-      setSettingsNotice("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。");
+      notify("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。", "info");
     }
 
     setMode((current) => {
@@ -3053,7 +3087,7 @@ export function App() {
       if (current === "wysiwyg") return "source";
       return "rendered";
     });
-  }, []);
+  }, [notify]);
 
   const toggleReadingEditing = useCallback(() => {
     const currentDocument = documentStateRef.current;
@@ -3516,18 +3550,21 @@ export function App() {
     );
   }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
 
-  const savePdfDocument = useCallback(async (html: string, defaultPath: string): Promise<boolean> => {
-    if (!isTauriRuntime()) {
-      await printHtmlDocument(html);
-      return true;
-    }
+  const savePdfDocument = useCallback(
+    async (html: string, defaultPath: string): Promise<boolean> => {
+      if (!isTauriRuntime()) {
+        await printHtmlDocument(html);
+        return true;
+      }
 
-    const path = await chooseSavePath(defaultPath, "pdf");
-    if (!path) return false;
-    await exportPdfFile(path, html);
-    setSettingsNotice(`已保存 PDF：${fileNameFromPath(path)}。`);
-    return true;
-  }, []);
+      const path = await chooseSavePath(defaultPath, "pdf");
+      if (!path) return false;
+      await exportPdfFile(path, html);
+      notify(`已保存 PDF：${fileNameFromPath(path)}。`);
+      return true;
+    },
+    [notify],
+  );
 
   const handleExport = useCallback(async () => {
     if ((documentState?.kind === "pdf" || documentState?.kind === "image") && documentState.previewUrl) {
@@ -4028,28 +4065,34 @@ export function App() {
     });
   }, []);
 
-  const handleCopyReaderText = useCallback(async (text: string) => {
-    const value = text.trim();
-    if (!value) return;
+  const handleCopyReaderText = useCallback(
+    async (text: string) => {
+      const value = text.trim();
+      if (!value) return;
 
-    try {
-      await copyPlainText(value);
-      setSettingsNotice("选中文本已复制。");
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "复制选中文本失败。");
-    }
-  }, []);
+      try {
+        await copyPlainText(value);
+        notify("选中文本已复制。");
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "复制选中文本失败。");
+      }
+    },
+    [notify],
+  );
 
-  const handleCopyReaderLink = useCallback(async (href: string) => {
-    try {
-      await copyPlainText(href);
-      setSettingsNotice("链接地址已复制。");
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "复制链接地址失败。");
-    }
-  }, []);
+  const handleCopyReaderLink = useCallback(
+    async (href: string) => {
+      try {
+        await copyPlainText(href);
+        notify("链接地址已复制。");
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "复制链接地址失败。");
+      }
+    },
+    [notify],
+  );
 
   const handleCopyReaderDocumentPath = useCallback(async () => {
     const path = documentStateRef.current?.path;
@@ -4060,12 +4103,12 @@ export function App() {
 
     try {
       await copyPlainText(path);
-      setSettingsNotice("文档路径已复制。");
+      notify("文档路径已复制。");
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "复制文档路径失败。");
     }
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     setReaderContextMenu(null);
@@ -4695,14 +4738,32 @@ export function App() {
         exportOrientation={preferences.exportOrientation}
         exportMargin={preferences.exportMargin}
         onReadingZoomChange={setReadingZoom}
-        onReadingWidthChange={(width) => setReaderPreferences({ readingWidth: width })}
-        onExportPaperChange={(paper) => setReaderPreferences({ exportPaper: paper })}
-        onExportOrientationChange={(orientation) => setReaderPreferences({ exportOrientation: orientation })}
-        onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}
+        onReadingWidthChange={(width) => {
+          setReaderPreferences({ readingWidth: width });
+          notify("正文宽度已更新。");
+        }}
+        onExportPaperChange={(paper) => {
+          setReaderPreferences({ exportPaper: paper });
+          notify("导出纸张已更新。");
+        }}
+        onExportOrientationChange={(orientation) => {
+          setReaderPreferences({ exportOrientation: orientation });
+          notify("导出方向已更新。");
+        }}
+        onExportMarginChange={(margin) => {
+          setReaderPreferences({ exportMargin: margin });
+          notify("导出页边距已更新。");
+        }}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
-        onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
-        onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
+        onAllowRemoteResourcesChange={(allowed) => {
+          setReaderPreferences({ allowRemoteResources: allowed });
+          notify(allowed ? "已允许加载远程图片。" : "已禁止加载远程图片。");
+        }}
+        onStartupUpdateCheckChange={(enabled) => {
+          setReaderPreferences({ startupUpdateCheck: enabled });
+          notify(enabled ? "已开启启动时检查更新。" : "已关闭启动时检查更新。");
+        }}
         onExportSettings={() => void exportPortableSettings()}
         onImportSettings={importPortableSettings}
         onOpenGuide={() => setGuideOpen(true)}
@@ -4762,28 +4823,35 @@ export function App() {
           setSearchOpen(false);
           setSearchQuery("");
         }}
-        onCycleTheme={cycleTheme}
-        onLocaleChange={setLocale}
+        onCycleTheme={() => {
+          cycleTheme();
+          notify("阅读主题已更新。");
+        }}
+        onLocaleChange={(nextLocale) => {
+          setLocale(nextLocale);
+          notify(nextLocale === "en-US" ? "Interface language changed." : "界面语言已切换。");
+        }}
+      />
+      <NotificationViewport
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        updateNotice={
+          updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" ? (
+            <UpdateNotice
+              status={updateStatus}
+              version={availableUpdate?.version ?? null}
+              notes={availableUpdate?.body?.trim() || null}
+              progress={updateProgress}
+              error={updateError}
+              onInstall={() => void installUpdate()}
+              onRelaunch={() => void relaunchUpdatedApp()}
+              onHide={() => setUpdateNoticeVisible(false)}
+              onDismiss={dismissUpdateNotice}
+            />
+          ) : null
+        }
       />
       <div className="navigation-strip">
-        {settingsNotice && (
-          <div className="settings-notice" role="status">
-            {settingsNotice}
-          </div>
-        )}
-        {updateNoticeVisible && updateStatus !== "idle" && updateStatus !== "checking" && (
-          <UpdateNotice
-            status={updateStatus}
-            version={availableUpdate?.version ?? null}
-            notes={availableUpdate?.body?.trim() || null}
-            progress={updateProgress}
-            error={updateError}
-            onInstall={() => void installUpdate()}
-            onRelaunch={() => void relaunchUpdatedApp()}
-            onHide={() => setUpdateNoticeVisible(false)}
-            onDismiss={dismissUpdateNotice}
-          />
-        )}
         <Tabs
           tabs={openTabs}
           activePath={documentState?.path ?? null}
@@ -4846,7 +4914,7 @@ export function App() {
             onTransferEntry={(sourcePath, destinationParentPath, operation, kind) =>
               handleTransferWorkspaceEntry(sourcePath, destinationParentPath, operation, kind)
             }
-            onStatusMessage={(message) => setSettingsNotice(message)}
+            onStatusMessage={(message) => notify(message)}
             onSearchQueryChange={setWorkspaceQuery}
             onTagChange={setSelectedTag}
             onKindChange={setSelectedFileKind}
@@ -4994,7 +5062,7 @@ export function App() {
                 canRedo={canRedo}
                 onUndo={(target) => undoEditor(target)}
                 onRedo={(target) => redoEditor(target)}
-                onStatusMessage={(message) => setSettingsNotice(message)}
+                onStatusMessage={(message) => notify(message)}
                 wikiCandidates={wikiLinkCandidates}
               />
             </Suspense>
@@ -5012,7 +5080,7 @@ export function App() {
               canRedo={canRedo}
               onUndo={(target) => undoEditor(target)}
               onRedo={(target) => redoEditor(target)}
-              onStatusMessage={(message) => setSettingsNotice(message)}
+              onStatusMessage={(message) => notify(message)}
               wikiCompletions={wikiLinkCandidates}
             />
           )}

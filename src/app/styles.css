@@ -100,6 +100,74 @@ a:focus-visible {
   position: relative;
   z-index: 10;
 }
+.notification-viewport {
+  position: fixed;
+  top: 84px;
+  right: 24px;
+  z-index: 80;
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - 48px));
+  pointer-events: none;
+}
+.notification-viewport > * {
+  pointer-events: auto;
+}
+.app-notification {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.app-notification-info {
+  border-left-color: var(--line-strong);
+}
+.app-notification-error {
+  border-color: #d6a297;
+  border-left-color: var(--danger);
+  background: #fff5f2;
+  color: var(--danger);
+}
+.app-notification-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-notification-dismiss {
+  flex: 0 0 auto;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.app-notification-dismiss:hover {
+  border-color: var(--line);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.notification-viewport > .update-notice {
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
 .topbar {
   position: relative;
   z-index: 20;
@@ -556,13 +624,6 @@ a:focus-visible {
 .settings-actions .quiet-button {
   padding: 5px 8px;
   font-size: 10px;
-}
-.settings-notice {
-  padding: 7px 18px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--accent-soft) 64%, var(--surface));
-  color: var(--accent-deep);
-  font-size: 11px;
 }
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
@@ -2440,6 +2501,7 @@ html.pane-resizing * {
 }
 .focus-mode .topbar,
 .focus-mode .navigation-strip,
+.focus-mode .notification-viewport,
 .focus-mode .sidebar,
 .focus-mode .statusbar {
   display: none;
@@ -3816,6 +3878,10 @@ html.pane-resizing * {
     border-color: #70463e;
     background: #372522;
   }
+  :root:not([data-theme]) .app-notification-error {
+    border-color: #70463e;
+    background: #372522;
+  }
   :root:not([data-theme]) .external-change-notice {
     border-color: #77613b;
     background: #3a3325;
@@ -3924,6 +3990,10 @@ html.pane-resizing * {
   background: #372522;
 }
 :root[data-theme="dark"] .update-notice-error {
+  border-color: #70463e;
+  background: #372522;
+}
+:root[data-theme="dark"] .app-notification-error {
   border-color: #70463e;
   background: #372522;
 }
@@ -4179,6 +4249,11 @@ html.pane-resizing * {
 }
 
 @media screen and (max-width: 720px) {
+  .notification-viewport {
+    top: 76px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
   .workspace-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -4308,6 +4383,7 @@ html.pane-resizing * {
   }
   .topbar,
   .navigation-strip,
+  .notification-viewport,
   .tab-strip,
   .sidebar,
   .pane-resize-handle,
