@@ -1,9 +1,15 @@
 node_modules/
 .npm-cache/
+.codex-worktrees/
+.codex-cache/
 dist/
 coverage/
 test-results/
+playwright-report/
 .vite/
+.vite-temp/
+.turbo/
+.cache/
 src-tauri/target/
 src-tauri/gen/
 *.tsbuildinfo
