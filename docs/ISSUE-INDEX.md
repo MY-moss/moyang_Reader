@@ -31,7 +31,7 @@
 
 ### v0.11.0 milestone 顺序
 
-`#87 → #234 → #189 → #301 → #346 → #299 → #119 → #190 → #172`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
+`#172 → #375 → #357 → #358 → #360/#369 → #359 → #361–#366 → #367/#368/#371/#372`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
 
 ## 2. 当前可执行 backlog
 
@@ -50,6 +50,10 @@
 | [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计     | v0.11.0 发布前            | 发布/镜像工作流优先                                                         |
 | [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归   | v0.11.0 第 5 阶段（条件） | 依赖 Cloudflare Secrets、真实旧版本安装环境和发布条件                       |
 | [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 第 5 阶段（条件） | SemVer 校验已完成；剩余 Authenticode 证书或限制说明                         |
+| [#357](https://github.com/MY-moss/moyang_Reader/issues/357) | 右键菜单 fixed 定位与内容区包含块  | v0.11.x 当前切片          | 唯一 Ready；三个挂载入口位置、裁剪与滚动稳定性                              |
+| [#358](https://github.com/MY-moss/moyang_Reader/issues/358) | 插入浮层跟随光标/视口              | v0.11.x                   | 待 #357 后独立切片                                                          |
+| [#359](https://github.com/MY-moss/moyang_Reader/issues/359) | 撤销历史全量快照与编辑粒度         | v0.11.x                   | 大文档驻留与 Ctrl+Z 粒度稳定性                                              |
+| [#360](https://github.com/MY-moss/moyang_Reader/issues/360) | 工作区树操作异步化                 | v0.11.x                   | 与 #369 分开验收、可共用底层命令改造                                        |
 
 ### Should：明显改善高频体验和可维护性
 
@@ -62,19 +66,31 @@
 | [#299](https://github.com/MY-moss/moyang_Reader/issues/299) | 右键菜单焦点循环与关闭归还       | v0.11.0 第 7 切片 | 共享菜单基座和五类调用入口                        |
 | [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航细节               | v0.11.x           | 按子问题独立切片                                  |
 | [#119](https://github.com/MY-moss/moyang_Reader/issues/119) | axe/WCAG AA Windows UI 基线      | v0.11.x           | 已完成；PR #350，真实读屏抽查保留在发布前清单     |
-| [#172](https://github.com/MY-moss/moyang_Reader/issues/172) | reduced-motion 下的程序化滚动    | v0.11.0           | 下一唯一 READY；低风险可独立交付                  |
+| [#172](https://github.com/MY-moss/moyang_Reader/issues/172) | reduced-motion 下的程序化滚动    | v0.11.0           | 已完成；PR #374 已合并，Issue 已关闭              |
 | [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、主按钮、页签和令牌细节   | v0.11.x           | 不与 #171 的大范围拆分混做                        |
 | [#233](https://github.com/MY-moss/moyang_Reader/issues/233) | 顶栏图标体系和操作密度           | v0.11.x           | 与 #187/#171 协同                                 |
 | [#227](https://github.com/MY-moss/moyang_Reader/issues/227) | SECURITY.md 与私密披露入口       | v0.11.x           | 文档成本低，独立交付                              |
 | [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档   | v0.11.x           | 清单中部分已完成，不能重复实现                    |
 | [#194](https://github.com/MY-moss/moyang_Reader/issues/194) | TS↔Rust 契约、路径谓词和重复实现 | v1.0 前           | 只有明确子切片才进入 Ready                        |
 | [#16](https://github.com/MY-moss/moyang_Reader/issues/16)   | 渐进拆分 App.tsx                 | v1.0 前           | 以职责和测试边界为准，不以行数为唯一目标          |
+| [#361](https://github.com/MY-moss/moyang_Reader/issues/361) | 暗色主题 accent 按钮对比度       | v0.11.x           | 视觉小切片                                        |
+| [#362](https://github.com/MY-moss/moyang_Reader/issues/362) | 交互与渲染微成本                 | v0.11.x           | 面板、草稿解析和差异对话框按测量拆分              |
+| [#363](https://github.com/MY-moss/moyang_Reader/issues/363) | 导出分块 Flush 与分卷恢复        | v0.11.x           | 仅在有基线后处理                                  |
+| [#364](https://github.com/MY-moss/moyang_Reader/issues/364) | 右键粘贴与图片剪贴板反馈         | v0.11.x           | 明确纯文本、图片和失败反馈                        |
+| [#365](https://github.com/MY-moss/moyang_Reader/issues/365) | 插入浮层焦点归还与图片浏览入口   | v0.11.x           | 不与 #358 混成一个 PR                             |
+| [#366](https://github.com/MY-moss/moyang_Reader/issues/366) | 统一确认弹层与关闭文案           | v0.11.x           | 统一草稿保存/关闭语义                             |
+| [#367](https://github.com/MY-moss/moyang_Reader/issues/367) | 文档级跳转历史与返回上一文档     | v0.11.x           | 双链闭环；独立导航切片                            |
+| [#368](https://github.com/MY-moss/moyang_Reader/issues/368) | 全文书签与选中文本批注           | v0.11.x–v1.0      | 先书签，再批注；sidecar 不污染 Markdown 真源      |
+| [#369](https://github.com/MY-moss/moyang_Reader/issues/369) | 回收站删除与保存上一版本保护     | v0.11.x           | 数据安全动作需单独验收                            |
+| [#370](https://github.com/MY-moss/moyang_Reader/issues/370) | 阅读历史与本地统计               | v1.0 前           | 仅本机数据，不做云同步                            |
+| [#371](https://github.com/MY-moss/moyang_Reader/issues/371) | 中文拼音首字母搜索               | v0.11.x           | 索引侧预计算，避免前端引入大依赖                  |
 
 ### Could：保留记录，当前不占用快速迭代资源
 
-| Issue                                                       | 主题                       | 计划      | 重新进入条件                 |
-| ----------------------------------------------------------- | -------------------------- | --------- | ---------------------------- |
-| [#111](https://github.com/MY-moss/moyang_Reader/issues/111) | 轻量中英双语 i18n 与错误码 | v1.0 后段 | 核心功能稳定且有真实语言需求 |
+| Issue                                                       | 主题                       | 计划      | 重新进入条件                             |
+| ----------------------------------------------------------- | -------------------------- | --------- | ---------------------------------------- |
+| [#111](https://github.com/MY-moss/moyang_Reader/issues/111) | 轻量中英双语 i18n 与错误码 | v1.0 后段 | 核心功能稳定且有真实语言需求             |
+| [#372](https://github.com/MY-moss/moyang_Reader/issues/372) | 设置导出/导入补全阅读位置  | v0.11.x   | 采用版本化迁移，待核心功能切片稳定后处理 |
 
 ## 3. 已归档 Issue
 
@@ -112,4 +128,4 @@
 - 2026-08-29：盘点 32 个开放 Issue。
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：12 个开放可执行 Issue（Must 2、Should 9、Could 1），9 个已归档；#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#119 已完成（PR #350），#190 已完成（PR #351），下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
+- 当前结果：27 个开放可执行 Issue（Must 6、Should 19、Could 2），9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#119 已完成（PR #350），#190 已完成（PR #351）；#375 为已合并的工程治理 PR，下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
