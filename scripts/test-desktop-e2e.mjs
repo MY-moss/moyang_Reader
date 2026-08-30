@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
+import { createBuildEnvironment } from "./shared-cargo-target.mjs";
 
 const command = (name) => (process.platform === "win32" ? `${name}.cmd` : name);
-const environment = { ...process.env, VITE_MOYANG_DESKTOP_E2E: "1" };
+const environment = createBuildEnvironment(process.cwd(), { VITE_MOYANG_DESKTOP_E2E: "1" });
 
 function run(name, args) {
   const result = spawnSync(command(name), args, {

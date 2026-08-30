@@ -8,15 +8,15 @@
 npm install
 npm run test
 npm run build
-npm run tauri dev
+npm run desktop
 ```
 
 Rust 命令层测试：
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+npm run rust -- test --manifest-path src-tauri/Cargo.toml
+npm run rust -- fmt --manifest-path src-tauri/Cargo.toml -- --check
+npm run rust -- clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 前端静态检查：
