@@ -130,7 +130,9 @@ describe("ContextMenu", () => {
     const menu = () => container.querySelector<HTMLElement>('[role="menu"]');
 
     act(() => {
-      menu()?.dispatchEvent(keyboardEvent("Escape"));
+      const event = keyboardEvent("Escape");
+      document.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
     });
     expect(onClosed).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(trigger);
@@ -164,3 +166,4 @@ describe("ContextMenu", () => {
     outside.remove();
   });
 });
+

@@ -115,12 +115,17 @@ export function ContextMenu({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const menu = menuRef.current;
-      if (!menu || !(event.target instanceof Node) || !menu.contains(event.target)) return;
-      if (event.key === "Escape") {
+      if (!menu) return;
+      // Native desktop drivers can deliver Escape to the document/webview
+      // rather than the focused menu item. Closing must not depend on the
+      // event target still being inside the menu.
+      if (event.key === "Escape" || event.key === "Esc" || event.code === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         onCloseRef.current();
         return;
       }
+      if (!(event.target instanceof Node) || !menu.contains(event.target)) return;
 
       const items = getEnabledMenuItems(menu);
       if (event.key === "Tab") {
@@ -156,10 +161,10 @@ export function ContextMenu({
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
-    menuElement?.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
-      menuElement?.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
       restoreFocus(restoreTarget, fallbackTarget);
     };
   }, []);
@@ -204,3 +209,4 @@ export function ContextMenu({
     </div>
   );
 }
+
