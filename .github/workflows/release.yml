@@ -119,4 +119,3 @@ jobs:
     with:
       version: ${{ needs.publish.outputs.release_tag }}
     secrets: inherit
-

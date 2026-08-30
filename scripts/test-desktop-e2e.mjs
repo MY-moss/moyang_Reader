@@ -26,4 +26,3 @@ run("tauri", [
   "src-tauri/tauri.wdio.conf.json",
 ]);
 run("wdio", ["run", "desktop-e2e/wdio.conf.mjs"]);
-

@@ -28,4 +28,3 @@ child.once("error", (cause) => {
 child.once("exit", (code, signal) => {
   process.exitCode = code ?? (signal ? 1 : 0);
 });
-

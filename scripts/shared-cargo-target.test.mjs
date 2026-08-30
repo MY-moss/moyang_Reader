@@ -66,4 +66,3 @@ test("keeps an explicitly configured Cargo target outside the repository", () =>
 
     assert.equal(resolveSharedCargoTargetDir(root), path.resolve(externalTarget));
   }));
-

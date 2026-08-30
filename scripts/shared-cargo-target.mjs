@@ -58,4 +58,3 @@ export function createBuildEnvironment(projectRoot = defaultProjectRoot, overrid
     CARGO_TARGET_DIR: resolveSharedCargoTargetDir(projectRoot),
   };
 }
-

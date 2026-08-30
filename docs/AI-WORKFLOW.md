@@ -171,4 +171,3 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 ## 当前停止规则
 
 功能分支合并、交接归档更新、`NEXT.md` 指向下一任务后，本次聊天立即停止。新的切片必须由新的“继续开发”请求触发。
-

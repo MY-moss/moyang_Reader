@@ -8,6 +8,7 @@ import {
   type WikiLinkCandidate,
 } from "../wiki-link-completion";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
+import type { EditorInsertAnchor } from "../editor-insert-position";
 import { applySourceEditorAction } from "../editor-context-actions";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
 import { applyEditorInsert, type EditorInsertKind, type EditorInsertRequest } from "../editor-insertion";
@@ -49,6 +50,15 @@ function isContextMenuKey(event: KeyboardEvent): boolean {
   return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
 }
 
+function focusWithoutScroll(element: HTMLElement | null): void {
+  if (!element) return;
+  try {
+    element.focus({ preventScroll: true });
+  } catch {
+    element.focus();
+  }
+}
+
 export function SourceEditor({
   value,
   ariaLabel,
@@ -83,6 +93,7 @@ export function SourceEditor({
   const [insertOpen, setInsertOpen] = useState(false);
   const [insertKind, setInsertKind] = useState<EditorInsertKind>("link");
   const [insertInitialValues, setInsertInitialValues] = useState<EditorInsertInitialValues>({});
+  const [insertAnchor, setInsertAnchor] = useState<EditorInsertAnchor | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -141,26 +152,44 @@ export function SourceEditor({
     onStatusMessageRef.current = onStatusMessage;
   }, [onStatusMessage]);
 
-  const replaceSourceValue = useCallback((nextValue: string, selectionStart: number, selectionEnd: number) => {
-    valueRef.current = nextValue;
+  const focusSourceEditorPreservingViewport = useCallback(() => {
+    const surface = containerRef.current ?? fallbackShellRef.current;
+    const viewport = surface ? captureEditorViewport(surface.closest<HTMLElement>(".content-area"), surface) : [];
     const view = viewRef.current;
-    if (view) {
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: nextValue },
-        selection: { anchor: selectionStart, head: selectionEnd },
-      });
-      view.focus();
-      return;
-    }
-
-    onChangeRef.current(nextValue);
-    window.requestAnimationFrame(() => {
-      const textarea = fallbackRef.current;
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(selectionStart, selectionEnd);
-    });
+    if (view) view.focus();
+    else focusWithoutScroll(fallbackRef.current);
+    restoreEditorViewport(viewport);
+    window.requestAnimationFrame(() => restoreEditorViewport(viewport));
   }, []);
+
+  const replaceSourceValue = useCallback(
+    (nextValue: string, selectionStart: number, selectionEnd: number) => {
+      valueRef.current = nextValue;
+      const view = viewRef.current;
+      if (view) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: nextValue },
+          selection: { anchor: selectionStart, head: selectionEnd },
+        });
+        focusSourceEditorPreservingViewport();
+        return;
+      }
+
+      onChangeRef.current(nextValue);
+      window.requestAnimationFrame(() => {
+        const textarea = fallbackRef.current;
+        if (!textarea) return;
+        focusWithoutScroll(textarea);
+        textarea.setSelectionRange(selectionStart, selectionEnd);
+        const surface = fallbackShellRef.current;
+        if (surface) {
+          const viewport = captureEditorViewport(surface.closest<HTMLElement>(".content-area"), surface);
+          restoreEditorViewport(viewport);
+        }
+      });
+    },
+    [focusSourceEditorPreservingViewport],
+  );
 
   const readCurrentSelection = useCallback(() => {
     const view = viewRef.current;
@@ -183,11 +212,27 @@ export function SourceEditor({
 
   const openInsert = useCallback(
     (kind: EditorInsertKind) => {
-      if (!viewRef.current && !fallbackRef.current) {
+      const view = viewRef.current;
+      const textarea = fallbackRef.current;
+      if (!view && !textarea) {
         onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
         return;
       }
       const selection = readCurrentSelection();
+      let anchor: EditorInsertAnchor | null = null;
+      if (view) {
+        try {
+          const coords = view.coordsAtPos(selection.selectionEnd);
+          if (coords) anchor = { left: coords.left, top: coords.top, bottom: coords.bottom };
+        } catch {
+          // A detached or not-yet-painted CodeMirror view has no usable caret rect.
+        }
+      }
+      if (!anchor) {
+        const bounds = (textarea ?? containerRef.current)?.getBoundingClientRect();
+        if (bounds) anchor = { left: bounds.left + 24, top: bounds.top + 24, bottom: bounds.top + 48 };
+      }
+
       pendingInsertRef.current = selection;
       setInsertKind(kind);
       setInsertInitialValues({
@@ -196,16 +241,45 @@ export function SourceEditor({
         rows: 3,
         columns: 3,
       });
+      setInsertAnchor(anchor);
       setInsertOpen(true);
       setContextMenu(null);
     },
     [readCurrentSelection],
   );
 
-  const closeInsert = useCallback(() => {
-    pendingInsertRef.current = null;
-    setInsertOpen(false);
-  }, []);
+  const restorePendingInsertSelection = useCallback(() => {
+    const pending = pendingInsertRef.current;
+    if (!pending) return;
+
+    const view = viewRef.current;
+    if (view) {
+      const max = view.state.doc.length;
+      const selectionStart = Math.max(0, Math.min(pending.selectionStart, max));
+      const selectionEnd = Math.max(selectionStart, Math.min(pending.selectionEnd, max));
+      view.dispatch({ selection: { anchor: selectionStart, head: selectionEnd } });
+      focusSourceEditorPreservingViewport();
+      return;
+    }
+
+    const textarea = fallbackRef.current;
+    if (!textarea) return;
+    const selectionStart = Math.max(0, Math.min(pending.selectionStart, textarea.value.length));
+    const selectionEnd = Math.max(selectionStart, Math.min(pending.selectionEnd, textarea.value.length));
+    focusWithoutScroll(textarea);
+    textarea.setSelectionRange(selectionStart, selectionEnd);
+    focusSourceEditorPreservingViewport();
+  }, [focusSourceEditorPreservingViewport]);
+
+  const closeInsert = useCallback(
+    (restoreSelection = true) => {
+      if (restoreSelection) restorePendingInsertSelection();
+      pendingInsertRef.current = null;
+      setInsertAnchor(null);
+      setInsertOpen(false);
+    },
+    [restorePendingInsertSelection],
+  );
 
   const handleInsertRequest = useCallback(
     (request: EditorInsertRequest) => {
@@ -226,7 +300,7 @@ export function SourceEditor({
       }
 
       replaceSourceValue(result.value, result.selectionStart, result.selectionEnd);
-      closeInsert();
+      closeInsert(false);
     },
     [closeInsert, readCurrentSelection, replaceSourceValue],
   );
@@ -584,6 +658,8 @@ export function SourceEditor({
           open={insertOpen}
           kind={insertKind}
           initialValues={insertInitialValues}
+          anchor={insertAnchor}
+          scrollContainerRef={fallbackShellRef}
           onCancel={closeInsert}
           onSubmit={handleInsertRequest}
         />
@@ -646,6 +722,8 @@ export function SourceEditor({
         open={insertOpen}
         kind={insertKind}
         initialValues={insertInitialValues}
+        anchor={insertAnchor}
+        scrollContainerRef={containerRef}
         onCancel={closeInsert}
         onSubmit={handleInsertRequest}
       />

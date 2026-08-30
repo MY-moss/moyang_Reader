@@ -242,4 +242,3 @@ npm run tauri -- build --config src-tauri/tauri.release.conf.json
 ```
 
 签名更新产物位于受管 Cargo 缓存的 `release/bundle/` 下（Windows 默认是 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`），项目目录不会生成 `src-tauri/target`。key、pem 和 sig 文件已经加入 .gitignore，但仍应在提交前检查 staged diff。
-

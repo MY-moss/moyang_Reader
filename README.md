@@ -134,4 +134,3 @@ npm run desktop
 ```text
 继续开发 Moyang Reader。严格读取并执行 docs/NEXT.md 中的唯一下一步，遵循 docs/AI-WORKFLOW.md，完成一个垂直切片、测试、PR 和交接后停止，不自动开始下一项。
 ```
-
