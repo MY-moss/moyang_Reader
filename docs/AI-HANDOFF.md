@@ -66,7 +66,7 @@
 ## 本轮 #346 交接
 
 - 基线：远程 `main@3b82408d67772f75cb75ec5eca702e8ec014abc1`；分支：`codex/draft-compare-2026-08-30`；独立 worktree。
-- Issue：[#346](https://github.com/MY-moss/moyang_Reader/issues/346)；本轮目标是恢复前明确比较“当前文件”和“本机草稿”，不是引入版本历史或三方合并。
+- PR：[#347](https://github.com/MY-moss/moyang_Reader/pull/347)；Issue：[#346](https://github.com/MY-moss/moyang_Reader/issues/346)；本轮目标是恢复前明确比较“当前文件”和“本机草稿”，不是引入版本历史或三方合并。
 - 变更：桌面端恢复中心和当前文档提示读取当前磁盘版本；异步加载/失败禁止恢复；浏览器回退明确标注为草稿保存时的原文；增加来源卡片、差异统计、换行等价判断、重试和过期请求保护；恢复仍只进入编辑区，显式保存后才写盘。
 - 验证：定向前端单测 4 文件/13 项、TypeScript build、format、git diff 检查、生产构建、浏览器恢复中心 E2E 1/1、Windows desktop targeted smoke 1/1 均通过。
 - 风险与回滚：T2；只读当前文件并改变恢复前确认 UI，无数据迁移、更新器、签名、发布或镜像影响；回退本切片 PR 即可恢复旧行为。
