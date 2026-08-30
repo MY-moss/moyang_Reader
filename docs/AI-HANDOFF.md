@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-08-30）
 
-- 本轮开发基线：`main@3b82408d67772f75cb75ec5eca702e8ec014abc1`。
+- 本轮开发基线：`main@55c09e94db26ed41aeb418dc3926ef012beb1b42`。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一切片 PR：[#344](https://github.com/MY-moss/moyang_Reader/pull/344)，用于完成 #301；已合并，Issue 已按 completed 关闭。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 本轮 #346 草稿当前版本核对已完成本地验收；PR 合并并关闭 Issue 后，唯一下一步为 #299 右键菜单焦点循环和焦点归还，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 本轮 #346 草稿当前版本核对已完成并已合并（PR #347、Issue #346 已 completed）；当前唯一下一步为 #299 右键菜单焦点循环和焦点归还，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -17,7 +17,7 @@
 3. #189：类型感知 TypeScript/ESLint 门禁。
 4. #301：文件拖放状态与失败反馈（已完成，PR #344）。
 5. #241/#51：更新实机验证、镜像与 Authenticode 条件项。
-6. #346：草稿恢复前核对当前磁盘版本（本轮已完成，PR 待合并）。
+6. #346：草稿恢复前核对当前磁盘版本（已完成，PR #347）。
 7. #299：右键菜单键盘导航和焦点归还（下一 READY）。
 
 每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
@@ -65,13 +65,13 @@
 
 ## 本轮 #346 交接
 
-- 基线：远程 `main@3b82408d67772f75cb75ec5eca702e8ec014abc1`；分支：`codex/draft-compare-2026-08-30`；独立 worktree。
+- 基线：远程 `main@55c09e94db26ed41aeb418dc3926ef012beb1b42`；分支：`codex/draft-compare-2026-08-30`；独立 worktree。
 - PR：[#347](https://github.com/MY-moss/moyang_Reader/pull/347)；Issue：[#346](https://github.com/MY-moss/moyang_Reader/issues/346)；本轮目标是恢复前明确比较“当前文件”和“本机草稿”，不是引入版本历史或三方合并。
 - 变更：桌面端恢复中心和当前文档提示读取当前磁盘版本；异步加载/失败禁止恢复；浏览器回退明确标注为草稿保存时的原文；增加来源卡片、差异统计、换行等价判断、重试和过期请求保护；恢复仍只进入编辑区，显式保存后才写盘。
 - 验证：定向前端单测 4 文件/13 项、TypeScript build、format、git diff 检查、生产构建、浏览器恢复中心 E2E 1/1、Windows desktop targeted smoke 1/1 均通过。
 - 风险与回滚：T2；只读当前文件并改变恢复前确认 UI，无数据迁移、更新器、签名、发布或镜像影响；回退本切片 PR 即可恢复旧行为。
 - 发布：本轮不生成安装包、Tag、Release 或镜像；纳入后续稳定 `v0.11.0` 批次。
-- 完成后唯一下一步：PR 合并、关闭 #346，然后执行 [`NEXT.md`](NEXT.md) 中的 #299；不自动开始下一项。
+- 当前唯一下一步：执行 [`NEXT.md`](NEXT.md) 中的 #299；不自动开始下一项。
 
 ## 已知条件与风险
 
