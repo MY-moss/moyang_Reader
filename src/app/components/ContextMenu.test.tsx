@@ -48,6 +48,53 @@ function keyboardEvent(key: string, options: KeyboardEventInit = {}): KeyboardEv
 }
 
 describe("ContextMenu", () => {
+  it("renders outside a containing content area so fixed coordinates stay in the viewport", () => {
+    const contentArea = document.createElement("div");
+    contentArea.className = "content-area";
+    contentArea.style.containerType = "inline-size";
+    const container = document.createElement("div");
+    contentArea.appendChild(container);
+    document.body.appendChild(contentArea);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(<ContextMenu x={24} y={28} ariaLabel="测试菜单" groups={groups} onClose={vi.fn()} />);
+    });
+
+    const menu = document.body.querySelector<HTMLElement>('[role="menu"][aria-label="测试菜单"]');
+    expect(menu).toBeTruthy();
+    expect(menu?.parentElement).toBe(document.body);
+    expect(contentArea.contains(menu)).toBe(false);
+
+    Object.defineProperty(menu, "getBoundingClientRect", {
+      configurable: true,
+      value: () =>
+        ({
+          width: 220,
+          height: 160,
+          top: 0,
+          left: 0,
+          right: 220,
+          bottom: 160,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    });
+    const x = window.innerWidth - 20;
+    const y = window.innerHeight - 20;
+
+    act(() => {
+      root.render(<ContextMenu x={x} y={y} ariaLabel="测试菜单" groups={groups} onClose={vi.fn()} />);
+    });
+
+    expect(menu?.style.left).toBe(`${Math.max(8, window.innerWidth - 220 - 8)}px`);
+    expect(menu?.style.top).toBe(`${Math.max(8, window.innerHeight - 160 - 8)}px`);
+
+    act(() => root.unmount());
+    contentArea.remove();
+  });
+
   it("cycles enabled items with Tab and arrow keys without resetting after rerenders", () => {
     const container = document.createElement("div");
     const trigger = document.createElement("button");
@@ -59,8 +106,8 @@ describe("ContextMenu", () => {
       root.render(<ContextMenu x={20} y={24} ariaLabel="测试菜单" groups={groups} onClose={vi.fn()} />);
     });
 
-    const menu = container.querySelector<HTMLElement>('[role="menu"]');
-    const items = () => Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const menu = document.body.querySelector<HTMLElement>('[role="menu"][aria-label="测试菜单"]');
+    const items = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
     expect(menu).toBeTruthy();
     expect(document.activeElement).toBe(items()[0]);
 
@@ -127,7 +174,7 @@ describe("ContextMenu", () => {
 
     trigger.focus();
     renderControlled(1);
-    const menu = () => container.querySelector<HTMLElement>('[role="menu"]');
+    const menu = () => document.body.querySelector<HTMLElement>('[role="menu"][aria-label="测试菜单"]');
 
     act(() => {
       const event = keyboardEvent("Escape");
@@ -148,7 +195,7 @@ describe("ContextMenu", () => {
     renderControlled(3);
     trigger.focus();
     act(() => {
-      container.querySelector<HTMLButtonElement>('[role="menuitem"]')?.click();
+      document.body.querySelector<HTMLButtonElement>('[role="menu"][aria-label="测试菜单"] [role="menuitem"]')?.click();
     });
     expect(onClosed).toHaveBeenCalledTimes(3);
     expect(document.activeElement).toBe(trigger);

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type ContextMenuItem = {
   id: string;
@@ -169,7 +170,7 @@ export function ContextMenu({
     };
   }, []);
 
-  return (
+  const menu = (
     <div
       ref={menuRef}
       className="moyang-context-menu"
@@ -208,4 +209,7 @@ export function ContextMenu({
       ))}
     </div>
   );
+
+  if (typeof document !== "undefined" && document.body) return createPortal(menu, document.body);
+  return menu;
 }
