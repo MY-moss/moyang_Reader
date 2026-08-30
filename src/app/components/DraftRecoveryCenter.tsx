@@ -76,17 +76,19 @@ export function DraftRecoveryCenter({
                 const isCurrentDocument = Boolean(
                   activeDocumentPath && isSameDocumentPath(activeDocumentPath, snapshot.path),
                 );
-                const comparison = buildDraftComparison(
+                const currentComparison =
                   isCurrentDocument && activeDocumentSource !== null && activeDocumentSource !== undefined
-                    ? activeDocumentSource
-                    : snapshot.baseSource,
-                  snapshot.draft,
-                );
+                    ? buildDraftComparison(activeDocumentSource, snapshot.draft)
+                    : null;
                 const characterDelta =
-                  comparison.characterDelta > 0 ? `+${comparison.characterDelta}` : comparison.characterDelta;
-                const diffSummary = comparison.hasChanges
-                  ? `草稿差异：+${comparison.addedLineCount} 行 / −${comparison.removedLineCount} 行 · ${comparison.changeHunkCount} 个区域 · 字符 ${characterDelta}${comparison.precise ? "" : " · 快速摘要"}`
-                  : "当前版本与草稿相同 · 无需恢复";
+                  currentComparison && currentComparison.characterDelta > 0
+                    ? `+${currentComparison.characterDelta}`
+                    : (currentComparison?.characterDelta ?? 0);
+                const diffSummary = currentComparison
+                  ? currentComparison.hasChanges
+                    ? `已打开内容差异：+${currentComparison.addedLineCount} 行 / −${currentComparison.removedLineCount} 行 · ${currentComparison.changeHunkCount} 个区域 · 字符 ${characterDelta}${currentComparison.precise ? "" : " · 快速摘要"}`
+                    : "已打开内容与草稿相同 · 无需恢复"
+                  : "查看差异时将读取当前文件 · 不会自动恢复";
 
                 return (
                   <>
@@ -94,13 +96,14 @@ export function DraftRecoveryCenter({
                       type="button"
                       className="draft-recovery-open"
                       onClick={() => onOpen(snapshot.path)}
-                      aria-label={`打开 ${fileName(snapshot.path)} 所在文档`}
+                      aria-label={`打开 ${fileName(snapshot.path)} 的当前文件（不会自动恢复草稿）`}
                     >
                       <strong>{fileName(snapshot.path)}</strong>
                       <span title={snapshot.path}>{snapshot.path}</span>
                       <small>
                         {formatDraftRecoveryTime(snapshot.savedAt)} · {draftPreview(snapshot.draft)}
                       </small>
+                      <small className="draft-recovery-source-note">当前文件 · 不会自动恢复草稿</small>
                       <small className="draft-recovery-diff-summary">{diffSummary}</small>
                     </button>
                     <div className="draft-recovery-actions">
@@ -108,7 +111,7 @@ export function DraftRecoveryCenter({
                         type="button"
                         className="draft-recovery-preview"
                         onClick={() => onPreview(snapshot.path)}
-                        aria-label={`查看 ${fileName(snapshot.path)} 草稿差异`}
+                        aria-label={`查看 ${fileName(snapshot.path)} 当前文件与草稿的差异`}
                       >
                         查看差异
                       </button>
@@ -128,7 +131,7 @@ export function DraftRecoveryCenter({
           ))}
         </div>
         <footer className="quick-open-footer draft-recovery-footer">
-          <span>先查看差异再恢复；恢复只进入编辑区，点击“保存”后才写回文件。</span>
+          <span>先查看当前文件与草稿的差异，再决定是否恢复；恢复只进入编辑区，点击“保存”后才写回文件。</span>
           <button type="button" className="quiet-button" onClick={onClearAll}>
             清空全部
           </button>

@@ -680,6 +680,49 @@ describe("Moyang Reader desktop runtime", () => {
     }
   });
 
+  it("compares a recovery draft with the current disk version before restoring", async () => {
+    await resetDesktopSession();
+    const comparisonFileName = "desktop-draft-comparison.md";
+    const comparisonFilePath = path.join(path.dirname(documentPath), comparisonFileName);
+    fs.rmSync(comparisonFilePath, { force: true });
+    fs.writeFileSync(comparisonFilePath, "# Draft comparison\n\n磁盘版本\n", "utf8");
+
+    const snapshot = {
+      path: comparisonFilePath,
+      draft: "# Draft comparison\n\n草稿版本\n",
+      baseSource: "# Draft comparison\n\n草稿保存时的旧版本\n",
+      savedAt: Date.now() - 60_000,
+    };
+
+    try {
+      await browser.execute((draft) => {
+        window.localStorage.setItem("moyang-reader-drafts", JSON.stringify([draft]));
+      }, snapshot);
+      await browser.refresh();
+      await browser.$(".document-title").waitForDisplayed();
+
+      await browser.$("button=草稿 1").click();
+      const preview = await browser.$(`[aria-label="查看 ${comparisonFileName} 当前文件与草稿的差异"]`);
+      await preview.waitForDisplayed();
+      await preview.click();
+
+      const dialog = await browser.$('[role="dialog"][aria-labelledby="draft-comparison-title"]');
+      await dialog.waitForDisplayed();
+      await browser.waitUntil(() => dialog.getText().then((text) => text.includes("当前磁盘版本")), {
+        timeout: 10_000,
+        timeoutMsg: "the draft comparison did not read the current disk version",
+      });
+      const dialogText = await dialog.getText();
+      assert.match(dialogText, /磁盘版本/);
+      assert.match(dialogText, /草稿版本/);
+      assert.match(dialogText, /草稿保存后原文件又发生了变化/);
+      assert.doesNotMatch(dialogText, /草稿保存时的旧版本/);
+    } finally {
+      await resetDesktopSession().catch(() => undefined);
+      fs.rmSync(comparisonFilePath, { force: true });
+    }
+  });
+
   it("manages workspace files and folders from context menus", async () => {
     const workspacePath = path.dirname(documentPath);
     const originalFileName = "context-managed.md";

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildDraftComparison } from "./draft-recovery-diff";
+import { areDraftSourcesEquivalent, buildDraftComparison } from "./draft-recovery-diff";
 
 describe("draft recovery diff", () => {
+  it("treats line-ending-only changes as equivalent", () => {
+    expect(areDraftSourcesEquivalent("one\r\ntwo\r\n", "one\ntwo")).toBe(true);
+    expect(areDraftSourcesEquivalent("one\ntwo", "one\nthree")).toBe(false);
+  });
+
   it("summarizes added and removed lines around a changed section", () => {
     const comparison = buildDraftComparison("# Note\n\n原始内容\n\n结尾", "# Note\n\n更新内容\n新增一行\n\n结尾");
 
