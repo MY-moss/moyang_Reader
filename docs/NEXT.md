@@ -10,8 +10,9 @@
 - 合并基线：main@999b2254c259e1145eabc94374772e1e135913f1
 - 稳定版本：v0.10.13
 - 当前 milestone：v0.11.0
-- 当前状态：CHECKPOINT（实现完成，待 PR/CI）
-- 当前实现分支：`codex/insert-popover-viewport-2026-08-31`
+- 当前状态：CHECKPOINT（PR #380 / CI 进行中）
+- 当前实现分支：`codex/insert-popover-viewport-2026-08-31`；远程提交 `f0fab00a222eaf74a5f788921e33a08a97b1993c`
+- 当前 PR：[#380](https://github.com/MY-moss/moyang_Reader/pull/380)；CI：`sha=f0fab00a222eaf74a5f788921e33a08a97b1993c run_id=33338843402 status=in_progress`
 - 开放 PR：无产品功能 PR；仅有 Dependabot 依赖 PR，不阻塞本切片
 
 ## 唯一下一步：#358 插入浮层跟随光标/视口

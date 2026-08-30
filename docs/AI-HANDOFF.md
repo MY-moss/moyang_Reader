@@ -28,11 +28,11 @@
 
 ## 当前进行中：#358 插入浮层跟随光标/视口
 
-- 分支：`codex/insert-popover-viewport-2026-08-31`，基于 `origin/main@999b2254c259e1145eabc94374772e1e135913f1`。
+- 分支：`codex/insert-popover-viewport-2026-08-31`，基于 `origin/main@999b2254c259e1145eabc94374772e1e135913f1`；PR [#380](https://github.com/MY-moss/moyang_Reader/pull/380)，远程提交 `f0fab00a222eaf74a5f788921e33a08a97b1993c`。
 - 结果：插入面板通过 portal 使用视口内 fixed 定位；锚点取 Milkdown/CodeMirror 当前光标；输入框使用 `preventScroll`；编辑器滚动关闭过期面板；取消时恢复原选区和阅读位置。
 - 验证：定位单测 4/4；相关回归单测 13/13；lint、format、TypeScript/Vite build；长文档定位 E2E 1/1；既有链接、图片和表格插入 E2E 2/2。
 - 边界：不改变 Markdown 输出、插入语义、右键菜单、持久化、更新器或发布资产；不创建安装包、Tag、Release 或镜像。
-- 当前状态：实现完成，等待本分支 PR/CI；PR 合并并关闭 #358 后，再把 `NEXT.md` 切换到下一项，不在本切片内继续扩展。
+- 当前状态：实现完成，等待 CI `run_id=33338843402`；PR 合并并关闭 #358 后，再把 `NEXT.md` 切换到下一项，不在本切片内继续扩展。
 
 ## 最近完成
 
