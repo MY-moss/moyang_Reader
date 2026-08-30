@@ -61,7 +61,7 @@
 | [#234](https://github.com/MY-moss/moyang_Reader/issues/234) | 设置通知可关闭、堆叠且不挤布局   | v0.11.0 第 2 切片 | 统一右上角最多三条通知栈和富更新通知              |
 | [#299](https://github.com/MY-moss/moyang_Reader/issues/299) | 右键菜单焦点循环与关闭归还       | v0.11.0 第 7 切片 | 共享菜单基座和五类调用入口                        |
 | [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航细节               | v0.11.x           | 按子问题独立切片                                  |
-| [#119](https://github.com/MY-moss/moyang_Reader/issues/119) | axe/WCAG AA Windows UI 基线      | v0.11.x           | 基线不替代具体缺陷                                |
+| [#119](https://github.com/MY-moss/moyang_Reader/issues/119) | axe/WCAG AA Windows UI 基线      | v0.11.x           | 已完成；PR #350，真实读屏抽查保留在发布前清单     |
 | [#172](https://github.com/MY-moss/moyang_Reader/issues/172) | reduced-motion 下的程序化滚动    | v0.11.x           | 低风险可独立交付                                  |
 | [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、主按钮、页签和令牌细节   | v0.11.x           | 不与 #171 的大范围拆分混做                        |
 | [#233](https://github.com/MY-moss/moyang_Reader/issues/233) | 顶栏图标体系和操作密度           | v0.11.x           | 与 #187/#171 协同                                 |
@@ -112,4 +112,4 @@
 - 2026-08-29：盘点 32 个开放 Issue。
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：15 个开放可执行 Issue（Must 2、Should 12、Could 1），9 个已归档；#301 已完成（PR #344），#346 已完成（PR #347，Issue completed），下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
+- 当前结果：14 个开放可执行 Issue（Must 2、Should 11、Could 1），9 个已归档；#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#119 已完成（PR #350），下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
