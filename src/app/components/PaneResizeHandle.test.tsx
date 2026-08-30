@@ -25,12 +25,14 @@ describe("PaneResizeHandle", () => {
     expect(handle?.getAttribute("aria-valuemin")).toBe("260");
     expect(handle?.getAttribute("aria-valuemax")).toBe("440");
 
-    act(() => handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })));
+    act(() => {
+      handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    });
     expect(onResizeBy).toHaveBeenCalledWith(16);
 
-    act(() =>
-      handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, shiftKey: true })),
-    );
+    act(() => {
+      handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, shiftKey: true }));
+    });
     expect(onResizeBy).toHaveBeenLastCalledWith(-48);
 
     act(() => root.unmount());

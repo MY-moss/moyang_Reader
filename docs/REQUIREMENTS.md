@@ -84,6 +84,18 @@
 - 当前代码执行 `npm run lint` 无 warning/error，`npm run build` 的 TypeScript 项目引用检查通过；新增显式 `any` 或未使用变量时，ESLint 必须以非零状态失败。
 - 当前应用和 Node 配置执行严格未使用、`switch` 穿透与模块语义检查通过；Rust Windows 目标 metadata 能在 `rust-version = "1.88"` 下解析。
 
+### v0.11.0 类型感知异步规则补充（#189）
+
+- 仅 `src/**/*.{ts,tsx}` 使用与当前 TypeScript 项目引用一致的 `projectService` 和 `tsconfigRootDir`；`scripts` 与 `desktop-e2e` 不启用类型感知规则。
+- `src` 必须阻断未等待、未处理或误用的 Promise：`@typescript-eslint/no-floating-promises`、`@typescript-eslint/await-thenable` 和 `@typescript-eslint/no-misused-promises`。
+- 现有代码首次启用时的 fallout 必须量化并逐项修复；同步测试动作使用明确的 block callback，真实异步操作必须 `await`、处理拒绝或显式 `void`。
+- `scripts/check-type-aware-eslint.mjs` 必须用三个故意违规的内存探针验证规则仍会命中，并确认脚本配置边界不会泄漏类型感知规则；CI 在普通 lint 后执行该探针。
+
+### v0.11.0 类型感知规则验收场景
+
+- 当前 `npm run lint` 无 warning/error；新增 `src` 中未处理 Promise、对非 thenable 使用 `await` 或把异步函数传给 void-return 回调时，规则必须使 lint 失败。
+- 类型感知配置不改变脚本、桌面 E2E 和用户可见行为；完整前端测试、TypeScript build、Rust fmt/clippy/test、发布预检与远程 Quality checks 全绿。
+
 ## v0.11.0 发布供应链门禁（#226）
 
 - `.github/workflows` 中的第三方 GitHub Action 必须固定到 40 位提交 SHA；每个固定引用必须保留可核验的版本或来源注释。

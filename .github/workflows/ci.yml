@@ -68,6 +68,9 @@ jobs:
       - name: Frontend lint
         run: npm run lint
 
+      - name: Type-aware ESLint probe
+        run: npm run check:type-aware
+
       - name: Configuration format check
         run: npm run format:check
 

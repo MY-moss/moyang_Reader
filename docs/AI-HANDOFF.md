@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-08-30）
 
-- 本轮开发基线：`main@33c798cbf34df74b9e0a46f324c4303226f8b36f0`。
+- 本轮开发基线：`main@4ca46c52e92bce6353667f0632db40613df4424b`。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一切片 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)，用于关闭 #87；已完成，最终状态以 GitHub 为准。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：#189 类型感知 TypeScript/ESLint 门禁；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 当前唯一下一步：#301 文件拖放状态和失败反馈；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -25,6 +25,8 @@
 
 - #234 已在 PR #342 实施统一固定通知视口：设置/更新反馈最多三条 FIFO，支持独立关闭，info/success 六秒自动关闭，error/action 常驻；正文无布局位移。
 - #234 本地门禁通过：270 个单测、50 条浏览器 E2E、Windows desktop E2E 12/12、lint、format、build；CI 已通过：`sha=c37627628bf9916b00a31961a672b68827a6139e workflow=CI/Quality checks run_id=33290796215 conclusion=success last_changed_at=2026-08-30T03:49:37Z next_action=merge PR #342`。
+- #189 本轮已完成类型感知 ESLint 异步门禁：`src` 启用 `no-floating-promises`、`await-thenable`、`no-misused-promises`，脚本和 desktop-e2e 保持非类型感知边界；13 处测试 fallout 已修复，3/3 规则探针通过。
+- #189 本地门禁通过：全量单测 270、TypeScript build、lint、format、Rust fmt/clippy/tests 51、发布预检和 Actions 固定检查；远程 PR/Quality checks 结果以 GitHub 为准。
 - #87 最终 Windows 矩阵已在 PR #341 实施：96 篇文档（重复图片 24、独立图片 20、长文本 20、复杂表格 16、嵌套 HTML 16），成功导出连续 3 轮。
 - 三轮 renderer 最大间隔为 77/80/76ms，上下文交互为 3/6/6ms；三轮各生成 5 个可解析 DOCX，Working Set 均非单调增长。
 - 取消路径确认延迟 50ms、renderer 最大间隔 78ms、生成 2 个可解析 DOCX；取消和目标目录失败后临时文件均为 0。
@@ -40,6 +42,14 @@
 - 风险：T2；无安全、权限、数据迁移、发布资产或持久化语义变化。回滚为回退 PR #342。
 - 变更：`src/app/notification-queue.ts`、`src/app/components/NotificationViewport.tsx`、`src/app/App.tsx` 与样式、单测和窄窗口 E2E；UpdateNotice 共用固定视口。
 - 完成后唯一下一步：#189；不自动开始。
+
+## 本轮 #189 交接
+
+- 分支：`codex/typescript-eslint-gates-2026-08-30`；独立 worktree，基于远程 `main@4ca46c5` 的等价文件树。
+- 范围：仅收紧 `src` 的类型感知异步规则；补充规则探针和 CI 步骤；清理同步 `act` 测试中的真实未处理 Promise。未改变用户功能、持久化、导出、更新器或发布资产。
+- 回滚：回退本切片 PR；不需要数据迁移，不生成安装包、Tag、Release 或镜像。
+- 验证：`npm test -- --run` 270/270、`npm run lint`、`npm run check:type-aware` 3/3、`npm run format:check`、TypeScript build、Rust fmt/clippy/tests 51、发布预检和 Actions 固定检查通过。
+- 交接：PR/CI 合并完成后将 #189 标记 completed；下一位 AI 只执行 [`NEXT.md`](NEXT.md) 中的 #301，不自动扩展范围。
 
 ## 已知条件与风险
 
