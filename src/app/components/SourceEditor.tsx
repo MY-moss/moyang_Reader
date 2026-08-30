@@ -45,6 +45,10 @@ export type SourceEditorPasteContext = {
   preventDefault: () => void;
 };
 
+function isContextMenuKey(event: KeyboardEvent): boolean {
+  return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
+}
+
 export function SourceEditor({
   value,
   ariaLabel,
@@ -61,6 +65,7 @@ export function SourceEditor({
   wikiCompletions,
 }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackShellRef = useRef<HTMLDivElement>(null);
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
   const viewRef = useRef<EditorViewInstance | null>(null);
   const valueRef = useRef(value);
@@ -84,6 +89,8 @@ export function SourceEditor({
     selectionStart: number;
     selectionEnd: number;
     value: string;
+    restoreFocusTarget: HTMLElement | null;
+    fallbackFocusTarget: HTMLElement | null;
   } | null>(null);
 
   useEffect(() => {
@@ -460,6 +467,24 @@ export function SourceEditor({
               view.EditorView.contentAttributes.of({ "aria-label": ariaLabel }),
               view.EditorView.domEventHandlers({
                 keydown: (event, _editorView) => {
+                  if (isContextMenuKey(event)) {
+                    event.preventDefault();
+                    const selection = _editorView.state.selection.main;
+                    const activeElement = document.activeElement;
+                    setContextMenu({
+                      x: _editorView.contentDOM.getBoundingClientRect().left,
+                      y: _editorView.contentDOM.getBoundingClientRect().bottom,
+                      selectionStart: selection.from,
+                      selectionEnd: selection.to,
+                      value: _editorView.state.doc.toString(),
+                      restoreFocusTarget:
+                        activeElement instanceof HTMLElement && parent.contains(activeElement)
+                          ? activeElement
+                          : _editorView.contentDOM,
+                      fallbackFocusTarget: parent,
+                    });
+                    return true;
+                  }
                   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return false;
                   event.preventDefault();
                   openInsert("link");
@@ -474,6 +499,11 @@ export function SourceEditor({
                     selectionStart: selection.from,
                     selectionEnd: selection.to,
                     value: editorView.state.doc.toString(),
+                    restoreFocusTarget:
+                      document.activeElement instanceof HTMLElement && parent.contains(document.activeElement)
+                        ? document.activeElement
+                        : editorView.contentDOM,
+                    fallbackFocusTarget: parent,
                   });
                   return true;
                 },
@@ -548,7 +578,7 @@ export function SourceEditor({
 
   if (loadFailed) {
     return (
-      <div className="editor-surface source-editor-fallback-shell">
+      <div ref={fallbackShellRef} className="editor-surface source-editor-fallback-shell" tabIndex={-1}>
         <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
         <EditorInsertPopover
           open={insertOpen}
@@ -574,6 +604,8 @@ export function SourceEditor({
               selectionStart: event.currentTarget.selectionStart,
               selectionEnd: event.currentTarget.selectionEnd,
               value: event.currentTarget.value,
+              restoreFocusTarget: event.currentTarget,
+              fallbackFocusTarget: event.currentTarget.parentElement,
             });
           }}
           onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -598,6 +630,8 @@ export function SourceEditor({
             title="编辑操作"
             ariaLabel="正文编辑菜单"
             groups={editorContextGroups}
+            restoreFocusTarget={contextMenu.restoreFocusTarget}
+            fallbackFocusTarget={contextMenu.fallbackFocusTarget}
             onClose={() => setContextMenu(null)}
           />
         )}
@@ -606,7 +640,7 @@ export function SourceEditor({
   }
 
   return (
-    <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready}>
+    <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready} tabIndex={-1}>
       <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
       <EditorInsertPopover
         open={insertOpen}
@@ -623,6 +657,8 @@ export function SourceEditor({
           title="编辑操作"
           ariaLabel="正文编辑菜单"
           groups={editorContextGroups}
+          restoreFocusTarget={contextMenu.restoreFocusTarget}
+          fallbackFocusTarget={contextMenu.fallbackFocusTarget}
           onClose={() => setContextMenu(null)}
         />
       )}

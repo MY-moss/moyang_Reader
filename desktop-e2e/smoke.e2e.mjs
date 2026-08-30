@@ -551,6 +551,48 @@ async function openWorkspaceContextMenu(selector, text) {
   return menu;
 }
 
+async function pressDesktopEscape() {
+  await browser.execute(() => {
+    window.__desktopE2EEscapeProbe = { count: 0 };
+    window.__desktopE2EEscapeListener = () => {
+      window.__desktopE2EEscapeProbe.count += 1;
+    };
+    document.addEventListener("keydown", window.__desktopE2EEscapeListener, true);
+  });
+
+  try {
+    await browser.keys("Escape");
+    const keydownCount = await browser.execute(() => window.__desktopE2EEscapeProbe?.count ?? 0);
+    const menuVisible = await browser
+      .$(".moyang-context-menu")
+      .isDisplayed()
+      .catch(() => false);
+    if (keydownCount === 0 && menuVisible) {
+      // The embedded Tauri driver can accept a WebDriver key action without
+      // forwarding it into the WebView. Exercise the same focused DOM path
+      // only for that driver limitation; a delivered native key must still
+      // close the menu through the product event listener above.
+      await browser.execute(() => {
+        const target = document.activeElement instanceof HTMLElement ? document.activeElement : document;
+        target.dispatchEvent(
+          new window.KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            key: "Escape",
+            code: "Escape",
+          }),
+        );
+      });
+    }
+  } finally {
+    await browser.execute(() => {
+      document.removeEventListener("keydown", window.__desktopE2EEscapeListener, true);
+      delete window.__desktopE2EEscapeListener;
+      delete window.__desktopE2EEscapeProbe;
+    });
+  }
+}
+
 async function discardDraftNotice() {
   const recoveryNotice = await browser.$(".draft-recovery-notice");
   await recoveryNotice.waitForDisplayed();
@@ -756,6 +798,46 @@ describe("Moyang Reader desktop runtime", () => {
         folderName,
         true,
         "the context-menu folder fixture did not appear in the workspace",
+      );
+
+      const keyboardFileEntry = await findWorkspaceElement(".workspace-file", originalFileName);
+      assert.ok(keyboardFileEntry, `workspace entry ${originalFileName} was not found for keyboard context menu`);
+      await browser.execute((element) => {
+        element.focus();
+        element.dispatchEvent(
+          new window.KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            key: "F10",
+            shiftKey: true,
+          }),
+        );
+      }, keyboardFileEntry);
+      const keyboardMenu = await browser.$(".moyang-context-menu");
+      await keyboardMenu.waitForDisplayed();
+      const keyboardFocusState = await browser.execute(() => {
+        const menu = document.querySelector('.moyang-context-menu[role="menu"]');
+        const firstItem = menu?.querySelector('[role="menuitem"]');
+        return {
+          active: document.activeElement?.outerHTML?.slice(0, 240) ?? null,
+          firstItem: firstItem?.outerHTML?.slice(0, 240) ?? null,
+          isFirst: firstItem === document.activeElement,
+        };
+      });
+      assert.equal(
+        keyboardFocusState.isFirst,
+        true,
+        `keyboard context menu should focus its first action: ${JSON.stringify(keyboardFocusState)}`,
+      );
+      await pressDesktopEscape();
+      await browser.waitUntil(() => keyboardMenu.isDisplayed().then((visible) => !visible), {
+        timeout: 5_000,
+        timeoutMsg: "the keyboard context menu did not close on Escape",
+      });
+      assert.equal(
+        await browser.execute((element) => document.activeElement === element, keyboardFileEntry),
+        true,
+        "keyboard context menu should restore focus to the workspace entry",
       );
 
       await browser.execute(() => {

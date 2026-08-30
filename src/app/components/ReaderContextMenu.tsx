@@ -5,6 +5,8 @@ export type ReaderContextTarget = {
   y: number;
   selectedText: string;
   linkHref: string | null;
+  restoreFocusTarget?: HTMLElement | null;
+  fallbackFocusTarget?: HTMLElement | null;
 };
 
 type ReaderContextMenuProps = {
@@ -110,6 +112,8 @@ export function ReaderContextMenu({
             ]
           : []),
       ]}
+      restoreFocusTarget={target.restoreFocusTarget}
+      fallbackFocusTarget={target.fallbackFocusTarget}
       onClose={onClose}
     />
   );

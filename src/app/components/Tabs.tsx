@@ -25,7 +25,13 @@ export function Tabs({
 }: TabsProps) {
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    path: string;
+    restoreFocusTarget: HTMLElement | null;
+    fallbackFocusTarget: HTMLElement | null;
+  } | null>(null);
 
   useEffect(() => {
     if (contextMenu && !tabs.some((tab) => tab.path === contextMenu.path)) setContextMenu(null);
@@ -38,15 +44,21 @@ export function Tabs({
   const otherPaths = contextTab ? tabs.filter((tab) => tab.path !== contextTab.path).map((tab) => tab.path) : [];
   const rightPaths = contextIndex >= 0 ? tabs.slice(contextIndex + 1).map((tab) => tab.path) : [];
 
-  const openContextMenu = (path: string, x: number, y: number) => {
-    setContextMenu({ path, x, y });
+  const openContextMenu = (path: string, x: number, y: number, restoreFocusTarget: HTMLElement) => {
+    setContextMenu({
+      path,
+      x,
+      y,
+      restoreFocusTarget,
+      fallbackFocusTarget: restoreFocusTarget.closest<HTMLElement>(".tab-strip"),
+    });
   };
 
   const isContextMenuKey = (event: KeyboardEvent<HTMLButtonElement>) =>
     event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
 
   return (
-    <div className="tab-strip" role="toolbar" aria-label="已打开文档">
+    <div className="tab-strip" role="toolbar" aria-label="已打开文档" tabIndex={-1}>
       {tabs.map((tab) => {
         const active = tab.path === activePath;
         const isDragging = draggedPath === tab.path;
@@ -66,7 +78,7 @@ export function Tabs({
             onContextMenu={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              openContextMenu(tab.path, event.clientX, event.clientY);
+              openContextMenu(tab.path, event.clientX, event.clientY, event.currentTarget);
             }}
             onDragStart={(event: ReactDragEvent<HTMLDivElement>) => {
               setDraggedPath(tab.path);
@@ -106,7 +118,7 @@ export function Tabs({
                 if (!isContextMenuKey(event)) return;
                 event.preventDefault();
                 const rect = event.currentTarget.getBoundingClientRect();
-                openContextMenu(tab.path, rect.left + Math.min(28, rect.width / 2), rect.bottom);
+                openContextMenu(tab.path, rect.left + Math.min(28, rect.width / 2), rect.bottom, event.currentTarget);
               }}
             >
               {tab.name}
@@ -163,6 +175,8 @@ export function Tabs({
               ],
             },
           ]}
+          restoreFocusTarget={contextMenu.restoreFocusTarget}
+          fallbackFocusTarget={contextMenu.fallbackFocusTarget}
           onClose={() => setContextMenu(null)}
         />
       )}

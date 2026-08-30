@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -539,6 +540,10 @@ function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: Recen
   for (const key of cache.keys()) {
     if (!mountedKeys.has(key)) cache.delete(key);
   }
+}
+
+function isContextMenuKeyboardEvent(event: ReactKeyboardEvent<HTMLElement>): boolean {
+  return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
 }
 
 export function App() {
@@ -4332,6 +4337,23 @@ export function App() {
       y: event.clientY,
       selectedText: window.getSelection()?.toString() ?? "",
       linkHref: anchor?.getAttribute("href") ?? null,
+      restoreFocusTarget: event.currentTarget,
+      fallbackFocusTarget: event.currentTarget,
+    });
+  }, []);
+
+  const handleReaderContextKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
+    if (!isContextMenuKeyboardEvent(event)) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const anchor = (event.target as HTMLElement).closest("a");
+    setReaderContextMenu({
+      x: rect.left + Math.min(32, rect.width / 2),
+      y: rect.bottom,
+      selectedText: window.getSelection()?.toString() ?? "",
+      linkHref: anchor?.getAttribute("href") ?? null,
+      restoreFocusTarget: event.currentTarget,
+      fallbackFocusTarget: event.currentTarget,
     });
   }, []);
 
@@ -5291,10 +5313,12 @@ export function App() {
                 <article
                   ref={articleRef}
                   className="reader-content markdown-body"
+                  tabIndex={-1}
                   data-search-result-count={searchResultCount}
                   data-search-active-result={searchResultCount ? searchResultIndex + 1 : 0}
                   onClick={handleReaderClick}
                   onContextMenu={handleReaderContextMenu}
+                  onKeyDown={handleReaderContextKeyDown}
                 >
                   <div className="reader-meta" aria-label="文档信息">
                     <span className="reader-meta-kicker">DOCUMENT</span>

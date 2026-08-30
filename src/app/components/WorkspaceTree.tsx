@@ -29,6 +29,8 @@ type WorkspaceTreeContextTarget = {
   entryKind: "root" | WorkspaceEntryKind;
   filePath?: string;
   details?: WorkspaceEntryDetails;
+  restoreFocusTarget?: HTMLElement | null;
+  fallbackFocusTarget?: HTMLElement | null;
 };
 
 type WorkspaceTreeProps = {
@@ -202,6 +204,8 @@ function targetFromKeyboard(
   return {
     x: rect.left + Math.min(32, rect.width / 2),
     y: rect.bottom,
+    restoreFocusTarget: event.currentTarget,
+    fallbackFocusTarget: event.currentTarget.closest<HTMLElement>(".workspace-tree"),
     ...details,
   };
 }
@@ -229,6 +233,8 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContex
         onOpenContextMenu({
           x: event.clientX,
           y: event.clientY,
+          restoreFocusTarget: event.currentTarget,
+          fallbackFocusTarget: event.currentTarget.closest<HTMLElement>(".workspace-tree"),
           parentPath,
           label: `“${file.relativePath}”`,
           entryPath: file.relativePath,
@@ -302,6 +308,8 @@ function WorkspaceFolderButton({
         onOpenContextMenu({
           x: event.clientX,
           y: event.clientY,
+          restoreFocusTarget: event.currentTarget,
+          fallbackFocusTarget: event.currentTarget.closest<HTMLElement>(".workspace-tree"),
           parentPath: folder.path,
           label: folderLabel,
           entryPath: folder.path,
@@ -446,12 +454,15 @@ export function WorkspaceTreeView({
       ref={treeRef}
       className="workspace-tree"
       style={{ height: `${rows.length * WORKSPACE_TREE_ROW_HEIGHT}px` }}
+      tabIndex={-1}
       onContextMenu={(event) => {
         if (!canManage || event.target !== event.currentTarget) return;
         event.preventDefault();
         openContextMenu({
           x: event.clientX,
           y: event.clientY,
+          restoreFocusTarget: event.currentTarget,
+          fallbackFocusTarget: event.currentTarget,
           parentPath: "",
           label: "阅读库根目录",
           entryPath: "",
@@ -725,6 +736,8 @@ export function WorkspaceTreeView({
                 ]
               : []),
           ]}
+          restoreFocusTarget={contextMenu.restoreFocusTarget}
+          fallbackFocusTarget={contextMenu.fallbackFocusTarget}
           onClose={() => setContextMenu(null)}
         />
       )}
