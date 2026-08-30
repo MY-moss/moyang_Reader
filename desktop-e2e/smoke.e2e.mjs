@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 17356)
-Total output lines: 1642
-
 import { execFileSync } from "node:child_process";
 import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
@@ -833,7 +830,125 @@ describe("Moyang Reader desktop runtime", () => {
       assert.equal(fs.existsSync(renamedFilePath), true);
 
       await browser.execute(() => {
-        window.__desktopE2EOriginalConfirm = …1356 tokens truncated…await waitForExport(pdfExportPath, "the real Tauri PDF export");
+        window.__desktopE2EOriginalConfirm = window.confirm;
+        window.confirm = () => true;
+      });
+      const deleteFileMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
+      await deleteFileMenu.$("button=删除文件").click();
+      await waitForWorkspaceEntry(".workspace-file", renamedFileName, false, "the context-menu file was not deleted");
+      assert.equal(fs.existsSync(renamedFilePath), false);
+
+      const deleteFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
+      await deleteFolderMenu.$("button=删除文件夹及内容").click();
+      await waitForWorkspaceEntry(".workspace-folder", folderName, false, "the context-menu folder was not deleted");
+      assert.equal(fs.existsSync(folderPath), false);
+    } finally {
+      await browser
+        .execute(() => {
+          if (window.__desktopE2EOriginalPrompt) window.prompt = window.__desktopE2EOriginalPrompt;
+          if (window.__desktopE2EOriginalConfirm) window.confirm = window.__desktopE2EOriginalConfirm;
+          delete window.__desktopE2EOriginalPrompt;
+          delete window.__desktopE2EOriginalConfirm;
+        })
+        .catch(() => undefined);
+      fs.rmSync(originalFilePath, { force: true });
+      fs.rmSync(renamedFilePath, { force: true });
+      fs.rmSync(copiedFilePath, { force: true });
+      fs.rmSync(folderPath, { recursive: true, force: true });
+      fs.rmSync(copiedFolderPath, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
+    await waitForWorkspaceEntry(
+      ".workspace-file",
+      "wiki-target.md",
+      true,
+      "the desktop wiki-link fixture was not indexed in the workspace",
+    );
+    const editable = await ensureWysiwygMode();
+    await editable.click();
+    await browser.execute((text) => {
+      const insert = window.__moyangDesktopE2e?.insertWysiwygText;
+      if (!insert) throw new Error("desktop WYSIWYG E2E bridge is unavailable");
+      insert(text);
+    }, "[[wiki");
+
+    const wikiOverlay = await browser.$('[role="listbox"][aria-label="双链补全候选"]');
+    try {
+      await wikiOverlay.waitForDisplayed();
+    } catch (cause) {
+      const debug = await browser.execute(() => ({
+        editorText: document.querySelector('.wysiwyg-editor [contenteditable="true"]')?.textContent ?? null,
+        editorHtml: document.querySelector('.wysiwyg-editor [contenteditable="true"]')?.innerHTML ?? null,
+        workspaceFiles: Array.from(document.querySelectorAll(".workspace-file")).map((element) => element.textContent),
+      }));
+      throw new Error(`${cause.message}; desktop completion debug: ${JSON.stringify(debug)}`, { cause });
+    }
+    await browser.waitUntil(
+      () =>
+        wikiOverlay
+          .$('[role="option"]')
+          .getText()
+          .then((text) => text.includes("wiki-target")),
+      { timeout: 5_000, timeoutMsg: "the desktop wiki-link completion did not show the fixture note" },
+    );
+    await wikiOverlay.$('[role="option"]').click();
+    await browser.waitUntil(() => wikiOverlay.isDisplayed().then((visible) => !visible), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop wiki-link completion did not close after acceptance",
+    });
+
+    await clickToolbarAction("源文本");
+    const editor = await browser.$('[aria-label="Markdown 源文本"]');
+    await editor.waitForDisplayed();
+    await browser.waitUntil(
+      () => editor.getText().then((text) => text.includes("[[wiki-target]]") || text.includes("\\[\\[wiki-target]]")),
+      {
+        timeout: 5_000,
+        timeoutMsg: "the desktop wiki-link completion did not serialize the accepted link",
+      },
+    );
+
+    await editor.click();
+    await browser.execute((text) => {
+      const insert = window.__moyangDesktopE2e?.insertSourceText;
+      if (!insert) throw new Error("desktop source E2E bridge is unavailable");
+      insert(text);
+    }, "\n/ul");
+    const slashMenu = await browser.$(".cm-tooltip-autocomplete");
+    await slashMenu.waitForDisplayed();
+    await browser.waitUntil(() => slashMenu.getText().then((text) => text === "无序列表- 列表项"), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop slash completion did not filter the list command",
+    });
+    await browser.execute(() => {
+      const accept = window.__moyangDesktopE2e?.acceptSourceCompletion;
+      if (!accept) throw new Error("desktop source completion accept bridge is unavailable");
+      accept();
+    });
+    try {
+      await browser.waitUntil(() => editor.getText().then((text) => text.includes("- ")), {
+        timeout: 5_000,
+        timeoutMsg: "the desktop slash completion did not insert a list marker",
+      });
+    } catch (cause) {
+      throw new Error(`${cause.message}; source after slash completion: ${JSON.stringify(await editor.getText())}`, {
+        cause,
+      });
+    }
+
+    await clickToolbarAction("保存");
+    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8").includes("wiki-target"), {
+      timeout: 15_000,
+      timeoutMsg: "the desktop completion scenario did not save its fixture edits",
+    });
+  });
+
+  it("exports a real PDF and the workspace to HTML and Word", async () => {
+    fs.rmSync(pdfExportPath, { force: true });
+    await clickToolbarAction("保存 PDF");
+    await waitForExport(pdfExportPath, "the real Tauri PDF export");
     const pdfBytes = fs.readFileSync(pdfExportPath);
     assert.ok(pdfBytes.length > 100, "the real Tauri PDF export should not be empty");
     assert.equal(pdfBytes.subarray(0, 5).toString("ascii"), "%PDF-");
