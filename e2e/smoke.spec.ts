@@ -609,7 +609,13 @@ test("opens a reader context menu for selected text and links", async ({ page })
   await page.locator('input[type="file"]').setInputFiles({
     name: "reader-context-menu.md",
     mimeType: "text/markdown",
-    buffer: Buffer.from("# Reader context menu\n\n阅读模式中的选中文本。\n\n[外部链接](https://example.com)\n"),
+    buffer: Buffer.from(
+      "# Reader context menu\n\n阅读模式中的选中文本。\n\n" +
+        Array.from({ length: 40 }, (_, index) => `第 ${index + 1} 行用于验证右键菜单不会随正文滚动漂移。`).join(
+          "\n\n",
+        ) +
+        "\n\n[外部链接](https://example.com)\n",
+    ),
   });
 
   await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
@@ -617,10 +623,30 @@ test("opens a reader context menu for selected text and links", async ({ page })
 
   const paragraph = page.locator(".reader-content p").filter({ hasText: "阅读模式中的选中文本" }).first();
   await paragraph.selectText();
-  await paragraph.click({ button: "right" });
+  const paragraphBox = await paragraph.boundingBox();
+  expect(paragraphBox).not.toBeNull();
+  const clickPosition = { x: 24, y: Math.min(12, Math.max(4, (paragraphBox?.height ?? 16) / 2)) };
+  const expectedPoint = {
+    x: (paragraphBox?.x ?? 0) + clickPosition.x,
+    y: (paragraphBox?.y ?? 0) + clickPosition.y,
+  };
+  await paragraph.click({ button: "right", position: clickPosition });
 
   const menu = page.getByRole("menu", { name: "阅读内容菜单" });
   await expect(menu).toBeVisible();
+  await page.waitForTimeout(150);
+  const menuBeforeScroll = await menu.boundingBox();
+  expect(menuBeforeScroll).not.toBeNull();
+  expect(Math.abs((menuBeforeScroll?.x ?? 0) - expectedPoint.x)).toBeLessThanOrEqual(4);
+  expect(Math.abs((menuBeforeScroll?.y ?? 0) - expectedPoint.y)).toBeLessThanOrEqual(4);
+  await page.locator(".content-area").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await page.waitForTimeout(150);
+  const menuAfterScroll = await menu.boundingBox();
+  expect(menuAfterScroll).not.toBeNull();
+  expect(Math.abs((menuAfterScroll?.x ?? 0) - (menuBeforeScroll?.x ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((menuAfterScroll?.y ?? 0) - (menuBeforeScroll?.y ?? 0))).toBeLessThanOrEqual(1);
   await expect(menu.getByRole("menuitem", { name: "复制选中文本" })).toBeEnabled();
   await expect(menu.getByRole("menuitem", { name: "查找选中文本" })).toBeEnabled();
   await menu.getByRole("menuitem", { name: "查找选中文本" }).click();
