@@ -119,7 +119,7 @@ export function ContextMenu({
       // Native desktop drivers can deliver Escape to the document/webview
       // rather than the focused menu item. Closing must not depend on the
       // event target still being inside the menu.
-      if (event.key === "Escape" || event.key === "Esc" || event.code === "Escape") {
+      if (event.key === "Escape" || event.key === "Esc" || event.key === "\uE00C" || event.code === "Escape") {
         event.preventDefault();
         event.stopPropagation();
         onCloseRef.current();
