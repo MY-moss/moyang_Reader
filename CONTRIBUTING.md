@@ -8,15 +8,15 @@
 npm install
 npm run test
 npm run build
-npm run tauri dev
+npm run desktop
 ```
 
 Rust 命令层测试：
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+npm run rust -- test --manifest-path src-tauri/Cargo.toml
+npm run rust -- fmt --manifest-path src-tauri/Cargo.toml -- --check
+npm run rust -- clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 前端静态检查：
@@ -76,3 +76,4 @@ Pop-Location
 ## AI 交接
 
 功能分支与 `main` 无冲突且 Quality checks 全绿时可自动合并；权限、安全、更新器、发布工作流和数据迁移变更需要人工确认。代码、测试、需求/架构文档和下一步交接说明应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前唯一任务见 [`docs/NEXT.md`](docs/NEXT.md)。
+

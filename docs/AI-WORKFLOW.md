@@ -37,6 +37,7 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 ## 本地空间与工作树卫生
 
 - 项目源码只保留一个真实的 `node_modules`。工作树必须使用 `npm run worktree:prepare -- <worktree-path>` 建立 junction；禁止在每个工作树再次执行 `npm install`，也禁止把依赖目录复制到项目外。
+- 所有本地 Tauri/Cargo 命令必须通过 `npm run desktop`、`npm run tauri -- <args>` 或 `npm run rust -- <args>`；包装层会把构建目标固定到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`。即使 `CARGO_TARGET_DIR` 误指向仓库内，也会自动改到受管缓存，禁止直接运行会写入项目的 `tauri`/`cargo` 构建命令。
 - 构建、测试和覆盖率目录都是可再生文件。开始新切片前先运行 `npm run cleanup:workspace` 预览；确认输出后使用 `npm run cleanup:workspace -- --apply --prune-targets` 清理生成物和 Rust 目标。
 - 清理器只认识明确的生成目录（`dist`、`coverage`、`test-results`、`playwright-report`、Vite/任务缓存和 Rust 目标），不会触碰源码、文档、用户笔记或主工作区 `node_modules`。
 - 工作树回收是额外动作：只有确认不再需要时才使用 `--apply --prune-worktrees`。脏工作树、包含 junction/符号链接的工作树会自动保留，不能使用 `git worktree remove --force`。
@@ -170,3 +171,4 @@ sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|succ
 ## 当前停止规则
 
 功能分支合并、交接归档更新、`NEXT.md` 指向下一任务后，本次聊天立即停止。新的切片必须由新的“继续开发”请求触发。
+

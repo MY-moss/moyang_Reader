@@ -103,11 +103,11 @@ npm run desktop
 
 `npm run tauri -- build --no-bundle` 已在 Windows 上成功生成：
 
-`src-tauri/target/release/moyang-reader.exe`
+受管构建缓存中的 `release/moyang-reader.exe`（Windows 默认位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`）。
 
 稳定批次生成的 NSIS 安装包预期路径：
 
-`src-tauri/target/release/bundle/nsis/Moyang Reader_0.9.1_x64-setup.exe`
+受管构建缓存中的 `release/bundle/nsis/Moyang Reader_0.9.1_x64-setup.exe`。项目目录不会生成 `src-tauri/target`。
 
 运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
 
@@ -134,3 +134,4 @@ npm run desktop
 ```text
 继续开发 Moyang Reader。严格读取并执行 docs/NEXT.md 中的唯一下一步，遵循 docs/AI-WORKFLOW.md，完成一个垂直切片、测试、PR 和交接后停止，不自动开始下一项。
 ```
+

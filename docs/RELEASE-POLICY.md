@@ -91,9 +91,9 @@ npm run test:e2e
 npm run test:e2e:desktop
 npm run release:check -- --version=vX.Y.Z
 npm run test:release
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path src-tauri/Cargo.toml
+npm run rust -- fmt --manifest-path src-tauri/Cargo.toml -- --check
+npm run rust -- clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+npm run rust -- test --manifest-path src-tauri/Cargo.toml
 ```
 
 确认 `main` 已包含发布提交且 CI 通过后，再推送 tag：
@@ -118,3 +118,4 @@ git push origin vX.Y.Z
 ## 回滚
 
 已发布版本不能通过低版本覆盖回滚。发现问题时保留原 Release，修复后发布更高的 patch 版本，并在问题版本的 Release 说明中指向推荐升级版本。若构建或镜像失败，先停止对外宣传和更新验证，修复流水线后重新发布同一目标版本或按规则递增 patch，不能复用含糊的 tag。
+

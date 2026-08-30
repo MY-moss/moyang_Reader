@@ -4,7 +4,8 @@
 
 ## 当前基线（2026-08-31）
 
-- 当前主线：`main@c32c34991b25f11cf4890ad793dbdbc065e46872`；#172、#357 与 #375 已合并。
+- 最新工程修复分支：`codex/build-cache-guard-2026-08-31`；已恢复 Tauri/Cargo 构建目标外置到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\<repository-key>\\cargo-target`，并阻止仓库内 `CARGO_TARGET_DIR` 误配置造成 `src-tauri/target` 膨胀；本轮不生成安装包或 Release。
+- 当前主线：`main@999b2254c259e1145eabc94374772e1e135913f1`；#172、#357 与 #375 已合并。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一功能切片：[#374](https://github.com/MY-moss/moyang_Reader/pull/374) 完成 #172，合并提交为 `c187edcf39798b16d9610b5b8fdda6e22532086c`；Issue #172 已关闭。
 - 上一工程切片：[#375](https://github.com/MY-moss/moyang_Reader/pull/375) 完成工作区空间治理，合并提交为 `c3f5c8ce1967f2649a47337ca699aedca48fd1e8`。
@@ -127,3 +128,4 @@
 - `docs/handoff/v0.10.md`、`v0.9-and-earlier.md`：只读历史摘要。
 - `docs/ROADMAP.md`：版本目标和跨切片顺序。
 - `docs/ISSUE-INDEX.md`：Issue 分类、Ready 状态与治理规则。
+
