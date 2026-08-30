@@ -2,13 +2,13 @@
 
 本文件只保留当前稳定事实、正在推进的版本和外部阻塞。下一位 AI 的可执行任务只以 [`NEXT.md`](NEXT.md) 为准；完整流程见 [`AI-WORKFLOW.md`](AI-WORKFLOW.md)，历史记录见 [`handoff/`](handoff/)。
 
-## 当前基线（2026-08-30）
+## 当前基线（2026-08-31）
 
-- 本轮开发基线：`main@ee84be9949f71f2745118b52a89d889ce170106c`；#119 分支从该主线继续。
+- 当前主线：`main@e7a08d655d952201eeae58e77624284cdf52bf1d`；#190 已合并。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 上一切片 PR：[#349](https://github.com/MY-moss/moyang_Reader/pull/349) 完成 #299，已合并；本轮 #119 已完成代码、测试和文档，PR/合并 SHA 以对应 GitHub 记录为准。
+- 上一切片 PR：[#351](https://github.com/MY-moss/moyang_Reader/pull/351) 完成 #190，已合并；Issue #190 已以 `completed` 关闭。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 本轮 #119 axe/WCAG AA Windows UI 基线已完成本地与远程验收；合并并关闭 Issue 后，唯一下一步为 #190 首屏加载与大文档挂载，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
+- 本轮 #190 已完成本地与远程验收；唯一下一步为 #172 reduced-motion 程序化滚动，详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 顺序
 
@@ -20,11 +20,16 @@
 6. #346：草稿恢复前核对当前磁盘版本（已完成，PR #347）。
 7. #299：右键菜单键盘导航和焦点归还（本轮已完成）。
 8. #119：axe/WCAG AA Windows UI 基线（已完成，PR #350）。
-9. #190：首屏加载与大文档挂载（下一 READY）。
+9. #190：首屏加载与大文档挂载（已完成，PR #351）。
+10. #172：reduced-motion 程序化滚动（下一 READY）。
 
 每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
 
 ## 最近完成
+
+- #190 首屏按需加载与大文档渐进挂载已完成：普通文档不再静态加载 KaTeX CSS；大 HTML 首块先挂载，后续按帧渐进挂载；搜索和目录/锚点跳转会在需要时完成剩余挂载。PR #351 合并提交为 `e7a08d6`，Issue 已以 `completed` 关闭。
+- #190 本地验证：定向单测 11/11、lint、类型规则探针 3/3、format、一次生产 build、构建产物检查、性能浏览器 E2E 2/2 和相关回归 E2E 4/4 通过；远程 Quality checks `run_id=33322595846` 成功，依赖审计 `run_id=33322611814` 成功。
+- #190 发布边界：不单独生成 Windows 安装包、Tag、Release 或镜像；结果并入 v0.11.0。回滚为回退 PR #351。
 
 - #234 已在 PR #342 实施统一固定通知视口：设置/更新反馈最多三条 FIFO，支持独立关闭，info/success 六秒自动关闭，error/action 常驻；正文无布局位移。
 - #234 本地门禁通过：270 个单测、50 条浏览器 E2E、Windows desktop E2E 12/12、lint、format、build；CI 已通过：`sha=c37627628bf9916b00a31961a672b68827a6139e workflow=CI/Quality checks run_id=33290796215 conclusion=success last_changed_at=2026-08-30T03:49:37Z next_action=merge PR #342`。
@@ -92,7 +97,7 @@
 - 变更：新增 `test:e2e:a11y` 定向入口、`docs/ACCESSIBILITY-WINDOWS.md` 和高对比度 CSS 回退；没有新增运行时依赖、跨平台范围或用户文档同步。
 - 验证：`npm run lint`、`npm run format:check`、`npm run build`、`npm run test:e2e:a11y -- --reporter=line --workers=1`（6/6）通过；远程 `sha=c0bca3de57e00cee3bbe59b8956b9a3c9952b856 workflow=CI run_id=33320052388 conclusion=success last_changed_at=2026-08-30T15:43:13Z`。
 - 发布/回滚：不创建安装包、Tag、Release 或镜像；回退 PR #350 即可恢复原主题令牌和测试范围。真实 Narrator/NVDA 抽查保留在发布前清单，不声称自动化替代读屏认证。
-- 下一唯一任务：#190 首屏加载与大文档挂载；不自动开始。
+- 下一唯一任务：#190 已完成；下一项 #172 以 [`NEXT.md`](NEXT.md) 为准，不自动开始。
 
 ## 已知条件与风险
 
@@ -117,3 +122,4 @@
 - `docs/handoff/v0.10.md`、`v0.9-and-earlier.md`：只读历史摘要。
 - `docs/ROADMAP.md`：版本目标和跨切片顺序。
 - `docs/ISSUE-INDEX.md`：Issue 分类、Ready 状态与治理规则。
+
