@@ -236,6 +236,7 @@ import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
 import { scrollHeadingInContainer } from "./heading-navigation";
+import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 import {
   formatTransitionConfirmation,
@@ -765,7 +766,10 @@ export function App() {
   const scrollToReaderEdge = useCallback((edge: "top" | "bottom") => {
     const contentArea = contentAreaRef.current;
     if (!contentArea) return;
-    contentArea.scrollTo({ top: edge === "top" ? 0 : contentArea.scrollHeight, behavior: "smooth" });
+    contentArea.scrollTo({
+      top: edge === "top" ? 0 : contentArea.scrollHeight,
+      behavior: resolveProgrammaticScrollBehavior(),
+    });
   }, []);
 
   const resizePane = useCallback((side: PaneSide, delta: number) => {
@@ -4518,7 +4522,7 @@ export function App() {
     if (mode !== "rendered") return;
     if (!progressiveReaderReady) return;
     const target = searchHighlightRef.current?.controller.setActive(searchResultIndex);
-    target?.scrollIntoView({ block: "center" });
+    target?.scrollIntoView({ behavior: resolveProgrammaticScrollBehavior("auto"), block: "center" });
   }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, searchResultIndex]);
 
   useEffect(() => {
