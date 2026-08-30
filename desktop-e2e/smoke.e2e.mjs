@@ -551,6 +551,48 @@ async function openWorkspaceContextMenu(selector, text) {
   return menu;
 }
 
+async function pressDesktopEscape() {
+  await browser.execute(() => {
+    window.__desktopE2EEscapeProbe = { count: 0 };
+    window.__desktopE2EEscapeListener = () => {
+      window.__desktopE2EEscapeProbe.count += 1;
+    };
+    document.addEventListener("keydown", window.__desktopE2EEscapeListener, true);
+  });
+
+  try {
+    await browser.keys("Escape");
+    const keydownCount = await browser.execute(() => window.__desktopE2EEscapeProbe?.count ?? 0);
+    const menuVisible = await browser
+      .$(".moyang-context-menu")
+      .isDisplayed()
+      .catch(() => false);
+    if (keydownCount === 0 && menuVisible) {
+      // The embedded Tauri driver can accept a WebDriver key action without
+      // forwarding it into the WebView. Exercise the same focused DOM path
+      // only for that driver limitation; a delivered native key must still
+      // close the menu through the product event listener above.
+      await browser.execute(() => {
+        const target = document.activeElement instanceof HTMLElement ? document.activeElement : document;
+        target.dispatchEvent(
+          new window.KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            key: "Escape",
+            code: "Escape",
+          }),
+        );
+      });
+    }
+  } finally {
+    await browser.execute(() => {
+      document.removeEventListener("keydown", window.__desktopE2EEscapeListener, true);
+      delete window.__desktopE2EEscapeListener;
+      delete window.__desktopE2EEscapeProbe;
+    });
+  }
+}
+
 async function discardDraftNotice() {
   const recoveryNotice = await browser.$(".draft-recovery-notice");
   await recoveryNotice.waitForDisplayed();
@@ -787,9 +829,7 @@ describe("Moyang Reader desktop runtime", () => {
         true,
         `keyboard context menu should focus its first action: ${JSON.stringify(keyboardFocusState)}`,
       );
-      // Use WebDriver's standard Escape key code. Tauri/WebDriver can treat
-      // the human-readable "Escape" name as text instead of a key action.
-      await browser.keys(["\uE00C"]);
+      await pressDesktopEscape();
       await browser.waitUntil(() => keyboardMenu.isDisplayed().then((visible) => !visible), {
         timeout: 5_000,
         timeoutMsg: "the keyboard context menu did not close on Escape",
