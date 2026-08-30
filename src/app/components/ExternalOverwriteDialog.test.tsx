@@ -20,7 +20,9 @@ describe("ExternalOverwriteDialog", () => {
     });
 
     expect(document.activeElement).toBe(container.querySelector('[data-testid="external-overwrite-cancel"]'));
-    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
     expect(onCancel).toHaveBeenCalledOnce();
 
     act(() => root.unmount());

@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@0c83f80e552db67e9a6e68e758f9fccf588c854c`，PR #339 已完成复杂 DOCX 块增量序列化。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@4ca46c52e92bce6353667f0632db40613df4424b`，PR #342 已完成统一通知层。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -119,14 +119,14 @@
 - 验收计划：复杂块/120 行表格等导出定向测试、Worker 客户端测试、lint、格式检查和 Windows desktop smoke；本机/CI 指标仅作为同机趋势证据。
 - 发布/状态：这是 #87 的内部性能切片，不单独生成 Windows x64 安装包或 Release；Issue 继续 open，待更大真实素材和单块 DOM 峰值观测完成后再决定关闭。
 
-## #189 TypeScript/Rust 质量门禁首个垂直切片（2026-08-29）
+## #189 TypeScript/Rust 质量门禁首个垂直切片（已完成，2026-08-30）
 
 - 目标：把已量化通过的 TypeScript/ESLint 约束和 Rust 最低版本约束固化为可持续门禁，降低后续 AI/贡献者引入回归的概率。
-- 已实现：ESLint 将显式 `any` 与未使用变量设为阻断错误；应用与 Node tsconfig 启用未使用、`switch` 穿透和模块语义约束；Cargo 声明 `rust-version = "1.88"`；Windows CI 在 Rust 编译门禁前输出并验证工具链兼容性。
+- 已实现：ESLint 将显式 `any` 与未使用变量设为阻断错误；`src` 启用类型感知 `no-floating-promises`、`await-thenable` 和 `no-misused-promises`；应用与 Node tsconfig 启用未使用、`switch` 穿透和模块语义约束；Cargo 声明 `rust-version = "1.88"`；Windows CI 在 Rust 编译门禁前输出并验证工具链兼容性。
 - 基线：现有代码显式 `any` 为 0、ESLint warning/error 为 0；严格 TypeScript 试运行无错误；Windows 依赖解析最高 Rust 要求为 1.88。以上是配置切片基线，不表示所有未来依赖都永久保持该版本。
-- 验收：本地 ESLint、TypeScript build、Cargo metadata 和后续完整 PR Quality checks 通过；CI 兼容性步骤不新增重复编译。
+- 验收：首次类型感知 lint 暴露 13 处测试 Promise fallout，均已修复；3/3 规则探针和脚本边界探针通过；本地 ESLint、TypeScript build、全量前端测试、Cargo metadata/fmt/clippy/test、发布预检和后续完整 PR Quality checks 通过；CI 兼容性步骤不新增重复编译。
 - 非目标：不启用所有高噪声实验规则，不大范围重构业务代码，不改变用户可见功能，不处理 Actions SHA、签名、更新器或 Release。
-- 状态：#189 保持 open，后续类型感知规则、真实 fallout 清理和更细的 Rust 工具链固定仍需独立切片；本切片不创建安装包或 Release。
+- 状态：本切片完成后 #189 标记 completed；后续更高噪声类型规则或更细的 Rust 工具链固定另开独立切片；本切片不创建安装包或 Release。
 
 ## v0.10.13 发布记录（2026-08-29）
 

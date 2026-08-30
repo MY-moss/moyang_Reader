@@ -34,14 +34,20 @@ describe("useModalBehavior", () => {
     expect(document.activeElement).toBe(first);
 
     last.focus();
-    act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true })));
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }));
+    });
     expect(document.activeElement).toBe(first);
 
     first.focus();
-    act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, cancelable: true })));
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, cancelable: true }));
+    });
     expect(document.activeElement).toBe(last);
 
-    act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true })));
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    });
     expect(onClose).toHaveBeenCalledOnce();
 
     act(() => root.unmount());

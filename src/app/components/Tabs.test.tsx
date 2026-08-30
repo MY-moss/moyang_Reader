@@ -50,7 +50,9 @@ describe("Tabs", () => {
     const { container, root, onClose } = mountTabs();
     const tab = container.querySelector<HTMLElement>(".tab-item");
 
-    act(() => tab?.dispatchEvent(new MouseEvent("auxclick", { button: 1, bubbles: true })));
+    act(() => {
+      tab?.dispatchEvent(new MouseEvent("auxclick", { button: 1, bubbles: true }));
+    });
 
     expect(onClose).toHaveBeenCalledWith("C:/one.md");
     cleanup(container, root);
@@ -67,9 +69,15 @@ describe("Tabs", () => {
     } as unknown as DataTransfer;
 
     expect(items[0]?.draggable).toBe(true);
-    act(() => items[0]?.dispatchEvent(withDataTransfer(new Event("dragstart", { bubbles: true }), dataTransfer)));
-    act(() => items[1]?.dispatchEvent(withDataTransfer(new Event("dragover", { bubbles: true }), dataTransfer)));
-    act(() => items[1]?.dispatchEvent(withDataTransfer(new Event("drop", { bubbles: true }), dataTransfer)));
+    act(() => {
+      items[0]?.dispatchEvent(withDataTransfer(new Event("dragstart", { bubbles: true }), dataTransfer));
+    });
+    act(() => {
+      items[1]?.dispatchEvent(withDataTransfer(new Event("dragover", { bubbles: true }), dataTransfer));
+    });
+    act(() => {
+      items[1]?.dispatchEvent(withDataTransfer(new Event("drop", { bubbles: true }), dataTransfer));
+    });
 
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "C:/one.md");
     expect(onReorder).toHaveBeenCalledWith("C:/one.md", "C:/two.md");
@@ -80,7 +88,9 @@ describe("Tabs", () => {
     const { container, root, onCloseMany } = mountTabs();
     const tab = container.querySelector<HTMLElement>(".tab-item");
 
-    act(() => tab?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 })));
+    act(() => {
+      tab?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 }));
+    });
     const closeRight = Array.from(document.body.querySelectorAll<HTMLButtonElement>("[role=menuitem]")).find(
       (button) => button.textContent?.trim() === "关闭右侧标签",
     );

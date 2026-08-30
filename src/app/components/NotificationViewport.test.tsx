@@ -57,9 +57,13 @@ describe("NotificationViewport", () => {
     vi.useFakeTimers();
     const { container, root, onDismiss } = mountViewport([notifications[0], notifications[1]]);
 
-    act(() => vi.advanceTimersByTime(5_999));
+    act(() => {
+      vi.advanceTimersByTime(5_999);
+    });
     expect(onDismiss).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     expect(onDismiss).toHaveBeenCalledTimes(2);
     expect(onDismiss).toHaveBeenNthCalledWith(1, 1);
     expect(onDismiss).toHaveBeenNthCalledWith(2, 2);
