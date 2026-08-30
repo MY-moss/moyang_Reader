@@ -166,4 +166,3 @@ describe("ContextMenu", () => {
     outside.remove();
   });
 });
-
