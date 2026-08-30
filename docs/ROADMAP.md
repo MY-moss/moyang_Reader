@@ -338,3 +338,5 @@
 - 版本分类、目标版本和是否发布必须在 PR 模板、`docs/NEXT.md` 与 `docs/AI-HANDOFF.md` 中明确；纯文档、测试和内部工具改动可以不发布。
 
 版本号选择和发布交付物的唯一规则见 [`docs/RELEASE-POLICY.md`](RELEASE-POLICY.md)。
+
+
