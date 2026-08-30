@@ -4,9 +4,9 @@
 
 ## 当前基线（2026-08-30）
 
-- 本轮开发基线：`main@628e5c3c23a942bd893fd2a9bbff2a66ddcac2bc`。
+- 本轮开发基线：`main@33c798cbf34df74b9e0a46f324c4303226f8b36f0`。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 当前切片 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)，用于关闭 #87；最终状态以 GitHub 为准。
+- 上一切片 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)，用于关闭 #87；已完成，最终状态以 GitHub 为准。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
 - 当前唯一下一步：#234 统一通知层；详细 READY 契约见 [`NEXT.md`](NEXT.md)。
 

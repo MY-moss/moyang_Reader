@@ -5,11 +5,11 @@
 ## 核验状态
 
 - 最近核验：2026-08-30
-- 本切片开发基线：`main@628e5c3c23a942bd893fd2a9bbff2a66ddcac2bc`
+- 本切片开发基线：`main@33c798cbf34df74b9e0a46f324c4303226f8b36f0`
 - 稳定版本：`v0.10.13`
 - 当前 milestone：`v0.11.0`
-- 相关 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)（#87 收尾；完成前不启动本项）
-- 当前状态：READY（待 #341 完成后执行）
+- 相关 PR：[#341](https://github.com/MY-moss/moyang_Reader/pull/341)（#87 收尾；已完成）
+- 当前状态：READY（#341 已完成，执行本项）
 
 ## 唯一下一步：#234 设置反馈通知：可关闭、可堆叠且不挤动阅读布局
 
