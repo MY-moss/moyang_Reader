@@ -634,6 +634,62 @@ test("opens a reader context menu for selected text and links", async ({ page })
   await expect(linkMenu.getByRole("menuitem", { name: "打开链接" })).toBeVisible();
 });
 
+test("keeps keyboard context menus contained and returns focus across tabs, reader, and editor", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "keyboard-context-first.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Keyboard context first\n\n第一份文档。\n"),
+    },
+    {
+      name: "keyboard-context-second.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Keyboard context second\n\n第二份文档。\n"),
+    },
+  ]);
+
+  const firstTab = page.getByRole("button", { name: "keyboard-context-first.md", exact: true });
+  await expect(firstTab).toBeVisible();
+  await firstTab.focus();
+  await page.keyboard.press("Shift+F10");
+  const tabMenu = page.getByRole("menu", { name: "标签页管理菜单" });
+  await expect(tabMenu).toBeVisible();
+  const tabItems = tabMenu.getByRole("menuitem");
+  await expect(tabItems.first()).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(tabItems.nth(1)).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(tabItems.first()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(firstTab).toBeFocused();
+
+  await switchToRenderedMode(page);
+  const reader = page.locator(".reader-content");
+  await reader.focus();
+  await page.keyboard.press("Shift+F10");
+  const readerMenu = page.getByRole("menu", { name: "阅读内容菜单" });
+  await expect(readerMenu).toBeVisible();
+  const readerItems = readerMenu.locator('button[role="menuitem"]:not(:disabled)');
+  await page.keyboard.press("Tab");
+  await expect(readerItems.first()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(reader).toBeFocused();
+
+  await page.keyboard.press("Control+E");
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await editable.focus();
+  await page.keyboard.press("Shift+F10");
+  const editorMenu = page.getByRole("menu", { name: "正文编辑菜单" });
+  await expect(editorMenu).toBeVisible();
+  const editorItems = editorMenu.locator('button[role="menuitem"]:not(:disabled)');
+  await page.keyboard.press("Tab");
+  await expect(editorItems.nth(1)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(editable).toBeFocused();
+});
+
 test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
   // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
   // one canonical form. This test pins the exact output so a Milkdown/remark

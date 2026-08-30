@@ -155,6 +155,12 @@ type CompletionOverlayState = EditorCompletionTrigger & {
   left: number;
 };
 
+function editorContextRestoreTarget(container: HTMLElement): HTMLElement {
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLElement && container.contains(activeElement)) return activeElement;
+  return container.querySelector<HTMLElement>('[contenteditable="true"]') ?? container;
+}
+
 /** 把 `/` 菜单命令映射到对应的 Milkdown 块级命令。 */
 function slashCommandAction(command: SlashCommand) {
   switch (command.id) {
@@ -212,7 +218,13 @@ function MilkdownSurface({
   const pendingInsertSelectionRef = useRef<{ from: number; to: number; selectedText: string } | null>(null);
   const lastRequestedInsertRef = useRef<EditorInsertKind | null>(null);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    hasSelection: boolean;
+    restoreFocusTarget: HTMLElement | null;
+    fallbackFocusTarget: HTMLElement | null;
+  } | null>(null);
   const [insertOpen, setInsertOpen] = useState(false);
   const [insertKind, setInsertKind] = useState<EditorInsertKind>("link");
   const [insertInitialValues, setInsertInitialValues] = useState<EditorInsertInitialValues>({});
@@ -776,6 +788,7 @@ function MilkdownSurface({
       ref={containerRef}
       className={`wysiwyg-editor${loading ? " is-loading" : ""}`}
       aria-busy={loading}
+      tabIndex={-1}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
         if (loading || mountFailed) return;
         event.preventDefault();
@@ -785,9 +798,26 @@ function MilkdownSurface({
           x: event.clientX,
           y: event.clientY,
           hasSelection: Boolean(window.getSelection()?.toString().trim()),
+          restoreFocusTarget: editorContextRestoreTarget(event.currentTarget),
+          fallbackFocusTarget: event.currentTarget,
         });
       }}
       onKeyDown={(event) => {
+        if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+          if (loading || mountFailed) return;
+          event.preventDefault();
+          const rect = event.currentTarget.getBoundingClientRect();
+          completionRef.current = null;
+          setCompletion(null);
+          setContextMenu({
+            x: rect.left + Math.min(32, rect.width / 2),
+            y: rect.bottom,
+            hasSelection: Boolean(window.getSelection()?.toString().trim()),
+            restoreFocusTarget: editorContextRestoreTarget(event.currentTarget),
+            fallbackFocusTarget: event.currentTarget,
+          });
+          return;
+        }
         if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
         event.preventDefault();
         openInsert("link");
@@ -838,6 +868,8 @@ function MilkdownSurface({
           title="编辑操作"
           ariaLabel="正文编辑菜单"
           groups={editorContextGroups}
+          restoreFocusTarget={contextMenu.restoreFocusTarget}
+          fallbackFocusTarget={contextMenu.fallbackFocusTarget}
           onClose={() => setContextMenu(null)}
         />
       )}

@@ -37,38 +37,38 @@
 
 ### Must：核心阅读、编辑、稳定性与发布
 
-| Issue                                                       | 主题                               | 计划                      | 备注                                                                        |
-| ----------------------------------------------------------- | ---------------------------------- | ------------------------- | --------------------------------------------------------------------------- |
-| [#87](https://github.com/MY-moss/moyang_Reader/issues/87)   | 批量导出单卷驻留内存与可取消归档   | v0.11.0 第 1 切片         | PR #339 已完成复杂块流式化；剩余三轮真实 Windows 最终矩阵                   |
-| [#164](https://github.com/MY-moss/moyang_Reader/issues/164) | GFM 与 WYSIWYG 往返保真            | v0.11.0                   | 防止脚注、任务列表等内容静默丢失                                            |
-| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试   | v0.11.0                   | 本轮验收已完成，PR 合并后关闭；与 #164 保持独立                             |
-| [#321](https://github.com/MY-moss/moyang_Reader/issues/321) | 原生格式工具栏与链接/图片/表格插入 | v0.10.13 稳定批次         | 已完成；PR #322 已合并，后续资源管理另行切片                                |
-| [#323](https://github.com/MY-moss/moyang_Reader/issues/323) | 草稿恢复前显示当前版本与草稿差异   | v0.10.13 稳定批次         | 已完成；PR #324 已合并，v0.10.13 已发布；后续当前磁盘核对由 #346 补齐       |
-| [#346](https://github.com/MY-moss/moyang_Reader/issues/346) | 草稿恢复时核对当前磁盘版本         | v0.11.0 第 6 切片         | 已完成；PR #347 已合并，Issue 已以 completed 关闭；不引入三方合并或版本历史 |
-| [#187](https://github.com/MY-moss/moyang_Reader/issues/187) | Windows 窄窗口与工具栏溢出         | v0.11.0                   | 已完成；PR #328 已合并，Issue 已关闭（completed）                           |
-| [#189](https://github.com/MY-moss/moyang_Reader/issues/189) | TypeScript/ESLint/Rust 质量门禁    | v0.11.0 第 3 切片         | 基础严格项已完成；剩余类型感知异步规则与真实 fallout                        |
-| [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计     | v0.11.0 发布前            | 发布/镜像工作流优先                                                         |
-| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归   | v0.11.0 第 5 阶段（条件） | 依赖 Cloudflare Secrets、真实旧版本安装环境和发布条件                       |
-| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 第 5 阶段（条件） | SemVer 校验已完成；剩余 Authenticode 证书或限制说明                         |
+| Issue                                                       | 主题                               | 计划                      | 备注                                                                  |
+| ----------------------------------------------------------- | ---------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| [#87](https://github.com/MY-moss/moyang_Reader/issues/87)   | 批量导出单卷驻留内存与可取消归档   | v0.11.0 第 1 切片         | PR #339 已完成复杂块流式化；剩余三轮真实 Windows 最终矩阵             |
+| [#164](https://github.com/MY-moss/moyang_Reader/issues/164) | GFM 与 WYSIWYG 往返保真            | v0.11.0                   | 防止脚注、任务列表等内容静默丢失                                      |
+| [#165](https://github.com/MY-moss/moyang_Reader/issues/165) | WYSIWYG 补全、同步、保存行为测试   | v0.11.0                   | 本轮验收已完成，PR 合并后关闭；与 #164 保持独立                       |
+| [#321](https://github.com/MY-moss/moyang_Reader/issues/321) | 原生格式工具栏与链接/图片/表格插入 | v0.10.13 稳定批次         | 已完成；PR #322 已合并，后续资源管理另行切片                          |
+| [#323](https://github.com/MY-moss/moyang_Reader/issues/323) | 草稿恢复前显示当前版本与草稿差异   | v0.10.13 稳定批次         | 已完成；PR #324 已合并，v0.10.13 已发布；后续当前磁盘核对由 #346 补齐 |
+| [#346](https://github.com/MY-moss/moyang_Reader/issues/346) | 草稿恢复时核对当前磁盘版本         | v0.11.0 第 6 切片         | 本轮实现已完成，PR 合并后关闭；不引入三方合并或版本历史               |
+| [#187](https://github.com/MY-moss/moyang_Reader/issues/187) | Windows 窄窗口与工具栏溢出         | v0.11.0                   | 已完成；PR #328 已合并，Issue 已关闭（completed）                     |
+| [#189](https://github.com/MY-moss/moyang_Reader/issues/189) | TypeScript/ESLint/Rust 质量门禁    | v0.11.0 第 3 切片         | 基础严格项已完成；剩余类型感知异步规则与真实 fallout                  |
+| [#226](https://github.com/MY-moss/moyang_Reader/issues/226) | Actions SHA 固定与前端定时审计     | v0.11.0 发布前            | 发布/镜像工作流优先                                                   |
+| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归   | v0.11.0 第 5 阶段（条件） | 依赖 Cloudflare Secrets、真实旧版本安装环境和发布条件                 |
+| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 第 5 阶段（条件） | SemVer 校验已完成；剩余 Authenticode 证书或限制说明                   |
 
 ### Should：明显改善高频体验和可维护性
 
-| Issue                                                       | 主题                             | 计划              | 备注                                              |
-| ----------------------------------------------------------- | -------------------------------- | ----------------- | ------------------------------------------------- |
-| [#190](https://github.com/MY-moss/moyang_Reader/issues/190) | 首屏按需加载与真实渐进挂载       | v0.11.x           | 不重复 #168 的阅读轨道优化                        |
-| [#171](https://github.com/MY-moss/moyang_Reader/issues/171) | CSS 令牌与主题规则治理           | v0.11.x–v1.0      | 分阶段，先令牌后拆文件                            |
-| [#301](https://github.com/MY-moss/moyang_Reader/issues/301) | 系统文件拖放反馈与失败提示       | v0.11.0 第 4 切片 | 已完成；PR #344 已合并，Issue 已以 completed 关闭 |
-| [#234](https://github.com/MY-moss/moyang_Reader/issues/234) | 设置通知可关闭、堆叠且不挤布局   | v0.11.0 第 2 切片 | 统一右上角最多三条通知栈和富更新通知              |
-| [#299](https://github.com/MY-moss/moyang_Reader/issues/299) | 右键菜单焦点循环与关闭归还       | v0.11.0 第 7 切片 | 共享菜单基座和五类调用入口                        |
-| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航细节               | v0.11.x           | 按子问题独立切片                                  |
-| [#119](https://github.com/MY-moss/moyang_Reader/issues/119) | axe/WCAG AA Windows UI 基线      | v0.11.x           | 基线不替代具体缺陷                                |
-| [#172](https://github.com/MY-moss/moyang_Reader/issues/172) | reduced-motion 下的程序化滚动    | v0.11.x           | 低风险可独立交付                                  |
-| [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、主按钮、页签和令牌细节   | v0.11.x           | 不与 #171 的大范围拆分混做                        |
-| [#233](https://github.com/MY-moss/moyang_Reader/issues/233) | 顶栏图标体系和操作密度           | v0.11.x           | 与 #187/#171 协同                                 |
-| [#227](https://github.com/MY-moss/moyang_Reader/issues/227) | SECURITY.md 与私密披露入口       | v0.11.x           | 文档成本低，独立交付                              |
-| [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档   | v0.11.x           | 清单中部分已完成，不能重复实现                    |
-| [#194](https://github.com/MY-moss/moyang_Reader/issues/194) | TS↔Rust 契约、路径谓词和重复实现 | v1.0 前           | 只有明确子切片才进入 Ready                        |
-| [#16](https://github.com/MY-moss/moyang_Reader/issues/16)   | 渐进拆分 App.tsx                 | v1.0 前           | 以职责和测试边界为准，不以行数为唯一目标          |
+| Issue                                                       | 主题                             | 计划              | 备注                                               |
+| ----------------------------------------------------------- | -------------------------------- | ----------------- | -------------------------------------------------- |
+| [#190](https://github.com/MY-moss/moyang_Reader/issues/190) | 首屏按需加载与真实渐进挂载       | v0.11.x           | 不重复 #168 的阅读轨道优化                         |
+| [#171](https://github.com/MY-moss/moyang_Reader/issues/171) | CSS 令牌与主题规则治理           | v0.11.x–v1.0      | 分阶段，先令牌后拆文件                             |
+| [#301](https://github.com/MY-moss/moyang_Reader/issues/301) | 系统文件拖放反馈与失败提示       | v0.11.0 第 4 切片 | 已完成；PR #344 已合并，Issue 已以 completed 关闭  |
+| [#234](https://github.com/MY-moss/moyang_Reader/issues/234) | 设置通知可关闭、堆叠且不挤布局   | v0.11.0 第 2 切片 | 统一右上角最多三条通知栈和富更新通知               |
+| [#299](https://github.com/MY-moss/moyang_Reader/issues/299) | 右键菜单焦点循环与关闭归还       | v0.11.0 第 7 切片 | 本轮已完成；共享菜单基座和五类调用入口，合并后关闭 |
+| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航细节               | v0.11.x           | 按子问题独立切片                                   |
+| [#119](https://github.com/MY-moss/moyang_Reader/issues/119) | axe/WCAG AA Windows UI 基线      | v0.11.x           | 基线不替代具体缺陷                                 |
+| [#172](https://github.com/MY-moss/moyang_Reader/issues/172) | reduced-motion 下的程序化滚动    | v0.11.x           | 低风险可独立交付                                   |
+| [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、主按钮、页签和令牌细节   | v0.11.x           | 不与 #171 的大范围拆分混做                         |
+| [#233](https://github.com/MY-moss/moyang_Reader/issues/233) | 顶栏图标体系和操作密度           | v0.11.x           | 与 #187/#171 协同                                  |
+| [#227](https://github.com/MY-moss/moyang_Reader/issues/227) | SECURITY.md 与私密披露入口       | v0.11.x           | 文档成本低，独立交付                               |
+| [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档   | v0.11.x           | 清单中部分已完成，不能重复实现                     |
+| [#194](https://github.com/MY-moss/moyang_Reader/issues/194) | TS↔Rust 契约、路径谓词和重复实现 | v1.0 前           | 只有明确子切片才进入 Ready                         |
+| [#16](https://github.com/MY-moss/moyang_Reader/issues/16)   | 渐进拆分 App.tsx                 | v1.0 前           | 以职责和测试边界为准，不以行数为唯一目标           |
 
 ### Could：保留记录，当前不占用快速迭代资源
 
@@ -112,4 +112,4 @@
 - 2026-08-29：盘点 32 个开放 Issue。
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：15 个开放可执行 Issue（Must 2、Should 12、Could 1），9 个已归档；#301 已完成（PR #344），#346 已完成（PR #347，Issue completed），下一 Ready 事项见 [`NEXT.md`](NEXT.md)。
+- 当前结果：15 个开放可执行 Issue（Must 2、Should 12、Could 1），9 个已归档；#301 已完成（PR #344），#346 本轮实现已完成并待 PR 合并关闭，下一 Ready 事项见 [`NEXT.md`](NEXT.md)。

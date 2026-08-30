@@ -758,6 +758,46 @@ describe("Moyang Reader desktop runtime", () => {
         "the context-menu folder fixture did not appear in the workspace",
       );
 
+      const keyboardFileEntry = await findWorkspaceElement(".workspace-file", originalFileName);
+      assert.ok(keyboardFileEntry, `workspace entry ${originalFileName} was not found for keyboard context menu`);
+      await browser.execute((element) => {
+        element.focus();
+        element.dispatchEvent(
+          new window.KeyboardEvent("keydown", {
+            bubbles: true,
+            cancelable: true,
+            key: "F10",
+            shiftKey: true,
+          }),
+        );
+      }, keyboardFileEntry);
+      const keyboardMenu = await browser.$(".moyang-context-menu");
+      await keyboardMenu.waitForDisplayed();
+      const keyboardFocusState = await browser.execute(() => {
+        const menu = document.querySelector('.moyang-context-menu[role="menu"]');
+        const firstItem = menu?.querySelector('[role="menuitem"]');
+        return {
+          active: document.activeElement?.outerHTML?.slice(0, 240) ?? null,
+          firstItem: firstItem?.outerHTML?.slice(0, 240) ?? null,
+          isFirst: firstItem === document.activeElement,
+        };
+      });
+      assert.equal(
+        keyboardFocusState.isFirst,
+        true,
+        `keyboard context menu should focus its first action: ${JSON.stringify(keyboardFocusState)}`,
+      );
+      await browser.keys("Escape");
+      await browser.waitUntil(() => keyboardMenu.isDisplayed().then((visible) => !visible), {
+        timeout: 5_000,
+        timeoutMsg: "the keyboard context menu did not close on Escape",
+      });
+      assert.equal(
+        await browser.execute((element) => document.activeElement === element, keyboardFileEntry),
+        true,
+        "keyboard context menu should restore focus to the workspace entry",
+      );
+
       await browser.execute(() => {
         window.__desktopE2EOriginalPrompt = window.prompt;
         window.prompt = (message) => {

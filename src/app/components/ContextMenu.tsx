@@ -21,6 +21,8 @@ type ContextMenuProps = {
   ariaLabel: string;
   groups: readonly ContextMenuGroup[];
   onClose: () => void;
+  restoreFocusTarget?: HTMLElement | null;
+  fallbackFocusTarget?: HTMLElement | null;
 };
 
 type MenuPosition = {
@@ -37,9 +39,59 @@ function clampMenuPosition(x: number, y: number, width: number, height: number):
   };
 }
 
-export function ContextMenu({ x, y, title, ariaLabel, groups, onClose }: ContextMenuProps) {
+function getEnabledMenuItems(menu: HTMLElement): HTMLButtonElement[] {
+  return Array.from(menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)'));
+}
+
+function focusElement(element: HTMLElement | null | undefined): boolean {
+  if (!element?.isConnected) return false;
+  try {
+    element.focus({ preventScroll: true });
+  } catch {
+    element.focus();
+  }
+  return document.activeElement === element;
+}
+
+function restoreFocus(target: HTMLElement | null, fallback: HTMLElement | null): void {
+  if (focusElement(target)) return;
+  if (focusElement(fallback)) return;
+
+  const body = document.body;
+  if (!body) return;
+
+  // `body` is the last-resort safe container when the triggering row/tab was
+  // deleted while the menu was open. Keep the temporary tab stop out of the
+  // user's document after focus has been placed there.
+  const previousTabIndex = body.getAttribute("tabindex");
+  if (previousTabIndex === null) body.setAttribute("tabindex", "-1");
+  focusElement(body);
+  if (previousTabIndex === null) body.removeAttribute("tabindex");
+}
+
+function activeElementOrNull(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
+export function ContextMenu({
+  x,
+  y,
+  title,
+  ariaLabel,
+  groups,
+  onClose,
+  restoreFocusTarget,
+  fallbackFocusTarget,
+}: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<MenuPosition>({ left: x, top: y });
+  const onCloseRef = useRef(onClose);
+  const restoreFocusTargetRef = useRef<HTMLElement | null>(restoreFocusTarget ?? activeElementOrNull());
+  const fallbackFocusTargetRef = useRef<HTMLElement | null>(fallbackFocusTarget ?? null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -50,27 +102,51 @@ export function ContextMenu({ x, y, title, ariaLabel, groups, onClose }: Context
 
   useEffect(() => {
     const menuElement = menuRef.current;
-    const firstItem = menuElement?.querySelector<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)');
-    firstItem?.focus();
+    if (!menuElement) return;
+    const restoreTarget = restoreFocusTargetRef.current;
+    const fallbackTarget = fallbackFocusTargetRef.current;
+
+    const firstItem = getEnabledMenuItems(menuElement)[0];
+    (firstItem ?? menuElement).focus();
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) onClose();
+      const target = event.target;
+      if (!(target instanceof Node) || !menuRef.current?.contains(target)) onCloseRef.current();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const menu = menuRef.current;
-      if (!menu) return;
+      if (!menu || !(event.target instanceof Node) || !menu.contains(event.target)) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
-      const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)'));
+      const items = getEnabledMenuItems(menu);
+      if (event.key === "Tab") {
+        event.preventDefault();
+        if (items.length === 0) {
+          menu.focus();
+          return;
+        }
+
+        const activeIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+        const nextIndex =
+          activeIndex < 0
+            ? event.shiftKey
+              ? items.length - 1
+              : 0
+            : (activeIndex + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+        items[nextIndex]?.focus();
+        return;
+      }
+
       if (!items.length) return;
-      const activeIndex = Math.max(0, items.indexOf(document.activeElement as HTMLButtonElement));
+      const activeIndex = items.indexOf(document.activeElement as HTMLButtonElement);
       let nextIndex: number;
-      if (event.key === "ArrowDown") nextIndex = (activeIndex + 1) % items.length;
-      else if (event.key === "ArrowUp") nextIndex = (activeIndex - 1 + items.length) % items.length;
+      if (event.key === "ArrowDown") nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % items.length;
+      else if (event.key === "ArrowUp")
+        nextIndex = activeIndex < 0 ? items.length - 1 : (activeIndex - 1 + items.length) % items.length;
       else if (event.key === "Home") nextIndex = 0;
       else if (event.key === "End") nextIndex = items.length - 1;
       else return;
@@ -84,8 +160,9 @@ export function ContextMenu({ x, y, title, ariaLabel, groups, onClose }: Context
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       menuElement?.removeEventListener("keydown", handleKeyDown);
+      restoreFocus(restoreTarget, fallbackTarget);
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
@@ -93,6 +170,7 @@ export function ContextMenu({ x, y, title, ariaLabel, groups, onClose }: Context
       className="moyang-context-menu"
       role="menu"
       aria-label={ariaLabel}
+      tabIndex={-1}
       style={{ left: position.left, top: position.top }}
       onContextMenu={(event) => {
         event.preventDefault();
