@@ -133,7 +133,10 @@ describe("draft recovery", () => {
 
     expect(getDraftSnapshotState(original.path, original.baseSource).snapshot).toEqual(original);
     expect(findDraftSnapshot(original.path, original.baseSource)).toEqual(original);
-    expect(saveDraftSnapshot({ path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 }).snapshots).toEqual([
+    const saveResult = saveDraftSnapshot({ path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 });
+    expect(saveResult.ok).toBe(true);
+    if (!saveResult.ok) throw new Error("expected draft save to succeed");
+    expect(saveResult.snapshots).toEqual([
       { path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 },
       original,
     ]);
