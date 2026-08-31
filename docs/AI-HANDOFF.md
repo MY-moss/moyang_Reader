@@ -4,13 +4,13 @@
 
 ## 当前基线（2026-08-31）
 
-- 最新工程修复分支：`codex/build-cache-stability-2026-08-31`；构建目标统一到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，拒绝仓库内 `CARGO_TARGET_DIR` 覆盖，并让清理器识别旧版按路径分组缓存；本轮不生成安装包或 Release。
-- 当前主线：`main@135d4da7c2225f1097bf288ef30763a82cf916ed`；#172、#357、#358、#375 与 #379 已合并。
+- 最新工程修复：PR #381 已合并；统一构建目标到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，拒绝仓库内 `CARGO_TARGET_DIR` 覆盖，并让清理器识别旧版按路径分组缓存；本轮不生成安装包或 Release。
+- 当前主线：`main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`；#172、#357、#358、#375、#379 与 #381 已合并。
 - 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
 - 上一功能切片：[#374](https://github.com/MY-moss/moyang_Reader/pull/374) 完成 #172，合并提交为 `c187edcf39798b16d9610b5b8fdda6e22532086c`；Issue #172 已关闭。
 - 上一工程切片：[#375](https://github.com/MY-moss/moyang_Reader/pull/375) 完成工作区空间治理，合并提交为 `c3f5c8ce1967f2649a47337ca699aedca48fd1e8`。
 - 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：完成构建缓存稳定性补强后转入 #360，详细契约见 [`NEXT.md`](NEXT.md)。
+- 当前唯一下一步：#360 工作区树操作异步化，详细契约见 [`NEXT.md`](NEXT.md)。
 
 ## v0.11.0 当前顺序
 
@@ -36,6 +36,14 @@
 - 验证：共享缓存路径、仓库内错误覆盖和旧缓存识别的定向测试通过；本轮不创建安装包、Tag、Release 或镜像。
 - 边界：不改变 Markdown、编辑器、用户文档、更新器、签名或发布资产；不顺手处理 #360。
 - 当前状态：代码和文档完成后进入一个 PR；合并后切换 `NEXT.md` 到 #360 并停止。
+
+## 本轮 #381 交接
+
+- PR：[#381](https://github.com/MY-moss/moyang_Reader/pull/381)，已 squash 合并为 `main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`。
+- 目标：把不同副本和 worktree 的 Cargo/Tauri 构建目标收敛到单一应用级缓存，阻止仓库内错误覆盖，并安全识别旧版缓存。
+- 验证：Quality checks run `33354301746` 成功；合并后主线 run `33355176879` 成功；项目内清理器回收约 7.4 MiB，未触碰用户笔记或非项目缓存。
+- 发布：不生成安装包、Tag、Release 或镜像；该工程修复纳入下一稳定 Windows x64 批次。
+- 下一唯一任务：#360；不自动开始其他 Issue。
 
 ## 最近完成
 
