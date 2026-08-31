@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@5f8fba3a37d429aa052add4543832b096ee28da5`，PR #377 已完成 #357，PR #380 已完成 #358，PR #379 与 PR #381 已完成构建缓存稳定性补强，PR #384 已完成 #360，PR #386 已完成 #369，PR #388 已完成 #359；下一项为 #361。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@0f11b602f675e5c5d8a62d27931b6595939f208a5`，PR #377 已完成 #357，PR #380 已完成 #358，PR #379 与 PR #381 已完成构建缓存稳定性补强，PR #384 已完成 #360，PR #386 已完成 #369，PR #388 已完成 #359；#361 正在实现。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -23,7 +23,7 @@
 | 13   | #379     | 构建缓存防膨胀回归修复（已完成，当前补强） | 单一应用级 Cargo target、仓库内覆盖重定向、旧版缓存识别和定向测试通过             |
 | 14   | #369     | 回收站删除与保存上一版本保护（已完成）     | PR #386；Windows 回收站失败边界、`.moyang.bak` 滚动、差异预览恢复和 desktop smoke |
 | 15   | #359     | 撤销历史分组与内存上限（已完成）           | PR #388；400ms 输入分组、100 条/8 MiB 历史预算、跨模式撤销回归和远程门禁通过      |
-| 16   | #361     | 暗色主题 accent 按钮对比度修复（Ready）    | 暗色分支实测 WCAG AA、hover/focus 可读、亮色与 a11y 回归通过                      |
+| 16   | #361     | 暗色主题 accent 按钮对比度修复（实现中）   | 暗色分支实测 WCAG AA、hover/focus 可读、亮色与 a11y 回归通过                      |
 
 ## #369 回收站删除与保存上一版本保护（已完成）
 
@@ -42,16 +42,17 @@
 - 风险：时间窗口是固定体验参数；超大单个快照可能消耗当前文档本身的内存，但历史预算会直接丢弃可回退快照，不影响磁盘内容。回滚为回退本切片提交。
 - 发布：不单独生成安装包、Tag、Release 或镜像；合入后纳入 `v0.11.0` Windows x64 稳定批次。
 
-## #361 暗色主题 accent 按钮对比度修复（Ready）
+## #361 暗色主题 accent 按钮对比度修复（实现中）
 
 - 用户价值：暗色模式下编辑器插入按钮、插入提交按钮和通用主按钮不再出现浅色底白字难以阅读的问题，保持 WCAG AA 可读性。
 - 范围：复用现有暗色令牌或固定深色按钮策略，覆盖自动暗色、显式暗色、hover/focus 和通用 `.toolbar-button.primary`；亮色主题保持现状。
 - 非目标：不重做整个主题、不处理 #362 性能、不引入颜色依赖、不顺手合并 #193 等其他视觉工作。
 - 验收：实际浏览器计算样式下所有受影响状态前景/背景对比达到 4.5:1；亮色、键盘焦点、插入动作、axe critical/serious 和现有浏览器 smoke 不回归。
-- 预计文件与测试：`src/styles.css`、相关前端样式/无障碍测试和必要交接文档；T2，定向测试加一个浏览器 E2E。
+- 预计文件与测试：`src/app/styles.css`、`e2e/a11y.spec.ts` 和必要交接文档；T2，定向测试加一个浏览器 E2E。
 - 版本/回滚：纳入 `v0.11.x`，不单独生成安装包、Tag、Release 或镜像；回退本切片提交即可。
-- 结果：PR [#386](https://github.com/MY-moss/moyang_Reader/pull/386) 已 squash 合并为 `main@7aaf2bffe887ec7967c6b6fb44391fac657acbd7`，Issue [#369](https://github.com/MY-moss/moyang_Reader/issues/369) 已以 `completed` 关闭。
-- 发布：不单独生成安装包或 Release；已纳入 `v0.11.0` 稳定 Windows x64 批次。回滚为回退 PR #386。
+- 当前实现：增加独立实心按钮色令牌；暗色自动/显式主题下受影响按钮的普通、hover 和 focus 状态使用高对比度深色底配白字；Windows 强制高对比度使用系统按钮色；亮色主题保持现状。
+- 本地验证：`npm run build` 一次通过；`e2e/a11y.spec.ts` 7/7、Lint、格式检查和 `git diff --check` 通过；远程 PR 与 Quality checks 尚未创建。
+- 发布：不单独生成安装包、Tag、Release 或镜像；合入后纳入 `v0.11.0` 稳定 Windows x64 批次。回滚为回退本切片提交。
 
 ## #360 工作区树操作异步化（已完成）
 
@@ -59,7 +60,7 @@
 - 实现：`create_markdown_file`、`delete_workspace_entry`、`duplicate_workspace_entry`、`copy_workspace_entry` 和 `move_workspace_entry` 改为 `async fn + run_blocking`；权限校验、返回值、错误文案、监听和右键语义保持不变。
 - 验证：本地工作区树定向测试 3/3、Markdown 文件定向测试 1/1、Rust format、`git diff --check` 通过；远程 Quality checks run `33361212388` 成功，包含 Windows desktop smoke、Rust clippy 和完整 Rust 测试。
 - 发布：PR [#384](https://github.com/MY-moss/moyang_Reader/pull/384) 已 squash 合并为 `main@d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`；Issue [#360](https://github.com/MY-moss/moyang_Reader/issues/360) 已以 `completed` 关闭；不单独生成安装包、Tag、Release 或镜像，纳入下一稳定 Windows x64 批次。
-- 回滚：回退 PR #384；不删除用户文件，不需要数据迁移。下一唯一 READY 事项为 #369。
+- 回滚：回退 PR #384；不删除用户文件，不需要数据迁移。下一唯一事项为 #361。
 
 ## #358 插入浮层跟随光标/视口（已完成）
 
@@ -372,7 +373,7 @@
 
 ## 下一 Ready 选择
 
-- 当前 Ready：#369 回收站删除与保存上一版本保护；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
+- 当前切片：#361 暗色主题 accent 按钮对比度修复；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
 - 发布收尾：如需让静态镜像 workflow 变绿，维护者配置 `CLOUDFLARE_API_TOKEN`（Pages 写入权限）和 `CLOUDFLARE_ACCOUNT_ID` 后重跑 v0.10.10；镜像凭据不写入仓库或交接上下文。
 
 ## 平台范围收敛

@@ -46,6 +46,29 @@ function contrastRatio(foreground: string, background: string): number {
   );
 }
 
+async function expectControlContrast(page: Page, selector: string, label: string): Promise<void> {
+  const colors = await page
+    .locator(selector)
+    .first()
+    .evaluate((element) => {
+      const styles = getComputedStyle(element);
+      const imageColors = styles.backgroundImage.match(/(?:rgba?\([^)]*\)|#[\da-f]{3,8})/gi) ?? [];
+      const solidColor = styles.backgroundColor === "rgba(0, 0, 0, 0)" ? [] : [styles.backgroundColor];
+      return {
+        foreground: styles.color,
+        background: styles.background,
+        backgrounds: [...solidColor, ...imageColors],
+      };
+    });
+
+  expect(colors.backgrounds, `${label} 未解析到背景色：${colors.background}`).not.toHaveLength(0);
+  const ratios = colors.backgrounds.map((background) => contrastRatio(colors.foreground, background));
+  expect(
+    Math.min(...ratios),
+    `${label} 对比度不足：${ratios.map((ratio) => ratio.toFixed(2)).join(", ")}`,
+  ).toBeGreaterThanOrEqual(4.5);
+}
+
 async function switchToRenderedMode(page: Page): Promise<void> {
   const menu = page.locator(".toolbar-overflow");
   if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
@@ -134,6 +157,63 @@ test("keeps light and dark theme tokens at WCAG AA contrast", async ({ page }) =
       const ratio = contrastRatio(tokens[pair.foreground], tokens[pair.background]);
       expect(ratio, `${theme} ${pair.name} 对比度不足：${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
     }
+  }
+});
+
+test("keeps solid accent controls readable in explicit and system dark themes", async ({ page }) => {
+  await loadReaderFixture(page);
+  await page.addStyleTag({
+    content: "*, *::before, *::after { transition: none !important; animation: none !important; }",
+  });
+  await switchToRenderedMode(page);
+  const overflow = page.locator(".toolbar-overflow");
+  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await overflow.getByRole("button", { name: "编辑", exact: true }).click();
+  await expect(page.locator(".editor-toolbar-insert-button")).toBeVisible({ timeout: 15_000 });
+
+  for (const theme of ["explicit", "system"] as const) {
+    if (theme === "explicit") {
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = "dark";
+      });
+    } else {
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.evaluate(() => {
+        document.documentElement.removeAttribute("data-theme");
+      });
+    }
+
+    if ((await overflow.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
+    const insertButton = page.locator(".editor-toolbar-insert-button");
+    const insertSubmit = page.locator(".editor-insert-submit");
+    if (!(await insertSubmit.isVisible())) await insertButton.click();
+    await expect(insertSubmit).toBeVisible();
+
+    for (const [selector, label] of [
+      [".editor-toolbar-insert-button", `${theme} dark 编辑器插入按钮`],
+      [".editor-insert-submit", `${theme} dark 插入提交按钮`],
+    ] as const) {
+      const control = page.locator(selector).first();
+      await expectControlContrast(page, selector, `${label} 普通状态`);
+      await control.hover();
+      await expectControlContrast(page, selector, `${label} 悬停状态`);
+    }
+
+    await page.getByRole("button", { name: "关闭插入面板" }).click();
+    if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+    const primaryButton = page.locator(".toolbar-overflow-settings .toolbar-button.primary").first();
+    await expect(primaryButton).toBeVisible();
+    await expectControlContrast(
+      page,
+      ".toolbar-overflow-settings .toolbar-button.primary",
+      `${theme} dark 通用主按钮普通状态`,
+    );
+    await primaryButton.hover();
+    await expectControlContrast(
+      page,
+      ".toolbar-overflow-settings .toolbar-button.primary",
+      `${theme} dark 通用主按钮悬停状态`,
+    );
   }
 });
 
