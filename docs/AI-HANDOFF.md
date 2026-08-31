@@ -4,12 +4,12 @@
 
 ## 当前基线（2026-08-31）
 
-- 当前主线基线（本切片开始）：`main@28bf09d88f3eb379897c31adbdeda5ef426b2adc`；PR #384、#385、#386、#388、#389、#390、#391 已合并，Issue #360、#359、#361、#369 已以 `completed` 关闭；#362 正在本切片完成。
-- 最新完成切片：PR #390 完成 #361——暗色主题实心 accent 按钮对比度修复；保持 Windows x64、本地优先和 Markdown 真源边界。
-- Quality checks：run `33392327386` 成功；前端 lint/构建、浏览器与无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
+- 当前主线基线（本轮完成后）：`main@c936666043d32ed1a4a1eec9312684994636034a`；PR #384、#385、#386、#388、#389、#390、#391、#392 已合并，Issue #360、#359、#361、#362、#369 已以 `completed` 关闭。
+- 最新完成切片：PR #392 完成 #362——面板拖动、草稿解析和差异计算微成本优化；保持 Windows x64、本地优先和 Markdown 真源边界。
+- Quality checks：run `33403555956` 成功；Frontend build、浏览器/无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前切片：#362 交互与渲染微成本包；分支为 `codex/perf-micro-cost-2026-08-31`，完成 PR、Issue 状态和交接同步后停止，不自动开启下一项。
-- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361 和 #369 纳入下一稳定 Windows x64 批次。
+- 当前唯一下一项：#367 文档级跳转历史与返回上一文档；详细 READY 契约见 [`NEXT.md`](NEXT.md)，完成后停止，不自动开启下一项。
+- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361、#362 和 #369 纳入下一稳定 Windows x64 批次。
 - 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 ## v0.11.0 当前顺序
@@ -32,14 +32,23 @@
 - 发布：本切片属于 `v0.11.x` 普通视觉修复，不单独生成安装包、Tag、Release 或镜像；纳入下一 Windows x64 稳定批次。
 - 回滚：回退本切片提交，无数据迁移。
 
-## 本轮 #362 交互与渲染微成本包（实现完成，待 PR）
+## 本轮 #362 交互与渲染微成本包（已合并）
 
 - 目标：降低面板拖动期间的全 App 重渲染与重复持久化，减少草稿链路重复全量 parse，并避免差异弹层在无输入变化时重算全文 diff。
 - 非目标：不改变面板、草稿和差异语义；不引入专用数据库，不改 Markdown 真源，不顺手扩展其他性能或 UI Issue。
 - 预计范围：`src/app/PaneResizeHandle.tsx`、`src/app/App.tsx`、`src/app/draft-recovery.ts`、`src/app/components/DraftRecoveryComparisonDialog.tsx` 及对应测试；先测量再最小拆分。
 - 实现：拖动期间只更新 app-shell CSS 变量，pointerup/cancel/lost-capture 才提交 React 状态和持久化；草稿存储按原始序列化内容复用解析结果，保存结果直接携带最新快照列表，查找与列表加载共用一次读取；差异计算按来源、状态和草稿内容 memo。
-- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针在查找与保存链路中仅执行 1 次。
-- 验证/发布：T2，相关单测或性能探针、前端 lint/format/build 和一个浏览器 E2E；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
+- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、一次生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针在查找与保存链路中仅执行 1 次。
+- PR：[#392](https://github.com/MY-moss/moyang_Reader/pull/392) 已 squash 合并为 `main@c936666043d32ed1a4a1eec9312684994636034a`；Issue #362 已以 `completed` 关闭。
+- 远程验证：Quality checks run `33403555956` 重跑成功；首轮桌面性能基准的单次 318.5ms 抖动未重现，Windows desktop smoke、依赖审计、发布检查和 Rust 门禁均通过。
+- 验证/发布：T2；不单独生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` Windows x64 稳定批次；回退 PR #392，无数据迁移。
+
+## 下一唯一任务 #367 文档级跳转历史与返回上一文档
+
+- 状态：Ready 候选；Should / P2；T2；计划 `v0.11.x`。
+- 目标：会话内记录跨文档访问栈，沿双链或本地链接跳转后可从命令面板返回来源文档；默认快捷键 `Ctrl+Alt+←`。
+- 边界：最多 50 项，连续重复去重；不持久化、不新增前进按钮 UI、不改变标签页策略；重载、关闭标签和草稿恢复不入栈。
+- 验收：A→B→C 两次返回 A，内容和阅读位置正确；未保存保护、命令键盘导航和一个浏览器 E2E 不回归。实现前重新检查 Issues/PR，并从最新 `main` 建项目内 worktree。
 
 ## 本轮 #359 交接（已合并）
 
