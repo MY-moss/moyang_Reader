@@ -39,20 +39,28 @@ test("only accepts one direct child of the managed worktree root", () => {
 
 test("collects known generated paths but does not follow links", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-cleanup-"));
+  const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-cleanup-cache-"));
+  const previousCacheRoot = process.env.MOYANG_BUILD_CACHE_DIR;
   const worktree = path.join(root, ".codex-worktrees", "feature");
-  fs.mkdirSync(path.join(worktree, "dist"), { recursive: true });
-  fs.writeFileSync(path.join(worktree, "dist", "bundle.js"), "bundle");
-  fs.mkdirSync(path.join(root, "src-tauri", "target"), { recursive: true });
-  fs.writeFileSync(path.join(root, "src-tauri", "target", "debug.bin"), "debug");
+  process.env.MOYANG_BUILD_CACHE_DIR = cacheRoot;
+  try {
+    fs.mkdirSync(path.join(worktree, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(worktree, "dist", "bundle.js"), "bundle");
+    fs.mkdirSync(path.join(root, "src-tauri", "target"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src-tauri", "target", "debug.bin"), "debug");
 
-  const artifacts = collectGeneratedArtifacts(root, [{ path: worktree }]);
-  assert.deepEqual(
-    artifacts.map((artifact) => path.relative(root, artifact.path).split(path.sep).join("/")).sort(),
-    [".codex-worktrees/feature/dist", "src-tauri/target"].sort(),
-  );
-  assert.equal(findReparsePoints(worktree).length, 0);
-
-  fs.rmSync(root, { recursive: true, force: true });
+    const artifacts = collectGeneratedArtifacts(root, [{ path: worktree }]);
+    assert.deepEqual(
+      artifacts.map((artifact) => path.relative(root, artifact.path).split(path.sep).join("/")).sort(),
+      [".codex-worktrees/feature/dist", "src-tauri/target"].sort(),
+    );
+    assert.equal(findReparsePoints(worktree).length, 0);
+  } finally {
+    if (previousCacheRoot === undefined) delete process.env.MOYANG_BUILD_CACHE_DIR;
+    else process.env.MOYANG_BUILD_CACHE_DIR = previousCacheRoot;
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+  }
 });
 
 test("collects legacy path-keyed Cargo caches but ignores unrelated cache folders", () => {

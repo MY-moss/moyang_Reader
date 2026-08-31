@@ -31,7 +31,7 @@ custom-protocol = ["tauri/custom-protocol"]
 wdio = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell"] }
 
 [dependencies.tauri-plugin-wdio-webdriver]
 version = "1.3"

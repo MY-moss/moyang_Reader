@@ -634,6 +634,12 @@ describe("Moyang Reader desktop runtime", () => {
     await browser.execute(() => window.localStorage.clear());
     await browser.refresh();
 
+    const initialSource = fs.readFileSync(documentPath, "utf8");
+    const initialMarker =
+      initialSource
+        .split(/\r?\n/)
+        .find((line) => line.trim())
+        ?.trim() ?? "";
     const title = await browser.$(".document-title");
     await title.waitForDisplayed();
     await browser.waitUntil(async () => /desktop-e2e\.md/.test(await title.getText()), {
@@ -682,6 +688,42 @@ describe("Moyang Reader desktop runtime", () => {
     });
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
+
+    const previousVersionPath = path.join(path.dirname(documentPath), ".desktop-e2e.md.moyang.bak");
+    await browser.waitUntil(() => fs.existsSync(previousVersionPath), {
+      timeout: 15_000,
+      timeoutMsg: "the latest-save backup was not created by the real Tauri write command",
+    });
+    assert.equal(fs.readFileSync(previousVersionPath, "utf8"), initialSource);
+
+    const previousVersionNotice = await browser.$(".previous-version-notice");
+    await browser.waitUntil(() => previousVersionNotice.isDisplayed(), {
+      timeout: 15_000,
+      timeoutMsg: "the previous-save recovery notice did not appear after saving",
+    });
+    await previousVersionNotice.$('[data-testid="previous-version-preview"]').click();
+
+    const previousVersionDialog = await browser.$('[role="dialog"][aria-labelledby="draft-comparison-title"]');
+    await previousVersionDialog.waitForDisplayed();
+    await browser.waitUntil(() => previousVersionDialog.getText().then((value) => value.includes("上次保存版本")), {
+      timeout: 5_000,
+      timeoutMsg: "the previous-save comparison dialog did not identify its recovery source",
+    });
+    const restorePreviousButton = await previousVersionDialog.$('[data-testid="draft-comparison-action"]');
+    await restorePreviousButton.waitForEnabled();
+    await restorePreviousButton.click();
+
+    const restoredEditor = await browser.$('[aria-label="Markdown 源文本"]');
+    await restoredEditor.waitForDisplayed();
+    await browser.waitUntil(() => restoredEditor.getText().then((value) => value.includes(initialMarker)), {
+      timeout: 5_000,
+      timeoutMsg: "restoring the previous-save version did not update the source editor",
+    });
+    await clickToolbarAction("保存");
+    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8") === initialSource, {
+      timeout: 15_000,
+      timeoutMsg: "saving the restored previous version did not update the fixture",
+    });
   });
 
   it("shows native drag feedback and opens a dropped Markdown file", async () => {

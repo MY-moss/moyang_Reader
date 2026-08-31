@@ -19,7 +19,12 @@ import { ContextPanel } from "./components/ContextPanel";
 import { FileDropOverlay } from "./components/FileDropOverlay";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
-import { DraftRecoveryComparisonDialog } from "./components/DraftRecoveryComparisonDialog";
+import {
+  DraftRecoveryComparisonDialog,
+  type RecoveryKind,
+  type RecoverySnapshot,
+} from "./components/DraftRecoveryComparisonDialog";
+import { PreviousVersionNotice } from "./components/PreviousVersionNotice";
 import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
 import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
@@ -71,6 +76,7 @@ import {
   revealWorkspaceEntry,
   readBinaryFile,
   readAppSettings,
+  readPreviousVersion,
   readTextFile,
   refreshWorkspace,
   resolveOpenPaths,
@@ -503,7 +509,7 @@ type CachedWorkspace = {
 type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
 
 type DraftComparisonRequest = {
-  snapshot: DraftSnapshot;
+  snapshot: RecoverySnapshot;
   comparisonSource: string | null;
   comparisonLabel: string;
   comparisonIsCurrent: boolean;
@@ -512,6 +518,7 @@ type DraftComparisonRequest = {
   currentDocumentModified: boolean;
   isCurrentDocument: boolean;
   sourceChangedSinceDraft: boolean;
+  recoveryKind: RecoveryKind;
 };
 
 type OpenPathsOutcome = {
@@ -633,6 +640,7 @@ export function App() {
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [previousVersion, setPreviousVersion] = useState<{ path: string; source: string } | null>(null);
   const [draftComparison, setDraftComparison] = useState<DraftComparisonRequest | null>(null);
   const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
@@ -697,6 +705,7 @@ export function App() {
   const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
   const draftComparisonRequestIdRef = useRef(0);
+  const previousVersionRequestIdRef = useRef(0);
   const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
   const renderedHtml = documentState?.rendered.html ?? "";
   const progressiveReaderReady =
@@ -2091,6 +2100,7 @@ export function App() {
         sourceDraftRef.current = source;
         resetEditorHistory(path, source);
         setDraftRecovery(findDraftSnapshot(path, source));
+        setPreviousVersion(null);
         setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
@@ -2177,6 +2187,7 @@ export function App() {
         sourceDraftRef.current = "";
         resetEditorHistory(path, "");
         setDraftRecovery(null);
+        setPreviousVersion(null);
         setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
@@ -2596,8 +2607,8 @@ export function App() {
       const label = fileNameFromPath(entryPath);
       const message =
         kind === "folder"
-          ? `确定删除文件夹“${label}”及其中的全部内容吗？此操作无法撤销。`
-          : `确定删除文件“${label}”吗？此操作无法撤销。`;
+          ? `确定将文件夹“${label}”及其中的全部内容移入 Windows 回收站吗？`
+          : `确定将文件“${label}”移入 Windows 回收站吗？`;
       if (!window.confirm(message)) return;
 
       const current = documentStateRef.current;
@@ -2654,7 +2665,7 @@ export function App() {
         }
 
         await refreshWorkspaceChanges(root, [oldAbsolutePath]);
-        notify(`已删除${kind === "folder" ? "文件夹及其内容" : "文件"}：${label}`);
+        notify(`已移入 Windows 回收站：${kind === "folder" ? "文件夹及其内容" : "文件"} ${label}`);
         if (!nextTabFailed) setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
@@ -3492,6 +3503,33 @@ export function App() {
     handleDraftSaveResult,
   ]);
 
+  useEffect(() => {
+    const current = documentStateRef.current;
+    const requestId = ++previousVersionRequestIdRef.current;
+    if (!current || !isEditableDocument(current.kind) || current.path.startsWith("browser://") || !isTauriRuntime()) {
+      setPreviousVersion(null);
+      return;
+    }
+
+    let active = true;
+    void readPreviousVersion(current.path)
+      .then((source) => {
+        if (!active || requestId !== previousVersionRequestIdRef.current) return;
+        if (!source || areDraftSourcesEquivalent(current.source, source)) {
+          setPreviousVersion(null);
+          return;
+        }
+        setPreviousVersion({ path: current.path, source });
+      })
+      .catch(() => {
+        if (active && requestId === previousVersionRequestIdRef.current) setPreviousVersion(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [documentState?.kind, documentState?.path, documentState?.source]);
+
   const recoverDraft = useCallback(() => {
     if (!draftRecovery || !isSameDocumentPath(documentStateRef.current?.path ?? "", draftRecovery.path)) return;
     updateSource(draftRecovery.draft);
@@ -3500,7 +3538,7 @@ export function App() {
   }, [draftRecovery, updateSource]);
 
   const prepareDraftComparison = useCallback(
-    async (snapshot: DraftSnapshot, current: OpenDocument | null, isCurrentDocument: boolean) => {
+    async (snapshot: RecoverySnapshot, current: OpenDocument | null, isCurrentDocument: boolean) => {
       const requestId = draftComparisonRequestIdRef.current + 1;
       draftComparisonRequestIdRef.current = requestId;
       const currentDocumentModified = Boolean(isCurrentDocument && current?.modified);
@@ -3518,6 +3556,7 @@ export function App() {
           currentDocumentModified,
           isCurrentDocument,
           sourceChangedSinceDraft: !areDraftSourcesEquivalent(comparisonSource, snapshot.baseSource),
+          recoveryKind: "draft",
         });
         return;
       }
@@ -3532,6 +3571,7 @@ export function App() {
         currentDocumentModified,
         isCurrentDocument,
         sourceChangedSinceDraft: false,
+        recoveryKind: "draft",
       });
 
       try {
@@ -3553,6 +3593,7 @@ export function App() {
           currentDocumentModified,
           isCurrentDocument,
           sourceChangedSinceDraft: !areDraftSourcesEquivalent(comparisonSource, snapshot.baseSource),
+          recoveryKind: "draft",
         });
       } catch (cause) {
         if (draftComparisonRequestIdRef.current !== requestId) return;
@@ -3566,6 +3607,63 @@ export function App() {
           currentDocumentModified,
           isCurrentDocument,
           sourceChangedSinceDraft: false,
+          recoveryKind: "draft",
+        });
+      }
+    },
+    [],
+  );
+
+  const preparePreviousVersionComparison = useCallback(
+    async (snapshot: RecoverySnapshot, current: OpenDocument | null) => {
+      const requestId = draftComparisonRequestIdRef.current + 1;
+      draftComparisonRequestIdRef.current = requestId;
+      const currentDocumentModified = Boolean(current?.modified);
+
+      if (!current || !isTauriRuntime() || current.path.startsWith("browser://")) return;
+
+      setDraftComparison({
+        snapshot,
+        comparisonSource: null,
+        comparisonLabel: "当前磁盘版本",
+        comparisonIsCurrent: true,
+        comparisonStatus: "loading",
+        comparisonError: null,
+        currentDocumentModified,
+        isCurrentDocument: true,
+        sourceChangedSinceDraft: false,
+        recoveryKind: "previous-save",
+      });
+
+      try {
+        const comparisonSource = await readTextFile(current.path);
+        if (draftComparisonRequestIdRef.current !== requestId) return;
+
+        setDraftComparison({
+          snapshot: { ...snapshot, baseSource: comparisonSource },
+          comparisonSource,
+          comparisonLabel: "当前磁盘版本",
+          comparisonIsCurrent: true,
+          comparisonStatus: "ready",
+          comparisonError: null,
+          currentDocumentModified,
+          isCurrentDocument: true,
+          sourceChangedSinceDraft: false,
+          recoveryKind: "previous-save",
+        });
+      } catch (cause) {
+        if (draftComparisonRequestIdRef.current !== requestId) return;
+        setDraftComparison({
+          snapshot,
+          comparisonSource: null,
+          comparisonLabel: "当前磁盘版本",
+          comparisonIsCurrent: true,
+          comparisonStatus: "unavailable",
+          comparisonError: cause instanceof Error ? cause.message : "当前文件不可访问，请确认文件仍存在且有读取权限。",
+          currentDocumentModified,
+          isCurrentDocument: true,
+          sourceChangedSinceDraft: false,
+          recoveryKind: "previous-save",
         });
       }
     },
@@ -3579,6 +3677,21 @@ export function App() {
 
     void prepareDraftComparison(snapshot, current, true);
   }, [draftRecovery, prepareDraftComparison]);
+
+  const previewPreviousVersion = useCallback(() => {
+    const candidate = previousVersion;
+    const current = documentStateRef.current;
+    if (!candidate || !current || !isSameDocumentPath(current.path, candidate.path)) return;
+
+    void preparePreviousVersionComparison(
+      {
+        path: candidate.path,
+        draft: candidate.source,
+        baseSource: current.source,
+      },
+      current,
+    );
+  }, [preparePreviousVersionComparison, previousVersion]);
 
   const previewDraftSnapshot = useCallback(
     (path: string) => {
@@ -3603,8 +3716,12 @@ export function App() {
     if (!request) return;
     const current = documentStateRef.current;
     const isCurrentDocument = Boolean(current && isSameDocumentPath(current.path, request.snapshot.path));
+    if (request.recoveryKind === "previous-save") {
+      if (isCurrentDocument) void preparePreviousVersionComparison(request.snapshot, current);
+      return;
+    }
     void prepareDraftComparison(request.snapshot, current, isCurrentDocument);
-  }, [draftComparison, prepareDraftComparison]);
+  }, [draftComparison, prepareDraftComparison, preparePreviousVersionComparison]);
 
   const discardDraft = useCallback(() => {
     if (draftRecovery) setDraftDiscardRequest({ path: draftRecovery.path, fromCenter: false });
@@ -3636,11 +3753,17 @@ export function App() {
 
     closeDraftComparison();
     if (request.isCurrentDocument) {
+      if (request.recoveryKind === "previous-save") {
+        updateSource(request.snapshot.draft);
+        setPreviousVersion(null);
+        setMode("source");
+        return;
+      }
       recoverDraft();
       return;
     }
     void openDraftSnapshot(request.snapshot.path);
-  }, [closeDraftComparison, draftComparison, openDraftSnapshot, recoverDraft]);
+  }, [closeDraftComparison, draftComparison, openDraftSnapshot, recoverDraft, updateSource]);
 
   const requestDraftDiscardByPath = useCallback((path: string) => {
     setDraftRecoveryOpen(false);
@@ -5124,6 +5247,8 @@ export function App() {
         onQuickOpen={() => setQuickOpen(true)}
         draftCount={draftSnapshots.length}
         onOpenRecovery={() => setDraftRecoveryOpen(true)}
+        previousVersionAvailable={Boolean(previousVersion)}
+        onOpenPreviousVersion={previewPreviousVersion}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
         focusMode={focusMode}
@@ -5336,6 +5461,15 @@ export function App() {
               onPreview={previewCurrentDraft}
               onLater={deferDraftRecovery}
               onDiscard={discardDraft}
+            />
+          )}
+          {previousVersion && isSameDocumentPath(documentState?.path ?? "", previousVersion.path) && (
+            <PreviousVersionNotice
+              path={previousVersion.path}
+              currentSource={documentState?.source ?? ""}
+              previousSource={previousVersion.source}
+              onPreview={previewPreviousVersion}
+              onDismiss={() => setPreviousVersion(null)}
             />
           )}
           {error && (
@@ -5594,6 +5728,7 @@ export function App() {
           onAction={handleDraftComparisonAction}
           onRetry={retryDraftComparison}
           onClose={closeDraftComparison}
+          recoveryKind={draftComparison.recoveryKind}
         />
       )}
       {draftDiscardRequest && (

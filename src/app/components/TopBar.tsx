@@ -43,6 +43,8 @@ type TopBarProps = {
   workspaceLimitReached: boolean;
   draftCount: number;
   onOpenRecovery: () => void;
+  previousVersionAvailable: boolean;
+  onOpenPreviousVersion: () => void;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   focusMode: boolean;
@@ -117,6 +119,8 @@ export function TopBar({
   workspaceLimitReached,
   draftCount,
   onOpenRecovery,
+  previousVersionAvailable,
+  onOpenPreviousVersion,
   sidebarCollapsed,
   onToggleSidebar,
   focusMode,
@@ -437,6 +441,19 @@ export function TopBar({
                 {draftCount > 0 && (
                   <button type="button" className="toolbar-button recovery-button" onClick={onOpenRecovery}>
                     {t("action.drafts")} {draftCount}
+                  </button>
+                )}
+                {previousVersionAvailable && (
+                  <button
+                    type="button"
+                    className="toolbar-button recovery-button"
+                    onClick={() => {
+                      dismissTopbarOverlays();
+                      onOpenPreviousVersion();
+                    }}
+                    title="查看并恢复上一保存版本"
+                  >
+                    恢复上一版
                   </button>
                 )}
                 <button

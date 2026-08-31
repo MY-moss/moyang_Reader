@@ -200,4 +200,40 @@ describe("DraftRecoveryComparisonDialog", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("labels a disk backup as the previous saved version", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <DraftRecoveryComparisonDialog
+          snapshot={{
+            path: "C:/Notes/note.md",
+            draft: "# Note\n\n上一版内容",
+            baseSource: "# Note\n\n当前内容",
+          }}
+          comparisonSource="# Note\n\n当前内容"
+          comparisonLabel="当前磁盘版本"
+          comparisonIsCurrent
+          comparisonStatus="ready"
+          comparisonError={null}
+          currentDocumentModified={false}
+          sourceChangedSinceDraft={false}
+          actionLabel="恢复到编辑区"
+          recoveryKind="previous-save"
+          onAction={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("上次保存版本");
+    expect(container.textContent).toContain("可以回到上一保存版本");
+    expect(container.textContent).toContain("保存前保留的本机版本");
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });

@@ -3,8 +3,11 @@ import { buildDraftComparison, type DraftDiffLine } from "../draft-recovery-diff
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
 import { useModalBehavior } from "./useModalBehavior";
 
+export type RecoveryKind = "draft" | "previous-save";
+export type RecoverySnapshot = Omit<DraftSnapshot, "savedAt"> & { savedAt?: number };
+
 type DraftRecoveryComparisonDialogProps = {
-  snapshot: DraftSnapshot;
+  snapshot: RecoverySnapshot;
   comparisonSource: string | null;
   comparisonLabel: string;
   comparisonIsCurrent: boolean;
@@ -16,6 +19,7 @@ type DraftRecoveryComparisonDialogProps = {
   onAction: () => void;
   onRetry?: () => void;
   onClose: () => void;
+  recoveryKind?: RecoveryKind;
 };
 
 function fileName(path: string): string {
@@ -38,6 +42,8 @@ function recoveryDecision(
   comparisonStatus: DraftRecoveryComparisonDialogProps["comparisonStatus"],
   comparisonIsCurrent: boolean,
   sourceChangedSinceDraft: boolean,
+  recoveryKind: RecoveryKind,
+  candidateLabel: string,
 ): { tone: "neutral" | "ready" | "warning"; title: string; description: string } {
   if (comparisonStatus === "loading") {
     return {
@@ -50,24 +56,24 @@ function recoveryDecision(
     return {
       tone: "warning",
       title: "无法判断是否需要恢复",
-      description: "当前文件无法读取，暂时不能可靠比较，也不会直接恢复草稿。",
+      description: `当前文件无法读取，暂时不能可靠比较，也不会直接恢复${candidateLabel}。`,
     };
   }
   if (!comparisonIsCurrent) {
     return {
       tone: "warning",
       title: "还需要核对当前文件",
-      description: "这里只能与草稿保存时的原文比较；打开当前文件后再决定是否恢复。",
+      description: `这里只能与${candidateLabel}保存时的原文比较；打开当前文件后再决定是否恢复。`,
     };
   }
   if (!comparison.hasChanges) {
     return {
       tone: "neutral",
       title: "无需恢复",
-      description: "草稿与当前版本内容相同，不需要恢复。",
+      description: `${candidateLabel}与当前版本内容相同，不需要恢复。`,
     };
   }
-  if (sourceChangedSinceDraft) {
+  if (sourceChangedSinceDraft && recoveryKind === "draft") {
     return {
       tone: "warning",
       title: "建议先核对",
@@ -76,8 +82,11 @@ function recoveryDecision(
   }
   return {
     tone: "ready",
-    title: "存在未保存内容",
-    description: "如果这些内容需要保留，可以恢复到编辑区；点击“保存”后才会写回原文件。",
+    title: recoveryKind === "previous-save" ? "可以回到上一保存版本" : "存在未保存内容",
+    description:
+      recoveryKind === "previous-save"
+        ? "如果需要回到上一版，可以恢复到编辑区；点击“保存”后才会写回原文件。"
+        : "如果这些内容需要保留，可以恢复到编辑区；点击“保存”后才会写回原文件。",
   };
 }
 
@@ -94,14 +103,28 @@ export function DraftRecoveryComparisonDialog({
   onAction,
   onRetry,
   onClose,
+  recoveryKind = "draft",
 }: DraftRecoveryComparisonDialogProps) {
+  const candidateLabel = recoveryKind === "previous-save" ? "上次保存版本" : "草稿";
+  const candidateDescription = recoveryKind === "previous-save" ? "保存前保留的本机版本" : "保存在本机的未保存快照";
+  const candidateDetail =
+    recoveryKind === "previous-save"
+      ? "文件保存前的本机备份"
+      : `本机恢复快照 · ${snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt) : "未知时间"}`;
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const comparison =
     comparisonStatus === "ready" && comparisonSource !== null
       ? buildDraftComparison(comparisonSource, snapshot.draft)
       : null;
-  const decision = recoveryDecision(comparison, comparisonStatus, comparisonIsCurrent, sourceChangedSinceDraft);
+  const decision = recoveryDecision(
+    comparison,
+    comparisonStatus,
+    comparisonIsCurrent,
+    sourceChangedSinceDraft,
+    recoveryKind,
+    candidateLabel,
+  );
 
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
 
@@ -129,7 +152,7 @@ export function DraftRecoveryComparisonDialog({
             type="button"
             className="quiet-button"
             onClick={onClose}
-            aria-label="关闭草稿差异"
+            aria-label={`关闭${candidateLabel}差异`}
           >
             关闭
           </button>
@@ -137,19 +160,19 @@ export function DraftRecoveryComparisonDialog({
 
         <div className="draft-comparison-body">
           <p id="draft-comparison-description" className="draft-comparison-intro">
-            <strong>当前版本</strong>是此刻可读取的文件内容，<strong>草稿</strong>是保存在本机的未保存快照。
+            <strong>当前版本</strong>是此刻可读取的文件内容，<strong>{candidateLabel}</strong>是{candidateDescription}。
             当前比较基线：<strong>{comparisonLabel}</strong>
             。恢复只会替换当前编辑区，确认后仍需点击“保存”才会写回原文件。
           </p>
 
-          <div className="draft-comparison-sources" aria-label="当前版本与草稿来源">
+          <div className="draft-comparison-sources" aria-label={`当前版本与${candidateLabel}来源`}>
             <div className="draft-comparison-source current">
               <strong>当前版本</strong>
               <span>{comparisonLabel}</span>
             </div>
             <div className="draft-comparison-source draft">
-              <strong>草稿</strong>
-              <span>本机恢复快照 · {formatDraftRecoveryTime(snapshot.savedAt)}</span>
+              <strong>{candidateLabel}</strong>
+              <span>{candidateDetail}</span>
             </div>
           </div>
 
@@ -158,13 +181,13 @@ export function DraftRecoveryComparisonDialog({
               <b className="removed" aria-hidden="true">
                 −
               </b>
-              当前版本有、草稿中移除
+              当前版本有、{candidateLabel}中移除
             </span>
             <span>
               <b className="added" aria-hidden="true">
                 +
               </b>
-              草稿新增
+              {candidateLabel}新增
             </span>
           </div>
 
@@ -174,13 +197,13 @@ export function DraftRecoveryComparisonDialog({
           </div>
 
           {comparison && (
-            <div className="draft-comparison-stats" aria-label="草稿变更摘要">
+            <div className="draft-comparison-stats" aria-label={`${candidateLabel}变更摘要`}>
               <div>
                 <span>{comparisonIsCurrent ? "当前版本行" : "比较基线行"}</span>
                 <strong>{comparison.baselineLineCount}</strong>
               </div>
               <div>
-                <span>草稿行</span>
+                <span>{candidateLabel}行</span>
                 <strong>{comparison.draftLineCount}</strong>
               </div>
               <div>
@@ -200,8 +223,10 @@ export function DraftRecoveryComparisonDialog({
                 <strong>{comparison.changeHunkCount}</strong>
               </div>
               <div>
-                <span>草稿保存</span>
-                <strong>{formatDraftRecoveryTime(snapshot.savedAt)}</strong>
+                <span>{recoveryKind === "previous-save" ? "备份来源" : "草稿保存"}</span>
+                <strong>
+                  {recoveryKind === "previous-save" ? "保存前" : candidateDetail.replace("本机恢复快照 · ", "")}
+                </strong>
               </div>
             </div>
           )}
@@ -228,20 +253,20 @@ export function DraftRecoveryComparisonDialog({
               当前编辑区还有未保存修改；恢复会替换这些修改，但不会自动覆盖磁盘文件。
             </div>
           )}
-          {sourceChangedSinceDraft && comparisonIsCurrent && (
+          {sourceChangedSinceDraft && recoveryKind === "draft" && comparisonIsCurrent && (
             <div className="draft-comparison-warning" role="note">
               原文件在草稿保存后又发生过变化，以上差异已按当前磁盘版本计算。
             </div>
           )}
           {comparisonStatus === "ready" && !comparisonIsCurrent && (
             <div className="draft-comparison-warning" role="note">
-              当前文件尚未在这里读取；以上内容只与草稿保存时的原文比较，不能代表此刻磁盘文件的完整差异。
+              当前文件尚未在这里读取；以上内容只与{candidateLabel}保存时的原文比较，不能代表此刻磁盘文件的完整差异。
             </div>
           )}
 
           {comparison && (
             <>
-              <div className="draft-comparison-preview" aria-label="草稿差异预览">
+              <div className="draft-comparison-preview" aria-label={`${candidateLabel}差异预览`}>
                 {comparison.preview.length > 0 ? (
                   comparison.preview.map((line, index) => (
                     <div
@@ -258,7 +283,7 @@ export function DraftRecoveryComparisonDialog({
                     </div>
                   ))
                 ) : (
-                  <div className="draft-comparison-empty">当前版本与草稿没有可见差异，不需要恢复。</div>
+                  <div className="draft-comparison-empty">当前版本与{candidateLabel}没有可见差异，不需要恢复。</div>
                 )}
               </div>
               {comparison.truncated && (
