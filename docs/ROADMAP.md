@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 13408)
-Total output lines: 388
-
 # Moyang Reader 版本路线
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
@@ -180,7 +177,45 @@ Total output lines: 388
 ## #189 TypeScript/Rust 质量门禁首个垂直切片（已完成，2026-08-30）
 
 - 目标：把已量化通过的 TypeScript/ESLint 约束和 Rust 最低版本约束固化为可持续门禁，降低后续 AI/贡献者引入回归的概率。
-- 已实现：ESLint 将显式 `any` 与未使用变量设为阻断错误；`src` 启用类型感知 `no-floating-promises`、`await-thenable` 和 `no-misused-promises`；应用与 Node tsconfig 启用未使用、`switch` 穿透和模块语义约束；Cargo 声明 `rust-version = "1.88"`；Windows CI 在 Rust 编译门禁前输出并验证工具链兼容…1408 tokens truncated…新建、复制/剪切/粘贴、重命名、删除、属性、路径和刷新操作保持不变。
+- 已实现：ESLint 将显式 `any` 与未使用变量设为阻断错误；`src` 启用类型感知 `no-floating-promises`、`await-thenable` 和 `no-misused-promises`；应用与 Node tsconfig 启用未使用、`switch` 穿透和模块语义约束；Cargo 声明 `rust-version = "1.88"`；Windows CI 在 Rust 编译门禁前输出并验证工具链兼容性。
+- 基线：现有代码显式 `any` 为 0、ESLint warning/error 为 0；严格 TypeScript 试运行无错误；Windows 依赖解析最高 Rust 要求为 1.88。以上是配置切片基线，不表示所有未来依赖都永久保持该版本。
+- 验收：首次类型感知 lint 暴露 13 处测试 Promise fallout，均已修复；3/3 规则探针和脚本边界探针通过；本地 ESLint、TypeScript build、全量前端测试、Cargo metadata/fmt/clippy/test、发布预检和后续完整 PR Quality checks 通过；CI 兼容性步骤不新增重复编译。
+- 非目标：不启用所有高噪声实验规则，不大范围重构业务代码，不改变用户可见功能，不处理 Actions SHA、签名、更新器或 Release。
+- 状态：本切片完成后 #189 标记 completed；后续更高噪声类型规则或更细的 Rust 工具链固定另开独立切片；本切片不创建安装包或 Release。
+
+## v0.10.13 发布记录（2026-08-29）
+
+- GitHub Release：[v0.10.13](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.13) 已公开，tag 指向 `main@5c016e2ddf71c589de3191383b3595af4c6e7705`。
+- Windows x64 安装包：`Moyang.Reader_0.10.13_x64-setup.exe`，5,046,081 字节，SHA-256 `2bd6097e9952e7c6c74365a4a1751290470586a16e28b54df8e4a994b642782f`。
+- 签名文件：`Moyang.Reader_0.10.13_x64-setup.exe.sig`，428 字节，SHA-256 `7b031ce4636b48d1774d118c4a6b2cbcff716bccb4038a07d072ff760088482c`。
+- `latest.json` 版本为 `0.10.13`，包含 Windows x64/NSIS 签名更新入口；GitHub Release、Cloudflare Pages 的 manifest、安装包和签名均已公开可访问。
+- Cloudflare 镜像安装包与签名均 HTTP 200，大小和 SHA-256 与 GitHub Release 一致；Release workflow run `33245475550` 的自动镜像 job 仍因 Cloudflare Actions Secret 缺失失败，不能把自动同步门禁记为全绿。本轮没有上传任何凭据。
+- 合并后的 main Quality checks run `33245189679`、Rust dependency audit run `33245189698` 均成功；Release Windows 构建与发布 job 成功。真实旧版本安装/更新闭环继续由 #241 跟踪。
+
+## v0.10.12 稳定发布结果（2026-08-29）
+
+- PR #305（#169 大工作区边界与文件树虚拟化）和版本 PR #306 已合并，`v0.10.12` tag 指向 `main@0e8d0bf6b14753953c9b988f07c2ddc08e5476d6`。
+- GitHub Release [v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 的 Windows 构建/发布 job 成功；安装包 4,976,921 字节，SHA-256 `de577b06d78eabc837df87da4e20ab5f127c8ddcd15fcd8d62e1f4ac558d8e74`；`.sig` 428 字节，SHA-256 `fcedb0c65194abb42838ba079458506e98b5e6fbeb2207309108b7b36bdec65d`。
+- Cloudflare Pages manifest 已返回 `0.10.12`，镜像安装包和签名可访问且哈希与 GitHub 一致；Release 镜像 job `98973037391` 仍因缺少 Cloudflare Actions Secrets 失败，不能记录为自动同步全绿。
+- PR #307 已合并并通过 Quality checks run `33209526541`，加固 Windows PDF 导出在高负载下的异步落盘等待；#241 继续保持 open，直到自动镜像链路完成独立验收。
+- PR #309 已合并为 `main@feb43b1f78500da6e9f9359bf694d6c7c44e7b8f`，Quality checks run `33213057443` 全绿；#168 已完成并关闭，长文档滚动阅读轨道性能修复暂不单独生成安装包。
+- PR #311 已 squash 合并为 `main@51e432e19dc76f0d701bd747050c5a589fa017d3`，Quality checks run `33216115439` 全绿；#181 已完成并关闭，出链索引和 SourceEditor 输入同步性能修复暂不单独生成安装包。
+- PR #313 已 squash 合并为 `main@92009301e619a1babaeaf4f0a44ae2eb49af79ed`，Quality checks run `33218342844` 全绿；#182 已完成并关闭，渲染模式文内搜索高亮优化暂不单独生成安装包。
+- 当前开发状态：#87 已完成本轮分块写入切片但仍 open；下一切片必须先从最新 Issues 复核，再从 #87 残余性能切片、#190 或其他更高优先级事项中选择一个。
+
+## v0.10.11 稳定发布结果（2026-08-29）
+
+- 内容：PR #302 已合并，对应 Issue #179 已完成并关闭；版本 PR #303 已合并到 `main@7cc08e21663c24fca3190539402711516569738b`，`v0.10.11` tag 已创建。
+- GitHub 资产：Release workflow run `33199034454` 构建成功并发布 Windows x64 安装包、`.sig` 和 `latest.json`；Quality checks run `33198995404`、Rust audit run `33198995394` 均成功。
+- 在线核验：GitHub Release 与 Cloudflare Pages 均返回 `0.10.11`；安装包 HTTP 200、4,960,497 字节，两边 SHA-256 一致为 `10cf086f89eb0bf16269b0922d71e7aac9684416f7bd8da7c19471ed0357e0ea`，签名 HTTP 200 且哈希一致。
+- 镜像自动化：Release 内置镜像 job 因缺少 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` 失败，不能记录为自动同步全绿；补齐 GitHub Actions Secrets 后从该 Release 重跑镜像 job。
+- 范围：其余 36 个开放 Issue 不纳入本次发布，后续从 Ready backlog 按独立垂直切片推进。
+
+## v0.10.12 实施记录：大工作区边界与文件树虚拟化（#169）
+
+- 目标：让大工作区打开和浏览保持可控，避免无限递归、重复枚举和一次性挂载数万行 DOM。
+- 已实现：Rust 统一受控遍历，限制 20,000 个文件、10,000 个文件夹和 32 层深度；内置跳过常见生成目录并按名称稳定排序；新增带 `truncated/scannedTotal` 状态的工作区列表 IPC，前端首次加载只做一次文件/文件夹遍历。
+- 已实现：文件树改为固定行高、带 overscan 的虚拟渲染，复用现有侧栏滚动区域，不新增内层滚动条；右键新建、复制/剪切/粘贴、重命名、删除、属性、路径和刷新操作保持不变。
 - 边界：不重写搜索算法、不引入大型虚拟列表依赖、不把超出安全边界的内容伪装成完整列表；截断时明确提示工作区列表与索引范围有限。
 - 本地验证：5000 文档暖搜索 P95 为 14 ms；前端全量测试、Rust 命令测试、构建、lint 和格式检查均已通过；浏览器 E2E 45/45、真实 Windows 桌面 smoke 11/11 也已通过，桌面测试的环境诊断不影响用例通过。
 - 发布：PR #305 已合并，#169 已标记 completed；版本 PR #306、`v0.10.12` tag 和 Windows x64 Release 已完成，后续只维护镜像自动化缺口。
