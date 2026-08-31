@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolveDefaultSharedCargoTargetDir } from "./shared-cargo-target.mjs";
 import { resolveRepositoryRoot } from "./repository-root.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,6 +24,8 @@ const generatedPaths = [
 const repositoryGeneratedPaths = [
   { relative: ".codex-worktrees/.shared-cargo-target", label: "共享 Rust 构建", protected: true },
 ];
+
+const legacyCargoCacheDirectoryPattern = /^[a-f0-9]{12}$/i;
 
 function runGit(args, cwd = projectRoot) {
   return execFileSync(gitCommand, args, {
@@ -116,14 +119,44 @@ export function measurePath(candidate) {
 
 function addArtifact(results, basePath, spec) {
   const artifactPath = path.join(basePath, spec.relative);
+  addArtifactAt(results, artifactPath, spec.label, Boolean(spec.protected));
+}
+
+function addArtifactAt(results, artifactPath, label, protectedArtifact = false) {
   if (!readLinkSafe(artifactPath)) return;
   results.push({
     path: artifactPath,
-    label: spec.label,
-    protected: Boolean(spec.protected),
+    label,
+    protected: protectedArtifact,
     bytes: measurePath(artifactPath),
     reparsePoint: isReparsePoint(artifactPath),
   });
+}
+
+function collectManagedCargoTargets(repositoryRoot) {
+  const currentTarget = resolveDefaultSharedCargoTargetDir(repositoryRoot);
+  const cacheRoot = path.dirname(currentTarget);
+  const results = [];
+
+  addArtifactAt(results, currentTarget, "共享 Rust 构建（用户缓存）", true);
+
+  const cacheStat = readLinkSafe(cacheRoot);
+  if (!cacheStat || cacheStat.isSymbolicLink() || !cacheStat.isDirectory()) return results;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(cacheRoot, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !legacyCargoCacheDirectoryPattern.test(entry.name)) continue;
+    const legacyTarget = path.join(cacheRoot, entry.name, "cargo-target");
+    if (path.resolve(legacyTarget).toLowerCase() === path.resolve(currentTarget).toLowerCase()) continue;
+    addArtifactAt(results, legacyTarget, "旧版共享 Rust 构建（用户缓存）", true);
+  }
+  return results;
 }
 
 export function collectGeneratedArtifacts(repositoryRoot, worktreeEntries = []) {
@@ -142,6 +175,7 @@ export function collectGeneratedArtifacts(repositoryRoot, worktreeEntries = []) 
     for (const spec of generatedPaths) addArtifact(results, basePath, spec);
   }
   for (const spec of repositoryGeneratedPaths) addArtifact(results, path.resolve(repositoryRoot), spec);
+  results.push(...collectManagedCargoTargets(repositoryRoot));
   return results;
 }
 

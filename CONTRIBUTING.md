@@ -59,6 +59,7 @@ Pop-Location
 - Rust 格式、clippy 和测试通过。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
+- 本地 Tauri/Cargo 命令必须使用项目包装脚本；构建目标统一位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`。发现生成物膨胀时先运行 `npm run cleanup:workspace` 预览，再按输出使用 `--apply --prune-targets`；清理器不会触碰源码、用户笔记或主 `node_modules`。
 - 每个功能切片必须同步更新交接文档；没有目标、验收、测试结果和下一步的 PR 不算完成。
 - 开始阅读代码前先读取 [`docs/NEXT.md`](docs/NEXT.md) 和 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)；只在需要版本背景时读取当前交接摘要，不要把完整仓库、历史归档或整段流水线日志复制进 AI 上下文。
 

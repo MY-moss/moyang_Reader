@@ -55,6 +55,36 @@ test("collects known generated paths but does not follow links", () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test("collects legacy path-keyed Cargo caches but ignores unrelated cache folders", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-legacy-cache-root-"));
+  const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-legacy-cache-"));
+  const previousCacheRoot = process.env.MOYANG_BUILD_CACHE_DIR;
+  process.env.MOYANG_BUILD_CACHE_DIR = cacheRoot;
+  try {
+    const legacyTarget = path.join(cacheRoot, "0123456789ab", "cargo-target");
+    const unrelatedTarget = path.join(cacheRoot, "not-a-repository-key", "cargo-target");
+    fs.mkdirSync(legacyTarget, { recursive: true });
+    fs.writeFileSync(path.join(legacyTarget, "old.bin"), "old");
+    fs.mkdirSync(unrelatedTarget, { recursive: true });
+    fs.writeFileSync(path.join(unrelatedTarget, "keep.bin"), "keep");
+
+    const artifacts = collectGeneratedArtifacts(root);
+    assert.equal(
+      artifacts.some((artifact) => artifact.path === legacyTarget && artifact.protected),
+      true,
+    );
+    assert.equal(
+      artifacts.some((artifact) => artifact.path === unrelatedTarget),
+      false,
+    );
+  } finally {
+    if (previousCacheRoot === undefined) delete process.env.MOYANG_BUILD_CACHE_DIR;
+    else process.env.MOYANG_BUILD_CACHE_DIR = previousCacheRoot;
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+  }
+});
+
 test("detects a junction without measuring or deleting its target", { skip: process.platform !== "win32" }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-junction-"));
   const worktree = path.join(root, ".codex-worktrees", "feature");
