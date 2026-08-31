@@ -1,11 +1,11 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：IMPLEMENTED（#362 交互与渲染微成本包，等待 PR 质量检查）。
-- 当前主线基线（本切片开始）：`main@28bf09d88f3eb379897c31adbdeda5ef426b2adc`；实现分支：`codex/perf-micro-cost-2026-08-31`。
-- #361 已通过 PR #390 合并并关闭；本切片只允许一个主要分支和一个 PR。
+- 当前状态：READY（#367 文档级跳转历史与返回上一文档）。
+- 当前主线基线（本切片完成后）：`main@c936666043d32ed1a4a1eec9312684994636034a`；#362 已通过 PR #392 合并并完成交接。
+- #362 的 Issue 已以 `completed` 关闭；本轮只保留一个下一项，不自动并行开发。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
-- 本切片完成 PR、Issue 状态和交接同步后停止；下一项必须重新检查 Issues，不自动开始。
+- #367 完成验证、PR、Issue 状态和交接同步后停止；下一项必须重新检查 Issues。
 
 ## 最近完成：#369 回收站删除与保存上一版本保护
 
@@ -72,21 +72,31 @@
 - 本地验证：`npm run build` 通过一次；`e2e/a11y.spec.ts` 7/7、`npm run lint`、`npm run format:check` 和 `git diff --check` 通过；远程 Quality checks run `33392327386` 通过；已明确关闭 Issue。
 - 回滚方式：回退本切片提交；不涉及文档格式、用户数据或迁移。
 
-## 当前切片：#362 交互与渲染微成本包
+## 最近完成：#362 交互与渲染微成本包
 
 - 优先级：Should / P3；风险级别：T2（交互流畅度、本地草稿持久化和差异计算）。
-- Issue：[#362](https://github.com/MY-moss/moyang_Reader/issues/362)；当前状态：实现完成，待 PR 合并后关闭；不与 #361 混合开发。
+- Issue：[#362](https://github.com/MY-moss/moyang_Reader/issues/362)；PR：[#392](https://github.com/MY-moss/moyang_Reader/pull/392)；合并提交：`c936666043d32ed1a4a1eec9312684994636034a`；已关闭。
 - 目标：降低面板拖动时的全 App 重渲染与重复持久化，减少草稿链路对 localStorage 的重复全量 parse，并避免差异弹层每次状态 tick 重算全文 diff。
 - 非目标：不改变面板、草稿、差异展示语义；不引入专用数据库，不改 Markdown 真源，不顺手处理其他性能或 UI Issue。
-- 预计范围：`src/app/PaneResizeHandle.tsx`、`src/app/App.tsx`、`src/app/draft-recovery.ts`、`src/app/components/DraftRecoveryComparisonDialog.tsx` 及对应测试；先测量再做最小拆分。
 - 实现：拖动期间只更新 app-shell CSS 变量，pointerup/cancel/lost-capture 才提交 React 状态和持久化；草稿存储按原始序列化内容复用解析结果，保存结果直接携带最新快照列表，查找与列表加载共用一次读取；差异计算按来源、状态和草稿内容 memo。
-- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针在查找与保存链路中仅执行 1 次。
-- 验证级别：T2，相关单测/性能探针、前端 lint/format/build 和一个浏览器 E2E；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
-- 回滚方式：回退本切片提交；无数据迁移，保留现有存储格式。
+- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、一次生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针仅执行 1 次。
+- 远程验证：Quality checks run `33403555956` 重跑成功；首轮桌面性能基准的单次 318.5ms 抖动未重现，Windows desktop smoke、依赖审计、发布检查和 Rust 门禁均通过。
+- 发布/回滚：不单独生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0`；回退 PR #392，无数据迁移，保留现有存储格式。
+
+## 唯一下一步：#367 文档级跳转历史与返回上一文档
+
+- 优先级：Should / P2；风险级别：T2（文档导航栈、阅读位置和未保存保护）。
+- Issue：[#367](https://github.com/MY-moss/moyang_Reader/issues/367)；状态：Ready 候选；计划版本：`v0.11.x`，不单独发布。
+- 用户价值：沿双链或本地链接连续跳转后，可一键返回来源文档，补齐阅读闭环。
+- 范围：新增仅存在于会话内的文档访问栈，支持 push/back/forward、连续重复去重和最多 50 项；跨文档导航成功后入栈；命令面板增加“返回上一文档”，默认快捷键 `Ctrl+Alt+←`，服从现有命令冲突规则。
+- 非目标：不持久化历史、不新增前进按钮 UI、不改变标签页策略、不与浏览器 history 混用；外部修改重载、关闭标签、草稿恢复不入栈。
+- 验收：A→B→C 两次返回到 A；返回后文档内容和阅读位置正确；未保存冲刷保护不回归；命令面板、键盘、Escape/焦点行为和一个浏览器 E2E 通过。
+- 预计范围：`src/app/navigation-history.ts`、对应单测、`App.tsx` 导航接线、命令注册/i18n 文案和一条导航回归 E2E；先从最新 `main` 建项目内 worktree。
+- 回滚：回退本切片 PR；不改 Markdown、持久化格式或用户文件。
 
 ## 开始前快速检查
 
-1. 查看 Issues/PR，确认没有重复的 #362 工作；记录提交 SHA、PR 和 CI run_id。
+1. 查看 Issues/PR，确认没有重复的 #367 工作；记录提交 SHA、PR 和 CI run_id。
 2. 读取 [`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，只读取与当前切片相关的源码、测试及一个相似实现。
 3. 保持原始工作目录不动；所有新切片使用项目内 `.codex-worktrees/` 的独立工作树。
 4. 完成验证、提交、推送、PR 和交接后停止，不自动开始下一项。
