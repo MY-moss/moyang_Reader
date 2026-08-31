@@ -2812,6 +2812,13 @@ html.pane-resizing * {
 .draft-recovery-notice {
   align-items: flex-start;
 }
+.previous-version-notice {
+  border-color: color-mix(in srgb, var(--accent) 42%, #d9b36c);
+  background: color-mix(in srgb, var(--accent-soft) 58%, #fff8e8);
+}
+.previous-version-notice strong {
+  color: var(--accent-deep);
+}
 .draft-recovery-copy {
   display: grid;
   gap: 2px;

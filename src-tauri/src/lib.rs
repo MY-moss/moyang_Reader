@@ -94,6 +94,7 @@ pub fn run() {
             commands::read_app_settings,
             commands::write_app_settings,
             commands::read_text_file,
+            commands::read_previous_version,
             commands::read_binary_file,
             commands::path_exists,
             commands::file_size,

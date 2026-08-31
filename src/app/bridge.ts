@@ -231,6 +231,12 @@ export async function readTextFile(path: string): Promise<string> {
   return invoke<string>("read_text_file", { path });
 }
 
+export async function readPreviousVersion(path: string): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+
+  return invoke<string | null>("read_previous_version", { path });
+}
+
 export async function readBinaryFile(path: string): Promise<Uint8Array> {
   if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");

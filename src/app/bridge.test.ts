@@ -15,6 +15,7 @@ import {
   commitBinaryFile,
   discardBinaryFile,
   fileMetadata,
+  readPreviousVersion,
   subscribeToFileDrop,
   writeBinaryFile,
   writeBinaryFileChunk,
@@ -65,6 +66,13 @@ describe("binary bridge", () => {
       modifiedMs: 1_725_000_000_000,
     });
     expect(invoke).toHaveBeenCalledWith("file_metadata", { path: "C:\\Notes\\Today.md" });
+  });
+
+  it("reads the optional previous saved version through the native bridge", async () => {
+    invoke.mockResolvedValue("# Previous");
+
+    await expect(readPreviousVersion("C:\\Notes\\Today.md")).resolves.toBe("# Previous");
+    expect(invoke).toHaveBeenCalledWith("read_previous_version", { path: "C:\\Notes\\Today.md" });
   });
 
   it("forwards native drag lifecycle events without dropping enter or leave feedback", async () => {

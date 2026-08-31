@@ -1585,6 +1585,44 @@ fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
     decode_text(&bytes)
 }
 
+fn previous_version_path(path: &Path) -> Result<PathBuf, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "文件路径没有父目录。".to_string())?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "文件名无法解析。".to_string())?;
+    Ok(parent.join(format!(".{file_name}.moyang.bak")))
+}
+
+fn read_previous_version_inner(path: PathBuf) -> Result<Option<String>, String> {
+    let backup = previous_version_path(&path)?;
+    let metadata = match fs::symlink_metadata(&backup) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("无法读取上一保存版本信息：{error}")),
+    };
+    if !metadata.is_file() {
+        return Err("上一保存版本备份不是可读取的文件。".to_string());
+    }
+    read_text_file_inner(backup).map(Some)
+}
+
+#[tauri::command]
+pub async fn read_previous_version(
+    path: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Option<String>, String> {
+    if !access.is_read_allowed(Path::new(&path)) {
+        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+    }
+    run_blocking("读取上一保存版本", move || {
+        read_previous_version_inner(PathBuf::from(path))
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn read_binary_file(
     path: String,
@@ -2732,10 +2770,73 @@ fn delete_workspace_entry_inner(root: String, entry_path: String) -> Result<(), 
     let metadata =
         fs::symlink_metadata(&target).map_err(|error| format!("无法读取工作区条目：{error}"))?;
 
-    if metadata.is_dir() {
-        fs::remove_dir_all(&target).map_err(|error| format!("无法删除文件夹：{error}"))?;
-    } else {
-        fs::remove_file(&target).map_err(|error| format!("无法删除文件：{error}"))?;
+    let mut paths = vec![target.clone()];
+    if metadata.is_file() {
+        if let Ok(backup) = previous_version_path(&target) {
+            if fs::symlink_metadata(&backup)
+                .map(|backup_metadata| backup_metadata.is_file())
+                .unwrap_or(false)
+            {
+                paths.push(backup);
+            }
+        }
+    }
+
+    delete_workspace_paths(&paths, metadata.is_dir())?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn delete_workspace_paths(paths: &[PathBuf], _contains_directory: bool) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+        SHFILEOPSTRUCTW,
+    };
+
+    let mut encoded = Vec::new();
+    for path in paths {
+        // SHFileOperationW rejects the extended-length `\\?\` prefix returned by
+        // Windows canonicalization, while the same fully qualified path without
+        // that prefix is accepted by Explorer and can be sent to the Recycle Bin.
+        let shell_path = display_path(path);
+        encoded.extend(std::ffi::OsStr::new(&shell_path).encode_wide());
+        encoded.push(0);
+    }
+    encoded.push(0);
+
+    let mut operation = SHFILEOPSTRUCTW {
+        hwnd: std::ptr::null_mut(),
+        wFunc: FO_DELETE,
+        pFrom: encoded.as_ptr(),
+        pTo: std::ptr::null(),
+        fFlags: (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT) as u16,
+        fAnyOperationsAborted: 0,
+        hNameMappings: std::ptr::null_mut(),
+        lpszProgressTitle: std::ptr::null(),
+    };
+
+    let status = unsafe { SHFileOperationW(&mut operation) };
+    if status != 0 {
+        return Err(format!(
+            "无法将内容移入 Windows 回收站（错误码 {status}），内容未删除。"
+        ));
+    }
+    if operation.fAnyOperationsAborted != 0 {
+        return Err("移入 Windows 回收站的操作被取消，内容未删除。".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn delete_workspace_paths(paths: &[PathBuf], contains_directory: bool) -> Result<(), String> {
+    for (index, path) in paths.iter().enumerate() {
+        let result = if index == 0 && contains_directory {
+            fs::remove_dir_all(path)
+        } else {
+            fs::remove_file(path)
+        };
+        result.map_err(|error| format!("无法删除工作区内容：{error}"))?;
     }
     Ok(())
 }
@@ -3694,13 +3795,10 @@ fn write_bytes_file_inner(
         .and_then(|name| name.to_str())
         .ok_or_else(|| "文件名无法解析。".to_string())?;
 
-    let backup = if create_backup && path.is_file() {
-        let backup = parent.join(format!(".{file_name}.moyang.bak"));
+    if create_backup && path.is_file() {
+        let backup = previous_version_path(&path)?;
         fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
-        Some(backup)
-    } else {
-        None
-    };
+    }
 
     let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let temp = parent.join(format!(
@@ -3720,9 +3818,6 @@ fn write_bytes_file_inner(
         drop(file);
 
         replace_file(&temp, &path).map_err(|error| format!("完成文件替换失败：{error}"))?;
-        if let Some(backup) = backup.as_deref() {
-            fs::remove_file(backup).map_err(|error| format!("清理备份失败：{error}"))?;
-        }
         Ok(())
     })();
     if result.is_err() {
@@ -3780,8 +3875,8 @@ mod tests {
         is_export_write_allowed_for_new_path, is_supported_document_path, is_supported_text_path,
         is_write_allowed_for_new_path, list_workspace_files_inner, normalize_access_path,
         path_exists_inner, persistent_search_index_path, prune_search_entries,
-        read_text_file_inner, refresh_workspace_inner, rename_workspace_entry_inner,
-        search_workspace_inner, search_workspace_inner_with_cache,
+        read_previous_version_inner, read_text_file_inner, refresh_workspace_inner,
+        rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
         search_workspace_inner_with_cache_and_persistence, should_skip_directory,
         sorted_workspace_directories, sorted_workspace_listing, source_search_tokens,
         touch_indexed_file, transfer_workspace_entry_inner, validate_export_stream_parent,
@@ -4122,7 +4217,7 @@ mod tests {
     }
 
     #[test]
-    fn replaces_existing_file_and_cleans_backup_after_success() {
+    fn replaces_existing_file_and_preserves_previous_version_backup() {
         let root = std::env::temp_dir().join(format!(
             "moyang-reader-atomic-{}-{}",
             std::process::id(),
@@ -4138,7 +4233,25 @@ mod tests {
             fs::read_to_string(&path).expect("read replaced file"),
             "new"
         );
-        assert!(!root.join(".note.md.moyang.bak").exists());
+        let backup = root.join(".note.md.moyang.bak");
+        assert_eq!(
+            fs::read_to_string(&backup).expect("read previous version"),
+            "old"
+        );
+        assert_eq!(
+            read_previous_version_inner(path.clone()).expect("read optional previous version"),
+            Some("old".to_string())
+        );
+
+        write_text_file_inner(path.clone(), "newer".to_string()).expect("roll previous version");
+        assert_eq!(
+            fs::read_to_string(&backup).expect("read rolled backup"),
+            "new"
+        );
+        assert_eq!(
+            read_previous_version_inner(path).expect("read rolled optional previous version"),
+            Some("new".to_string())
+        );
         fs::remove_dir_all(root).expect("remove atomic test directory");
     }
 
@@ -5260,6 +5373,14 @@ mod tests {
         assert!(Path::new(&renamed_archive).is_dir());
         assert!(Path::new(&renamed_archive).join("Nested.md").is_file());
 
+        write_text_file_inner(PathBuf::from(&renamed_note), "# Updated".to_string())
+            .expect("create deleted note backup");
+        let renamed_note_backup = Path::new(&renamed_note)
+            .parent()
+            .expect("renamed note parent")
+            .join(".Reading.md.moyang.bak");
+        assert!(renamed_note_backup.is_file());
+
         assert!(rename_workspace_entry_inner(
             root_string.clone(),
             "../outside".to_string(),
@@ -5271,6 +5392,7 @@ mod tests {
         delete_workspace_entry_inner(root_string.clone(), "Reading.md".to_string())
             .expect("delete workspace note");
         assert!(!Path::new(&renamed_note).exists());
+        assert!(!renamed_note_backup.exists());
         delete_workspace_entry_inner(root_string, "Saved".to_string())
             .expect("delete workspace folder recursively");
         assert!(!Path::new(&renamed_archive).exists());
