@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：READY（#361 暗色主题 accent 按钮对比度修复）。
-- 当前主线基线：`main@5f8fba3a37d429aa052add4543832b096ee28da5`；当前无实现分支和 PR。
+- 当前状态：IN PROGRESS（#361 暗色主题 accent 按钮对比度修复）。
+- 当前主线基线：`main@0f11b602f675e5c5d8a62d27931b6595939f208a5`；实现分支：`codex/dark-accent-contrast-2026-08-31`；PR 尚未创建。
 - #359 已通过 PR #388 合并并关闭；本切片只允许一个主要分支和一个 PR。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
@@ -59,15 +59,17 @@
 - 发布边界：不单独生成安装包、Tag、Release 或 Cloudflare 镜像；合入后纳入 `v0.11.0` 稳定 Windows x64 批次。
 - 回滚方式：回退本切片提交；不需要数据迁移，Markdown 文件内容和保存协议不变。
 
-## 唯一下一项：#361 暗色主题 accent 按钮对比度修复
+## 当前切片：#361 暗色主题 accent 按钮对比度修复
 
 - 优先级：Should / P2；风险级别：T2（视觉可读性与 WCAG AA）。
-- Issue：[#361](https://github.com/MY-moss/moyang_Reader/issues/361)；当前状态：Open、Ready 候选；关联 #119、#170、#193。
+- Issue：[#361](https://github.com/MY-moss/moyang_Reader/issues/361)；当前状态：Open、实现中；关联 #119、#170、#193。
 - 目标：修复暗色主题下编辑器“插入”、插入面板提交和通用主按钮的浅色 accent 底配白字问题，使正文、悬停、焦点和禁用状态可读且不破坏亮色主题。
 - 非目标：不重做整个主题、不处理 #362 渲染成本、不引入颜色库、不顺手修改其他视觉/交互 Issue。
-- 预计范围：`src/styles.css`、相关样式/可访问性测试和必要的 UI 交接文档；优先复用现有深色令牌，不增加运行时依赖。
+- 预计范围：`src/app/styles.css`、`e2e/a11y.spec.ts` 和必要的 UI 交接文档；优先复用现有深色令牌，不增加运行时依赖。
 - 验收：暗色自动/显式主题下受影响按钮的实际前景与背景对比达到 WCAG AA 4.5:1；hover/focus 仍达标；亮色、键盘焦点、插入动作和现有 a11y smoke 不回归；检查覆盖两个暗色分支和通用 `.toolbar-button.primary`。
 - 版本与发布：v0.11.x 普通视觉切片；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
+- 当前实现：增加独立的实心按钮色令牌；暗色自动/显式主题的编辑器插入、插入提交和通用主按钮使用可读的深色底配白字，hover/focus 不再被通用浅色 hover 覆盖；Windows 强制高对比度改用系统按钮色。
+- 本地验证：`npm run build` 通过一次；`e2e/a11y.spec.ts` 7/7、`npm run lint`、`npm run format:check` 和 `git diff --check` 通过；不生成安装包、Tag、Release 或 Cloudflare 镜像。
 - 回滚方式：回退本切片提交；不涉及文档格式、用户数据或迁移。
 
 ## 开始前快速检查
