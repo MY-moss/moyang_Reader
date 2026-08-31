@@ -39,6 +39,16 @@ test("uses one stable managed cache outside the repository", () =>
     assert.equal(path.basename(target), "cargo-target");
   }));
 
+test("shares one cache across copies of the same project", () =>
+  withCacheEnvironment((root) => {
+    const sibling = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-cache-copy-"));
+    try {
+      assert.equal(resolveDefaultSharedCargoTargetDir(root), resolveDefaultSharedCargoTargetDir(sibling));
+    } finally {
+      fs.rmSync(sibling, { recursive: true, force: true });
+    }
+  }));
+
 test("redirects a repository-local CARGO_TARGET_DIR to the managed cache", () =>
   withCacheEnvironment((root) => {
     process.env.CARGO_TARGET_DIR = path.join(root, "src-tauri", "target");
