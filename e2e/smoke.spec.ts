@@ -367,6 +367,31 @@ test("shares undo and redo history between WYSIWYG and source editing", async ({
   await expect.poll(() => readEditorText(editor)).toContain("可撤销内容。");
 });
 
+test("groups rapid source typing into one undo step", async ({ page }) => {
+  await page.goto("/");
+  const initialSource = "# Source history\n\n初始内容。\n";
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "source-history.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(initialSource),
+  });
+
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+  await clickToolbarAction(page, "源文本");
+  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await editor.press("Control+End");
+  await page.keyboard.type("连续输入应作为一个撤销组。");
+  await expect.poll(() => readEditorText(editor)).toContain("连续输入应作为一个撤销组。");
+
+  await editor.press("Control+Z");
+  await expect.poll(() => readEditorText(editor)).toBe(initialSource);
+
+  await editor.press("Control+Y");
+  await expect.poll(() => readEditorText(editor)).toContain("连续输入应作为一个撤销组。");
+});
+
 test("opens the command palette and restores trigger focus", async ({ page }) => {
   await page.goto("/");
 

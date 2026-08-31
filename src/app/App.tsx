@@ -3460,13 +3460,13 @@ export function App() {
     return cancel;
   }, [mode, preferences.allowRemoteResources, sourceDraft]);
 
-  const updateSource = useCallback((nextSource: string) => {
+  const updateSource = useCallback((nextSource: string, options: { merge?: boolean } = {}) => {
     const current = documentStateRef.current;
     if (!current || !isEditableDocument(current.kind)) return;
 
     const history = editorHistoryRef.current;
     const nextHistory = isSameDocumentPath(history.documentKey, current.path)
-      ? recordEditorChange(history, nextSource)
+      ? recordEditorChange(history, nextSource, options)
       : createEditorHistory(current.path, nextSource);
     if (nextHistory !== history) {
       editorHistoryRef.current = nextHistory;
@@ -5544,7 +5544,7 @@ export function App() {
                 source={sourceDraft}
                 documentKey={documentState.path}
                 ariaLabel="Markdown 所见即所得编辑器"
-                onChange={(value) => void updateSource(value)}
+                onChange={(value) => void updateSource(value, { merge: true })}
                 requestedInsertKind={requestedInsertKind}
                 onInsertRequestHandled={handleEditorInsertRequestHandled}
                 onFindText={handleFindEditorText}
@@ -5561,7 +5561,7 @@ export function App() {
             <SourceEditor
               value={sourceDraft}
               ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
-              onChange={(value) => void updateSource(value)}
+              onChange={(value) => void updateSource(value, { merge: true })}
               onPaste={handleSourcePaste}
               requestedInsertKind={requestedInsertKind}
               onInsertRequestHandled={handleEditorInsertRequestHandled}
