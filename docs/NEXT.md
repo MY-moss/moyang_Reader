@@ -1,11 +1,11 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：READY（#362 交互与渲染微成本包）。
-- 当前主线基线：`main@41acf808a54683e9ed4b2f7a1d15cdc132c8629d`；当前无实现分支和 PR。
+- 当前状态：IMPLEMENTED（#362 交互与渲染微成本包，等待 PR 质量检查）。
+- 当前主线基线（本切片开始）：`main@28bf09d88f3eb379897c31adbdeda5ef426b2adc`；实现分支：`codex/perf-micro-cost-2026-08-31`。
 - #361 已通过 PR #390 合并并关闭；本切片只允许一个主要分支和一个 PR。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
-- 新任务必须从以上最新 `main` 创建独立工作树；完成交接后停止，不自动开始下一项。
+- 本切片完成 PR、Issue 状态和交接同步后停止；下一项必须重新检查 Issues，不自动开始。
 
 ## 最近完成：#369 回收站删除与保存上一版本保护
 
@@ -72,14 +72,15 @@
 - 本地验证：`npm run build` 通过一次；`e2e/a11y.spec.ts` 7/7、`npm run lint`、`npm run format:check` 和 `git diff --check` 通过；远程 Quality checks run `33392327386` 通过；已明确关闭 Issue。
 - 回滚方式：回退本切片提交；不涉及文档格式、用户数据或迁移。
 
-## 唯一下一项：#362 交互与渲染微成本包
+## 当前切片：#362 交互与渲染微成本包
 
 - 优先级：Should / P3；风险级别：T2（交互流畅度、本地草稿持久化和差异计算）。
-- Issue：[#362](https://github.com/MY-moss/moyang_Reader/issues/362)；当前状态：Open、Ready 候选；不与 #361 混合开发。
+- Issue：[#362](https://github.com/MY-moss/moyang_Reader/issues/362)；当前状态：实现完成，待 PR 合并后关闭；不与 #361 混合开发。
 - 目标：降低面板拖动时的全 App 重渲染与重复持久化，减少草稿链路对 localStorage 的重复全量 parse，并避免差异弹层每次状态 tick 重算全文 diff。
 - 非目标：不改变面板、草稿、差异展示语义；不引入专用数据库，不改 Markdown 真源，不顺手处理其他性能或 UI Issue。
 - 预计范围：`src/app/PaneResizeHandle.tsx`、`src/app/App.tsx`、`src/app/draft-recovery.ts`、`src/app/components/DraftRecoveryComparisonDialog.tsx` 及对应测试；先测量再做最小拆分。
-- 验收：拖动期间不写入持久化设置，pointerup 才提交；草稿保存/查找不重复全量解析；差异输入不变时只计算一次；既有拖拽、草稿恢复、差异和 Windows smoke 不回归。
+- 实现：拖动期间只更新 app-shell CSS 变量，pointerup/cancel/lost-capture 才提交 React 状态和持久化；草稿存储按原始序列化内容复用解析结果，保存结果直接携带最新快照列表，查找与列表加载共用一次读取；差异计算按来源、状态和草稿内容 memo。
+- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针在查找与保存链路中仅执行 1 次。
 - 验证级别：T2，相关单测/性能探针、前端 lint/format/build 和一个浏览器 E2E；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
 - 回滚方式：回退本切片提交；无数据迁移，保留现有存储格式。
 

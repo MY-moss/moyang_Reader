@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { buildDraftComparison, type DraftDiffLine } from "../draft-recovery-diff";
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
 import { useModalBehavior } from "./useModalBehavior";
@@ -113,10 +113,13 @@ export function DraftRecoveryComparisonDialog({
       : `本机恢复快照 · ${snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt) : "未知时间"}`;
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const comparison =
-    comparisonStatus === "ready" && comparisonSource !== null
-      ? buildDraftComparison(comparisonSource, snapshot.draft)
-      : null;
+  const comparison = useMemo(
+    () =>
+      comparisonStatus === "ready" && comparisonSource !== null
+        ? buildDraftComparison(comparisonSource, snapshot.draft)
+        : null,
+    [comparisonSource, comparisonStatus, snapshot.draft],
+  );
   const decision = recoveryDecision(
     comparison,
     comparisonStatus,

@@ -12,10 +12,20 @@ export type DraftSnapshot = {
   savedAt: number;
 };
 
-export type DraftSaveResult = {
-  ok: boolean;
-  prunedCount: number;
+export type DraftSaveResult =
+  { ok: true; prunedCount: number; snapshots: DraftSnapshot[] } | { ok: false; prunedCount: 0 };
+
+export type DraftSnapshotState = {
+  snapshots: DraftSnapshot[];
+  snapshot: DraftSnapshot | null;
 };
+
+type DraftStoreCache = {
+  raw: string | null;
+  snapshots: DraftSnapshot[];
+};
+
+let draftStoreCache: DraftStoreCache | null = null;
 
 function comparablePath(path: string): string {
   return normalizePathKey(path);
@@ -52,10 +62,9 @@ function serializeDrafts(snapshots: DraftSnapshot[]): string | null {
   return localStorageBytes(serialized) <= MAX_DRAFT_STORAGE_BYTES ? serialized : null;
 }
 
-export function loadDraftSnapshots(): DraftSnapshot[] {
+function parseDraftSnapshots(raw: string | null): DraftSnapshot[] {
+  if (!raw) return [];
   try {
-    const raw = localStorage.getItem(draftStorageKey);
-    if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
 
@@ -75,20 +84,41 @@ export function loadDraftSnapshots(): DraftSnapshot[] {
   }
 }
 
-export function findDraftSnapshot(path: string, source: string): DraftSnapshot | null {
-  const snapshot = loadDraftSnapshots().find((item) => comparablePath(item.path) === comparablePath(path));
-  if (!snapshot) return null;
-  if (snapshot.draft === source) {
-    clearDraftSnapshot(path);
-    return null;
+function readDraftSnapshots(): DraftSnapshot[] {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(draftStorageKey);
+  } catch {
+    return [];
   }
-  return snapshot;
+
+  if (draftStoreCache?.raw === raw) return draftStoreCache.snapshots;
+  const snapshots = parseDraftSnapshots(raw);
+  draftStoreCache = { raw, snapshots };
+  return snapshots;
+}
+
+export function loadDraftSnapshots(): DraftSnapshot[] {
+  return readDraftSnapshots();
+}
+
+export function getDraftSnapshotState(path: string, source: string): DraftSnapshotState {
+  const snapshots = loadDraftSnapshots();
+  const snapshot = snapshots.find((item) => comparablePath(item.path) === comparablePath(path));
+  if (!snapshot) return { snapshots, snapshot: null };
+  if (snapshot.draft === source) {
+    return { snapshots: clearDraftSnapshot(path), snapshot: null };
+  }
+  return { snapshots, snapshot };
+}
+
+export function findDraftSnapshot(path: string, source: string): DraftSnapshot | null {
+  return getDraftSnapshotState(path, source).snapshot;
 }
 
 export function saveDraftSnapshot(snapshot: DraftSnapshot): DraftSaveResult {
   if (snapshot.draft === snapshot.baseSource) {
-    clearDraftSnapshot(snapshot.path);
-    return { ok: true, prunedCount: 0 };
+    return { ok: true, prunedCount: 0, snapshots: clearDraftSnapshot(snapshot.path) };
   }
   if (
     snapshot.path.trim().length === 0 ||
@@ -116,7 +146,8 @@ export function saveDraftSnapshot(snapshot: DraftSnapshot): DraftSaveResult {
 
   try {
     localStorage.setItem(draftStorageKey, serialized);
-    return { ok: true, prunedCount };
+    draftStoreCache = { raw: serialized, snapshots: next };
+    return { ok: true, prunedCount, snapshots: next };
   } catch (cause) {
     if (!isQuotaExceeded(cause) || next.length <= 1) return { ok: false, prunedCount: 0 };
 
@@ -126,27 +157,37 @@ export function saveDraftSnapshot(snapshot: DraftSnapshot): DraftSaveResult {
 
     try {
       localStorage.setItem(draftStorageKey, retrySerialized);
-      return { ok: true, prunedCount: prunedCount + 1 };
+      draftStoreCache = { raw: retrySerialized, snapshots: retry };
+      return { ok: true, prunedCount: prunedCount + 1, snapshots: retry };
     } catch {
       return { ok: false, prunedCount: 0 };
     }
   }
 }
 
-export function clearDraftSnapshot(path: string): void {
+export function clearDraftSnapshot(path: string): DraftSnapshot[] {
   try {
     const key = comparablePath(path);
     const next = loadDraftSnapshots().filter((snapshot) => comparablePath(snapshot.path) !== key);
-    if (next.length > 0) localStorage.setItem(draftStorageKey, JSON.stringify(next));
-    else localStorage.removeItem(draftStorageKey);
+    if (next.length > 0) {
+      const serialized = JSON.stringify(next);
+      localStorage.setItem(draftStorageKey, serialized);
+      draftStoreCache = { raw: serialized, snapshots: next };
+    } else {
+      localStorage.removeItem(draftStorageKey);
+      draftStoreCache = { raw: null, snapshots: [] };
+    }
+    return next;
   } catch {
     // Draft cleanup is best-effort when local storage is unavailable.
+    return readDraftSnapshots();
   }
 }
 
 export function clearAllDraftSnapshots(): void {
   try {
     localStorage.removeItem(draftStorageKey);
+    draftStoreCache = { raw: null, snapshots: [] };
   } catch {
     // Draft cleanup is best-effort when local storage is unavailable.
   }

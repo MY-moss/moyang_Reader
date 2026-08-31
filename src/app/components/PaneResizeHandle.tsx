@@ -7,21 +7,34 @@ type PaneResizeHandleProps = {
   min: number;
   max: number;
   onResizeBy: (delta: number) => void;
+  onResizePreview?: (delta: number) => void;
+  onResizeCommit?: () => void;
   onReset: () => void;
 };
 
 const KEYBOARD_STEP = 16;
 const KEYBOARD_LARGE_STEP = 48;
 
-export function PaneResizeHandle({ side, value, min, max, onResizeBy, onReset }: PaneResizeHandleProps) {
+export function PaneResizeHandle({
+  side,
+  value,
+  min,
+  max,
+  onResizeBy,
+  onResizePreview,
+  onResizeCommit,
+  onReset,
+}: PaneResizeHandleProps) {
   const lastPointerX = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const finishDragging = useCallback(() => {
+    const wasDragging = lastPointerX.current !== null;
     lastPointerX.current = null;
+    if (wasDragging) onResizeCommit?.();
     setDragging(false);
     document.documentElement.classList.remove("pane-resizing");
-  }, []);
+  }, [onResizeCommit]);
 
   useEffect(() => {
     return () => {
@@ -46,7 +59,8 @@ export function PaneResizeHandle({ side, value, min, max, onResizeBy, onReset }:
     const delta = event.clientX - previousX;
     if (delta === 0) return;
     lastPointerX.current = event.clientX;
-    onResizeBy(side === "sidebar" ? delta : -delta);
+    const signedDelta = side === "sidebar" ? delta : -delta;
+    (onResizePreview ?? onResizeBy)(signedDelta);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
