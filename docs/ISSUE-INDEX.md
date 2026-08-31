@@ -31,7 +31,7 @@
 
 ### v0.11.0 milestone 顺序
 
-`#172 → #375 → #357 → #358 → #379 → #360 → #369 → #359 → #361–#366 → #367/#368/#371/#372`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
+`#172 → #375 → #357 → #358 → #379 → #360 → #369 → #359 → #361–#366 → #367/#368/#371/#372`。其中 #241/#51 是外部条件项：缺少 Cloudflare Secrets、旧版本安装环境或 Authenticode 证书时保留开放并移出 milestone，不阻塞常规功能切片。#359 已由 PR #388 完成并关闭，当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不能仅凭表格顺序自动开始下一项。
 
 ## 2. 当前可执行 backlog
 
@@ -52,7 +52,7 @@
 | [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验   | v0.11.0 第 5 阶段（条件） | SemVer 校验已完成；剩余 Authenticode 证书或限制说明                         |
 | [#357](https://github.com/MY-moss/moyang_Reader/issues/357) | 右键菜单 fixed 定位与内容区包含块  | v0.11.x                   | 已完成；PR #377 已合并，Issue 已以 completed 关闭                           |
 | [#358](https://github.com/MY-moss/moyang_Reader/issues/358) | 插入浮层跟随光标/视口              | v0.11.x                   | 已完成；PR #380 已合并，Issue 已以 completed 关闭                           |
-| [#359](https://github.com/MY-moss/moyang_Reader/issues/359) | 撤销历史全量快照与编辑粒度         | v0.11.x                   | 大文档驻留与 Ctrl+Z 粒度稳定性                                              |
+| [#359](https://github.com/MY-moss/moyang_Reader/issues/359) | 撤销历史全量快照与编辑粒度         | v0.11.x                   | 已完成；PR #388 合并，400ms 分组与 100 条/8 MiB 历史预算                    |
 | [#360](https://github.com/MY-moss/moyang_Reader/issues/360) | 工作区树操作异步化                 | v0.11.x                   | 与 #369 分开验收、可共用底层命令改造                                        |
 
 ### Should：明显改善高频体验和可维护性

@@ -1,8 +1,8 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：IN PROGRESS（#359 撤销历史从全量快照收敛为稳定粒度）。
-- 当前主线基线：`origin/main@4a60c61fe5ec0b6adc760f177af4f166275984e`；实现分支：`codex/editor-undo-granularity-2026-08-31`；工作树位于项目内 `.codex-worktrees/`。
-- #369 已通过 PR #386 合并；本切片只允许一个主要分支和一个 PR。
+- 当前状态：READY（#361 暗色主题 accent 按钮对比度修复）。
+- 当前主线基线：`main@5f8fba3a37d429aa052add4543832b096ee28da5`；当前无实现分支和 PR。
+- #359 已通过 PR #388 合并并关闭；本切片只允许一个主要分支和一个 PR。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
 - 新任务必须从以上最新 `main` 创建独立工作树；完成交接后停止，不自动开始下一项。
@@ -47,20 +47,32 @@
 - 回滚方式：回退本切片 PR；不需要数据迁移，不触碰用户其他笔记。
 - 本切片不单独更新版本或安装包；合入后纳入 `v0.11.0` 稳定批次。
 
-## 当前切片：#359 撤销历史从全量快照收敛为稳定粒度
+## 最近完成：#359 撤销历史从全量快照收敛为稳定粒度
 
 - 优先级：Must / P2；风险级别：T2（编辑体验、内存和撤销正确性）。
+- Issue：[#359](https://github.com/MY-moss/moyang_Reader/issues/359)；PR：[#388](https://github.com/MY-moss/moyang_Reader/pull/388)；合并提交：`5f8fba3a37d429aa052add4543832b096ee28da5`。
 - 目标：降低长文档连续编辑时全量快照造成的内存和历史噪声，同时保持 Ctrl+Z/Ctrl+Y、切换文档和保存语义稳定。
 - 非目标：不改 Markdown 解析、保存格式、草稿恢复、版本备份或其他编辑器功能。
 - 实现：编辑器输入在 400ms 窗口内合并为一个撤销组；历史仍最多 100 个快照，并对保留的 past/future 快照增加 8 MiB UTF-16 估算上限；程序化更新保持原子边界。
 - 涉及文件：`src/app/editor-history.ts`、`src/app/editor-history.test.ts`、`src/app/App.tsx`、`e2e/smoke.spec.ts` 及本切片交接文档。
-- 当前结果：定向单测 6/6、TypeScript 检查、生产构建、源码连续输入浏览器 E2E 1/1、跨模式撤销/重做回归 E2E 1/1、完整 lint/format/diff 检查均已通过；下一步仅创建本地 checkpoint。
+- 结果：定向单测 6/6、TypeScript 检查、生产构建、源码连续输入浏览器 E2E 1/1、跨模式撤销/重做回归 E2E 1/1、完整 lint/format/diff 检查均已通过；远程 Quality checks run `33386166171` 成功，Issue 已关闭。
 - 发布边界：不单独生成安装包、Tag、Release 或 Cloudflare 镜像；合入后纳入 `v0.11.0` 稳定 Windows x64 批次。
 - 回滚方式：回退本切片提交；不需要数据迁移，Markdown 文件内容和保存协议不变。
 
+## 唯一下一项：#361 暗色主题 accent 按钮对比度修复
+
+- 优先级：Should / P2；风险级别：T2（视觉可读性与 WCAG AA）。
+- Issue：[#361](https://github.com/MY-moss/moyang_Reader/issues/361)；当前状态：Open、Ready 候选；关联 #119、#170、#193。
+- 目标：修复暗色主题下编辑器“插入”、插入面板提交和通用主按钮的浅色 accent 底配白字问题，使正文、悬停、焦点和禁用状态可读且不破坏亮色主题。
+- 非目标：不重做整个主题、不处理 #362 渲染成本、不引入颜色库、不顺手修改其他视觉/交互 Issue。
+- 预计范围：`src/styles.css`、相关样式/可访问性测试和必要的 UI 交接文档；优先复用现有深色令牌，不增加运行时依赖。
+- 验收：暗色自动/显式主题下受影响按钮的实际前景与背景对比达到 WCAG AA 4.5:1；hover/focus 仍达标；亮色、键盘焦点、插入动作和现有 a11y smoke 不回归；检查覆盖两个暗色分支和通用 `.toolbar-button.primary`。
+- 版本与发布：v0.11.x 普通视觉切片；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
+- 回滚方式：回退本切片提交；不涉及文档格式、用户数据或迁移。
+
 ## 开始前快速检查
 
-1. 查看 Issues/PR，确认没有重复的 #359 工作；记录提交 SHA、PR 和 CI run_id。
+1. 查看 Issues/PR，确认没有重复的 #361 工作；记录提交 SHA、PR 和 CI run_id。
 2. 读取 [`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，只读取与当前切片相关的源码、测试及一个相似实现。
 3. 保持原始工作目录不动；所有新切片使用项目内 `.codex-worktrees/` 的独立工作树。
 4. 完成验证、提交、推送、PR 和交接后停止，不自动开始下一项。
