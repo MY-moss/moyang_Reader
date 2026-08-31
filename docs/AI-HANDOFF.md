@@ -4,12 +4,12 @@
 
 ## 当前基线（2026-08-31）
 
-- 当前主线基线：`main@0f11b602f675e5c5d8a62d27931b6595939f208a5`；PR #384、#385、#386、#388、#389 已合并，Issue #360、#359、#369 已以 `completed` 关闭。
-- 最新完成切片：PR #388 完成 #359——撤销输入分组与历史快照内存上限；保持 Windows x64、本地优先和 Markdown 真源边界。
-- Quality checks：run `33367813186` 成功；Rust dependency audit run `33367921971` 成功；前端 lint/构建、浏览器与无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
+- 当前主线：`main@41acf808a54683e9ed4b2f7a1d15cdc132c8629d`；PR #384、#385、#386、#388、#389、#390 已合并，Issue #360、#359、#361、#369 已以 `completed` 关闭。
+- 最新完成切片：PR #390 完成 #361——暗色主题实心 accent 按钮对比度修复；保持 Windows x64、本地优先和 Markdown 真源边界。
+- Quality checks：run `33392327386` 成功；前端 lint/构建、浏览器与无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前进行中：#361 暗色主题 accent 按钮对比度修复；分支 `codex/dark-accent-contrast-2026-08-31` 基于以上 `main`，完成一个垂直切片后停止。
-- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360 和 #369 纳入下一稳定 Windows x64 批次。
+- 当前唯一 READY：#362 交互与渲染微成本包；必须从以上最新 `main` 新建分支，完成一个垂直切片后停止。
+- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361 和 #369 纳入下一稳定 Windows x64 批次。
 - 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 ## v0.11.0 当前顺序
@@ -17,19 +17,28 @@
 1. #360：工作区树操作异步化（已完成，PR #384）。
 2. #369：回收站删除与保存上一版本保护（已完成，PR #386）。
 3. #359：撤销历史从全量快照收敛为稳定粒度（已完成，PR #388）。
-4. #361–#366：视觉、粘贴、插入和确认交互小切片（下一项为 #361）。
+4. #361–#366：视觉、粘贴、插入和确认交互小切片（#361 已完成，后续按 NEXT.md 选择）。
 5. #367/#368/#371/#372：知识库体验与本机数据迁移候选。
 
 其中 #241/#51 是外部发布条件项；不按顺序列表自动并行开发，唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准。
 
-## 本轮 #361 交接（实现中）
+## 本轮 #361 交接（已合并）
 
 - 目标：修复暗色自动/显式主题下编辑器插入、插入面板提交和通用主按钮的浅色 accent 配白字对比度问题；亮色主题保持现状。
 - 变更：`src/app/styles.css` 增加独立实心按钮色令牌；主按钮的普通、hover、focus 和编辑器插入动作使用可读的深色底配白字；强制高对比度改用 Windows 系统按钮色。
 - 测试：新增 `e2e/a11y.spec.ts` 对两个暗色分支和普通/悬停状态执行 WCAG AA 4.5:1 检查；本地 `a11y` 7/7、Lint、格式检查、构建和差异检查通过。
-- 当前状态：本地代码已完成，尚未提交、推送或创建 PR；完成 checkpoint 后等待远程 Quality checks，再按绿色结果合并。
+- PR：[#390](https://github.com/MY-moss/moyang_Reader/pull/390) 已 squash 合并为 `main@41acf808a54683e9ed4b2f7a1d15cdc132c8629d`；Issue #361 已明确以 `completed` 关闭。
+- 本地验证：`e2e/a11y.spec.ts` 7/7、Lint、格式检查、`git diff --check` 和一次前端生产构建通过；远程 Quality checks run `33392327386` 通过。
 - 发布：本切片属于 `v0.11.x` 普通视觉修复，不单独生成安装包、Tag、Release 或镜像；纳入下一 Windows x64 稳定批次。
 - 回滚：回退本切片提交，无数据迁移。
+
+## 下一唯一 READY：#362 交互与渲染微成本包
+
+- 目标：降低面板拖动期间的全 App 重渲染与重复持久化，减少草稿链路重复全量 parse，并避免差异弹层在无输入变化时重算全文 diff。
+- 非目标：不改变面板、草稿和差异语义；不引入专用数据库，不改 Markdown 真源，不顺手扩展其他性能或 UI Issue。
+- 预计范围：`src/app/PaneResizeHandle.tsx`、`src/app/App.tsx`、`src/app/draft-recovery.ts`、`src/app/components/DraftRecoveryComparisonDialog.tsx` 及对应测试；先测量再最小拆分。
+- 验收：拖动期间不写持久化设置、pointerup 才提交；草稿保存/查找不重复全量解析；差异输入不变时只计算一次；既有拖拽、草稿恢复、差异和 Windows smoke 不回归。
+- 验证/发布：T2，相关单测或性能探针、前端 lint/format/build 和一个浏览器 E2E；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
 
 ## 本轮 #359 交接（已合并）
 
