@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,10 +18,6 @@ function resolveBuildCacheRoot() {
   return path.join(os.tmpdir(), "moyang-reader-build-cache");
 }
 
-function repositoryCacheKey(repositoryRoot) {
-  return crypto.createHash("sha256").update(path.resolve(repositoryRoot).toLowerCase()).digest("hex").slice(0, 12);
-}
-
 function isInside(candidate, root) {
   const relative = path.relative(path.resolve(root), path.resolve(candidate));
   return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
@@ -34,7 +29,7 @@ export function resolveDefaultSharedCargoTargetDir(projectRoot = defaultProjectR
   const cacheRoot = isInside(configuredRoot, repositoryRoot)
     ? path.join(os.tmpdir(), "moyang-reader-build-cache")
     : configuredRoot;
-  return path.join(cacheRoot, repositoryCacheKey(repositoryRoot), "cargo-target");
+  return path.join(cacheRoot, "cargo-target");
 }
 
 export function resolveSharedCargoTargetDir(projectRoot = defaultProjectRoot) {

@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@52acd223d7ca0fb251f143bfc02820eecc88337e`，PR #377 已完成 #357，PR #380 已完成 #358。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@135d4da7c2225f1097bf288ef30763a82cf916ed`，PR #377 已完成 #357，PR #380 已完成 #358，PR #379 已完成首轮构建缓存外置。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -20,7 +20,7 @@
 | 10   | #375     | 工作区空间治理（已完成）              | PR #375；限制生成物、复用依赖和安全回收工作树                              |
 | 11   | #357     | 右键菜单 fixed 定位修复（已完成）     | PR #377；脱离 content-area containing block，位置、裁剪和滚动稳定性通过    |
 | 12   | #358     | 插入浮层跟随光标/视口（已完成）       | PR #380；长文档中部定位、焦点 preventScroll 和滚动稳定性通过               |
-| 13   | #379     | 构建缓存防膨胀回归修复（当前工程）    | 修正格式/主线偏差后，Quality checks 和目标路径验证通过                     |
+| 13   | #379     | 构建缓存防膨胀回归修复（已完成，当前补强） | 单一应用级 Cargo target、仓库内覆盖重定向、旧版缓存识别和定向测试通过 |
 
 ## #358 插入浮层跟随光标/视口（已完成）
 
@@ -30,14 +30,14 @@
 - 边界：不改变插入语义、Markdown 真源、右键菜单、持久化、更新器或发布资产；不单独生成安装包、Tag、Release 或镜像。
 - 当前状态：PR [#380](https://github.com/MY-moss/moyang_Reader/pull/380) 已 squash 合并为 `main@52acd223d7ca0fb251f143bfc02820eecc88337e`；Issue #358 已以 `completed` 关闭；不在本切片继续扩展。
 
-## #379 构建缓存防膨胀回归修复（当前工程切片）
+## #379 构建缓存防膨胀回归修复（合并后稳定性补强）
 
 - 用户价值：避免 Windows 开发、测试和发布把 Cargo/Tauri target 写回项目或在多个 worktree 中重复占用数 GB。
-- 实现：恢复 `npm run desktop`、`npm run tauri -- <args>` 和 `npm run rust -- <args>` 包装；默认使用项目外共享缓存，并重定向仓库内错误的 `CARGO_TARGET_DIR`。
-- 范围：CI、Windows desktop smoke 和发布前 Rust 检查复用同一缓存边界；修复 PR #379 与最新 `main@52acd223d7ca0fb251f143bfc02820eecc88337e` 的主线/格式偏差。
-- 验收：包装器测试、路径边界测试、lint、format、TypeScript/build、Rust fmt/clippy/tests 和 Quality checks 全部通过；项目内不生成 `src-tauri/target`。
+- 实现：在 PR #379 已外置构建目标的基础上，改为单一应用级 `cargo-target`，拒绝仓库内覆盖路径，并让清理器识别旧版按路径分组缓存。
+- 范围：只涉及本地构建包装和清理脚本，不改变 CI、Windows desktop smoke、用户文档、更新器或发布资产。
+- 验收：共享路径、仓库内错误覆盖和旧缓存识别的定向测试通过；项目内不生成 `src-tauri/target`。
 - 发布：不单独生成安装包、Tag、Release 或镜像；合并后纳入下一稳定 Windows x64 批次。
-- 回滚：回退 PR #379；不删除用户缓存，不触碰源码和用户笔记。
+- 回滚：回退本次稳定性补强 PR；旧版目标仅为可再生构建产物，不触碰源码和用户笔记。
 
 ## #119 axe/WCAG AA Windows UI 基线（本轮已完成，2026-08-30）
 
