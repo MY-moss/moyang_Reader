@@ -29,6 +29,7 @@
 - 验证：本地工作区树定向测试 3/3、Markdown 文件定向测试 1/1、Rust format、`git diff --check` 通过；远程 Quality checks run `33361212388` 成功，包含 Windows desktop smoke、Rust clippy 和完整 Rust 测试。
 - 发布：PR [#384](https://github.com/MY-moss/moyang_Reader/pull/384) 已 squash 合并为 `main@d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`；Issue [#360](https://github.com/MY-moss/moyang_Reader/issues/360) 已以 `completed` 关闭；不单独生成安装包、Tag、Release 或镜像，纳入下一稳定 Windows x64 批次。
 - 回滚：回退 PR #384；不删除用户文件，不需要数据迁移。下一唯一 READY 事项为 #369。
+
 ## #358 插入浮层跟随光标/视口（已完成）
 
 - 用户价值：长文档中部插入链接、图片或表格时，面板出现在当前光标附近，不把阅读位置拉回文首。
