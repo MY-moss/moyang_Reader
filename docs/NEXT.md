@@ -1,65 +1,72 @@
 # Moyang Reader 唯一下一步
 
-- 开放 PR：以 GitHub 最新状态为准；不并行处理 Dependabot
+- 当前状态：等待从最新 `main` 创建 #360 的独立功能分支和 PR。
+- 当前原则：一个垂直切片、一次主要 CI、一个 PR；完成交接后停止，不自动开始下一项。
+- 不并行处理 Dependabot；没有用户功能变化的工程治理切片不创建安装包。
 
 ## 核验状态
 
 - 最近核验：2026-08-31
-- 当前主线：`main@135d4da7c2225f1097bf288ef30763a82cf916ed`；#172、#357、#358、#375 与 #379 已合并
-- 上一功能切片：[#380](https://github.com/MY-moss/moyang_Reader/pull/380) 完成 #358，Issue 已以 `completed` 关闭
+- 当前主线：`main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`；PR #381 已合并。
+- 已完成切片：PR #381 完成构建缓存稳定性补强；Quality checks run `33354301746` 成功，合并后主线 run `33355176879` 成功。
 - 稳定版本：`v0.10.13`
 - 当前 milestone：`v0.11.0`
-- 当前状态：READY（构建缓存稳定性补强；合并后只转入 #360）
-- 当前实现分支：`codex/build-cache-stability-2026-08-31`
-- 当前 PR：待创建；这是 #379 合并后的工程补强，不创建安装包
-- 开放 PR：#379 工程治理 PR；其余为 Dependabot，不并行处理
+- 当前实现分支：无；下一切片必须从最新 `main` 创建。
+- 当前 PR：无。
+- 本轮发布：不创建安装包、Tag、Release 或 Cloudflare 镜像；构建缓存修复纳入下一稳定 Windows x64 批次。
 
-## 唯一下一步：构建缓存稳定性补强（PR #379 后续）
+## 唯一下一步：#360 工作区树操作异步化
 
 - 优先级：Must / P2
-- 风险级别：T2（构建路径、工作树复用和清理脚本）
-- 版本分类：不单独发布；合并后纳入下一稳定 Windows x64 批次
+- 风险级别：T2（Rust 命令边界和长时文件 IO）
+- 计划版本：v0.11.x
+- Issue：[#360](https://github.com/MY-moss/moyang_Reader/issues/360)
 
 ### 用户价值
 
-让 Windows 开发、测试和发布不会把 Cargo/Tauri 的 `target` 重新写回项目目录，也不会因不同本地副本重复占用数 GB。
+删除、复制、移动或新建大型文件夹时，窗口保持响应，不因递归文件 IO 和 fsync 长时间显示“未响应”。
 
 ### 本切片范围
 
-- 默认把 Cargo target 放入 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`；不同本地副本共用同一目录，误配置到仓库内时自动重定向。
-- 清理器识别旧版按路径分组的 12 位缓存目录；仅在明确使用 `--prune-targets` 时纳入可清理列表。
-- 只更新构建包装、清理器、对应测试和必要交接文档。
+- 将 `delete_workspace_entry`、`duplicate_workspace_entry`、`copy_workspace_entry`、`move_workspace_entry`、`create_markdown_file` 改为现有的 `async fn + run_blocking` 模式。
+- 保持现有返回值、错误文案、文件监听和右键菜单语义；只把阻塞 IO 移出窗口事件循环。
+- 为大目录失败、目标已存在、源目标相同和取消/中断边界补充 Rust 定向测试。
+- 如果现有进度反馈边界足够稳定，再补最小进度状态；不在本切片引入新的任务系统。
 
 ### 非目标
 
-- 不改变 Markdown、编辑器、导出、更新器、签名或用户数据。
-- 不删除用户目录中的非项目缓存，不生成安装包、Tag、Release 或镜像。
+- 不改 Markdown 编辑器、阅读渲染、导出、更新器、签名、用户数据或跨平台范围。
+- 不顺手实现回收站、撤销历史、云同步或新的文件树功能。
+- 不改变删除语义；回收站方案仍由独立 Issue 决定。
 
 ### 验收标准
 
-- [ ] 包装命令始终使用项目外单一共享 target。
-- [ ] `CARGO_TARGET_DIR` 指向仓库或 worktree 时被安全重定向，指向外部目录时可保留。
-- [ ] 旧版按路径目标能被清理器识别且不跟随非受管目录。
-- [ ] 定向测试、脚本 lint、format 和远程 Quality checks 通过。
-- [ ] 项目内没有新增 `src-tauri/target` 或未忽略的生成物。
+- [ ] 五个命令不再在 Tauri 主线程执行递归文件 IO。
+- [ ] 大目录操作期间窗口、取消和错误反馈保持可用。
+- [ ] 现有成功路径和错误路径行为不回归。
+- [ ] Rust 定向测试、lint、format 和相关 Windows desktop smoke 通过。
+- [ ] 不生成项目内 `src-tauri/target`，继续使用应用级构建缓存。
+- [ ] PR 包含测试结果、手动验证路径、回滚方式和下一项交接。
 
 ### 依赖、风险与回滚
 
-- 依赖：Node、Cargo、Tauri CLI、Windows `LOCALAPPDATA` 和现有 CI 缓存。
-- 风险：共享目标正在使用时不能强制删除；失败时先看实际 target 路径，不扩大清理范围。
-- 回滚：回退本切片 PR；目标目录仅为可再生构建产物，不触碰源码或用户笔记。
+- 依赖：现有 `run_blocking` helper、Tauri command 注册和 Windows 文件系统权限。
+- 风险：跨线程错误转换、操作取消时的部分文件和监听事件顺序；失败时保留现有同步实现的可回滚提交。
+- 回滚：回退 #360 PR；不删除用户文件，不需要数据迁移。
 
 ### 预计修改范围
 
-- 脚本：`scripts/shared-cargo-target.mjs`、`scripts/cleanup-workspace.mjs` 及对应测试。
-- 文档：README、CONTRIBUTING、CHANGELOG、`docs/AI-WORKFLOW.md`、`docs/AI-HANDOFF.md`、本文件和 `docs/UPDATE.md`。
+- 代码：`src-tauri/src/commands.rs` 及其 Rust 测试/命令注册。
+- 测试：相关 Rust 测试、必要的 Windows desktop smoke。
+- 文档：`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/ROADMAP.md`、`CHANGELOG.md`（仅在行为完成后更新）。
 
-## 完成后
+## 开始前检查
 
-1. 记录 PR #379 的最终 head SHA、Quality checks `run_id`、结论和最后变化时间。
-2. CI 全绿且无冲突后合并 PR；#375 已关闭，不重复关闭或重开 Issue。
-3. 合并后从最新 `main` 创建新分支，把唯一下一步切换为 #360；本切片完成后停止，不自动开始 #360。
-4. 本切片不创建安装包、Tag、Release 或镜像；稳定批次再统一发布。
+1. 查看 Issues，确认 #360 没有新的重复反馈。
+2. 从最新 `main` 创建 `codex/<scope>-2026-08-31` 分支和独立 worktree。
+3. 只读取 `docs/AI-WORKFLOW.md`、本文件、#360、相关 Rust 命令、一个相似的 `run_blocking` 实现和对应测试。
+4. 先写一页以内的 READY 上下文，再实现、验证、提交、推送和创建一个 PR。
+5. 合并后更新本文件并停止，不自动开始 #369 或 #359。
 
 ## 快速触发
 
