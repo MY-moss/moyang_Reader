@@ -280,6 +280,16 @@ import {
   type EditorHistoryState,
 } from "./editor-history";
 import { captureEditorViewport, restoreEditorViewport } from "./editor-history-viewport";
+import {
+  canGoBack,
+  createNavigationHistory,
+  getBackNavigationPath,
+  goBack,
+  goForward,
+  pushNavigationPath,
+  replaceNavigationPath,
+  type NavigationHistoryState,
+} from "./navigation-history";
 import type { EditorInsertKind } from "./editor-insertion";
 import {
   classifyFileDropPaths,
@@ -529,6 +539,8 @@ type OpenPathsOutcome = {
   cancelled: boolean;
 };
 
+type DocumentOpenNavigation = "sync" | "push" | "back" | "forward";
+
 type PendingAppSettingsWrite = {
   snapshot: AppSettingsSnapshot;
   localSaved: boolean;
@@ -657,6 +669,7 @@ export function App() {
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
   const [currentHeadingId, setCurrentHeadingId] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
+  const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryState>(() => createNavigationHistory());
   const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -677,6 +690,7 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const navigationHistoryRef = useRef<NavigationHistoryState>(navigationHistory);
   const closeConfirmationOpenRef = useRef(false);
   const sourceDraftRef = useRef(sourceDraft);
   const editorHistoryRef = useRef(editorHistory);
@@ -2253,44 +2267,82 @@ export function App() {
     [releaseDocumentResources, resetEditorHistory],
   );
 
+  const commitNavigationHistory = useCallback((next: NavigationHistoryState) => {
+    if (next === navigationHistoryRef.current) return;
+    navigationHistoryRef.current = next;
+    setNavigationHistory(next);
+  }, []);
+
+  const commitDocumentOpenNavigation = useCallback(
+    (path: string, navigation: DocumentOpenNavigation, previousPath: string | null) => {
+      const current = navigationHistoryRef.current;
+      let next: NavigationHistoryState;
+
+      if (navigation === "push") {
+        const baseline = previousPath ? replaceNavigationPath(current, previousPath) : current;
+        next = pushNavigationPath(baseline, path);
+      } else if (navigation === "back") {
+        const candidate = goBack(current);
+        next =
+          candidate.current && isSameDocumentPath(candidate.current, path)
+            ? candidate
+            : replaceNavigationPath(current, path);
+      } else if (navigation === "forward") {
+        const candidate = goForward(current);
+        next =
+          candidate.current && isSameDocumentPath(candidate.current, path)
+            ? candidate
+            : replaceNavigationPath(current, path);
+      } else {
+        next = replaceNavigationPath(current, path);
+      }
+
+      commitNavigationHistory(next);
+    },
+    [commitNavigationHistory],
+  );
+
   const openPath = useCallback(
-    async (path: string, preserveMode = false): Promise<boolean> => {
+    async (path: string, preserveMode = false, navigation: DocumentOpenNavigation = "sync"): Promise<boolean> => {
+      const previousPath = documentStateRef.current?.path ?? null;
       try {
+        let opened = false;
         if (path.startsWith("browser://")) {
           const cached = browserDocumentsRef.current.get(path);
           if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
           if (cached.bytes) {
-            return await openBinary(path, cached.bytes, preserveMode);
+            opened = await openBinary(path, cached.bytes, preserveMode);
           } else if (cached.source !== undefined) {
-            return await openSource(path, cached.source, preserveMode);
+            opened = await openSource(path, cached.source, preserveMode);
           }
-          return false;
+        } else {
+          const kind = documentKindFromPath(path);
+          if (!kind) {
+            throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
+          }
+          const stamp = await fileMetadata(path);
+          const cached = documentCacheRef.current.get(path, stamp);
+          if (kind === "docx" || kind === "pdf" || kind === "image") {
+            if (cached?.kind === kind && cached.bytes) {
+              opened = await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
+            } else {
+              opened = await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
+            }
+          } else if (cached?.kind === kind) {
+            opened = await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
+          } else {
+            opened = await openSource(path, await readTextFile(path), preserveMode, stamp);
+          }
         }
 
-        const kind = documentKindFromPath(path);
-        if (!kind) {
-          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
-        }
-        const stamp = await fileMetadata(path);
-        const cached = documentCacheRef.current.get(path, stamp);
-        if (kind === "docx" || kind === "pdf" || kind === "image") {
-          if (cached?.kind === kind && cached.bytes) {
-            return await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
-          }
-          return await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
-        }
-
-        if (cached?.kind === kind) {
-          return await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
-        }
-        const source = await readTextFile(path);
-        return await openSource(path, source, preserveMode, stamp);
+        if (opened) commitDocumentOpenNavigation(path, navigation, previousPath);
+        return opened;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "文件打开失败。");
         return false;
       }
     },
-    [openBinary, openSource],
+    [commitDocumentOpenNavigation, openBinary, openSource],
   );
 
   const reloadExternalChange = useCallback(async () => {
@@ -2410,6 +2462,13 @@ export function App() {
     },
     [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
   );
+
+  const handleNavigateBack = useCallback(async () => {
+    const targetPath = getBackNavigationPath(navigationHistoryRef.current);
+    if (!targetPath) return;
+    if (!confirmDocumentReplacement([targetPath], "返回上一文档")) return;
+    await openPath(targetPath, false, "back");
+  }, [confirmDocumentReplacement, openPath]);
 
   const saveDocument = useCallback(async (allowExternalOverwrite = false): Promise<boolean> => {
     const current = documentStateRef.current;
@@ -3345,6 +3404,17 @@ export function App() {
         return;
       }
       if (
+        !isTextEntry &&
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        event.key === "ArrowLeft" &&
+        canGoBack(navigationHistoryRef.current)
+      ) {
+        event.preventDefault();
+        void handleNavigateBack();
+        return;
+      }
+      if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "f" &&
         (event.defaultPrevented || isCodeMirrorEditor)
@@ -3410,6 +3480,7 @@ export function App() {
   }, [
     focusMode,
     handleChooseWorkspace,
+    handleNavigateBack,
     mode,
     openSelectedFile,
     requestEditorInsert,
@@ -4318,14 +4389,15 @@ export function App() {
   );
 
   const handleSelectTab = useCallback(
-    async (path: string) => {
-      if (path === documentState?.path) return;
-      if (!confirmDocumentReplacement([path], "切换文档")) return;
+    async (path: string): Promise<boolean> => {
+      if (documentState?.path && isSameDocumentPath(path, documentState.path)) return true;
+      if (!confirmDocumentReplacement([path], "切换文档")) return false;
       try {
         const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
-        await openPath(authorizedPath);
+        return await openPath(authorizedPath, false, "push");
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "最近文档无法打开，请重新选择文件。");
+        return false;
       }
     },
     [confirmDocumentReplacement, documentState, openPath],
@@ -4364,6 +4436,7 @@ export function App() {
         await openPath(nextTab.path);
       } else {
         setDocumentState(null);
+        commitNavigationHistory(createNavigationHistory());
         setSourceDraft("");
         setMode("rendered");
         setSearchQuery("");
@@ -4374,7 +4447,7 @@ export function App() {
         }
       }
     },
-    [flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],
+    [commitNavigationHistory, flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],
   );
 
   const handleCloseTab = useCallback(
@@ -4468,8 +4541,8 @@ export function App() {
           setError("浏览器预览模式无法解析文档内链接，请在 Moyang Reader 桌面版中打开。");
           return;
         }
-        void handleSelectTab(path).then(() => {
-          if (rawAnchor)
+        void handleSelectTab(path).then((opened) => {
+          if (opened && rawAnchor)
             scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current, revealProgressiveReader);
         });
         return;
@@ -4508,8 +4581,8 @@ export function App() {
         setError("无法解析这个本地文档链接。");
         return;
       }
-      void handleSelectTab(path).then(() => {
-        if (rawAnchor)
+      void handleSelectTab(path).then((opened) => {
+        if (opened && rawAnchor)
           scrollToHeading(safeDecode(rawAnchor), contentAreaRef.current, articleRef.current, revealProgressiveReader);
       });
     },
@@ -4801,6 +4874,9 @@ export function App() {
         case "quick-open":
           setQuickOpen(true);
           break;
+        case "navigate-back":
+          void handleNavigateBack();
+          break;
         case "toggle-mode":
           toggleReadingEditing();
           break;
@@ -4826,6 +4902,7 @@ export function App() {
     },
     [
       handleChooseWorkspace,
+      handleNavigateBack,
       openSelectedFile,
       requestEditorInsert,
       redoEditor,
@@ -4853,6 +4930,12 @@ export function App() {
         id: "quick-open",
         label: "快速打开",
         shortcut: "Ctrl P",
+      },
+      {
+        id: "navigate-back",
+        label: "返回上一文档",
+        shortcut: "Ctrl Alt ←",
+        disabled: !canGoBack(navigationHistory),
       },
       {
         id: "toggle-mode",
@@ -4896,7 +4979,7 @@ export function App() {
         disabled: !documentState,
       },
     ],
-    [canEdit, canRedo, canUndo, focusMode, mode, rightPanelOpen, documentState],
+    [canEdit, canRedo, canUndo, focusMode, mode, navigationHistory, rightPanelOpen, documentState],
   );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
