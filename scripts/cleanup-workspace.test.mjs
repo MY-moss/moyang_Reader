@@ -73,7 +73,10 @@ test("collects legacy path-keyed Cargo caches but ignores unrelated cache folder
       artifacts.some((artifact) => artifact.path === legacyTarget && artifact.protected),
       true,
     );
-    assert.equal(artifacts.some((artifact) => artifact.path === unrelatedTarget), false);
+    assert.equal(
+      artifacts.some((artifact) => artifact.path === unrelatedTarget),
+      false,
+    );
   } finally {
     if (previousCacheRoot === undefined) delete process.env.MOYANG_BUILD_CACHE_DIR;
     else process.env.MOYANG_BUILD_CACHE_DIR = previousCacheRoot;
