@@ -2425,7 +2425,7 @@ fn create_note_parts(target: &str) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn create_markdown_file(
+pub async fn create_markdown_file(
     root: String,
     base_file: String,
     target: String,
@@ -2434,7 +2434,10 @@ pub fn create_markdown_file(
     if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝在未通过用户文件夹选择的工作区中创建文档。请重新添加文件夹。".to_string());
     }
-    create_markdown_file_inner(root, base_file, target)
+    run_blocking("创建 Markdown 文档", move || {
+        create_markdown_file_inner(root, base_file, target)
+    })
+    .await
 }
 
 fn create_markdown_file_inner(
@@ -2930,7 +2933,7 @@ pub fn rename_workspace_entry(
 }
 
 #[tauri::command]
-pub fn delete_workspace_entry(
+pub async fn delete_workspace_entry(
     root: String,
     entry_path: String,
     access: State<'_, AccessRegistry>,
@@ -2938,11 +2941,14 @@ pub fn delete_workspace_entry(
     if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝删除未通过用户文件夹选择的工作区内容。请重新添加文件夹。".to_string());
     }
-    delete_workspace_entry_inner(root, entry_path)
+    run_blocking("删除工作区条目", move || {
+        delete_workspace_entry_inner(root, entry_path)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn duplicate_workspace_entry(
+pub async fn duplicate_workspace_entry(
     root: String,
     entry_path: String,
     name: String,
@@ -2951,11 +2957,14 @@ pub fn duplicate_workspace_entry(
     if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝在未通过用户文件夹选择的工作区中创建副本。请重新添加文件夹。".to_string());
     }
-    duplicate_workspace_entry_inner(root, entry_path, name)
+    run_blocking("创建工作区副本", move || {
+        duplicate_workspace_entry_inner(root, entry_path, name)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn copy_workspace_entry(
+pub async fn copy_workspace_entry(
     root: String,
     entry_path: String,
     destination_parent_path: String,
@@ -2964,11 +2973,14 @@ pub fn copy_workspace_entry(
     if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝复制未通过用户文件夹选择的工作区内容。请重新添加文件夹。".to_string());
     }
-    transfer_workspace_entry_inner(root, entry_path, destination_parent_path, true)
+    run_blocking("复制工作区条目", move || {
+        transfer_workspace_entry_inner(root, entry_path, destination_parent_path, true)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn move_workspace_entry(
+pub async fn move_workspace_entry(
     root: String,
     entry_path: String,
     destination_parent_path: String,
@@ -2977,7 +2989,10 @@ pub fn move_workspace_entry(
     if !access.is_write_allowed(Path::new(&root)) {
         return Err("拒绝移动未通过用户文件夹选择的工作区内容。请重新添加文件夹。".to_string());
     }
-    transfer_workspace_entry_inner(root, entry_path, destination_parent_path, false)
+    run_blocking("移动工作区条目", move || {
+        transfer_workspace_entry_inner(root, entry_path, destination_parent_path, false)
+    })
+    .await
 }
 
 #[tauri::command]
