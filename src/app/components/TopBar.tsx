@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import brandLogo from "../../assets/moyang-reader-logo.png";
 import type {
   DocumentKind,
   ExportMargin,
@@ -263,9 +264,7 @@ export function TopBar({
   return (
     <header className="topbar">
       <div className="brand-block">
-        <span className="brand-mark" aria-hidden="true">
-          M
-        </span>
+        <img className="brand-logo" src={brandLogo} alt="" aria-hidden="true" />
         <div>
           <div className="brand-name">Moyang Reader</div>
           <div className="brand-subtitle">{t("brand.subtitle")}</div>
