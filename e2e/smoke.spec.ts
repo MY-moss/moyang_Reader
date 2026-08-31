@@ -875,6 +875,46 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
 });
 
+test("returns to previously selected documents with the navigation history shortcut", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "history-first.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# History first"),
+    },
+    {
+      name: "history-second.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# History second"),
+    },
+    {
+      name: "history-third.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# History third"),
+    },
+  ]);
+
+  await switchToRenderedMode(page);
+  const tabs = page.getByRole("button", { name: /history-(?:first|second|third)\.md/ });
+  await tabs.filter({ hasText: "history-first.md" }).click();
+  await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
+  await tabs.filter({ hasText: "history-second.md" }).click();
+  await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
+  await tabs.filter({ hasText: "history-third.md" }).click();
+  await expect(page.getByRole("heading", { name: "History third" })).toBeVisible();
+
+  await page.keyboard.press("Control+Alt+ArrowLeft");
+  await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
+
+  await page.keyboard.press("Control+Shift+P");
+  const backCommand = page.getByRole("option", { name: /返回上一文档/ });
+  await expect(backCommand).toBeEnabled();
+  await backCommand.click();
+  await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
+});
+
 test("supports tab gestures and reading zoom shortcuts", async ({ page }) => {
   await page.goto("/");
 
