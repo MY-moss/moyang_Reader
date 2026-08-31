@@ -4,46 +4,54 @@
 
 ## 当前基线（2026-08-31）
 
-- 最新工程修复：PR #381 已合并；统一构建目标到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，拒绝仓库内 `CARGO_TARGET_DIR` 覆盖，并让清理器识别旧版按路径分组缓存；本轮不生成安装包或 Release。
-- 当前主线：`main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`；#172、#357、#358、#375、#379 与 #381 已合并。
-- 稳定版本：`v0.10.13`；此前 Windows x64 Release、NSIS 安装包、Tauri 更新签名和公开镜像资产已核验。
-- 上一功能切片：[#374](https://github.com/MY-moss/moyang_Reader/pull/374) 完成 #172，合并提交为 `c187edcf39798b16d9610b5b8fdda6e22532086c`；Issue #172 已关闭。
-- 上一工程切片：[#375](https://github.com/MY-moss/moyang_Reader/pull/375) 完成工作区空间治理，合并提交为 `c3f5c8ce1967f2649a47337ca699aedca48fd1e8`。
-- 当前 milestone：`v0.11.0`，采用稳定性与用户体验双轨交替。
-- 当前唯一下一步：#360 工作区树操作异步化，详细契约见 [`NEXT.md`](NEXT.md)。
+- 当前主线：`main@d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`；PR #384 已合并，Issue #360 已以 `completed` 关闭。
+- 最新完成切片：PR #384 将 `create_markdown_file`、删除、复制、移动和副本操作改为 `async fn + run_blocking`；保持权限、返回值、错误文案、监听和右键语义不变。
+- Quality checks：run `33361212388` 成功；前端 lint/构建、浏览器与无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
+- 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
+- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#360 纳入下一稳定 Windows x64 批次。
+- 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 ## v0.11.0 当前顺序
 
-1. #172：reduced-motion 程序化滚动（已完成，PR #374）。
-2. #375：工作区空间治理（已完成，PR #375）。
-3. #357：右键菜单 fixed 定位修复（已完成，PR #377）。
-4. #358：插入浮层跟随光标/视口（已完成，PR #380）。
-5. #379：构建缓存防膨胀回归修复（已完成，当前分支补强）。
-6. #360：工作区树操作异步化。
-7. #369：回收站删除与保存上一版本保护。
-8. #359：撤销历史从全量快照收敛为稳定粒度。
-9. #361–#366：视觉、粘贴、插入和确认交互小切片。
-10. #367/#368/#371/#372：知识库体验与本机数据迁移候选。
+1. #360：工作区树操作异步化（已完成，PR #384）。
+2. #369：回收站删除与保存上一版本保护（下一唯一 READY 事项）。
+3. #359：撤销历史从全量快照收敛为稳定粒度。
+4. #361–#366：视觉、粘贴、插入和确认交互小切片。
+5. #367/#368/#371/#372：知识库体验与本机数据迁移候选。
 
-其中 #241/#51 是外部发布条件项；当前唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准，不按列表自动并行开发。
+其中 #241/#51 是外部发布条件项；不按顺序列表自动并行开发，唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准。
 
-每个切片使用独立分支和 PR；中间切片不生成安装包，全部完成后统一准备 `v0.11.0`。
+## 本轮 #384 交接
 
-## 最近工程切片：构建缓存稳定性补强
+- PR：[#384](https://github.com/MY-moss/moyang_Reader/pull/384)，squash 合并提交为 `d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`。
+- 目标：把工作区树的长时递归文件 IO 移出 Tauri 窗口事件循环，降低大目录删除、复制、移动和 Markdown 新建时的“未响应”风险。
+- 变更：保留入口权限校验；五个命令通过现有 `run_blocking` 执行内部文件 IO，没有引入新任务系统、进度协议或依赖。
+- 本地验证：`workspace_entries` 3/3、`markdown_files` 1/1、Rust format 和 `git diff --check` 通过；项目内没有生成 `src-tauri/target`。
+- 远程验证：Quality checks run `33361212388` 成功；旧的格式失败 run `33360473718` 未合并，根因是 API 上传时多出的文件尾空行，已修正。
+- 发布：不单独生成安装包、Tag、Release 或镜像；按稳定批次纳入 `v0.11.0`。
+- 下一唯一任务：#369；完成本次交接后停止，不自动开始 #369。
 
-- 分支：`codex/build-cache-stability-2026-08-31`；基于远程 `main@135d4da7c2225f1097bf288ef30763a82cf916ed` 的等价文件树；这是 PR [#379](https://github.com/MY-moss/moyang_Reader/pull/379) 合并后的缓存稳定性补强。
-- 结果：不同本地副本共用单一应用级 `cargo-target`；仓库内 target 环境变量自动重定向；清理器可识别旧版 12 位路径缓存。
-- 验证：共享缓存路径、仓库内错误覆盖和旧缓存识别的定向测试通过；本轮不创建安装包、Tag、Release 或镜像。
-- 边界：不改变 Markdown、编辑器、用户文档、更新器、签名或发布资产；不顺手处理 #360。
-- 当前状态：代码和文档完成后进入一个 PR；合并后切换 `NEXT.md` 到 #360 并停止。
+## 下一项 #369 的边界
 
-## 本轮 #381 交接
+- 先核对 Windows 回收站 API 与 `.moyang.bak` 滚动策略；删除、恢复和保存安全属于 T3，未经完整回归不要自动合并。
+- 只做最近一份上一版本，不做多级历史、独立回收站 UI 或数据迁移；详细目标和验收见 [`NEXT.md`](NEXT.md)。
 
-- PR：[#381](https://github.com/MY-moss/moyang_Reader/pull/381)，已 squash 合并为 `main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`。
-- 目标：把不同副本和 worktree 的 Cargo/Tauri 构建目标收敛到单一应用级缓存，阻止仓库内错误覆盖，并安全识别旧版缓存。
-- 验证：Quality checks run `33354301746` 成功；合并后主线 run `33355176879` 成功；项目内清理器回收约 7.4 MiB，未触碰用户笔记或非项目缓存。
-- 发布：不生成安装包、Tag、Release 或镜像；该工程修复纳入下一稳定 Windows x64 批次。
-- 下一唯一任务：#360；不自动开始其他 Issue。
+## 已知条件与风险
+
+- #241：Cloudflare 静态自动部署仍需仓库凭据；凭据不得进入仓库、Issue、PR 或聊天。
+- #51：Tauri 更新包已有签名，NSIS Authenticode 仍取决于证书；无证书时保留 SmartScreen 限制和哈希核验说明。
+- 原始开发目录存在大量未提交修改且落后主线；所有新切片必须从最新 `main` 建独立 worktree，不得重置或覆盖原目录。
+
+## 文档职责
+
+- `docs/NEXT.md`：唯一当前任务，最多 120 行，无历史。
+- `docs/AI-HANDOFF.md`：当前版本状态和外部风险摘要，最多约 150 行。
+- `docs/handoff/v0.11.md`：v0.11 已完成切片的短记录。
+- `docs/handoff/v0.10.md`、`v0.9-and-earlier.md`：只读历史摘要。
+- `docs/ROADMAP.md`：版本目标和跨切片顺序。
+- `docs/ISSUE-INDEX.md`：Issue 分类、Ready 状态与治理规则。
+
+## 历史交接摘要
 
 ## 最近完成
 

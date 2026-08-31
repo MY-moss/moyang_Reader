@@ -2,7 +2,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-08-30）
 
-- 稳定基线：`v0.10.13`；当前远程主线为 `main@5c039f75a8bd471e14ccacbeedf3ef8a233ea51c`，PR #377 已完成 #357，PR #380 已完成 #358，PR #379 与 PR #381 已完成构建缓存外置和稳定性补强。
+- 稳定基线：`v0.10.13`；当前远程主线为 `main@d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`，PR #377 已完成 #357，PR #380 已完成 #358，PR #379 与 PR #381 已完成构建缓存稳定性补强，PR #384 已完成 #360。
 - 交付方式：稳定性与用户体验切片交替推进；一个切片、一个主要分支、一个 PR，合并后更新 [`NEXT.md`](NEXT.md) 并停止。
 - 发布方式：中间切片不生成安装包；全部非条件切片完成后统一准备 `v0.11.0` Windows x64 Release。
 
@@ -21,6 +21,14 @@
 | 11   | #357     | 右键菜单 fixed 定位修复（已完成）          | PR #377；脱离 content-area containing block，位置、裁剪和滚动稳定性通过    |
 | 12   | #358     | 插入浮层跟随光标/视口（已完成）            | PR #380；长文档中部定位、焦点 preventScroll 和滚动稳定性通过               |
 | 13   | #379     | 构建缓存防膨胀回归修复（已完成，当前补强） | 单一应用级 Cargo target、仓库内覆盖重定向、旧版缓存识别和定向测试通过      |
+
+## #360 工作区树操作异步化（已完成）
+
+- 用户价值：大目录删除、复制、移动或 Markdown 新建期间，窗口不再被递归文件 IO 长时间占满。
+- 实现：`create_markdown_file`、`delete_workspace_entry`、`duplicate_workspace_entry`、`copy_workspace_entry` 和 `move_workspace_entry` 改为 `async fn + run_blocking`；权限校验、返回值、错误文案、监听和右键语义保持不变。
+- 验证：本地工作区树定向测试 3/3、Markdown 文件定向测试 1/1、Rust format、`git diff --check` 通过；远程 Quality checks run `33361212388` 成功，包含 Windows desktop smoke、Rust clippy 和完整 Rust 测试。
+- 发布：PR [#384](https://github.com/MY-moss/moyang_Reader/pull/384) 已 squash 合并为 `main@d25eb0b6f6e2330bbc1cf67ee7ac08d305b1b931`；Issue [#360](https://github.com/MY-moss/moyang_Reader/issues/360) 已以 `completed` 关闭；不单独生成安装包、Tag、Release 或镜像，纳入下一稳定 Windows x64 批次。
+- 回滚：回退 PR #384；不删除用户文件，不需要数据迁移。下一唯一 READY 事项为 #369。
 
 ## #358 插入浮层跟随光标/视口（已完成）
 
@@ -333,7 +341,7 @@
 
 ## 下一 Ready 选择
 
-- 当前 Ready：#358 插入浮层跟随光标/视口；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
+- 当前 Ready：#369 回收站删除与保存上一版本保护；范围、验收和回滚契约见 [`NEXT.md`](NEXT.md)；#241/#51 仍需先满足外部发布条件。
 - 发布收尾：如需让静态镜像 workflow 变绿，维护者配置 `CLOUDFLARE_API_TOKEN`（Pages 写入权限）和 `CLOUDFLARE_ACCOUNT_ID` 后重跑 v0.10.10；镜像凭据不写入仓库或交接上下文。
 
 ## 平台范围收敛
