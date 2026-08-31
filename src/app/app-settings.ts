@@ -72,7 +72,9 @@ function parseSnapshot(value: unknown): AppSettingsSnapshot | null {
 
   const savedAt = typeof value.savedAt === "number" && Number.isFinite(value.savedAt) ? value.savedAt : 0;
   const activeContextTab =
-    value.activeContextTab === "backlinks" || value.activeContextTab === "properties"
+    value.activeContextTab === "backlinks" ||
+    value.activeContextTab === "properties" ||
+    value.activeContextTab === "bookmarks"
       ? value.activeContextTab
       : "outline";
   const theme = value.theme === "light" || value.theme === "dark" ? value.theme : "system";

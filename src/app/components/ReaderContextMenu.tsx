@@ -5,6 +5,7 @@ export type ReaderContextTarget = {
   y: number;
   selectedText: string;
   linkHref: string | null;
+  headingId?: string | null;
   restoreFocusTarget?: HTMLElement | null;
   fallbackFocusTarget?: HTMLElement | null;
 };
@@ -13,6 +14,8 @@ type ReaderContextMenuProps = {
   target: ReaderContextTarget;
   documentPath?: string | null;
   canEdit: boolean;
+  canBookmark?: boolean;
+  isBookmarked?: boolean;
   editLabel: string;
   onCopySelection: (text: string) => void;
   onFindSelection: (text: string) => void;
@@ -20,6 +23,7 @@ type ReaderContextMenuProps = {
   onOpenLink: (href: string) => void;
   onEdit: () => void;
   onCopyDocumentPath: () => void;
+  onToggleBookmark?: () => void;
   onClose: () => void;
 };
 
@@ -27,6 +31,8 @@ export function ReaderContextMenu({
   target,
   documentPath,
   canEdit,
+  canBookmark = false,
+  isBookmarked = false,
   editLabel,
   onCopySelection,
   onFindSelection,
@@ -34,6 +40,7 @@ export function ReaderContextMenu({
   onOpenLink,
   onEdit,
   onCopyDocumentPath,
+  onToggleBookmark,
   onClose,
 }: ReaderContextMenuProps) {
   const hasSelection = Boolean(target.selectedText.trim());
@@ -84,11 +91,20 @@ export function ReaderContextMenu({
               },
             ]
           : []),
-        ...(canEdit || documentPath
+        ...(canEdit || documentPath || (canBookmark && onToggleBookmark)
           ? [
               {
                 label: "文档",
                 items: [
+                  ...(canBookmark && onToggleBookmark
+                    ? [
+                        {
+                          id: "reader-toggle-bookmark",
+                          label: isBookmarked ? "移除当前书签" : "添加书签",
+                          onSelect: onToggleBookmark,
+                        },
+                      ]
+                    : []),
                   ...(canEdit
                     ? [
                         {

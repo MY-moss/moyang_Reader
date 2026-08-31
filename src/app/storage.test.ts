@@ -81,6 +81,9 @@ describe("reader storage", () => {
 
     expect(loadContextPanelOpen()).toBe(false);
     expect(loadContextPanelTab()).toBe("properties");
+
+    saveContextPanelTab("bookmarks");
+    expect(loadContextPanelTab()).toBe("bookmarks");
   });
 
   it("persists bounded pane widths and recovers from malformed values", () => {

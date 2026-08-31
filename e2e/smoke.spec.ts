@@ -212,7 +212,7 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "目录" })).toBeVisible();
-  await expect(page.getByRole("tab")).toHaveCount(3);
+  await expect(page.getByRole("tab")).toHaveCount(4);
 });
 
 test("keeps a direct read/edit action for immediate WYSIWYG editing", async ({ page }) => {
@@ -684,6 +684,48 @@ test("opens a reader context menu for selected text and links", async ({ page })
   const linkMenu = page.getByRole("menu", { name: "阅读内容菜单" });
   await expect(linkMenu.getByRole("menuitem", { name: "复制链接地址" })).toBeVisible();
   await expect(linkMenu.getByRole("menuitem", { name: "打开链接" })).toBeVisible();
+});
+
+test("adds, jumps to and deletes a document bookmark", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "bookmark-slice.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(
+      [
+        "# Bookmark slice",
+        "",
+        ...Array.from({ length: 36 }, (_, index) => `前置阅读内容 ${index + 1}，用于验证书签跳转。`),
+        "",
+        "## Important section",
+        "",
+        "需要稍后回来的内容。",
+      ].join("\n"),
+    ),
+  });
+
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+  await switchToRenderedMode(page);
+
+  await page.getByRole("heading", { name: "Important section" }).click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "阅读内容菜单" });
+  await expect(menu.getByRole("menuitem", { name: "添加书签" })).toBeVisible();
+  await menu.getByRole("menuitem", { name: "添加书签" }).click();
+
+  await page.getByRole("tab", { name: "书签" }).click();
+  const bookmark = page.getByRole("button", { name: "打开书签：bookmark-slice.md · #important-section" });
+  await expect(bookmark).toBeVisible();
+
+  const contentArea = page.locator(".content-area");
+  await contentArea.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await bookmark.click();
+  await expect.poll(() => contentArea.evaluate((element) => element.scrollTop)).toBeGreaterThan(100);
+
+  await page.getByRole("button", { name: "删除书签：bookmark-slice.md · #important-section" }).click();
+  await expect(bookmark).toHaveCount(0);
 });
 
 test("keeps keyboard context menus contained and returns focus across tabs, reader, and editor", async ({ page }) => {
