@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAllDraftSnapshots,
   clearDraftSnapshot,
+  getDraftSnapshotState,
   findDraftSnapshot,
   formatDraftRecoveryTime,
   loadDraftSnapshots,
@@ -120,8 +121,26 @@ describe("draft recovery", () => {
       return originalSetItem.call(localStorage, key, value);
     });
 
-    expect(saveDraftSnapshot(newDraft)).toEqual({ ok: true, prunedCount: 1 });
+    expect(saveDraftSnapshot(newDraft)).toMatchObject({ ok: true, prunedCount: 1, snapshots: [newDraft] });
     expect(loadDraftSnapshots()).toEqual([newDraft]);
     expect(attempts).toBe(1);
+  });
+
+  it("parses the persisted store once and reuses the in-memory snapshot state", () => {
+    const original = { path: "C:/Notes/original.md", draft: "draft", baseSource: "source", savedAt: 1 };
+    localStorage.setItem("moyang-reader-drafts", JSON.stringify([original]));
+    const parseSpy = vi.spyOn(JSON, "parse");
+
+    expect(getDraftSnapshotState(original.path, original.baseSource).snapshot).toEqual(original);
+    expect(findDraftSnapshot(original.path, original.baseSource)).toEqual(original);
+    const saveResult = saveDraftSnapshot({ path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 });
+    expect(saveResult.ok).toBe(true);
+    if (!saveResult.ok) throw new Error("expected draft save to succeed");
+    expect(saveResult.snapshots).toEqual([
+      { path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 },
+      original,
+    ]);
+
+    expect(parseSpy).toHaveBeenCalledTimes(1);
   });
 });

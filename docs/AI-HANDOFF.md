@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-08-31）
 
-- 当前主线：`main@41acf808a54683e9ed4b2f7a1d15cdc132c8629d`；PR #384、#385、#386、#388、#389、#390 已合并，Issue #360、#359、#361、#369 已以 `completed` 关闭。
+- 当前主线基线（本切片开始）：`main@28bf09d88f3eb379897c31adbdeda5ef426b2adc`；PR #384、#385、#386、#388、#389、#390、#391 已合并，Issue #360、#359、#361、#369 已以 `completed` 关闭；#362 正在本切片完成。
 - 最新完成切片：PR #390 完成 #361——暗色主题实心 accent 按钮对比度修复；保持 Windows x64、本地优先和 Markdown 真源边界。
 - Quality checks：run `33392327386` 成功；前端 lint/构建、浏览器与无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前唯一 READY：#362 交互与渲染微成本包；必须从以上最新 `main` 新建分支，完成一个垂直切片后停止。
+- 当前切片：#362 交互与渲染微成本包；分支为 `codex/perf-micro-cost-2026-08-31`，完成 PR、Issue 状态和交接同步后停止，不自动开启下一项。
 - 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361 和 #369 纳入下一稳定 Windows x64 批次。
 - 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -32,12 +32,13 @@
 - 发布：本切片属于 `v0.11.x` 普通视觉修复，不单独生成安装包、Tag、Release 或镜像；纳入下一 Windows x64 稳定批次。
 - 回滚：回退本切片提交，无数据迁移。
 
-## 下一唯一 READY：#362 交互与渲染微成本包
+## 本轮 #362 交互与渲染微成本包（实现完成，待 PR）
 
 - 目标：降低面板拖动期间的全 App 重渲染与重复持久化，减少草稿链路重复全量 parse，并避免差异弹层在无输入变化时重算全文 diff。
 - 非目标：不改变面板、草稿和差异语义；不引入专用数据库，不改 Markdown 真源，不顺手扩展其他性能或 UI Issue。
 - 预计范围：`src/app/PaneResizeHandle.tsx`、`src/app/App.tsx`、`src/app/draft-recovery.ts`、`src/app/components/DraftRecoveryComparisonDialog.tsx` 及对应测试；先测量再最小拆分。
-- 验收：拖动期间不写持久化设置、pointerup 才提交；草稿保存/查找不重复全量解析；差异输入不变时只计算一次；既有拖拽、草稿恢复、差异和 Windows smoke 不回归。
+- 实现：拖动期间只更新 app-shell CSS 变量，pointerup/cancel/lost-capture 才提交 React 状态和持久化；草稿存储按原始序列化内容复用解析结果，保存结果直接携带最新快照列表，查找与列表加载共用一次读取；差异计算按来源、状态和草稿内容 memo。
+- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针在查找与保存链路中仅执行 1 次。
 - 验证/发布：T2，相关单测或性能探针、前端 lint/format/build 和一个浏览器 E2E；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
 
 ## 本轮 #359 交接（已合并）

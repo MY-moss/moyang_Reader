@@ -241,6 +241,7 @@ import {
 import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
+import type { PaneWidths } from "./pane-layout";
 import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
@@ -262,7 +263,7 @@ import {
 import {
   clearAllDraftSnapshots,
   clearDraftSnapshot,
-  findDraftSnapshot,
+  getDraftSnapshotState,
   loadDraftSnapshots,
   saveDraftSnapshot,
   type DraftSnapshot,
@@ -659,6 +660,7 @@ export function App() {
   const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const appShellRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const progressiveReaderRef = useRef<ProgressiveReaderContentHandle>(null);
@@ -679,6 +681,7 @@ export function App() {
   const sourceDraftRef = useRef(sourceDraft);
   const editorHistoryRef = useRef(editorHistory);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
+  const paneWidthsRef = useRef<PaneWidths>(paneWidths);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const openTabsRef = useRef<RecentFile[]>(openTabs);
   const readingZoomNoticeTimerRef = useRef<number | null>(null);
@@ -781,20 +784,49 @@ export function App() {
     });
   }, []);
 
-  const resizePane = useCallback((side: PaneSide, delta: number) => {
-    setPaneWidths((current) => {
-      const nextWidth = clampPaneWidth(side, current[side] + delta);
-      if (nextWidth === current[side]) return current;
-      return { ...current, [side]: nextWidth };
-    });
+  const setPaneWidthCss = useCallback((side: PaneSide, width: number) => {
+    const variable = side === "sidebar" ? "--sidebar-width" : "--context-width";
+    appShellRef.current?.style.setProperty(variable, `${width}px`);
   }, []);
 
-  const resetPane = useCallback((side: PaneSide) => {
-    setPaneWidths((current) => ({
-      ...current,
-      [side]: DEFAULT_PANE_WIDTHS[side],
-    }));
+  const resizePane = useCallback(
+    (side: PaneSide, delta: number) => {
+      const current = paneWidthsRef.current;
+      const nextWidth = clampPaneWidth(side, current[side] + delta);
+      if (nextWidth === current[side]) return;
+      const next = { ...current, [side]: nextWidth };
+      paneWidthsRef.current = next;
+      setPaneWidthCss(side, nextWidth);
+      setPaneWidths(next);
+    },
+    [setPaneWidthCss],
+  );
+
+  const previewPaneResize = useCallback(
+    (side: PaneSide, delta: number) => {
+      const current = paneWidthsRef.current;
+      const nextWidth = clampPaneWidth(side, current[side] + delta);
+      if (nextWidth === current[side]) return;
+      paneWidthsRef.current = { ...current, [side]: nextWidth };
+      setPaneWidthCss(side, nextWidth);
+    },
+    [setPaneWidthCss],
+  );
+
+  const commitPaneResize = useCallback(() => {
+    setPaneWidths(paneWidthsRef.current);
   }, []);
+
+  const resetPane = useCallback(
+    (side: PaneSide) => {
+      const current = paneWidthsRef.current;
+      const next = { ...current, [side]: DEFAULT_PANE_WIDTHS[side] };
+      paneWidthsRef.current = next;
+      setPaneWidthCss(side, next[side]);
+      setPaneWidths(next);
+    },
+    [setPaneWidthCss],
+  );
 
   const enqueueNativeSettingsWrite = useCallback((pending: PendingAppSettingsWrite): Promise<boolean> => {
     const revision = ++settingsWriteRevisionRef.current;
@@ -919,7 +951,7 @@ export function App() {
         return false;
       }
 
-      const snapshots = loadDraftSnapshots();
+      const snapshots = result.snapshots;
       setDraftSnapshots(snapshots);
       if (result.prunedCount > 0) {
         notify(`草稿空间不足，仅保留最近 ${snapshots.length} 条。`, "info");
@@ -1148,6 +1180,7 @@ export function App() {
           setSidebarCollapsed(nativeSnapshot.sidebarCollapsed);
           setRightPanelOpen(nativeSnapshot.rightPanelOpen);
           setActiveContextTab(nativeSnapshot.activeContextTab);
+          paneWidthsRef.current = nativeSnapshot.paneWidths;
           setPaneWidths(nativeSnapshot.paneWidths);
         }
         setNativeSettingsReady(true);
@@ -2099,9 +2132,10 @@ export function App() {
         setSourceDraft(source);
         sourceDraftRef.current = source;
         resetEditorHistory(path, source);
-        setDraftRecovery(findDraftSnapshot(path, source));
+        const draftState = getDraftSnapshotState(path, source);
+        setDraftRecovery(draftState.snapshot);
         setPreviousVersion(null);
-        setDraftSnapshots(loadDraftSnapshots());
+        setDraftSnapshots(draftState.snapshots);
         setOpenTabs((current) =>
           current.some((tab) => tab.path === path) ? current : [...current, { path, name: fileNameFromPath(path) }],
         );
@@ -2425,8 +2459,7 @@ export function App() {
           ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
           : latest,
       );
-      clearDraftSnapshot(path);
-      setDraftSnapshots(loadDraftSnapshots());
+      setDraftSnapshots(clearDraftSnapshot(path));
       setDraftRecovery(null);
       setExternalChangePath(null);
       setError(null);
@@ -3780,8 +3813,7 @@ export function App() {
     const request = draftDiscardRequest;
     if (!request) return;
 
-    clearDraftSnapshot(request.path);
-    const remaining = loadDraftSnapshots();
+    const remaining = clearDraftSnapshot(request.path);
     setDraftSnapshots(remaining);
     if (isSameDocumentPath(draftRecovery?.path ?? "", request.path)) setDraftRecovery(null);
     setDraftDiscardRequest(null);
@@ -5172,6 +5204,7 @@ export function App() {
 
   return (
     <div
+      ref={appShellRef}
       className={`app-shell reading-width-${preferences.readingWidth}${
         focusMode ? " focus-mode" : ""
       }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
@@ -5419,6 +5452,8 @@ export function App() {
             min={PANE_WIDTH_LIMITS.sidebar.min}
             max={PANE_WIDTH_LIMITS.sidebar.max}
             onResizeBy={(delta) => resizePane("sidebar", delta)}
+            onResizePreview={(delta) => previewPaneResize("sidebar", delta)}
+            onResizeCommit={commitPaneResize}
             onReset={() => resetPane("sidebar")}
           />
         )}
@@ -5597,6 +5632,8 @@ export function App() {
             min={PANE_WIDTH_LIMITS.context.min}
             max={PANE_WIDTH_LIMITS.context.max}
             onResizeBy={(delta) => resizePane("context", delta)}
+            onResizePreview={(delta) => previewPaneResize("context", delta)}
+            onResizeCommit={commitPaneResize}
             onReset={() => resetPane("context")}
           />
         )}

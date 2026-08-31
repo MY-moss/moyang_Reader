@@ -16,6 +16,16 @@ function mountHandle() {
   return { container, root, onResizeBy };
 }
 
+function dispatchPointerEvent(target: HTMLElement, type: string, clientX: number) {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperties(event, {
+    button: { value: 0 },
+    clientX: { value: clientX },
+    pointerId: { value: 1 },
+  });
+  void act(() => target.dispatchEvent(event));
+}
+
 describe("PaneResizeHandle", () => {
   it("exposes a vertical separator and keyboard resizing", () => {
     const { container, root, onResizeBy } = mountHandle();
@@ -34,6 +44,48 @@ describe("PaneResizeHandle", () => {
       handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, shiftKey: true }));
     });
     expect(onResizeBy).toHaveBeenLastCalledWith(-48);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps pointer dragging in the preview path and commits once at the end", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onResizeBy = vi.fn();
+    const onResizePreview = vi.fn();
+    const onResizeCommit = vi.fn();
+
+    act(() => {
+      root.render(
+        <PaneResizeHandle
+          side="sidebar"
+          value={260}
+          min={220}
+          max={380}
+          onResizeBy={onResizeBy}
+          onResizePreview={onResizePreview}
+          onResizeCommit={onResizeCommit}
+          onReset={vi.fn()}
+        />,
+      );
+    });
+
+    const handle = container.querySelector<HTMLElement>('[role="separator"]');
+    expect(handle).not.toBeNull();
+    Object.defineProperty(handle, "setPointerCapture", { value: vi.fn() });
+
+    dispatchPointerEvent(handle!, "pointerdown", 100);
+    dispatchPointerEvent(handle!, "pointermove", 116);
+    dispatchPointerEvent(handle!, "pointermove", 132);
+    expect(onResizePreview).toHaveBeenNthCalledWith(1, 16);
+    expect(onResizePreview).toHaveBeenNthCalledWith(2, 16);
+    expect(onResizeBy).not.toHaveBeenCalled();
+    expect(onResizeCommit).not.toHaveBeenCalled();
+
+    dispatchPointerEvent(handle!, "pointerup", 132);
+    expect(onResizeCommit).toHaveBeenCalledOnce();
 
     act(() => root.unmount());
     container.remove();
