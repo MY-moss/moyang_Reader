@@ -18,7 +18,7 @@ const maxRecentFiles = 12;
 const maxRecentWorkspaces = 8;
 export const MAX_MOUNTED_WORKSPACES = 5;
 const maxOpenTabs = 16;
-const maxReadingPositions = 32;
+export const MAX_READING_POSITIONS = 32;
 
 export type WorkspaceSession = {
   path: string;
@@ -253,38 +253,54 @@ export function saveOpenTabs(tabs: RecentFile[]): void {
   }
 }
 
-type StoredReadingPosition = {
+export type ReadingPosition = {
   path: string;
   top: number;
 };
 
-function loadReadingPositions(): StoredReadingPosition[] {
+function isReadingPosition(value: unknown): value is ReadingPosition {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ReadingPosition).path === "string" &&
+    typeof (value as ReadingPosition).top === "number" &&
+    Number.isFinite((value as ReadingPosition).top) &&
+    (value as ReadingPosition).top >= 0
+  );
+}
+
+export function normalizeReadingPositions(value: unknown): ReadingPosition[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  return value
+    .filter(isReadingPosition)
+    .map((item) => ({ path: item.path.trim(), top: Math.max(0, Math.round(item.top)) }))
+    .filter((item) => item.path.length > 0)
+    .filter((item) => {
+      const key = comparablePath(item.path);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_READING_POSITIONS);
+}
+
+export function loadReadingPositions(): ReadingPosition[] {
   try {
     const raw = localStorage.getItem(readingPositionsKey);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    const seen = new Set<string>();
-    return parsed
-      .filter(
-        (item): item is StoredReadingPosition =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof (item as StoredReadingPosition).path === "string" &&
-          typeof (item as StoredReadingPosition).top === "number" &&
-          Number.isFinite((item as StoredReadingPosition).top) &&
-          (item as StoredReadingPosition).top >= 0,
-      )
-      .filter((item) => {
-        const key = comparablePath(item.path);
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, maxReadingPositions);
+    return normalizeReadingPositions(JSON.parse(raw) as unknown);
   } catch {
     return [];
+  }
+}
+
+export function saveReadingPositions(positions: readonly ReadingPosition[]): void {
+  try {
+    localStorage.setItem(readingPositionsKey, JSON.stringify(normalizeReadingPositions(positions)));
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
   }
 }
 
@@ -297,15 +313,7 @@ export function saveReadingPosition(path: string, top: number): void {
   const key = comparablePath(path);
   if (!key || !Number.isFinite(top)) return;
 
-  try {
-    const next = [
-      { path, top: Math.max(0, Math.round(top)) },
-      ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key),
-    ].slice(0, maxReadingPositions);
-    localStorage.setItem(readingPositionsKey, JSON.stringify(next));
-  } catch {
-    // Local storage may be unavailable in a restricted browser preview.
-  }
+  saveReadingPositions([{ path, top }, ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key)]);
 }
 
 function parseWorkspaceList(raw: string | null, limit: number): RecentWorkspace[] {

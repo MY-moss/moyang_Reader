@@ -186,6 +186,7 @@ import {
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
+  loadReadingPositions,
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
@@ -198,6 +199,7 @@ import {
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
+  saveReadingPositions,
   saveSidebarCollapsed,
   saveContextPanelOpen,
   saveContextPanelTab,
@@ -1163,6 +1165,8 @@ export function App() {
           mountedWorkspaces,
           workspaceSessions: loadWorkspaceSessions(),
           openTabs,
+          readingPositions: loadReadingPositions(),
+          bookmarks,
         }),
       );
       if (isTauriRuntime()) {
@@ -1177,7 +1181,7 @@ export function App() {
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : "设置备份导出失败。", "error");
     }
-  }, [locale, mountedWorkspaces, notify, openTabs, preferences, theme, workspacePath]);
+  }, [bookmarks, locale, mountedWorkspaces, notify, openTabs, preferences, theme, workspacePath]);
 
   const importPortableSettings = useCallback(() => {
     const input = document.createElement("input");
@@ -1194,6 +1198,11 @@ export function App() {
           saveReaderPreferences(bundle.preferences);
           saveWorkspaceSessions([...bundle.workspaceSessions]);
           saveOpenTabs([...bundle.openTabs]);
+          if (bundle.version >= 2) {
+            saveReadingPositions(bundle.readingPositions);
+            saveBookmarks(bundle.bookmarks);
+            setBookmarks([...bundle.bookmarks]);
+          }
           saveMountedWorkspaces([...bundle.mountedWorkspaces]);
           saveWorkspacePath(bundle.workspacePath);
           saveLastDocumentPath(bundle.lastDocumentPath);
@@ -1203,7 +1212,11 @@ export function App() {
           saveLocale(bundle.locale);
           setTheme(bundle.theme);
           setMountedWorkspaces([...bundle.mountedWorkspaces]);
-          notify("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
+          notify(
+            bundle.version >= 2
+              ? "设置已导入；阅读位置和书签也已恢复，阅读库路径将在重新授权后恢复。"
+              : "旧版设置已导入；该备份不含阅读位置和书签，现有本机记录已保留。阅读库路径将在重新授权后恢复。",
+          );
         })
         .catch((cause: unknown) => {
           notify(cause instanceof Error ? cause.message : "设置备份导入失败。", "error");
