@@ -56,6 +56,7 @@ import {
 } from "./annotation-highlighter";
 import {
   chooseDocumentPaths,
+  chooseImagePaths,
   chooseSavePath,
   chooseWorkspacePath,
   authorizeStoredPath,
@@ -211,6 +212,7 @@ import {
   saveWorkspacePath,
 } from "./storage";
 import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
+import { relativeMarkdownAssetPath } from "./markdown-path";
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
@@ -4035,6 +4037,41 @@ export function App() {
     [saveClipboardImageAsset],
   );
 
+  const handlePickImageForInsert = useCallback(async (): Promise<string | null> => {
+    const current = documentStateRef.current;
+    const root = workspacePathRef.current;
+    if (!isTauriRuntime()) {
+      setError("浏览器预览模式不能浏览本地图片，请使用桌面版 Moyang Reader。");
+      return null;
+    }
+    if (!current || current.kind !== "markdown") {
+      setError("图片插入仅支持 Markdown 文档。");
+      return null;
+    }
+    if (!root || current.path.startsWith("browser://")) {
+      setError("请先添加文档所在的文件夹，再浏览工作区图片。");
+      return null;
+    }
+
+    const selectedPaths = await chooseImagePaths();
+    const selectedPath = selectedPaths[0];
+    if (!selectedPath) return null;
+
+    const documentRelativePath = workspaceRelativePath(root, current.path);
+    const assetRelativePath = workspaceRelativePath(root, selectedPath);
+    const source =
+      documentRelativePath && assetRelativePath
+        ? relativeMarkdownAssetPath(documentRelativePath, assetRelativePath)
+        : null;
+    if (!source) {
+      setError("请选择当前工作区内的图片；工作区外的图片请手动填写路径或先复制到工作区。");
+      return null;
+    }
+
+    setError(null);
+    return source;
+  }, []);
+
   const handleSourcePaste = useCallback(
     (context: SourceEditorPasteContext) => {
       const image = findClipboardImage(context.clipboardData);
@@ -6048,6 +6085,7 @@ export function App() {
                 onStatusMessage={(message) => notify(message)}
                 wikiCandidates={wikiLinkCandidates}
                 onPasteImage={handleWysiwygPasteImage}
+                onPickImage={handlePickImageForInsert}
               />
             </Suspense>
           )}
@@ -6066,6 +6104,7 @@ export function App() {
               onRedo={(target) => redoEditor(target)}
               onStatusMessage={(message) => notify(message)}
               wikiCompletions={wikiLinkCandidates}
+              onPickImage={handlePickImageForInsert}
             />
           )}
           {readerContextMenu && documentState && mode === "rendered" && (

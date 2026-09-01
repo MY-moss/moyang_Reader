@@ -1283,6 +1283,12 @@ test("uses the in-app insertion panel for WYSIWYG links and source images/tables
 
   const wysiwygDialog = page.getByRole("dialog", { name: "插入内容" });
   await expect(wysiwygDialog).toBeVisible();
+  const linkTab = wysiwygDialog.getByRole("tab", { name: "链接" });
+  await linkTab.focus();
+  await linkTab.press("ArrowRight");
+  await expect(wysiwygDialog.getByRole("tab", { name: "双链" })).toHaveAttribute("aria-selected", "true");
+  await expect(wysiwygDialog.getByRole("tab", { name: "双链" })).toBeFocused();
+  await linkTab.click();
   await wysiwygDialog.getByLabel("地址").fill("https://example.com");
   await wysiwygDialog.getByRole("button", { name: "插入到正文" }).click();
 
@@ -1295,6 +1301,7 @@ test("uses the in-app insertion panel for WYSIWYG links and source images/tables
   await sourceToolbar.getByRole("button", { name: "插入" }).click();
   const sourceDialog = page.getByRole("dialog", { name: "插入内容" });
   await sourceDialog.getByRole("tab", { name: "图片" }).click();
+  await expect(sourceDialog.getByRole("button", { name: "浏览图片" })).toBeVisible();
   await sourceDialog.getByLabel("图片路径或 URL").fill("images/cover.png");
   await sourceDialog.getByLabel("替代文字").fill("封面");
   await sourceDialog.getByRole("button", { name: "插入到正文" }).click();
@@ -1309,6 +1316,28 @@ test("uses the in-app insertion panel for WYSIWYG links and source images/tables
   await tableDialog.getByRole("button", { name: "插入到正文" }).click();
   await expect.poll(async () => readEditorText(source)).toContain("列 4");
   await expect(page.getByRole("dialog", { name: "插入内容" })).toHaveCount(0);
+});
+
+test("returns focus to the editor after cancelling an insertion panel", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "insert-focus-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# 插入焦点\n\n继续编辑"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await editable.click();
+  await page.locator(".wysiwyg-editor .editor-format-toolbar").getByRole("button", { name: "插入" }).click();
+
+  const insertDialog = page.getByRole("dialog", { name: "插入内容" });
+  await expect(insertDialog).toBeVisible();
+  await insertDialog.press("Escape");
+
+  await expect(insertDialog).toHaveCount(0);
+  await expect(editable).toBeFocused();
 });
 
 test("keeps the insert panel near the caret without hijacking a long-document viewport", async ({ page }) => {

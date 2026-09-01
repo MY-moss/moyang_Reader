@@ -3560,6 +3560,12 @@ html.pane-resizing * {
   display: grid;
   gap: 10px;
 }
+.editor-insert-image-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
 .editor-insert-field {
   display: grid;
   gap: 5px;
@@ -3590,6 +3596,27 @@ html.pane-resizing * {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
   outline: 0;
+}
+.editor-insert-browse {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--accent-deep);
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.editor-insert-browse:hover:not(:disabled),
+.editor-insert-browse:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  outline: 0;
+}
+.editor-insert-browse:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 .editor-insert-number-row {
   display: grid;
