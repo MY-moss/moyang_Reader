@@ -4,9 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches:
-      - main
-      - "codex/**"
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -22,10 +20,9 @@ permissions:
 jobs:
   quality:
     name: Quality checks
-    # First-party feature branches run once from the push event so the
-    # required check is attached directly to the PR head SHA. Forks continue
-    # to use pull_request, which avoids granting write access to untrusted code.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # Feature branches use the pull_request event as their single validation
+    # path. This also covers commits created through the GitHub API, which do
+    # not always emit a push event; main remains covered by the push trigger.
     runs-on: windows-latest
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org

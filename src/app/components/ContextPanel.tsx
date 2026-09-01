@@ -1,4 +1,6 @@
 import type { ContextPanelTab, OpenDocument, ReaderMode, TocItem, WorkspaceIndexEntry } from "../types";
+import type { DocumentBookmark } from "../bookmarks";
+import { BookmarksPanel } from "./BookmarksPanel";
 import { Outline } from "./Outline";
 import { ReadingRail } from "./ReadingRail";
 import { RelatedPanel } from "./RelatedPanel";
@@ -8,6 +10,8 @@ type ContextPanelProps = {
   entry?: WorkspaceIndexEntry;
   backlinks: WorkspaceIndexEntry[];
   outgoing: Array<{ target: string; entry?: WorkspaceIndexEntry }>;
+  bookmarks: DocumentBookmark[];
+  knownPaths: string[];
   canCreateNote: boolean;
   selectedTag: string | null;
   toc: TocItem[];
@@ -19,6 +23,8 @@ type ContextPanelProps = {
   onTabChange: (tab: ContextPanelTab) => void;
   onClose: () => void;
   onOpenFile: (path: string) => void;
+  onOpenBookmark: (bookmark: DocumentBookmark) => void;
+  onDeleteBookmark: (bookmark: DocumentBookmark) => void;
   onCreateNote: (target: string) => void;
   onOpenGraph: () => void;
   onSelectTag: (tag: string | null) => void;
@@ -31,6 +37,7 @@ const tabs: Array<{ id: ContextPanelTab; label: string }> = [
   { id: "outline", label: "目录" },
   { id: "backlinks", label: "关联" },
   { id: "properties", label: "属性" },
+  { id: "bookmarks", label: "书签" },
 ];
 
 function fileTypeLabel(kind: OpenDocument["kind"]): string {
@@ -54,6 +61,8 @@ export function ContextPanel({
   entry,
   backlinks,
   outgoing,
+  bookmarks,
+  knownPaths,
   canCreateNote,
   selectedTag,
   toc,
@@ -65,6 +74,8 @@ export function ContextPanel({
   onTabChange,
   onClose,
   onOpenFile,
+  onOpenBookmark,
+  onDeleteBookmark,
   onCreateNote,
   onOpenGraph,
   onSelectTag,
@@ -179,6 +190,16 @@ export function ContextPanel({
             )}
             <p className="context-panel-note">YAML 属性编辑将在知识库增强批次中开放，未知字段会保持原样。</p>
           </section>
+        )}
+        {activeTab === "bookmarks" && (
+          <BookmarksPanel
+            bookmarks={bookmarks}
+            knownPaths={knownPaths}
+            currentPath={documentState?.path}
+            currentHeadingId={activeHeadingId}
+            onOpen={onOpenBookmark}
+            onDelete={onDeleteBookmark}
+          />
         )}
       </div>
     </aside>

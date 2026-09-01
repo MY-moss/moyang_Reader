@@ -240,6 +240,15 @@ import {
 } from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
 import { normalizePathKey } from "./path-key";
+import {
+  addBookmark,
+  createBookmark,
+  hasBookmark,
+  loadBookmarks,
+  removeBookmark,
+  saveBookmarks,
+  type DocumentBookmark,
+} from "./bookmarks";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
 import type { PaneWidths } from "./pane-layout";
 import { scrollHeadingInContainer } from "./heading-navigation";
@@ -578,6 +587,11 @@ function isContextMenuKeyboardEvent(event: ReactKeyboardEvent<HTMLElement>): boo
   return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
 }
 
+function headingIdFromTarget(target: EventTarget | null): string | null {
+  if (!(target instanceof HTMLElement)) return null;
+  return target.closest<HTMLElement>("h1, h2, h3, h4, h5, h6")?.id ?? null;
+}
+
 export function App() {
   const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
@@ -664,6 +678,7 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
   const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);
+  const [bookmarks, setBookmarks] = useState<DocumentBookmark[]>(loadBookmarks);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
@@ -4609,6 +4624,7 @@ export function App() {
       y: event.clientY,
       selectedText: window.getSelection()?.toString() ?? "",
       linkHref: anchor?.getAttribute("href") ?? null,
+      headingId: headingIdFromTarget(event.target),
       restoreFocusTarget: event.currentTarget,
       fallbackFocusTarget: event.currentTarget,
     });
@@ -4624,6 +4640,7 @@ export function App() {
       y: rect.bottom,
       selectedText: window.getSelection()?.toString() ?? "",
       linkHref: anchor?.getAttribute("href") ?? null,
+      headingId: headingIdFromTarget(event.target),
       restoreFocusTarget: event.currentTarget,
       fallbackFocusTarget: event.currentTarget,
     });
@@ -4831,6 +4848,80 @@ export function App() {
           }))
         : [],
     [currentIndexEntry, linkIndex, workspaceIndex],
+  );
+  const bookmarkKnownPaths = useMemo(
+    () => [
+      ...(documentPath ? [documentPath] : []),
+      ...openTabs.map((tab) => tab.path),
+      ...workspaceIndex.map((entry) => entry.file.path),
+    ],
+    [documentPath, openTabs, workspaceIndex],
+  );
+  const canBookmark = Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image");
+  const readerBookmarkTarget = useMemo(
+    () =>
+      documentState && readerContextMenu
+        ? createBookmark(documentState.path, { headingId: readerContextMenu.headingId })
+        : null,
+    [documentState, readerContextMenu],
+  );
+  const readerBookmarkPresent = readerBookmarkTarget ? hasBookmark(bookmarks, readerBookmarkTarget) : false;
+  const handleToggleReaderBookmark = useCallback(() => {
+    if (!readerBookmarkTarget) return;
+
+    if (readerBookmarkPresent) {
+      setBookmarks((current) => {
+        const next = removeBookmark(current, readerBookmarkTarget);
+        saveBookmarks(next);
+        return next;
+      });
+      notify("已移除当前书签。");
+    } else {
+      setBookmarks((current) => {
+        const next = addBookmark(current, readerBookmarkTarget);
+        saveBookmarks(next);
+        return next;
+      });
+      notify(readerBookmarkTarget.headingId ? "已添加章节书签。" : "已添加文档书签。");
+    }
+    setError(null);
+  }, [notify, readerBookmarkPresent, readerBookmarkTarget]);
+  const handleDeleteBookmark = useCallback(
+    (bookmark: DocumentBookmark) => {
+      setBookmarks((current) => {
+        const next = removeBookmark(current, bookmark);
+        saveBookmarks(next);
+        return next;
+      });
+      notify("已删除书签。");
+    },
+    [notify],
+  );
+  const handleOpenBookmark = useCallback(
+    async (bookmark: DocumentBookmark) => {
+      const current = documentStateRef.current;
+      if (current && isSameDocumentPath(bookmark.path, current.path)) {
+        if (!bookmark.headingId) return;
+
+        const item = current.rendered.toc.find((candidate) => candidate.id === bookmark.headingId);
+        if (item) {
+          navigateToHeading(item);
+          return;
+        }
+        if (mode !== "rendered") {
+          pendingHeadingRef.current = bookmark.headingId;
+          setMode("rendered");
+          return;
+        }
+        scrollToHeading(bookmark.headingId, contentAreaRef.current, articleRef.current, revealProgressiveReader);
+        return;
+      }
+
+      pendingHeadingRef.current = bookmark.headingId ?? null;
+      const opened = await handleSelectTab(bookmark.path);
+      if (!opened) pendingHeadingRef.current = null;
+    },
+    [handleSelectTab, mode, navigateToHeading, revealProgressiveReader],
   );
   const availableTags = useMemo(
     () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
@@ -5697,6 +5788,8 @@ export function App() {
               target={readerContextMenu}
               documentPath={documentState.path.startsWith("browser://") ? null : documentState.path}
               canEdit={canEdit}
+              canBookmark={canBookmark}
+              isBookmarked={readerBookmarkPresent}
               editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}
               onCopySelection={(text) => void handleCopyReaderText(text)}
               onFindSelection={(text) => handleFindEditorText(text)}
@@ -5704,6 +5797,7 @@ export function App() {
               onOpenLink={handleOpenReaderLink}
               onEdit={toggleReadingEditing}
               onCopyDocumentPath={() => void handleCopyReaderDocumentPath()}
+              onToggleBookmark={handleToggleReaderBookmark}
               onClose={() => setReaderContextMenu(null)}
             />
           )}
@@ -5726,6 +5820,8 @@ export function App() {
             entry={currentIndexEntry}
             backlinks={backlinks}
             outgoing={outgoing}
+            bookmarks={bookmarks}
+            knownPaths={bookmarkKnownPaths}
             canCreateNote={Boolean(workspacePath && isTauriRuntime())}
             selectedTag={selectedTag}
             toc={documentState?.rendered.toc ?? []}
@@ -5737,6 +5833,8 @@ export function App() {
             onTabChange={setActiveContextTab}
             onClose={() => setRightPanelOpen(false)}
             onOpenFile={(path) => void handleSelectTab(path)}
+            onOpenBookmark={(bookmark) => void handleOpenBookmark(bookmark)}
+            onDeleteBookmark={handleDeleteBookmark}
             onCreateNote={(target) => void handleCreateNote(target)}
             onOpenGraph={() => setGraphOpen(true)}
             onSelectTag={setSelectedTag}

@@ -29,6 +29,12 @@ describe("consolidated app settings", () => {
     expect(parseAppSettings(serializeAppSettings(snapshot))).toEqual(snapshot);
   });
 
+  it("preserves the bookmarks context tab", () => {
+    const snapshot = createAppSettingsSnapshot({ ...input, activeContextTab: "bookmarks" }, 123);
+
+    expect(parseAppSettings(serializeAppSettings(snapshot))?.activeContextTab).toBe("bookmarks");
+  });
+
   it("uses safe defaults for unsupported values", () => {
     const parsed = parseAppSettings(
       JSON.stringify({

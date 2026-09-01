@@ -4869,7 +4869,7 @@ html.pane-resizing * {
   }
   .context-tab-list {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 3px;
     margin: 14px 0;
     padding: 3px;
@@ -4937,6 +4937,139 @@ html.pane-resizing * {
     color: var(--muted);
     font-size: 10px;
     line-height: 1.65;
+  }
+  .bookmarks-panel {
+    min-width: 0;
+    padding: 5px 2px 18px;
+  }
+  .bookmarks-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 7px 0 8px;
+  }
+  .bookmarks-panel-heading h3 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 500;
+  }
+  .bookmarks-count {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0 5px;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .bookmarks-panel-intro,
+  .bookmarks-empty {
+    margin: 0 0 15px;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.65;
+  }
+  .bookmarks-empty {
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px dashed color-mix(in srgb, var(--line) 90%, var(--accent));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-strong) 55%, transparent);
+  }
+  .bookmark-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .bookmark-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+    transition:
+      border-color 120ms ease,
+      background 120ms ease;
+  }
+  .bookmark-item:hover,
+  .bookmark-item.current {
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+    background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface-strong));
+  }
+  .bookmark-open {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    border: 0;
+    border-radius: 8px 0 0 8px;
+    background: transparent;
+    padding: 10px 5px 10px 10px;
+    text-align: left;
+  }
+  .bookmark-pin {
+    flex: 0 0 auto;
+    color: var(--accent);
+    font-size: 9px;
+  }
+  .bookmark-copy {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+  .bookmark-copy strong,
+  .bookmark-copy span,
+  .bookmark-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bookmark-copy strong {
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 650;
+  }
+  .bookmark-copy span,
+  .bookmark-copy small {
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .bookmark-copy small {
+    color: var(--accent-deep);
+  }
+  .bookmark-copy small.bookmark-status {
+    color: var(--danger);
+  }
+  .bookmark-current-badge {
+    margin-left: 3px;
+    color: var(--accent-deep) !important;
+    font-size: 9px !important;
+    font-weight: 700;
+  }
+  .bookmark-delete {
+    align-self: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 5px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1;
+  }
+  .bookmark-delete:hover {
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
   }
   .context-frontmatter {
     margin-top: 22px;
