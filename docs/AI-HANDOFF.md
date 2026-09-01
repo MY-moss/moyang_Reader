@@ -4,13 +4,22 @@
 
 ## 当前基线（2026-09-01）
 
-- 当前主线代码基线：`main@fcdc3463f16c561ec575d8067a8ef7d6c706ee09`；PR #406 已 squash 合并，Issue #364 已以 `completed` 关闭。
-- 最新完成切片：#364 编辑器右键粘贴语义统一；普通粘贴复用原生管线，纯文本粘贴只插入纯文本，图片进入工作区资源保存流程。
-- Quality checks：CI run `33515048213` 成功；本地完整单元测试 84 个文件/327 项、变更文件 lint/格式、生产构建和浏览器右键粘贴 E2E 均通过。
+- 当前主线代码基线：`main@4544c926a9a0485c1f02b6ac20f9982f81877da3`；PR #408 已 squash 合并，Issue #365 已以 `completed` 关闭。
+- 最新完成切片：#365 插入浮层焦点与图片浏览体验；tab 键盘导航、编辑器焦点归还和 Windows 工作区图片选择已完成。
+- Quality checks：CI run `33526998019` 成功；本地定向单测 2 文件/6 项、变更文件 lint/格式、生产构建、Rust 门禁和插入面板浏览器 E2E 均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前状态：#364 已完成，本轮已停止；下一项只能从最新 `main` 重新检查后的 Ready backlog 选择。
-- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#364 与既有未发布稳定切片纳入下一 Windows x64 稳定批次。
+- 当前状态：#365 已完成，本轮已停止；下一项只能从最新 `main` 重新检查后的 Ready backlog 选择。
+- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#365 与既有未发布稳定切片纳入下一 Windows x64 稳定批次。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
+
+## 本轮 #365 交接（已合并）
+
+- 目标：让插入面板在关闭后把焦点可靠交还给编辑器，并为 Markdown 图片插入提供 Windows 工作区浏览入口。
+- 实现：`EditorInsertPopover` 使用 roving tabindex 和方向键/Home/End 切换 tab；外部 pointerdown 关闭前阻止默认焦点转移；`choose_image_paths` 复用 `AccessRegistry` 注册选择结果；按文档路径生成工作区相对 Markdown 图片路径。
+- 保护：图片选择限定 `avif/gif/jpeg/jpg/png/svg/webp`；工作区外、绝对和包含 `..` 的路径被拒绝；浏览器预览模式显示桌面版限制；选择失败、取消和进行中状态有明确反馈。
+- 验证：`markdown-path` 与 `EditorInsertPopover` 定向单测 2 文件/6 项；变更文件 ESLint/Prettier；一次生产构建；Rust fmt/test/clippy；浏览器插入面板 E2E 2/2；远程 Quality checks run `33526998019` success，包含 Windows 桌面烟测。
+- 交付：分支 `codex/insert-popover-2026-09-01`、PR [#408](https://github.com/MY-moss/moyang_Reader/pull/408)、合并提交 `4544c926a9a0485c1f02b6ac20f9982f81877da3`；Issue [#365](https://github.com/MY-moss/moyang_Reader/issues/365) 已以 `completed` 关闭。
+- 发布边界：不单独生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像；纳入 `v0.11.0` 稳定批次。回退 PR #408 无需迁移；完成交接后停止，不自动开始下一切片。
 
 ## v0.11.0 当前顺序
 
