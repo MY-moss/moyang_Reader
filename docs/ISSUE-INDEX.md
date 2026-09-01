@@ -80,7 +80,7 @@
 | [#365](https://github.com/MY-moss/moyang_Reader/issues/365) | 插入浮层焦点归还与图片浏览入口   | v0.11.x           | 不与 #358 混成一个 PR                             |
 | [#366](https://github.com/MY-moss/moyang_Reader/issues/366) | 统一确认弹层与关闭文案           | v0.11.x           | 统一草稿保存/关闭语义                             |
 | [#367](https://github.com/MY-moss/moyang_Reader/issues/367) | 文档级跳转历史与返回上一文档     | v0.11.x           | 双链闭环；独立导航切片                            |
-| [#368](https://github.com/MY-moss/moyang_Reader/issues/368) | 全文书签与选中文本批注           | v0.11.x–v1.0      | 第一切片已实现；第二切片仍 open                   |
+| [#368](https://github.com/MY-moss/moyang_Reader/issues/368) | 全文书签与选中文本批注           | v0.11.x–v1.0      | 第一切片已由 PR #397 合并；第二切片仍 open，需重新 Ready 检查 |
 | [#369](https://github.com/MY-moss/moyang_Reader/issues/369) | 回收站删除与保存上一版本保护     | v0.11.x           | 数据安全动作需单独验收                            |
 | [#370](https://github.com/MY-moss/moyang_Reader/issues/370) | 阅读历史与本地统计               | v1.0 前           | 仅本机数据，不做云同步                            |
 | [#371](https://github.com/MY-moss/moyang_Reader/issues/371) | 中文拼音首字母搜索               | v0.11.x           | 索引侧预计算，避免前端引入大依赖                  |
@@ -129,3 +129,4 @@
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
 - 当前结果：25 个开放可执行 Issue（Must 4、Should 19、Could 2），9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#357 已完成（PR #377），#358 已完成（PR #380），#119 已完成（PR #350），#190 已完成（PR #351）；#375 为已合并的工程治理 PR，下一工程切片为 PR #379，随后进入 #360。
+
