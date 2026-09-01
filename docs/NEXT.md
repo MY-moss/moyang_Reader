@@ -1,11 +1,11 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：CHECKPOINT READY（#368 第二切片：选中文本高亮批注；本地实现和门禁已完成，待提交/PR）。
-- 当前主线基线：`main@9f5f7934f0fdfcb2ac0b265eb29f574c9ba2c583`；#368 第一切片已由 PR #397 合并，交接文档由 PR #398 同步。
+- 当前状态：STOPPED AFTER HANDOFF（#368 两个切片已完成并合并）。
+- 当前主线基线：`main@871d6032336036b406109126c26f80bf831463bc`；第二切片由 PR #399 squash 合并，Issue #368 已以 `completed` 关闭。
 - 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
 
-## 当前 Ready 任务：#368 第二切片（选中文本高亮批注）
+## 最近完成：#368 选中文本高亮批注第二切片
 
 - 目标：阅读模式选中文本后通过右键创建本机批注，在当前正文中用 CSS Custom Highlight 显示，并在右栏查看、定位和删除。
 - 非目标：不改写 Markdown，不做 DOCX/PDF/图片标注、编辑器内标注、尾注导出或跨设备同步；不引入数据库和新运行时依赖。
@@ -14,7 +14,8 @@
 - 预计文件：`src/app/annotations.ts`、`src/app/annotation-highlighter.ts`、`src/app/components/AnnotationDialog.tsx`、`src/app/components/AnnotationsPanel.tsx`、`ReaderContextMenu`、`ContextPanel`、`TopBar`、`App.tsx`、`bridge.ts`、`types.ts`、`preferences.ts`、`src-tauri/src/commands.rs`、相关测试和文档。
 - 风险与回滚：sidecar 是用户工作区新文件，写入失败不改变内存确认状态；关闭设置只停止读取/渲染并保留 sidecar；回滚本切片 PR 不需要迁移。
 - 本地验证：前端全量 83 文件/323 项、TypeScript、Lint、格式检查、一次生产构建、Rust 全量 52 项/clippy、浏览器批注 E2E 1/1、Windows desktop smoke 14/14、发布预检和构建产物检查通过；本轮不生成安装包。
-- 检查点：只推送 `codex/annotation-highlight-2026-09-01` 并创建一个 PR；CI 全绿且无真实冲突后合并，随后更新 #368、主线 SHA 和本文件，再停止，不自动开启下一切片。
+- 交付：分支 `codex/annotation-highlight-2026-09-01`、PR [#399](https://github.com/MY-moss/moyang_Reader/pull/399)、合并提交 `871d6032336036b406109126c26f80bf831463bc`；CI Quality checks run `33469013579` 全部通过，Issue #368 已标记 `completed`。
+- 当前动作：本轮已停止。下一次开发必须从最新 `main` 重新检查 Issues/Ready backlog，不从历史上下文自动开启下一切片。
 
 ## 最近完成：#369 回收站删除与保存上一版本保护
 
