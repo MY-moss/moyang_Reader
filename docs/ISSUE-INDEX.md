@@ -77,7 +77,7 @@
 | [#362](https://github.com/MY-moss/moyang_Reader/issues/362) | 交互与渲染微成本                 | v0.11.x           | 面板、草稿解析和差异对话框按测量拆分                          |
 | [#363](https://github.com/MY-moss/moyang_Reader/issues/363) | 导出分块 Flush 与分卷恢复        | v0.11.x           | 仅在有基线后处理                                              |
 | [#364](https://github.com/MY-moss/moyang_Reader/issues/364) | 右键粘贴与图片剪贴板反馈         | v0.11.x           | 明确纯文本、图片和失败反馈                                    |
-| [#365](https://github.com/MY-moss/moyang_Reader/issues/365) | 插入浮层焦点归还与图片浏览入口   | v0.11.x           | 不与 #358 混成一个 PR                                         |
+| [#365](https://github.com/MY-moss/moyang_Reader/issues/365) | 插入浮层焦点归还与图片浏览入口   | v0.11.x           | 已完成；PR #408 已合并，Issue 已以 completed 关闭             |
 | [#366](https://github.com/MY-moss/moyang_Reader/issues/366) | 统一确认弹层与关闭文案           | v0.11.x           | 统一草稿保存/关闭语义                                         |
 | [#367](https://github.com/MY-moss/moyang_Reader/issues/367) | 文档级跳转历史与返回上一文档     | v0.11.x           | 双链闭环；独立导航切片                                        |
 | [#368](https://github.com/MY-moss/moyang_Reader/issues/368) | 全文书签与选中文本批注           | v0.11.x–v1.0      | 第一切片已由 PR #397 合并；第二切片仍 open，需重新 Ready 检查 |
@@ -128,4 +128,4 @@
 - 2026-08-29：盘点 32 个开放 Issue。
 - 2026-08-29：统一 32 个 Issue 的标题、正文结构和标签。
 - 2026-08-29：归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 当前结果：25 个开放可执行 Issue（Must 4、Should 19、Could 2），9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#357 已完成（PR #377），#358 已完成（PR #380），#119 已完成（PR #350），#190 已完成（PR #351）；#375 为已合并的工程治理 PR，下一工程切片为 PR #379，随后进入 #360。
+- 当前结果：14 个开放可执行 Issue（Must 2、Should 11、Could 1），另有 1 个开放跟踪 Issue，9 个已归档；#172 已完成（PR #374），#301 已完成（PR #344），#346 已完成（PR #347），#299 已完成（PR #349），#357 已完成（PR #377），#358 已完成（PR #380），#119 已完成（PR #350），#190 已完成（PR #351），#365 已完成（PR #408）；#375 为已合并的工程治理 PR，下一次选择必须从最新 main 重新检查 Ready backlog。

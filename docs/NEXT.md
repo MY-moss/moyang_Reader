@@ -1,144 +1,33 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：STOPPED AFTER HANDOFF（#364 已完成并合并）。
-- 当前主线代码基线：`main@fcdc3463f16c561ec575d8067a8ef7d6c706ee09`；PR #406 已 squash 合并，Issue #364 已以 `completed` 关闭。
-- 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
+- 当前状态：STOPPED AFTER HANDOFF（#365 已完成并合并）。
+- 当前主线代码基线：`main@4544c926a9a0485c1f02b6ac20f9982f81877da3`；PR #408 已 squash 合并，Issue #365 已以 `completed` 关闭。
+- 当前稳定版本：`v0.10.13`；目标稳定批次：`v0.11.0` Windows x64。
+- 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成并通过发布验收后统一生成。
 
-## 最近完成：#364 编辑器右键粘贴语义统一
+## 最近完成：#365 插入浮层焦点与图片浏览体验
 
-- 目标：让右键「粘贴」与 Ctrl+V 使用一致的编辑器粘贴管线，同时保留「粘贴为纯文本」的明确差异。
-- 非目标：不新增运行时依赖，不改变 Ctrl+V 的既有文本行为，不在本切片生成安装包、Tag、Release 或 Cloudflare 镜像。
-- 实现：新增轻量剪贴板适配层，读取纯文本、HTML 和图片；所见即所得模式把普通粘贴交给 Milkdown，图片保存到工作区 `assets/`，源码模式复用现有图片资源流程；纯文本入口只插入纯文本。
-- 反馈：空剪贴板、图片误用纯文本粘贴、权限失败和异步期间正文变化都会显示明确提示，不再静默无操作或覆盖最新编辑。
-- 验收：本地完整单元测试 84 个文件/327 项通过；变更文件 ESLint、Prettier、生产构建和浏览器右键粘贴 E2E 通过；远程 Quality checks run `33515048213` 成功。
-- 交付：分支 `codex/paste-semantics-2026-09-01`、PR [#406](https://github.com/MY-moss/moyang_Reader/pull/406)、合并提交 `fcdc3463f16c561ec575d8067a8ef7d6c706ee09`；Issue #364 已以 `completed` 关闭。
-- 风险与回滚：剪贴板富文本读取依赖 Windows WebView 权限，失败时保留文本回退和状态提示；回退 PR #406 不需要数据迁移。
+- 目标：让插入面板支持键盘导航、关闭后可靠归还编辑器焦点，并可从当前 Windows 工作区选择图片。
+- 非目标：不改变 Markdown 插入语义、渲染协议或编辑器架构；不处理 DOCX/PDF 图片编辑；不在本切片生成安装包、Tag、Release 或 Cloudflare 镜像。
+- 实现：插入类型 tab 使用 roving tabindex，支持方向键、Home/End；外部 pointerdown 关闭时阻止焦点漂移；图片选择器限定图片扩展名，并按当前文档计算工作区内相对路径，拒绝工作区外和不安全路径。
+- 反馈：图片选择中的加载、取消、失败和桌面版限制均有明确状态；手动路径、截图粘贴和拖入提示保持可见。
+- 验收：定向单测 2 文件/6 项、变更文件 ESLint/Prettier、一次前端生产构建、Rust fmt/test/clippy、浏览器插入面板 E2E 2/2、Windows 桌面烟测和远程 Quality checks run `33526998019` 均通过。
+- 交付：分支 `codex/insert-popover-2026-09-01`、PR [#408](https://github.com/MY-moss/moyang_Reader/pull/408)、合并提交 `4544c926a9a0485c1f02b6ac20f9982f81877da3`；Issue #365 已以 `completed` 关闭。
+- 风险与回滚：图片选择只允许当前已授权工作区，回退 PR #408 不需要数据迁移；未选择的工作区外文件不会被复制或写入。
 - 发布边界：本切片不单独生成安装包；纳入 `v0.11.0` Windows x64 稳定批次。
 
 ## 下一次开发
 
-- 当前没有 IN PROGRESS 事项。本轮已完成并停止。
+- 当前没有 IN PROGRESS/READY 事项；本轮已完成并停止。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
-
-## 最近完成：#372 设置导出/导入补全阅读位置与书签
-
-- 目标：升级便携设置备份到 v2，把本机阅读位置和书签纳入 JSON；v1 旧备份仍可导入。
-- 非目标：不复制文档正文，不同步草稿、AI 历史或工作区文件；不改变 Markdown 真源和现有 32 条阅读位置上限。
-- 兼容契约：导入 v1 时只恢复原有设置元数据，保留当前本机阅读位置和书签；导入 v2 时按备份快照恢复两类记录，临时 `browser://` 书签不进入备份。
-- 验收：v1/v2 解析、路径大小写去重、非法记录过滤、32 条裁剪、阅读位置读写和书签 round-trip 均有定向测试；设置页面的导入/导出提示明确说明恢复范围。
-- 预计文件：`src/app/portable-settings.ts`、`src/app/storage.ts`、`src/app/App.tsx` 及对应测试。
-- 风险与回滚：仅变更 localStorage 备份格式；旧备份只读兼容，回退 PR 不需迁移；v2 导入空列表表示恢复为空快照。
-- 本地验证：定向测试 2 文件/17 项、TypeScript、Lint、格式检查和 `git diff --check` 已通过；未执行生产构建，也未生成安装包。
-- 交付：分支 `codex/portable-reading-positions-2026-09-01`、PR [#402](https://github.com/MY-moss/moyang_Reader/pull/402)、合并提交 `d93c992474db0e5e8ab0f04d68044db1ab774700`；Quality checks run `33474094871` 通过，Issue #372 已标记 `completed`。
-- 当前动作：本轮已停止。下一次开发必须从最新 `main` 重新检查 Issues/Ready backlog，不从历史上下文自动开启下一切片。
-
-## 最近完成：#368 选中文本高亮批注第二切片
-
-- 目标：阅读模式选中文本后通过右键创建本机批注，在当前正文中用 CSS Custom Highlight 显示，并在右栏查看、定位和删除。
-- 非目标：不改写 Markdown，不做 DOCX/PDF/图片标注、编辑器内标注、尾注导出或跨设备同步；不引入数据库和新运行时依赖。
-- 数据边界：批注保存到已授权工作区的 `.moyang/annotations.json`，仅保存相对路径、引文、前后文、字符偏移、备注和时间；无法重新定位时保留条目并显示“待定位”。
-- 验收：Rust sidecar 读写走 `AccessRegistry`；选区锚点可跨内联节点定位；右键创建批注、设置开关、右栏列表/删除/跳转、失配保留、刷新后恢复；浏览器高亮与 Windows 桌面读写路径有针对性验证。
-- 预计文件：`src/app/annotations.ts`、`src/app/annotation-highlighter.ts`、`src/app/components/AnnotationDialog.tsx`、`src/app/components/AnnotationsPanel.tsx`、`ReaderContextMenu`、`ContextPanel`、`TopBar`、`App.tsx`、`bridge.ts`、`types.ts`、`preferences.ts`、`src-tauri/src/commands.rs`、相关测试和文档。
-- 风险与回滚：sidecar 是用户工作区新文件，写入失败不改变内存确认状态；关闭设置只停止读取/渲染并保留 sidecar；回滚本切片 PR 不需要迁移。
-- 本地验证：前端全量 83 文件/323 项、TypeScript、Lint、格式检查、一次生产构建、Rust 全量 52 项/clippy、浏览器批注 E2E 1/1、Windows desktop smoke 14/14、发布预检和构建产物检查通过；本轮不生成安装包。
-- 交付：分支 `codex/annotation-highlight-2026-09-01`、PR [#399](https://github.com/MY-moss/moyang_Reader/pull/399)、合并提交 `871d6032336036b406109126c26f80bf831463bc`；CI Quality checks run `33469013579` 全部通过，Issue #368 已标记 `completed`。
-- 当前动作：本轮已停止。下一次开发必须从最新 `main` 重新检查 Issues/Ready backlog，不从历史上下文自动开启下一切片。
-
-## 最近完成：#369 回收站删除与保存上一版本保护
-
-- 优先级：Should / P2；风险级别：T3（删除语义、保存安全和 Windows 原生文件系统）。
-- Issue：[#369](https://github.com/MY-moss/moyang_Reader/issues/369)
-
-### 目标
-
-- 删除工作区文件或文件夹时使用 Windows 回收站语义；回收站操作失败时明确报错并保留原内容。
-- 每次成功保存文本文件时滚动保留一份 `.文件名.moyang.bak`，用于识别和恢复上一保存版本。
-- 恢复前复用现有差异预览，恢复只进入编辑区，仍需用户显式保存。
-
-### 非目标
-
-- 不做多级版本历史、独立回收站 UI、云同步、跨平台支持或 DOCX/PDF 原格式回写。
-- 不改变现有删除确认、文件监听、标签页和未保存保护契约。
-- 不顺手扩展撤销、导出、更新器或其他 Issue。
-
-### 已实现
-
-- Windows 使用 `SHFileOperationW + FOF_ALLOWUNDO`，不再调用永久删除；扩展长度路径在进入 Shell API 前转换为兼容路径。
-- 删除文件时将对应 `.moyang.bak` 一并送入同一回收站操作，避免留下无主备份；文件夹递归语义保持不变。
-- `write_text_file` 在原子替换前滚动写入上一版本备份；写入失败时保留旧备份，不静默覆盖或丢失恢复材料。
-- 新增上一保存版本读取边界、正文提示、差异预览和“恢复到编辑区”动作；恢复后不自动写盘。
-- 工作流清理测试隔离本机共享 Cargo 缓存，避免本机环境污染测试产物判断。
-
-### 验收与验证
-
-- 前端定向测试：3 个文件、14 项通过。
-- Rust：编译、格式、上一版本滚动测试、删除工作区条目测试通过。
-- 工作流测试：13/13 通过；Lint、格式检查、`git diff --check` 通过。
-- Windows Tauri desktop smoke：14/14 通过，覆盖真实保存、`.moyang.bak` 内容、差异查看、恢复到编辑区和显式保存。
-- 远程 Quality checks：run `33367813186` success；Rust dependency audit：run `33367921971` success。
-
-### 限制、回滚与发布
-
-- Windows 回收站对特殊路径、网络盘或系统禁用回收站可能无法接收内容；失败时应用不执行永久删除。最终发布前仍需在目标 Windows 环境手动确认 Explorer 还原路径。
-- `.moyang.bak` 是每个文本文件旁的一份滚动备份，不是多级历史；超大文件策略沿用现有文本大小边界。
-- 回滚方式：回退本切片 PR；不需要数据迁移，不触碰用户其他笔记。
-- 本切片不单独更新版本或安装包；合入后纳入 `v0.11.0` 稳定批次。
-
-## 最近完成：#359 撤销历史从全量快照收敛为稳定粒度
-
-- 优先级：Must / P2；风险级别：T2（编辑体验、内存和撤销正确性）。
-- Issue：[#359](https://github.com/MY-moss/moyang_Reader/issues/359)；PR：[#388](https://github.com/MY-moss/moyang_Reader/pull/388)；合并提交：`5f8fba3a37d429aa052add4543832b096ee28da5`。
-- 目标：降低长文档连续编辑时全量快照造成的内存和历史噪声，同时保持 Ctrl+Z/Ctrl+Y、切换文档和保存语义稳定。
-- 非目标：不改 Markdown 解析、保存格式、草稿恢复、版本备份或其他编辑器功能。
-- 实现：编辑器输入在 400ms 窗口内合并为一个撤销组；历史仍最多 100 个快照，并对保留的 past/future 快照增加 8 MiB UTF-16 估算上限；程序化更新保持原子边界。
-- 涉及文件：`src/app/editor-history.ts`、`src/app/editor-history.test.ts`、`src/app/App.tsx`、`e2e/smoke.spec.ts` 及本切片交接文档。
-- 结果：定向单测 6/6、TypeScript 检查、生产构建、源码连续输入浏览器 E2E 1/1、跨模式撤销/重做回归 E2E 1/1、完整 lint/format/diff 检查均已通过；远程 Quality checks run `33386166171` 成功，Issue 已关闭。
-- 发布边界：不单独生成安装包、Tag、Release 或 Cloudflare 镜像；合入后纳入 `v0.11.0` 稳定 Windows x64 批次。
-- 回滚方式：回退本切片提交；不需要数据迁移，Markdown 文件内容和保存协议不变。
-
-## 最近完成：#361 暗色主题 accent 按钮对比度修复
-
-- 优先级：Should / P2；风险级别：T2（视觉可读性与 WCAG AA）。
-- Issue：[#361](https://github.com/MY-moss/moyang_Reader/issues/361)；PR：[#390](https://github.com/MY-moss/moyang_Reader/pull/390)；合并提交：`41acf808a54683e9ed4b2f7a1d15cdc132c8629d`；已关闭。
-- 目标：修复暗色主题下编辑器“插入”、插入面板提交和通用主按钮的浅色 accent 底配白字问题，使正文、悬停、焦点和禁用状态可读且不破坏亮色主题。
-- 非目标：不重做整个主题、不处理 #362 渲染成本、不引入颜色库、不顺手修改其他视觉/交互 Issue。
-- 预计范围：`src/app/styles.css`、`e2e/a11y.spec.ts` 和必要的 UI 交接文档；优先复用现有深色令牌，不增加运行时依赖。
-- 验收：暗色自动/显式主题下受影响按钮的实际前景与背景对比达到 WCAG AA 4.5:1；hover/focus 仍达标；亮色、键盘焦点、插入动作和现有 a11y smoke 不回归；检查覆盖两个暗色分支和通用 `.toolbar-button.primary`。
-- 版本与发布：v0.11.x 普通视觉切片；不单独生成安装包、Tag、Release 或 Cloudflare 镜像。
-- 当前实现：增加独立的实心按钮色令牌；暗色自动/显式主题的编辑器插入、插入提交和通用主按钮使用可读的深色底配白字，hover/focus 不再被通用浅色 hover 覆盖；Windows 强制高对比度改用系统按钮色。
-- 本地验证：`npm run build` 通过一次；`e2e/a11y.spec.ts` 7/7、`npm run lint`、`npm run format:check` 和 `git diff --check` 通过；远程 Quality checks run `33392327386` 通过；已明确关闭 Issue。
-- 回滚方式：回退本切片提交；不涉及文档格式、用户数据或迁移。
-
-## 最近完成：#362 交互与渲染微成本包
-
-- 优先级：Should / P3；风险级别：T2（交互流畅度、本地草稿持久化和差异计算）。
-- Issue：[#362](https://github.com/MY-moss/moyang_Reader/issues/362)；PR：[#392](https://github.com/MY-moss/moyang_Reader/pull/392)；合并提交：`c936666043d32ed1a4a1eec9312684994636034a`；已关闭。
-- 目标：降低面板拖动时的全 App 重渲染与重复持久化，减少草稿链路对 localStorage 的重复全量 parse，并避免差异弹层每次状态 tick 重算全文 diff。
-- 非目标：不改变面板、草稿、差异展示语义；不引入专用数据库，不改 Markdown 真源，不顺手处理其他性能或 UI Issue。
-- 实现：拖动期间只更新 app-shell CSS 变量，pointerup/cancel/lost-capture 才提交 React 状态和持久化；草稿存储按原始序列化内容复用解析结果，保存结果直接携带最新快照列表，查找与列表加载共用一次读取；差异计算按来源、状态和草稿内容 memo。
-- 验收：定向单测 17/17、全量前端单测 76 文件/300 项、TypeScript、Lint、格式检查、一次生产构建和侧栏拖拽浏览器 E2E 1/1 通过；草稿 parse 回归探针仅执行 1 次。
-- 远程验证：Quality checks run `33403555956` 重跑成功；首轮桌面性能基准的单次 318.5ms 抖动未重现，Windows desktop smoke、依赖审计、发布检查和 Rust 门禁均通过。
-- 发布/回滚：不单独生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0`；回退 PR #392，无数据迁移，保留现有存储格式。
-
-## 本轮实现：#368 文档书签第一切片（已合并）
-
-- 优先级：Should / P2；风险级别：T2（阅读定位、本机状态和上下文面板交互）。
-- Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)；状态：第一切片已完成，Issue 继续 open 等待第二切片；PR：[#397](https://github.com/MY-moss/moyang_Reader/pull/397)；合并提交：`fc51db210cf2142f4a317e713516dd39c6454edf`；计划版本：`v0.11.x`，不单独发布。
-- 用户价值：在长文档和多文档阅读中保存可复用的定位，补齐“回到上次阅读位置”之外的阅读连续性闭环。
-- 范围：新增 `{path, headingId?, quote?, note?, createdAt}` 文档书签；本机 localStorage 存储；正文右键添加书签；右栏增加“书签”页签，支持点击跳转和删除；复用现有目录锚点跳转。
-- 非目标：本切片不做选中文本高亮/批注、sidecar 文件、DOCX/PDF/图片标注、跨设备同步或 Markdown 内容写回；迁移导出 v2 只保留为后续独立任务。
-- 验收：添加、列出、跳转、删除闭环；当前标题书签可准确定位，文档缺失时有明确状态；刷新后本机书签仍可用；Escape、焦点、未保存保护和现有目录/反向链接不回归；至少一条浏览器 E2E。
-- 实现：新增 `src/app/bookmarks.ts` 和 `BookmarksPanel`；右键标题/正文支持添加或移除书签；右栏新增第四个“书签”页签，支持跳转、删除和当前阅读库外状态提示；浏览器 `browser://` 书签只保留在当前会话。
-- 验证：书签、面板、右键菜单、存储与设置定向测试 5 个文件/27 项通过；快速打开与书签浏览器 E2E 2/2 通过；TypeScript、Lint、格式检查、`git diff --check` 和一次前端生产构建通过。
-- 风险与回滚：路径大小写、重命名和失效锚点不静默丢失；回滚为回退 PR #397，保留未知 localStorage 数据；本轮不生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定 Windows x64 批次。
+- 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。
 
 ## 开始前快速检查
 
-1. 查看 Issues/PR，确认没有重复的 #368 工作；记录提交 SHA、PR 和 CI run_id。
-2. 读取 [`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，只读取与当前切片相关的源码、测试及一个相似实现。
-3. 保持原始工作目录不动；所有新切片使用项目内 `.codex-worktrees/` 的独立工作树。
+1. 查看 Issues/PR，确认没有重复工作；记录提交 SHA、PR 和 CI run_id。
+2. 读取 [`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，只读取当前切片相关的源码、测试及一个相似实现。
+3. 保持原始工作目录不动；新切片使用项目内 `.codex-worktrees/` 的独立工作树，并复用主工作区依赖。
 4. 完成验证、提交、推送、PR 和交接后停止，不自动开始下一项。
 
 ## 快速触发
