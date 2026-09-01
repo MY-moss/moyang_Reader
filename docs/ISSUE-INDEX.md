@@ -84,7 +84,7 @@
 | [#369](https://github.com/MY-moss/moyang_Reader/issues/369) | 回收站删除与保存上一版本保护     | v0.11.x           | 数据安全动作需单独验收                                        |
 | [#370](https://github.com/MY-moss/moyang_Reader/issues/370) | 阅读历史与本地统计               | v1.0 前           | 仅本机数据，不做云同步                                        |
 | [#371](https://github.com/MY-moss/moyang_Reader/issues/371) | 中文拼音首字母搜索               | v0.11.x           | 索引侧预计算，避免前端引入大依赖                              |
-| [#372](https://github.com/MY-moss/moyang_Reader/issues/372) | 设置导出/导入补全阅读位置与书签  | v0.11.x           | 当前切片：v2 备份、v1 兼容、32 条裁剪和导入提示               |
+| [#372](https://github.com/MY-moss/moyang_Reader/issues/372) | 设置导出/导入补全阅读位置与书签  | v0.11.x           | 已完成；PR #402，v2 备份、v1 兼容、32 条裁剪和导入提示        |
 
 ### Could：保留记录，当前不占用快速迭代资源
 
