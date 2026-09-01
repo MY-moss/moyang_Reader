@@ -14,4 +14,5 @@ export type DocxExportWorkerEvent =
   | { type: "started" }
   | { type: "chunk"; chunkId: number; buffer: ArrayBuffer }
   | { type: "done" }
+  | { type: "cancelled"; message: string }
   | { type: "error"; message: string };

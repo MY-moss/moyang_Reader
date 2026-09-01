@@ -24,12 +24,23 @@ function normalizedError(cause: unknown, fallbackMessage: string): Error {
   return cause instanceof Error ? cause : new Error(typeof cause === "string" ? cause : fallbackMessage);
 }
 
+function fallbackError(workerCause: unknown, fallbackCause: unknown): Error {
+  const workerError = normalizedError(workerCause, "DOCX_EXPORT_FAILED");
+  const mainThreadError = normalizedError(fallbackCause, workerError.message);
+  if (mainThreadError.message === "EXPORT_CANCELLED" || workerError.message === "DOCX_EXPORT_FAILED") {
+    return mainThreadError;
+  }
+  if (mainThreadError.message.includes(workerError.message)) return mainThreadError;
+  return new Error(`${mainThreadError.message}（Worker 原因：${workerError.message}）`);
+}
+
 export async function streamDocxExportWithWorker(
   title: string,
   documents: HtmlExportDocument[],
   options: ExportOptions = defaultExportOptions,
   writeChunk: (chunk: Uint8Array) => Promise<void>,
   signal?: AbortSignal,
+  resetOutput?: () => Promise<void>,
 ): Promise<"worker" | "main"> {
   if (!shouldUseDocxExportWorker(documents)) {
     await streamDocxExport(title, documents, options, writeChunk, signal);
@@ -48,6 +59,7 @@ export async function streamDocxExportWithWorker(
     let settled = false;
     let wroteChunk = false;
     let pendingWrites = 0;
+    let pendingWrite: Promise<void> | null = null;
     let workerFinished = false;
 
     const cleanup = () => {
@@ -69,22 +81,37 @@ export async function streamDocxExportWithWorker(
       cleanup();
       reject(normalizedError(cause, "DOCX_EXPORT_WORKER_FAILED"));
     };
-    const fallbackToMainThread = (cause: unknown) => {
+    const fallbackToMainThread = (cause: unknown, resetPartialOutput: boolean) => {
       if (settled) return;
       settled = true;
       cleanup();
-      void streamDocxExport(title, documents, options, writeChunk, signal)
-        .then(() => resolve("main"))
-        .catch((fallbackCause) =>
-          reject(normalizedError(fallbackCause, normalizedError(cause, "DOCX_EXPORT_FAILED").message)),
-        );
+      const writeToSettle = pendingWrite;
+      void (async () => {
+        try {
+          await writeToSettle;
+          if (resetPartialOutput) await resetOutput?.();
+          await streamDocxExport(title, documents, options, writeChunk, signal);
+          resolve("main");
+        } catch (fallbackCause) {
+          reject(fallbackError(cause, fallbackCause));
+        }
+      })();
     };
     const handleWorkerFailure = (cause: unknown) => {
-      if (wroteChunk || pendingWrites > 0) {
-        fail(cause);
+      const normalizedCause = normalizedError(cause, "DOCX_EXPORT_WORKER_FAILED");
+      if (normalizedCause.message === "EXPORT_CANCELLED") {
+        fail(normalizedCause);
         return;
       }
-      fallbackToMainThread(cause);
+      if (wroteChunk || pendingWrites > 0) {
+        if (!resetOutput) {
+          fail(normalizedCause);
+          return;
+        }
+        fallbackToMainThread(normalizedCause, true);
+        return;
+      }
+      fallbackToMainThread(normalizedCause, false);
     };
     const onAbort = () => {
       if (settled) return;
@@ -107,10 +134,12 @@ export async function streamDocxExportWithWorker(
         }
         wroteChunk = true;
         pendingWrites += 1;
-        void Promise.resolve()
-          .then(() => writeChunk(new Uint8Array(message.buffer)))
+        const writePromise = Promise.resolve().then(() => writeChunk(new Uint8Array(message.buffer)));
+        pendingWrite = writePromise;
+        void writePromise
           .then(() => {
             pendingWrites -= 1;
+            if (pendingWrite === writePromise) pendingWrite = null;
             if (settled) return;
             worker.postMessage({ type: "ack", chunkId: message.chunkId });
             if (workerFinished && pendingWrites === 0) finish("worker");
@@ -121,6 +150,10 @@ export async function streamDocxExportWithWorker(
       if (message.type === "done") {
         workerFinished = true;
         if (pendingWrites === 0) finish("worker");
+        return;
+      }
+      if (message.type === "cancelled") {
+        fail(new Error(message.message || "EXPORT_CANCELLED"));
         return;
       }
       if (message.type === "error") handleWorkerFailure(new Error(message.message));
