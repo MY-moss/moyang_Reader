@@ -4,12 +4,12 @@
 
 ## 当前基线（2026-09-01）
 
-- 当前主线基线：`main@eb225d0834bdba363d45a66f4abaadfebd45c5bc`；PR #384、#385、#386、#388、#389、#390、#391、#392、#395、#396 已合并，Issue #360、#359、#361、#362、#367、#369 已以 `completed` 关闭。
+- 当前主线基线：`main@fc51db210cf2142f4a317e713516dd39c6454edf`；PR #384、#385、#386、#388、#389、#390、#391、#392、#395、#396、#397 已合并，Issue #360、#359、#361、#362、#367、#369 已以 `completed` 关闭。
 - 最新完成切片：PR #395 完成 #367——会话内文档跳转历史与“返回上一文档”；保持 Windows x64、本地优先和 Markdown 真源边界。
 - Quality checks：run `33416594395` 成功；Frontend build、浏览器/无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前进行中：#368 文档书签第一切片已在 `codex/document-bookmarks-2026-09-01` 完成，待创建 PR；详细契约和交接以 [`NEXT.md`](NEXT.md) 为准。合并后停止，不自动开启第二切片。
-- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361、#362 和 #369 纳入下一稳定 Windows x64 批次。
+- 最近完成：#368 文档书签第一切片已由 PR #397 squash 合并；详细契约和交接以 [`NEXT.md`](NEXT.md) 为准。Issue #368 继续 open，第二切片不自动开启。
+- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361、#362、#368 第一切片和 #369 纳入下一稳定 Windows x64 批次。
 - 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 ## v0.11.0 当前顺序
@@ -45,14 +45,14 @@
 - 远程验证：Quality checks run `33403555956` 重跑成功；首轮桌面性能基准的单次 318.5ms 抖动未重现，Windows desktop smoke、依赖审计、发布检查和 Rust 门禁均通过。
 - 验证/发布：T2；不单独生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` Windows x64 稳定批次；回退 PR #392，无数据迁移。
 
-## 本轮 #368 文档书签第一切片（分支待 PR）
+## 本轮 #368 文档书签第一切片（已合并）
 
-- 状态：实现完成，待 PR；Should / P2；T2；计划 `v0.11.x`；Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)。
+- 状态：第一切片已完成，Issue 继续 open 等待第二切片；Should / P2；T2；计划 `v0.11.x`；Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)；PR：[#397](https://github.com/MY-moss/moyang_Reader/pull/397)；合并提交：`fc51db210cf2142f4a317e713516dd39c6454edf`。
 - 目标：为文档保存可复用的定位，在正文右键添加书签，并在右栏书签页签中列出、跳转和删除。
 - 边界：书签使用本机 localStorage，字段为 `path`、可选 `headingId`/`quote`/`note` 和 `createdAt`；不写回 Markdown，不做选中文本高亮、sidecar、跨设备同步或 DOCX/PDF/图片标注。
 - 实现：`bookmarks.ts` 本机存储与 Windows 路径去重；阅读区右键标题添加/移除；ContextPanel 第四页签列出、跳转、删除，并标出当前阅读库外的定位；临时 `browser://` 书签不写入持久存储。
 - 验收：定向测试 5 文件/27 项，快速打开和书签浏览器 E2E 2/2，TypeScript、Lint、格式检查、`git diff --check` 和一次前端生产构建均通过。Escape、焦点、未保存保护、目录和关联页签沿用现有边界。
-- 发布/回滚：不单独生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定批次；回退本切片 PR，不需要数据迁移；#368 第二切片（选中文本批注）必须重新走 Issues/Ready 检查。
+- 发布/回滚：不单独生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定批次；回退 PR #397，不需要数据迁移；#368 第二切片（选中文本批注）必须重新走 Issues/Ready 检查。
 
 ## 本轮 #359 交接（已合并）
 
@@ -206,3 +206,4 @@
 - `docs/handoff/v0.10.md`、`v0.9-and-earlier.md`：只读历史摘要。
 - `docs/ROADMAP.md`：版本目标和跨切片顺序。
 - `docs/ISSUE-INDEX.md`：Issue 分类、Ready 状态与治理规则。
+
