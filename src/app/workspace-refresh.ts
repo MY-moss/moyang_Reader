@@ -26,6 +26,7 @@ export function workspaceFilesMatch(left: WorkspaceFile[], right: WorkspaceFile[
         normalizeWorkspacePath(file.path) === normalizeWorkspacePath(other.path) &&
         file.name === other.name &&
         file.relativePath === other.relativePath &&
+        (file.pinyinKey ?? "") === (other.pinyinKey ?? "") &&
         file.size === other.size &&
         (file.modifiedMs ?? null) === (other.modifiedMs ?? null) &&
         file.kind === other.kind
