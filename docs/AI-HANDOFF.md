@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-01）
 
-- 当前主线基线：`main@9f5f7934f0fdfcb2ac0b265eb29f574c9ba2c583`；PR #384、#385、#386、#388、#389、#390、#391、#392、#395、#396、#397、#398 已合并，Issue #360、#359、#361、#362、#367、#369 已以 `completed` 关闭。
-- 最新完成切片：PR #395 完成 #367——会话内文档跳转历史与“返回上一文档”；保持 Windows x64、本地优先和 Markdown 真源边界。
-- Quality checks：run `33416594395` 成功；Frontend build、浏览器/无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
+- 当前主线基线：`main@871d6032336036b406109126c26f80bf831463bc`；PR #384、#385、#386、#388、#389、#390、#391、#392、#395、#396、#397、#398、#399 已合并，Issue #360、#359、#361、#362、#367、#368、#369 已以 `completed` 关闭。
+- 最新完成切片：PR #399 完成 #368 第二切片——阅读模式选中文本高亮/批注；保持 Windows x64、本地优先和 Markdown 真源边界。
+- Quality checks：run `33469013579` 成功；Frontend build、浏览器/无障碍 smoke、Windows desktop smoke、依赖审计、发布检查、Rust format/clippy/完整测试均通过。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前切片：#368 第二切片（选中文本高亮/批注）已完成本地实现和门禁，正在进入唯一 PR 检查点；详细契约和交接以 [`NEXT.md`](NEXT.md) 为准。
+- 当前状态：#368 第二切片已由 PR #399 squash 合并，详细契约和交接以 [`NEXT.md`](NEXT.md) 为准；本轮已停止。
 - 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#359、#360、#361、#362、#368 两个切片和 #369 纳入下一稳定 Windows x64 批次。
 - 产品范围继续是 Windows x64、本地优先、Markdown 真源；不增加云同步、脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -19,7 +19,7 @@
 3. #359：撤销历史从全量快照收敛为稳定粒度（已完成，PR #388）。
 4. #361–#366：视觉、粘贴、插入和确认交互小切片（#361 已完成，后续按 NEXT.md 选择）。
 5. #367：文档级跳转历史（已完成，PR #395）。
-6. #368：文档书签第一切片已完成；第二切片已完成本地验证，待 PR/CI/合并。
+6. #368：文档书签与选中文本高亮/批注两个切片均已完成，PR #399 已合并。
 7. #371/#372：知识库体验与本机数据迁移候选。
 
 其中 #241/#51 是外部发布条件项；不按顺序列表自动并行开发，唯一可执行事项始终以 [`NEXT.md`](NEXT.md) 为准。
@@ -54,14 +54,14 @@
 - 验收：定向测试 5 文件/27 项，快速打开和书签浏览器 E2E 2/2，TypeScript、Lint、格式检查、`git diff --check` 和一次前端生产构建均通过。Escape、焦点、未保存保护、目录和关联页签沿用现有边界。
 - 发布/回滚：不单独生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定批次；回退 PR #397，不需要数据迁移；#368 第二切片（选中文本批注）必须重新走 Issues/Ready 检查。
 
-## 本轮 #368 选中文本高亮批注第二切片（待 PR）
+## 本轮 #368 选中文本高亮批注第二切片（已合并）
 
-- 基线：`main@9f5f7934f0fdfcb2ac0b265eb29f574c9ba2c583`；分支：`codex/annotation-highlight-2026-09-01`；Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)。
+- 基线：`main@9f5f7934f0fdfcb2ac0b265eb29f574c9ba2c583`；分支：`codex/annotation-highlight-2026-09-01`；Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)；PR：[#399](https://github.com/MY-moss/moyang_Reader/pull/399)；合并提交：`871d6032336036b406109126c26f80bf831463bc`。
 - 目标：阅读模式选中文本后创建高亮/备注；在正文中定位显示，在右栏批注页签中查看、跳转和删除；Markdown 仍是唯一正文真源。
 - 实现：新增 `.moyang/annotations.json` 的 Tauri 授权读写、引文/前后文锚点、CSS Custom Highlight 与 DOM 回退、失配“待定位”状态、批注设置开关和右键/右栏闭环；浏览器会话使用内存回退，不写本机文件。
 - 非目标：不改写 Markdown，不做编辑器内标注、DOCX/PDF/图片标注、尾注导出、跨设备同步或数据库。
 - 验证：前端 83 文件/323 项、TypeScript、Lint、格式和差异检查、一次生产构建、Rust 52 项/clippy、浏览器批注 E2E 1/1、Windows desktop smoke 14/14、发布预检和构建产物检查均通过。
-- 发布/回滚：本切片不生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像；合入后纳入 `v0.11.0` 稳定批次；回退本切片 PR，无数据迁移。下一步只做推送、一个 PR、CI、合并、Issue 状态和交接更新。
+- 发布/回滚：本切片不生成 Windows x64 安装包、Tag、Release 或 Cloudflare 镜像；纳入 `v0.11.0` 稳定批次；回退 PR #399，无数据迁移。Issue #368 已标记 `completed`，本轮交接完成后停止。
 
 ## 本轮 #359 交接（已合并）
 
