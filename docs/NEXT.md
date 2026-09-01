@@ -1,9 +1,17 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：STOPPED AFTER HANDOFF（#365 已完成并合并）。
-- 当前主线代码基线：`main@4544c926a9a0485c1f02b6ac20f9982f81877da3`；PR #408 已 squash 合并，Issue #365 已以 `completed` 关闭。
-- 当前稳定版本：`v0.10.13`；目标稳定批次：`v0.11.0` Windows x64。
-- 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成并通过发布验收后统一生成。
+- 当前状态：STOPPED AFTER RELEASE（v0.10.14 已完成发布与交接）。
+- 发布代码主线基线：`main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`；PR #414 已 squash 合并，Issue #363 已以 `completed` 关闭。
+- 当前稳定版本：`v0.10.14`；下一目标稳定批次仍为 `v0.11.0` Windows x64。
+- GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
+- 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
+
+## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
+
+- 目标：让批量 Word 导出在大文件场景减少逐块刷盘，并在 Worker 部分输出后失败时清理临时卷、回放当前卷；取消操作不误触发回退。
+- 验收：前端 338 项、Rust 54 项、浏览器和 Windows 桌面 E2E、Release 检查、构建与远程 Quality checks 均通过；旧 Release 首次构建发现产物路径问题，已由 PR #414 修复并重新发布。
+- 交付：PR [#413](https://github.com/MY-moss/moyang_Reader/pull/413) 完成 v0.10.14 版本元数据，PR [#414](https://github.com/MY-moss/moyang_Reader/pull/414) 修复 Release 构建产物发现；Issue [#363](https://github.com/MY-moss/moyang_Reader/issues/363) 已关闭。
+- 回滚：回退 #363 代码和 #414 工作流修复均不需要数据迁移；如需撤回发布，保留 v0.10.14 资产并按发布政策准备新的 patch 版本，不覆盖用户安装状态。
 
 ## 最近完成：#365 插入浮层焦点与图片浏览体验
 
@@ -18,7 +26,7 @@
 
 ## 下一次开发
 
-- 当前没有 IN PROGRESS/READY 事项；本轮已完成并停止。
+- 当前没有 IN PROGRESS/READY 事项；v0.10.14 发布与交接已完成，本轮已停止。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。

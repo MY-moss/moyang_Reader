@@ -2,15 +2,22 @@
 
 本文件只保留当前稳定事实、正在推进的版本和外部阻塞。下一位 AI 的可执行任务只以 [`NEXT.md`](NEXT.md) 为准；完整流程见 [`AI-WORKFLOW.md`](AI-WORKFLOW.md)，历史记录见 [`handoff/`](handoff/)。
 
-## 当前基线（2026-09-01）
+## 当前基线（2026-09-02）
 
-- 当前主线代码基线：`main@4544c926a9a0485c1f02b6ac20f9982f81877da3`；PR #408 已 squash 合并，Issue #365 已以 `completed` 关闭。
-- 最新完成切片：#365 插入浮层焦点与图片浏览体验；tab 键盘导航、编辑器焦点归还和 Windows 工作区图片选择已完成。
-- Quality checks：CI run `33526998019` 成功；本地定向单测 2 文件/6 项、变更文件 lint/格式、生产构建、Rust 门禁和插入面板浏览器 E2E 均通过。
-- 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
-- 当前状态：#365 已完成，本轮已停止；下一项只能从最新 `main` 重新检查后的 Ready backlog 选择。
-- 本轮未生成安装包、Tag、Release 或 Cloudflare 镜像；#365 与既有未发布稳定切片纳入下一 Windows x64 稳定批次。
+- 发布代码主线基线：`main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`；PR #414 已 squash 合并，Issue #363 已以 `completed` 关闭。
+- 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
+- GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
+- 当前状态：v0.10.14 已发布并完成交接；下一项只能从重新检查后的 Ready backlog 选择，本轮不自动开启新功能。
+- Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
+
+## v0.10.14 发布交接（已完成）
+
+- 修复范围：#363 批量 DOCX 导出不再对每个 256 KiB 分块强制刷盘；在提交边界统一持久化；Worker 部分输出失败时清理临时输出并回放当前卷；取消与真实错误分开处理。
+- 版本交付：PR [#413](https://github.com/MY-moss/moyang_Reader/pull/413) 更新版本元数据，PR [#414](https://github.com/MY-moss/moyang_Reader/pull/414) 将 Release action 显式切换到 `npx tauri` 并保留 3 次 action 重试；合并主线为上述 `ec76d3d`。
+- GitHub 资产：`Moyang.Reader_0.10.14_x64-setup.exe` 5,243,339 字节，SHA-256 `293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59`；`.sig` 428 字节，SHA-256 `fd832a5689c9064118dd0bb8e9c3ba3d88e0a75da0c061bbd6809b069ab70adf`；`latest.json` 1,413 字节，SHA-256 `dfb110ba23f248d6c374d714613888511f99a4aae2b038219caeea27350af8cc`。
+- 在线验证：GitHub Release 和 Cloudflare Pages 的 manifest、安装包、签名均 HTTP 200；镜像安装包大小和 SHA-256 与 GitHub 资产一致。未上传私钥、API Token 或其他凭据。
+- 首次发布失败根因：Release runner 的 npm 包装脚本将 Cargo 产物重定向到共享缓存，tauri-action 默认扫描 `src-tauri/target`，因此出现 `No artifacts were found`；#414 已修复路径不一致并重新发布。
 
 ## 本轮 #365 交接（已合并）
 
@@ -27,7 +34,7 @@
 - #371：中文文件名拼音首字母搜索（已完成，PR #404）。
 - #372：设置导出/导入补全阅读位置与书签（已完成，PR #402）。
 - 后续事项不按历史列表自动并行开发；唯一可执行事项以 [`NEXT.md`](NEXT.md) 中重新确认的 READY 项为准。
-- #241/#51 仍是外部发布条件项；没有满足条件时不阻塞普通功能切片，但发布前必须复核。
+- #241/#51 仍是外部发布条件项；v0.10.14 的公开镜像已验证可用，但自动镜像 job 仍需仓库配置 Cloudflare Secrets 后重跑，旧版本真实安装/更新闭环和 Authenticode 条件仍需发布前复核。
 
 ## 本轮 #364 交接（已合并）
 
