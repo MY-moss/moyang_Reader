@@ -1,11 +1,11 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：IN PROGRESS（#372 设置备份补全阅读位置与书签）。
-- 当前主线基线：`main@0dd24b3cddda4c2ec150704ef1129a8723e5446a`；#368 两个切片已完成并合并，Issue #368 已以 `completed` 关闭。
+- 当前状态：STOPPED AFTER HANDOFF（#372 已完成并合并）。
+- 当前主线基线：`main@d93c992474db0e5e8ab0f04d68044db1ab774700`；#372 已由 PR #402 squash 合并，Issue #372 已以 `completed` 关闭。
 - 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
 
-## 当前切片：#372 设置导出/导入补全阅读位置与书签
+## 最近完成：#372 设置导出/导入补全阅读位置与书签
 
 - 目标：升级便携设置备份到 v2，把本机阅读位置和书签纳入 JSON；v1 旧备份仍可导入。
 - 非目标：不复制文档正文，不同步草稿、AI 历史或工作区文件；不改变 Markdown 真源和现有 32 条阅读位置上限。
@@ -14,7 +14,8 @@
 - 预计文件：`src/app/portable-settings.ts`、`src/app/storage.ts`、`src/app/App.tsx` 及对应测试。
 - 风险与回滚：仅变更 localStorage 备份格式；旧备份只读兼容，回退 PR 不需迁移；v2 导入空列表表示恢复为空快照。
 - 本地验证：定向测试 2 文件/17 项、TypeScript、Lint、格式检查和 `git diff --check` 已通过；未执行生产构建，也未生成安装包。
-- 交付规则：本切片仅一个功能分支和一个 PR；CI 通过后合入 main，再更新 Issue #372 和最终交接；本轮完成后停止。
+- 交付：分支 `codex/portable-reading-positions-2026-09-01`、PR [#402](https://github.com/MY-moss/moyang_Reader/pull/402)、合并提交 `d93c992474db0e5e8ab0f04d68044db1ab774700`；Quality checks run `33474094871` 通过，Issue #372 已标记 `completed`。
+- 当前动作：本轮已停止。下一次开发必须从最新 `main` 重新检查 Issues/Ready backlog，不从历史上下文自动开启下一切片。
 
 ## 最近完成：#368 选中文本高亮批注第二切片
 
