@@ -55,7 +55,12 @@ async function runExport(message: DocxExportWorkerStartMessage, controller: Abor
     );
     send({ type: "done" });
   } catch (cause) {
-    send({ type: "error", message: cause instanceof Error ? cause.message : String(cause) });
+    const message = cause instanceof Error ? cause.message : String(cause);
+    if (message === "EXPORT_CANCELLED") {
+      send({ type: "cancelled", message });
+    } else {
+      send({ type: "error", message });
+    }
   } finally {
     if (activeController === controller) activeController = null;
     rejectPendingAcknowledgement(new Error("EXPORT_CANCELLED"));

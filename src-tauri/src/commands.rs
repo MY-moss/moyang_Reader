@@ -3872,6 +3872,7 @@ pub async fn commit_binary_file(
         return Err("拒绝提交未通过用户选择的导出路径。请重新选择保存位置。".to_string());
     }
     run_blocking("完成二进制导出", move || {
+        sync_binary_file_inner(temp_path.clone())?;
         replace_file(&temp_path, &destination_path)
             .map_err(|error| format!("完成导出文件替换失败：{error}"))
     })
@@ -4020,8 +4021,17 @@ fn write_binary_file_chunk_inner(
         .map_err(|error| format!("打开临时导出文件失败：{error}"))?;
     file.write_all(contents)
         .map_err(|error| format!("写入导出分块失败：{error}"))?;
-    file.sync_data()
-        .map_err(|error| format!("刷新导出分块失败：{error}"))?;
+    Ok(())
+}
+
+fn sync_binary_file_inner(path: PathBuf) -> Result<(), String> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| format!("打开待提交导出文件失败：{error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("刷新待提交导出文件失败：{error}"))?;
     Ok(())
 }
 
@@ -4123,13 +4133,14 @@ mod tests {
         refresh_workspace_inner, rename_workspace_entry_inner, search_workspace_inner,
         search_workspace_inner_with_cache, search_workspace_inner_with_cache_and_persistence,
         should_skip_directory, sorted_workspace_directories, sorted_workspace_listing,
-        source_search_tokens, touch_indexed_file, transfer_workspace_entry_inner,
-        validate_export_stream_parent, validate_export_stream_temp_path, write_annotations_inner,
-        write_binary_file_chunk_inner, write_bytes_file_inner, write_text_file_inner,
-        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind,
-        StoredAnnotation, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
-        MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE,
-        MAX_SEARCH_INDEX_TOKEN_CHARS, MAX_WORKSPACE_DEPTH, MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
+        source_search_tokens, sync_binary_file_inner, touch_indexed_file,
+        transfer_workspace_entry_inner, validate_export_stream_parent,
+        validate_export_stream_temp_path, write_annotations_inner, write_binary_file_chunk_inner,
+        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
+        CachedSearchText, OpenPath, OpenPathKind, StoredAnnotation, WorkspaceFile,
+        WorkspaceSearchCache, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES,
+        MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS,
+        MAX_WORKSPACE_DEPTH, MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -4462,6 +4473,7 @@ mod tests {
             .expect("write first stream export chunk");
         write_binary_file_chunk_inner(temp.clone(), &[2, 3], true)
             .expect("append second stream export chunk");
+        sync_binary_file_inner(temp.clone()).expect("sync stream export at commit boundary");
         assert_eq!(
             fs::read(&temp).expect("read stream export temp"),
             vec![0, 1, 2, 3]

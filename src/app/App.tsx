@@ -5552,6 +5552,13 @@ export function App() {
             let committed = false;
             try {
               let hasWrittenChunk = false;
+              const resetOutput = async () => {
+                try {
+                  await discardBinaryFile(tempPath, targetPath);
+                } finally {
+                  hasWrittenChunk = false;
+                }
+              };
               await streamDocxExportWithWorker(
                 volumeTitle,
                 batch,
@@ -5562,6 +5569,7 @@ export function App() {
                   return writeBinaryFileChunk(tempPath, chunk, append, targetPath);
                 },
                 controller.signal,
+                resetOutput,
               );
               if (controller.signal.aborted) throw new Error("EXPORT_CANCELLED");
               await commitBinaryFile(tempPath, targetPath);
