@@ -1,9 +1,27 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：STOPPED AFTER HANDOFF（#372 已完成并合并）。
-- 当前主线基线：`main@d93c992474db0e5e8ab0f04d68044db1ab774700`；#372 已由 PR #402 squash 合并，Issue #372 已以 `completed` 关闭。
+- 当前状态：STOPPED AFTER HANDOFF（#371 已完成并合并）。
+- 当前主线基线：`main@c4794bcc618401c36c5a826a07ab22f18f99900a`；#371 已由 PR #404 squash 合并，Issue #371 已以 `completed` 关闭。
 - 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
+
+## 最近完成：#371 中文文件名拼音首字母匹配
+
+- 目标：让快速打开和工作区搜索支持中文文件名的轻量拼音首字母匹配，例如输入 `bj` 命中 `北京笔记.md`。
+- 非目标：不做全文内容拼音检索、多音字精确消歧或前端 JS 拼音库；不改变 Markdown 真源和已有非中文排序。
+- 实现：Rust 侧使用轻量 `pinyinKey` 辅助索引，快速打开和工作区搜索同时保留原文件名匹配；旧缓存缺少该字段时会自动刷新。
+- 验收：`北京笔记.md` 通过 `bj` 命中且不误命中其他文件；ASCII 文件名行为保持；Rust 拼音/搜索测试、前端快速打开/缓存测试覆盖。
+- 本地验证：Rust 全量库测试 54 项通过；前端定向测试 2 文件/10 项通过；TypeScript、Lint、格式检查和一次前端生产构建通过。
+- 远程验证：CI run `33506583653`（Quality checks）成功；Rust dependency audit run `33506583870` 成功；浏览器/无障碍、Windows desktop smoke、发布预检和 Rust 门禁均通过。
+- 交付：分支 `codex/pinyin-search-2026-09-01`、PR [#404](https://github.com/MY-moss/moyang_Reader/pull/404)、合并提交 `c4794bcc618401c36c5a826a07ab22f18f99900a`。
+- 风险与回滚：仅新增可选 IPC 字段和搜索辅助索引；回退 PR #404 不需要数据迁移，原文件名匹配仍是事实来源。
+- 发布边界：本切片不单独生成安装包；纳入 `v0.11.0` Windows x64 稳定批次。
+
+## 下一次开发
+
+- 当前没有 IN PROGRESS 事项。本轮已完成并停止。
+- 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
+- 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 
 ## 最近完成：#372 设置导出/导入补全阅读位置与书签
 
