@@ -1397,6 +1397,23 @@ pub async fn choose_document_paths(
 }
 
 #[tauri::command]
+pub async fn choose_image_paths(
+    app: AppHandle,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<String>, String> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title("选择图片")
+            .add_filter("图片", &IMAGE_EXTENSIONS)
+            .blocking_pick_files()
+    })
+    .await
+    .map_err(|error| format!("打开图片选择器失败：{error}"))?;
+    register_selected_paths(access, selected, false)
+}
+
+#[tauri::command]
 pub async fn choose_workspace_path(
     app: AppHandle,
     access: State<'_, AccessRegistry>,

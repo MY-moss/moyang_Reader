@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   buildMarkdownImage,
@@ -46,6 +56,7 @@ type EditorInsertPopoverProps = {
   scrollContainerRef?: { readonly current: HTMLElement | null };
   onCancel: () => void;
   onSubmit: (request: EditorInsertRequest) => void;
+  onPickImage?: () => Promise<string | null>;
 };
 
 const tabs: readonly { kind: EditorInsertKind; label: string }[] = [
@@ -99,13 +110,17 @@ export function EditorInsertPopover({
   scrollContainerRef,
   onCancel,
   onSubmit,
+  onPickImage,
 }: EditorInsertPopoverProps) {
   const popoverRef = useRef<HTMLElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const skipInputFocusRef = useRef(false);
   const [activeKind, setActiveKind] = useState<EditorInsertKind>(kind);
   const [form, setForm] = useState<EditorInsertForm>(() => createForm(initialValues));
   const [error, setError] = useState<string | null>(null);
+  const [isPickingImage, setIsPickingImage] = useState(false);
   const [position, setPosition] = useState<EditorInsertPosition>({ left: 12, top: 12 });
+  const popoverId = useId().replace(/:/g, "-");
   const anchorLeft = anchor?.left;
   const anchorTop = anchor?.top;
   const anchorBottom = anchor?.bottom;
@@ -120,7 +135,10 @@ export function EditorInsertPopover({
   const initialColumns = initialValues?.columns ?? 3;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      skipInputFocusRef.current = false;
+      return;
+    }
     setActiveKind(kind);
     setForm(
       createForm({
@@ -152,6 +170,10 @@ export function EditorInsertPopover({
 
   useEffect(() => {
     if (!open) return;
+    if (skipInputFocusRef.current) {
+      skipInputFocusRef.current = false;
+      return;
+    }
     const timer = window.setTimeout(() => focusWithoutScroll(firstInputRef.current), 0);
     return () => window.clearTimeout(timer);
   }, [activeKind, open]);
@@ -198,10 +220,13 @@ export function EditorInsertPopover({
   useEffect(() => {
     if (!open) return;
     const handleOutsidePointer = (event: PointerEvent) => {
-      if (event.target instanceof Node && !popoverRef.current?.contains(event.target)) onCancel();
+      if (event.target instanceof Node && !popoverRef.current?.contains(event.target)) {
+        event.preventDefault();
+        onCancel();
+      }
     };
-    document.addEventListener("pointerdown", handleOutsidePointer);
-    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+    document.addEventListener("pointerdown", handleOutsidePointer, true);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer, true);
   }, [onCancel, open]);
 
   if (!open) return null;
@@ -248,6 +273,55 @@ export function EditorInsertPopover({
     onSubmit(request);
   };
 
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = tabs.findIndex((tab) => tab.kind === activeKind);
+    if (currentIndex < 0) return;
+
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (currentIndex + 1) % tabs.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    const nextKind = tabs[nextIndex]?.kind;
+    if (!nextKind) return;
+    event.preventDefault();
+    skipInputFocusRef.current = true;
+    setActiveKind(nextKind);
+    setError(null);
+    focusWithoutScroll(document.getElementById(`${popoverId}-tab-${nextKind}`));
+  };
+
+  const handlePickImage = async () => {
+    if (!onPickImage || isPickingImage) return;
+    setIsPickingImage(true);
+    setError(null);
+    try {
+      const source = await onPickImage();
+      if (!source) return;
+      setForm((current) => ({ ...current, src: source }));
+      window.setTimeout(() => focusWithoutScroll(firstInputRef.current), 0);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法选择图片，请重试。");
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
   const popover = (
     <section
       ref={popoverRef}
@@ -255,7 +329,7 @@ export function EditorInsertPopover({
       style={{ left: position.left, top: position.top }}
       role="dialog"
       aria-modal="false"
-      aria-labelledby="editor-insert-title"
+      aria-labelledby={`${popoverId}-title`}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -266,25 +340,30 @@ export function EditorInsertPopover({
       <div className="editor-insert-header">
         <div>
           <span className="editor-insert-eyebrow">INSERT</span>
-          <h2 id="editor-insert-title">插入内容</h2>
+          <h2 id={`${popoverId}-title`}>插入内容</h2>
         </div>
         <button type="button" className="editor-insert-close" aria-label="关闭插入面板" onClick={onCancel}>
           ×
         </button>
       </div>
 
-      <div className="editor-insert-tabs" role="tablist" aria-label="插入类型">
+      <div className="editor-insert-tabs" role="tablist" aria-label="插入类型" aria-orientation="horizontal">
         {tabs.map((tab) => (
           <button
             key={tab.kind}
+            id={`${popoverId}-tab-${tab.kind}`}
             type="button"
             role="tab"
             aria-selected={activeKind === tab.kind}
+            aria-controls={`${popoverId}-panel`}
+            tabIndex={activeKind === tab.kind ? 0 : -1}
             className={activeKind === tab.kind ? "is-active" : undefined}
             onClick={() => {
+              skipInputFocusRef.current = false;
               setActiveKind(tab.kind);
               setError(null);
             }}
+            onKeyDown={handleTabKeyDown}
           >
             {tab.label}
           </button>
@@ -292,82 +371,117 @@ export function EditorInsertPopover({
       </div>
 
       <form onSubmit={handleSubmit}>
-        {activeKind === "link" && (
-          <div className="editor-insert-fields">
-            <label className="editor-insert-field">
-              <span>链接文字</span>
-              <input ref={firstInputRef} value={form.label} onChange={update("label")} placeholder="例如：项目主页" />
-            </label>
-            <label className="editor-insert-field">
-              <span>地址</span>
-              <input value={form.href} onChange={update("href")} placeholder="https://example.com 或相对路径" />
-            </label>
-            <label className="editor-insert-field">
-              <span>
-                提示文字 <em>可选</em>
-              </span>
-              <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
-            </label>
-          </div>
-        )}
-
-        {activeKind === "wikilink" && (
-          <div className="editor-insert-fields">
-            <label className="editor-insert-field">
-              <span>目标笔记</span>
-              <input ref={firstInputRef} value={form.target} onChange={update("target")} placeholder="例如：项目计划" />
-            </label>
-            <label className="editor-insert-field">
-              <span>
-                显示别名 <em>可选</em>
-              </span>
-              <input value={form.alias} onChange={update("alias")} placeholder="留空则显示笔记名称" />
-            </label>
-            <p className="editor-insert-hint">将生成 Obsidian 兼容的双链，例如：[[项目计划|查看计划]]</p>
-          </div>
-        )}
-
-        {activeKind === "image" && (
-          <div className="editor-insert-fields">
-            <label className="editor-insert-field">
-              <span>图片路径或 URL</span>
-              <input
-                ref={firstInputRef}
-                value={form.src}
-                onChange={update("src")}
-                placeholder="相对路径、绝对路径或 https://…"
-              />
-            </label>
-            <label className="editor-insert-field">
-              <span>
-                替代文字 <em>可选</em>
-              </span>
-              <input value={form.alt} onChange={update("alt")} placeholder="帮助读者理解图片内容" />
-            </label>
-            <label className="editor-insert-field">
-              <span>
-                提示文字 <em>可选</em>
-              </span>
-              <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
-            </label>
-          </div>
-        )}
-
-        {activeKind === "table" && (
-          <div className="editor-insert-fields editor-insert-table-fields">
-            <div className="editor-insert-number-row">
+        <div
+          id={`${popoverId}-panel`}
+          className="editor-insert-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`${popoverId}-tab-${activeKind}`}
+          tabIndex={0}
+        >
+          {activeKind === "link" && (
+            <div className="editor-insert-fields">
               <label className="editor-insert-field">
-                <span>行数</span>
-                <input ref={firstInputRef} type="number" min={2} max={8} value={form.rows} onChange={update("rows")} />
+                <span>链接文字</span>
+                <input ref={firstInputRef} value={form.label} onChange={update("label")} placeholder="例如：项目主页" />
               </label>
               <label className="editor-insert-field">
-                <span>列数</span>
-                <input type="number" min={2} max={8} value={form.columns} onChange={update("columns")} />
+                <span>地址</span>
+                <input value={form.href} onChange={update("href")} placeholder="https://example.com 或相对路径" />
+              </label>
+              <label className="editor-insert-field">
+                <span>
+                  提示文字 <em>可选</em>
+                </span>
+                <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
               </label>
             </div>
-            <p className="editor-insert-hint">首行为表头，插入后可直接按 Tab 在单元格之间移动。</p>
-          </div>
-        )}
+          )}
+
+          {activeKind === "wikilink" && (
+            <div className="editor-insert-fields">
+              <label className="editor-insert-field">
+                <span>目标笔记</span>
+                <input
+                  ref={firstInputRef}
+                  value={form.target}
+                  onChange={update("target")}
+                  placeholder="例如：项目计划"
+                />
+              </label>
+              <label className="editor-insert-field">
+                <span>
+                  显示别名 <em>可选</em>
+                </span>
+                <input value={form.alias} onChange={update("alias")} placeholder="留空则显示笔记名称" />
+              </label>
+              <p className="editor-insert-hint">将生成 Obsidian 兼容的双链，例如：[[项目计划|查看计划]]</p>
+            </div>
+          )}
+
+          {activeKind === "image" && (
+            <div className="editor-insert-fields">
+              <div className="editor-insert-image-source-row">
+                <label className="editor-insert-field">
+                  <span>图片路径或 URL</span>
+                  <input
+                    ref={firstInputRef}
+                    value={form.src}
+                    onChange={update("src")}
+                    placeholder="相对路径或 https://…"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="editor-insert-browse"
+                  aria-label="浏览图片"
+                  title={onPickImage ? "从当前工作区选择图片" : "桌面版支持浏览工作区图片"}
+                  disabled={!onPickImage || isPickingImage}
+                  onClick={() => void handlePickImage()}
+                >
+                  {isPickingImage ? "选择中…" : "浏览"}
+                </button>
+              </div>
+              <label className="editor-insert-field">
+                <span>
+                  替代文字 <em>可选</em>
+                </span>
+                <input value={form.alt} onChange={update("alt")} placeholder="帮助读者理解图片内容" />
+              </label>
+              <label className="editor-insert-field">
+                <span>
+                  提示文字 <em>可选</em>
+                </span>
+                <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
+              </label>
+              <p className="editor-insert-hint">
+                也可以直接粘贴截图或把图片拖入编辑器；浏览选择会生成工作区内相对路径。
+              </p>
+            </div>
+          )}
+
+          {activeKind === "table" && (
+            <div className="editor-insert-fields editor-insert-table-fields">
+              <div className="editor-insert-number-row">
+                <label className="editor-insert-field">
+                  <span>行数</span>
+                  <input
+                    ref={firstInputRef}
+                    type="number"
+                    min={2}
+                    max={8}
+                    value={form.rows}
+                    onChange={update("rows")}
+                  />
+                </label>
+                <label className="editor-insert-field">
+                  <span>列数</span>
+                  <input type="number" min={2} max={8} value={form.columns} onChange={update("columns")} />
+                </label>
+              </div>
+              <p className="editor-insert-hint">首行为表头，插入后可直接按 Tab 在单元格之间移动。</p>
+            </div>
+          )}
+        </div>
 
         {error && (
           <p className="editor-insert-error" role="alert">
@@ -379,7 +493,7 @@ export function EditorInsertPopover({
           <button type="button" className="editor-insert-cancel" onClick={onCancel}>
             取消
           </button>
-          <button type="submit" className="editor-insert-submit">
+          <button type="submit" className="editor-insert-submit" disabled={isPickingImage}>
             插入到正文
           </button>
         </div>

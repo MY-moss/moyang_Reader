@@ -67,6 +67,7 @@ type MarkdownWysiwygEditorProps = {
   onStatusMessage?: (message: string) => void;
   wikiCandidates?: readonly WikiLinkCandidate[];
   onPasteImage?: (image: File) => Promise<string | null>;
+  onPickImage?: () => Promise<string | null>;
 };
 
 type EditorViewInstance = {
@@ -204,6 +205,7 @@ function MilkdownSurface({
   onStatusMessage,
   wikiCandidates,
   onPasteImage,
+  onPickImage,
 }: MarkdownWysiwygEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
@@ -984,6 +986,7 @@ function MilkdownSurface({
         scrollContainerRef={containerRef}
         onCancel={closeInsert}
         onSubmit={handleInsertRequest}
+        onPickImage={onPickImage}
       />
       <Milkdown />
       {completion && (

@@ -32,6 +32,7 @@ type SourceEditorProps = {
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
   wikiCompletions?: readonly WikiLinkCandidate[];
+  onPickImage?: () => Promise<string | null>;
 };
 
 type EditorViewInstance = import("@codemirror/view").EditorView;
@@ -75,6 +76,7 @@ export function SourceEditor({
   canRedo = false,
   onStatusMessage,
   wikiCompletions,
+  onPickImage,
 }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fallbackShellRef = useRef<HTMLDivElement>(null);
@@ -691,6 +693,7 @@ export function SourceEditor({
           scrollContainerRef={fallbackShellRef}
           onCancel={closeInsert}
           onSubmit={handleInsertRequest}
+          onPickImage={onPickImage}
         />
         <textarea
           ref={fallbackRef}
@@ -755,6 +758,7 @@ export function SourceEditor({
         scrollContainerRef={containerRef}
         onCancel={closeInsert}
         onSubmit={handleInsertRequest}
+        onPickImage={onPickImage}
       />
       {!ready && <span className="source-editor-loading">正在加载编辑器…</span>}
       {contextMenu && (

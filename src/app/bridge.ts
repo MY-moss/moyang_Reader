@@ -54,6 +54,11 @@ export async function chooseDocumentPaths(): Promise<string[]> {
   return invoke<string[]>("choose_document_paths");
 }
 
+export async function chooseImagePaths(): Promise<string[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<string[]>("choose_image_paths");
+}
+
 export async function chooseWorkspacePath(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invoke<string | null>("choose_workspace_path");
