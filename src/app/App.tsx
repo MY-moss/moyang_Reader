@@ -186,7 +186,6 @@ import {
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
-  loadReadingPositions,
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
@@ -199,7 +198,6 @@ import {
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
-  saveReadingPositions,
   saveSidebarCollapsed,
   saveContextPanelOpen,
   saveContextPanelTab,
@@ -1165,8 +1163,6 @@ export function App() {
           mountedWorkspaces,
           workspaceSessions: loadWorkspaceSessions(),
           openTabs,
-          readingPositions: loadReadingPositions(),
-          bookmarks,
         }),
       );
       if (isTauriRuntime()) {
@@ -1181,7 +1177,7 @@ export function App() {
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : "设置备份导出失败。", "error");
     }
-  }, [bookmarks, locale, mountedWorkspaces, notify, openTabs, preferences, theme, workspacePath]);
+  }, [locale, mountedWorkspaces, notify, openTabs, preferences, theme, workspacePath]);
 
   const importPortableSettings = useCallback(() => {
     const input = document.createElement("input");
@@ -1198,11 +1194,6 @@ export function App() {
           saveReaderPreferences(bundle.preferences);
           saveWorkspaceSessions([...bundle.workspaceSessions]);
           saveOpenTabs([...bundle.openTabs]);
-          if (bundle.version >= 2) {
-            saveReadingPositions(bundle.readingPositions);
-            saveBookmarks(bundle.bookmarks);
-            setBookmarks([...bundle.bookmarks]);
-          }
           saveMountedWorkspaces([...bundle.mountedWorkspaces]);
           saveWorkspacePath(bundle.workspacePath);
           saveLastDocumentPath(bundle.lastDocumentPath);
@@ -1212,11 +1203,7 @@ export function App() {
           saveLocale(bundle.locale);
           setTheme(bundle.theme);
           setMountedWorkspaces([...bundle.mountedWorkspaces]);
-          notify(
-            bundle.version >= 2
-              ? "设置已导入；阅读位置和书签也已恢复，阅读库路径将在重新授权后恢复。"
-              : "旧版设置已导入；该备份不含阅读位置和书签，现有本机记录已保留。阅读库路径将在重新授权后恢复。",
-          );
+          notify("设置已导入；已保存的阅读库路径将在重新授权后恢复。");
         })
         .catch((cause: unknown) => {
           notify(cause instanceof Error ? cause.message : "设置备份导入失败。", "error");
@@ -3980,6 +3967,61 @@ export function App() {
     setDraftRecovery(null);
   }, [draftSnapshots.length]);
 
+  const saveClipboardImageAsset = useCallback(async (image: File, documentPath: string): Promise<string> => {
+    if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {
+      throw new Error("剪贴板图片不能超过 10 MB。");
+    }
+
+    const bytes = await clipboardImageToPng(image);
+    if (bytes.byteLength > MAX_CLIPBOARD_IMAGE_BYTES) {
+      throw new Error("转换后的剪贴板图片不能超过 10 MB。");
+    }
+
+    const baseName = clipboardAssetFileName(bytes);
+    let assetName = baseName;
+    let assetPath = clipboardAssetPath(documentPath, assetName);
+    for (let suffix = 2; suffix <= 100 && (await fileExists(assetPath)); suffix += 1) {
+      assetName = baseName.replace(/\.png$/i, `-${suffix}.png`);
+      assetPath = clipboardAssetPath(documentPath, assetName);
+    }
+    if (await fileExists(assetPath)) throw new Error("无法为剪贴板图片生成不重复的文件名。");
+
+    await writeBinaryFile(assetPath, bytes);
+    return assetName;
+  }, []);
+
+  const handleWysiwygPasteImage = useCallback(
+    async (image: File): Promise<string | null> => {
+      const current = documentStateRef.current;
+      if (!isTauriRuntime()) {
+        setError("浏览器预览模式不能保存剪贴板图片，请使用桌面版 Moyang Reader。");
+        return null;
+      }
+      if (!current || current.kind !== "markdown") {
+        setError("剪贴板图片只能粘贴到 Markdown 文档中。");
+        return null;
+      }
+      if (!workspacePathRef.current || current.path.startsWith("browser://")) {
+        setError("请先添加文档所在的文件夹，再粘贴剪贴板图片。");
+        return null;
+      }
+
+      const path = current.path;
+      try {
+        const assetName = await saveClipboardImageAsset(image, path);
+        if (documentStateRef.current?.path !== path) {
+          throw new Error("文档已切换，图片已保存但未插入引用。");
+        }
+        setError(null);
+        return `assets/${assetName}`;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法保存剪贴板图片。");
+        return null;
+      }
+    },
+    [saveClipboardImageAsset],
+  );
+
   const handleSourcePaste = useCallback(
     (context: SourceEditorPasteContext) => {
       const image = findClipboardImage(context.clipboardData);
@@ -3999,10 +4041,6 @@ export function App() {
         setError("请先添加文档所在的文件夹，再粘贴剪贴板图片。");
         return true;
       }
-      if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {
-        setError("剪贴板图片不能超过 10 MB。");
-        return true;
-      }
 
       const initialStart = context.selectionStart;
       const initialEnd = context.selectionEnd;
@@ -4011,24 +4049,10 @@ export function App() {
 
       void (async () => {
         try {
-          const bytes = await clipboardImageToPng(image);
-          if (bytes.byteLength > MAX_CLIPBOARD_IMAGE_BYTES) {
-            throw new Error("转换后的剪贴板图片不能超过 10 MB。");
-          }
+          const assetName = await saveClipboardImageAsset(image, path);
           if (documentStateRef.current?.path !== path) {
             throw new Error("文档已切换，未插入剪贴板图片。");
           }
-
-          const baseName = clipboardAssetFileName(bytes);
-          let assetName = baseName;
-          let assetPath = clipboardAssetPath(path, assetName);
-          for (let suffix = 2; suffix <= 100 && (await fileExists(assetPath)); suffix += 1) {
-            assetName = baseName.replace(/\.png$/i, `-${suffix}.png`);
-            assetPath = clipboardAssetPath(path, assetName);
-          }
-          if (await fileExists(assetPath)) throw new Error("无法为剪贴板图片生成不重复的文件名。");
-
-          await writeBinaryFile(assetPath, bytes);
           if (documentStateRef.current?.path !== path) {
             throw new Error("文档已切换，图片已保存但未插入引用。");
           }
@@ -4047,7 +4071,7 @@ export function App() {
       })();
       return true;
     },
-    [updateSource],
+    [saveClipboardImageAsset, updateSource],
   );
 
   const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
@@ -6013,6 +6037,7 @@ export function App() {
                 onRedo={(target) => redoEditor(target)}
                 onStatusMessage={(message) => notify(message)}
                 wikiCandidates={wikiLinkCandidates}
+                onPasteImage={handleWysiwygPasteImage}
               />
             </Suspense>
           )}

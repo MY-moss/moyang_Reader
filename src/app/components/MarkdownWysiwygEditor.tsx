@@ -35,6 +35,8 @@ import { ContextMenu } from "./ContextMenu";
 import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorInsertPopover";
 import { EditorToolbar } from "./EditorToolbar";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import { findClipboardImage } from "../clipboard-image";
+import { clipboardPayloadHasContent, dispatchClipboardPaste, readClipboardPayload } from "../clipboard-paste";
 import {
   buildMarkdownImage,
   buildMarkdownLink,
@@ -64,6 +66,7 @@ type MarkdownWysiwygEditorProps = {
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
   wikiCandidates?: readonly WikiLinkCandidate[];
+  onPasteImage?: (image: File) => Promise<string | null>;
 };
 
 type EditorViewInstance = {
@@ -200,6 +203,7 @@ function MilkdownSurface({
   canRedo = false,
   onStatusMessage,
   wikiCandidates,
+  onPasteImage,
 }: MarkdownWysiwygEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
@@ -216,6 +220,7 @@ function MilkdownSurface({
   const onRedoRef = useRef(onRedo);
   const onFindTextRef = useRef(onFindText);
   const onStatusMessageRef = useRef(onStatusMessage);
+  const onPasteImageRef = useRef(onPasteImage);
   const pendingInsertSelectionRef = useRef<{ from: number; to: number; selectedText: string } | null>(null);
   const lastRequestedInsertRef = useRef<EditorInsertKind | null>(null);
   const [completion, setCompletion] = useState<CompletionOverlayState | null>(null);
@@ -250,6 +255,10 @@ function MilkdownSurface({
   useEffect(() => {
     onStatusMessageRef.current = onStatusMessage;
   }, [onStatusMessage]);
+
+  useEffect(() => {
+    onPasteImageRef.current = onPasteImage;
+  }, [onPasteImage]);
 
   useEffect(() => {
     wikiCandidatesRef.current = wikiCandidates ?? [];
@@ -511,6 +520,57 @@ function MilkdownSurface({
     }
   }, []);
 
+  const pasteFromClipboard = useCallback(
+    async (plainOnly: boolean) => {
+      const view = viewRef.current;
+      if (!view) {
+        onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
+        return;
+      }
+
+      const { from, to } = view.state.selection;
+      const initialMarkdown = serializerRef.current?.(view.state.doc) ?? null;
+
+      try {
+        const payload = await readClipboardPayload();
+        if (!clipboardPayloadHasContent(payload)) {
+          onStatusMessageRef.current?.("剪贴板中没有可粘贴的内容。");
+          return;
+        }
+
+        if (!plainOnly) {
+          const target = containerRef.current;
+          if (target && dispatchClipboardPaste(target, payload)) return;
+        }
+
+        if (!payload.text) {
+          onStatusMessageRef.current?.(
+            plainOnly
+              ? "剪贴板中没有可粘贴的文本；如需插入图片，请使用“粘贴”。"
+              : "剪贴板中没有可粘贴的文本；图片请使用 Ctrl+V 或切换源码模式。",
+          );
+          return;
+        }
+
+        const currentView = viewRef.current;
+        if (
+          !currentView ||
+          (initialMarkdown !== null && serializerRef.current?.(currentView.state.doc) !== initialMarkdown)
+        ) {
+          onStatusMessageRef.current?.("正文内容已经变化，请重新执行粘贴，避免覆盖最新修改。");
+          return;
+        }
+
+        currentView.focus();
+        currentView.dispatch(currentView.state.tr.insertText(payload.text, from, to));
+        focusEditorPreservingViewport();
+      } catch {
+        onStatusMessageRef.current?.("无法读取剪贴板，请检查应用权限后重试。");
+      }
+    },
+    [focusEditorPreservingViewport],
+  );
+
   const applyContextAction = useCallback(
     (action: EditorContextAction) => {
       const editor = getRef.current();
@@ -538,20 +598,7 @@ function MilkdownSurface({
       }
 
       if (action === "paste" || action === "paste-plain") {
-        const clipboard = navigator.clipboard;
-        if (!clipboard?.readText) {
-          onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
-          setContextMenu(null);
-          return;
-        }
-        void clipboard
-          .readText()
-          .then((pastedText) => {
-            if (!pastedText) return;
-            view.focus();
-            view.dispatch(view.state.tr.insertText(pastedText, view.state.selection.from, view.state.selection.to));
-          })
-          .catch(() => onStatusMessageRef.current?.("无法读取剪贴板，请使用 Ctrl+V 或检查应用权限。"));
+        void pasteFromClipboard(action === "paste-plain");
         setContextMenu(null);
         return;
       }
@@ -659,7 +706,7 @@ function MilkdownSurface({
       view.focus();
       setContextMenu(null);
     },
-    [contextMenu, openInsert],
+    [contextMenu, openInsert, pasteFromClipboard],
   );
 
   const editorContextGroups = editorContextMenuGroups.map((group) => ({
@@ -802,14 +849,62 @@ function MilkdownSurface({
       closeCompletion();
     };
 
+    const handlePasteCapture = (event: Event) => {
+      const clipboardEvent = event as ClipboardEvent;
+      const image = findClipboardImage(clipboardEvent.clipboardData);
+      if (!image) return;
+
+      const view = viewRef.current;
+      const editor = getRef.current();
+      const handler = onPasteImageRef.current;
+      clipboardEvent.preventDefault();
+      clipboardEvent.stopPropagation();
+
+      if (!view || !editor || !handler) {
+        onStatusMessageRef.current?.("当前无法保存剪贴板图片，请切换源码模式或稍后重试。");
+        return;
+      }
+
+      const { from, to } = view.state.selection;
+      const initialMarkdown = serializerRef.current?.(view.state.doc) ?? null;
+      void handler(image)
+        .then((src) => {
+          if (!src) return;
+
+          const currentView = viewRef.current;
+          const currentEditor = getRef.current();
+          if (
+            !currentView ||
+            currentView !== view ||
+            !currentEditor ||
+            (initialMarkdown !== null && serializerRef.current?.(currentView.state.doc) !== initialMarkdown)
+          ) {
+            onStatusMessageRef.current?.("正文内容已经变化，图片已保存但未插入引用。");
+            return;
+          }
+
+          const docSize = (currentView.state.doc as unknown as { content?: { size?: number } }).content?.size ?? to;
+          const safeFrom = Math.max(1, Math.min(from, docSize));
+          const safeTo = Math.max(safeFrom, Math.min(to, docSize));
+          currentView.dispatch(
+            currentView.state.tr.setSelection(TextSelection.create(currentView.state.doc as never, safeFrom, safeTo)),
+          );
+          currentEditor.action(callCommand(insertImageCommand.key, { src, alt: "" }));
+          focusEditorPreservingViewport();
+        })
+        .catch(() => onStatusMessageRef.current?.("无法插入剪贴板图片，请切换源码模式继续操作。"));
+    };
+
     container.addEventListener("input", handleInput);
     container.addEventListener("keydown", handleKeyDownCapture, true);
     container.addEventListener("focusout", handleFocusOut);
+    container.addEventListener("paste", handlePasteCapture, true);
 
     return () => {
       container.removeEventListener("input", handleInput);
       container.removeEventListener("keydown", handleKeyDownCapture, true);
       container.removeEventListener("focusout", handleFocusOut);
+      container.removeEventListener("paste", handlePasteCapture, true);
 
       // Milkdown cancels its debounced markdownUpdated on destroy, so edits
       // from the last 200ms would be lost when the editor unmounts (e.g. a
@@ -832,7 +927,7 @@ function MilkdownSurface({
       }
       viewRef.current = null;
     };
-  }, [applyCompletionItem, loading]);
+  }, [applyCompletionItem, focusEditorPreservingViewport, loading]);
 
   return (
     <div
