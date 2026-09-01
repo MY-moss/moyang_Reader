@@ -4,9 +4,11 @@ import { defaultReaderPreferences, type ReaderPreferences } from "./preferences"
 import type { Locale } from "./i18n";
 import { normalizePathKey } from "./path-key";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
+import { normalizeBookmarks, type DocumentBookmark } from "./bookmarks";
+import { normalizeReadingPositions, type ReadingPosition } from "./storage";
 
 const PORTABLE_SETTINGS_FORMAT = "moyang-reader-settings";
-const PORTABLE_SETTINGS_VERSION = 1;
+const PORTABLE_SETTINGS_VERSION = 2;
 const MAX_WORKSPACES = 5;
 const MAX_TABS = 16;
 
@@ -19,11 +21,13 @@ export type PortableSettingsInput = {
   mountedWorkspaces: readonly RecentWorkspace[];
   workspaceSessions: readonly WorkspaceSession[];
   openTabs: readonly RecentFile[];
+  readingPositions: readonly ReadingPosition[];
+  bookmarks: readonly DocumentBookmark[];
 };
 
 export type PortableSettingsBundle = PortableSettingsInput & {
   format: typeof PORTABLE_SETTINGS_FORMAT;
-  version: typeof PORTABLE_SETTINGS_VERSION;
+  version: 1 | typeof PORTABLE_SETTINGS_VERSION;
   exportedAt: string;
 };
 
@@ -147,6 +151,10 @@ function parseSessions(value: unknown): WorkspaceSession[] {
     .slice(0, MAX_WORKSPACES);
 }
 
+function parseBookmarks(value: unknown): DocumentBookmark[] {
+  return normalizeBookmarks(value).filter((bookmark) => !bookmark.path.toLowerCase().startsWith("browser://"));
+}
+
 export function createPortableSettingsBundle(input: PortableSettingsInput): PortableSettingsBundle {
   return {
     format: PORTABLE_SETTINGS_FORMAT,
@@ -160,6 +168,8 @@ export function createPortableSettingsBundle(input: PortableSettingsInput): Port
     mountedWorkspaces: parseWorkspaces(input.mountedWorkspaces),
     workspaceSessions: parseSessions(input.workspaceSessions),
     openTabs: parseTabs(input.openTabs),
+    readingPositions: normalizeReadingPositions(input.readingPositions),
+    bookmarks: parseBookmarks(input.bookmarks),
   };
 }
 
@@ -175,16 +185,22 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
     throw new Error("设置备份不是有效的 JSON 文件。");
   }
 
-  if (!isRecord(parsed) || parsed.format !== PORTABLE_SETTINGS_FORMAT || parsed.version !== PORTABLE_SETTINGS_VERSION) {
+  if (
+    !isRecord(parsed) ||
+    parsed.format !== PORTABLE_SETTINGS_FORMAT ||
+    (parsed.version !== 1 && parsed.version !== PORTABLE_SETTINGS_VERSION)
+  ) {
     throw new Error("设置备份版本不受支持。");
   }
+
+  const version = parsed.version;
 
   const theme =
     parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system" ? parsed.theme : "system";
   const locale = parsed.locale === "en-US" || parsed.locale === "zh-CN" ? parsed.locale : "zh-CN";
   return {
     format: PORTABLE_SETTINGS_FORMAT,
-    version: PORTABLE_SETTINGS_VERSION,
+    version,
     exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(),
     preferences: parsePreferences(parsed.preferences),
     locale,
@@ -194,5 +210,7 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
     mountedWorkspaces: parseWorkspaces(parsed.mountedWorkspaces),
     workspaceSessions: parseSessions(parsed.workspaceSessions),
     openTabs: parseTabs(parsed.openTabs),
+    readingPositions: version >= 2 ? normalizeReadingPositions(parsed.readingPositions) : [],
+    bookmarks: version >= 2 ? parseBookmarks(parsed.bookmarks) : [],
   };
 }

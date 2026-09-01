@@ -7,6 +7,7 @@ import {
   loadLastDocumentPath,
   loadOpenTabs,
   loadReadingPosition,
+  loadReadingPositions,
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
@@ -17,6 +18,7 @@ import {
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPosition,
+  saveReadingPositions,
   saveSidebarCollapsed,
   saveContextPanelOpen,
   saveContextPanelTab,
@@ -133,6 +135,16 @@ describe("reader storage", () => {
     expect(loadReadingPosition("C:/Notes/0.md")).toBe(0);
     expect(loadReadingPosition("C:/Notes/39.md")).toBe(39);
     expect(JSON.parse(localStorage.getItem("moyang-reader-reading-positions") ?? "[]")).toHaveLength(32);
+  });
+
+  it("normalizes a portable reading-position snapshot before persisting it", () => {
+    saveReadingPositions([
+      { path: " C:/Notes/Guide.md ", top: 12.4 },
+      { path: "c:\\notes\\guide.md", top: 99 },
+      { path: "C:/Notes/invalid.md", top: Number.NaN },
+    ]);
+
+    expect(loadReadingPositions()).toEqual([{ path: "C:/Notes/Guide.md", top: 12 }]);
   });
 
   it("deduplicates recent workspaces case-insensitively and keeps the newest eight", () => {
