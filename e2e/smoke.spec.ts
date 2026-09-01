@@ -765,8 +765,9 @@ test("keeps keyboard context menus contained and returns focus across tabs, read
   const readerMenu = page.getByRole("menu", { name: "阅读内容菜单" });
   await expect(readerMenu).toBeVisible();
   const readerItems = readerMenu.locator('button[role="menuitem"]:not(:disabled)');
-  await page.keyboard.press("Tab");
   await expect(readerItems.first()).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(readerItems.nth(1)).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(reader).toBeFocused();
 
