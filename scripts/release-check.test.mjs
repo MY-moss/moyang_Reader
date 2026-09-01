@@ -128,6 +128,13 @@ test("guards release and mirror workflows against stale or incomplete publishing
   assert.deepEqual(validateReleaseWorkflow(root), []);
 });
 
+test("runs release builds through the direct Tauri CLI and retries transient publishing failures", () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const release = fs.readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
+  assert.match(release, /^\s+tauriScript:\s+npx tauri\s*$/m);
+  assert.match(release, /^\s+retryAttempts:\s+3\s*$/m);
+});
+
 test("rejects a mirror workflow that can silently skip deployment or duplicate triggers", () => {
   const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-workflow-"));

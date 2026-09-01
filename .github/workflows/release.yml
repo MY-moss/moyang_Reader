@@ -109,6 +109,11 @@ jobs:
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
           updaterJsonPreferNsis: true
+          # Bypass npm's run-tauri wrapper: it redirects Cargo output to the
+          # shared local cache, while tauri-action discovers bundles under
+          # src-tauri/target on the ephemeral release runner.
+          tauriScript: npx tauri
+          retryAttempts: 3
           args: --config src-tauri/tauri.release.conf.json
 
   mirror:

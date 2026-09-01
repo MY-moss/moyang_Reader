@@ -106,6 +106,12 @@ export function validateReleaseWorkflow(projectRoot = defaultRoot) {
   for (const field of ["uploadUpdaterJson: true", "uploadUpdaterSignatures: true", "updaterJsonPreferNsis: true"]) {
     if (!release.includes(field)) errors.push(`release.yml 缺少 ${field}。`);
   }
+  if (!release.includes("tauriScript: npx tauri")) {
+    errors.push("release.yml 必须通过直接 Tauri CLI 构建，避免共享 Cargo 缓存导致 tauri-action 找不到安装包。");
+  }
+  if (!release.includes("retryAttempts: 3")) {
+    errors.push("release.yml 必须为构建和上传保留至少三次瞬时失败重试。");
+  }
   if (!mirror.includes("release:") || !mirror.includes("types: [published]")) {
     errors.push("mirror-release.yml 必须在 Release 发布后触发。");
   }
