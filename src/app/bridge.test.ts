@@ -15,10 +15,12 @@ import {
   commitBinaryFile,
   discardBinaryFile,
   fileMetadata,
+  readAnnotations,
   readPreviousVersion,
   subscribeToFileDrop,
   writeBinaryFile,
   writeBinaryFileChunk,
+  writeAnnotations,
 } from "./bridge";
 
 describe("binary bridge", () => {
@@ -73,6 +75,29 @@ describe("binary bridge", () => {
 
     await expect(readPreviousVersion("C:\\Notes\\Today.md")).resolves.toBe("# Previous");
     expect(invoke).toHaveBeenCalledWith("read_previous_version", { path: "C:\\Notes\\Today.md" });
+  });
+
+  it("round-trips workspace annotation sidecar calls through native IPC", async () => {
+    const annotations = [
+      {
+        id: "a-1",
+        path: "Notes/Today.md",
+        quote: "important",
+        prefix: "Read",
+        suffix: "now",
+        start: 5,
+        end: 14,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    invoke.mockResolvedValueOnce(annotations).mockResolvedValueOnce(undefined);
+
+    await expect(readAnnotations("C:\\Vault")).resolves.toEqual(annotations);
+    await writeAnnotations("C:\\Vault", annotations);
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "read_annotations", { root: "C:\\Vault" });
+    expect(invoke).toHaveBeenNthCalledWith(2, "write_annotations", { root: "C:\\Vault", annotations });
   });
 
   it("forwards native drag lifecycle events without dropping enter or leave feedback", async () => {

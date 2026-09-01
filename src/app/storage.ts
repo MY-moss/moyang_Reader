@@ -62,7 +62,9 @@ export function saveContextPanelOpen(open: boolean): void {
 export function loadContextPanelTab(): ContextPanelTab {
   try {
     const saved = localStorage.getItem(contextPanelTabKey);
-    return saved === "backlinks" || saved === "properties" || saved === "bookmarks" ? saved : "outline";
+    return saved === "backlinks" || saved === "properties" || saved === "bookmarks" || saved === "annotations"
+      ? saved
+      : "outline";
   } catch {
     return "outline";
   }

@@ -1406,6 +1406,66 @@ a:focus-visible {
 .close-confirm-actions .quiet-button {
   min-height: 32px;
 }
+.annotation-dialog-backdrop {
+  z-index: 72;
+  align-items: center;
+}
+.annotation-dialog {
+  width: min(560px, 100%);
+}
+.annotation-dialog-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 20px 18px;
+}
+.annotation-dialog-label,
+.annotation-note-label > span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.annotation-quote {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  border-left: 3px solid #ad7d2d;
+  border-radius: 0 7px 7px 0;
+  background: color-mix(in srgb, #e7c768 14%, var(--surface));
+  color: var(--ink);
+  padding: 11px 13px;
+  font-family: var(--font-reading);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.annotation-note-label {
+  display: grid;
+  gap: 6px;
+}
+.annotation-note-label textarea {
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 11px;
+  font: inherit;
+  line-height: 1.55;
+}
+.annotation-note-label textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 78%, transparent);
+  outline: 0;
+}
+.annotation-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 14px;
+  border-top: 1px solid var(--line);
+}
 .workspace-entry-details-backdrop {
   z-index: 68;
   align-items: center;
@@ -3305,6 +3365,19 @@ html.pane-resizing * {
   text-decoration: underline;
   text-decoration-thickness: 2px;
 }
+.moyang-annotation-hit {
+  border-radius: 2px;
+  background: color-mix(in srgb, #e7c768 42%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, #ad7d2d 54%, transparent);
+  color: inherit;
+}
+::highlight(moyang-annotation) {
+  background-color: color-mix(in srgb, #e7c768 42%, transparent);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, #ad7d2d 60%, transparent);
+  text-decoration-thickness: 2px;
+}
 .editor-surface {
   position: relative;
   min-width: 0;
@@ -4869,7 +4942,7 @@ html.pane-resizing * {
   }
   .context-tab-list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px;
     margin: 14px 0;
     padding: 3px;
@@ -5068,6 +5141,136 @@ html.pane-resizing * {
     line-height: 1;
   }
   .bookmark-delete:hover {
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
+  }
+  .annotations-panel {
+    min-width: 0;
+    padding: 5px 2px 18px;
+  }
+  .annotations-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 7px 0 8px;
+  }
+  .annotations-panel-heading h3 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 500;
+  }
+  .annotations-count {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0 5px;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .annotations-panel-intro,
+  .annotations-empty {
+    margin: 0 0 15px;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.65;
+  }
+  .annotations-empty {
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px dashed color-mix(in srgb, var(--line) 90%, var(--accent));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-strong) 55%, transparent);
+  }
+  .annotation-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .annotation-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+  }
+  .annotation-item:hover,
+  .annotation-item.current {
+    border-color: color-mix(in srgb, #ad7d2d 50%, var(--line));
+    background: color-mix(in srgb, #e7c768 15%, var(--surface-strong));
+  }
+  .annotation-open {
+    display: flex;
+    min-width: 0;
+    align-items: start;
+    gap: 9px;
+    border: 0;
+    border-radius: 8px 0 0 8px;
+    background: transparent;
+    padding: 10px 5px 10px 10px;
+    text-align: left;
+  }
+  .annotation-mark {
+    flex: 0 0 auto;
+    color: #ad7d2d;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  .annotation-copy {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+  .annotation-copy strong,
+  .annotation-copy span,
+  .annotation-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .annotation-copy strong {
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 650;
+  }
+  .annotation-copy span,
+  .annotation-copy small {
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .annotation-copy .annotation-quote-inline {
+    color: var(--ink);
+  }
+  .annotation-copy .annotation-status {
+    color: var(--accent-deep);
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .annotation-copy .annotation-status-stale {
+    color: var(--danger);
+  }
+  .annotation-delete {
+    align-self: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 5px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1;
+  }
+  .annotation-delete:hover {
     background: color-mix(in srgb, var(--danger) 12%, transparent);
     color: var(--danger);
   }

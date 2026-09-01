@@ -16,6 +16,7 @@ import { EmptyState } from "./components/EmptyState";
 import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
 import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
+import { AnnotationDialog } from "./components/AnnotationDialog";
 import { FileDropOverlay } from "./components/FileDropOverlay";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
@@ -49,6 +50,11 @@ import { createReadingPositionTracker } from "./reading-position";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
 import { createSearchHighlightController, type SearchHighlightController } from "./search-highlighter";
 import {
+  createAnnotationHighlightController,
+  type AnnotationHighlightController,
+  type AnnotationLocation,
+} from "./annotation-highlighter";
+import {
   chooseDocumentPaths,
   chooseSavePath,
   chooseWorkspacePath,
@@ -76,6 +82,7 @@ import {
   revealWorkspaceEntry,
   readBinaryFile,
   readAppSettings,
+  readAnnotations,
   readPreviousVersion,
   readTextFile,
   refreshWorkspace,
@@ -88,6 +95,7 @@ import {
   writeBinaryFile,
   writeBinaryFileChunk,
   writeAppSettings,
+  writeAnnotations,
   writeTextFile,
   type FileDropEvent,
 } from "./bridge";
@@ -204,6 +212,16 @@ import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } fr
 import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
+import {
+  addAnnotation,
+  createAnnotation,
+  createSelectionAnchor,
+  normalizeAnnotations,
+  removeAnnotation,
+  workspaceRelativePath,
+  type AnnotationSelection,
+  type TextAnnotation,
+} from "./annotations";
 import {
   createAppSettingsSnapshot,
   loadAppSettingsSnapshot,
@@ -679,6 +697,12 @@ export function App() {
   const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
   const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);
   const [bookmarks, setBookmarks] = useState<DocumentBookmark[]>(loadBookmarks);
+  const [annotations, setAnnotations] = useState<TextAnnotation[]>([]);
+  const [annotationDialog, setAnnotationDialog] = useState<{
+    relativePath: string;
+    selection: AnnotationSelection;
+  } | null>(null);
+  const [annotationLocations, setAnnotationLocations] = useState<AnnotationLocation[]>([]);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [currentHeading, setCurrentHeading] = useState<string | null>(null);
@@ -697,6 +721,13 @@ export function App() {
     contentKey: string;
     controller: SearchHighlightController;
   } | null>(null);
+  const annotationHighlightRef = useRef<{
+    root: HTMLElement;
+    contentKey: string;
+    controller: AnnotationHighlightController;
+  } | null>(null);
+  const readerBodyRef = useRef<HTMLDivElement>(null);
+  const pendingAnnotationIdRef = useRef<string | null>(null);
   const readingHeadingsRef = useRef<HTMLElement[]>([]);
   const readingHeadingObserverRef = useRef<IntersectionObserver | null>(null);
   const readingHeadingCandidatesRef = useRef(new Set<HTMLElement>());
@@ -1192,6 +1223,29 @@ export function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    const root = workspacePath;
+    if (!root || !preferences.annotationEnabled || !isTauriRuntime()) {
+      setAnnotations([]);
+      return;
+    }
+
+    let active = true;
+    void readAnnotations(root)
+      .then((stored) => {
+        if (active) setAnnotations(normalizeAnnotations(stored));
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setAnnotations([]);
+        notify(cause instanceof Error ? cause.message : "阅读批注读取失败。", "error");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [notify, preferences.annotationEnabled, workspacePath]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -4619,12 +4673,14 @@ export function App() {
   const handleReaderContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
     const anchor = (event.target as HTMLElement).closest("a");
+    const selection = window.getSelection();
     setReaderContextMenu({
       x: event.clientX,
       y: event.clientY,
-      selectedText: window.getSelection()?.toString() ?? "",
+      selectedText: selection?.toString() ?? "",
       linkHref: anchor?.getAttribute("href") ?? null,
       headingId: headingIdFromTarget(event.target),
+      annotationSelection: readerBodyRef.current ? createSelectionAnchor(readerBodyRef.current, selection) : null,
       restoreFocusTarget: event.currentTarget,
       fallbackFocusTarget: event.currentTarget,
     });
@@ -4635,12 +4691,14 @@ export function App() {
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const anchor = (event.target as HTMLElement).closest("a");
+    const selection = window.getSelection();
     setReaderContextMenu({
       x: rect.left + Math.min(32, rect.width / 2),
       y: rect.bottom,
-      selectedText: window.getSelection()?.toString() ?? "",
+      selectedText: selection?.toString() ?? "",
       linkHref: anchor?.getAttribute("href") ?? null,
       headingId: headingIdFromTarget(event.target),
+      annotationSelection: readerBodyRef.current ? createSelectionAnchor(readerBodyRef.current, selection) : null,
       restoreFocusTarget: event.currentTarget,
       fallbackFocusTarget: event.currentTarget,
     });
@@ -4771,9 +4829,64 @@ export function App() {
   }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, searchResultIndex]);
 
   useEffect(() => {
+    const root = readerBodyRef.current;
+    const currentPath = documentState?.path;
+    const currentAnnotationPath = currentPath?.startsWith("browser://")
+      ? currentPath
+      : currentPath && workspacePath
+        ? workspaceRelativePath(workspacePath, currentPath)
+        : null;
+    if (
+      !root ||
+      mode !== "rendered" ||
+      !progressiveReaderReady ||
+      !currentAnnotationPath ||
+      !preferences.annotationEnabled
+    ) {
+      annotationHighlightRef.current?.controller.dispose();
+      annotationHighlightRef.current = null;
+      setAnnotationLocations([]);
+      return;
+    }
+
+    if (
+      !annotationHighlightRef.current ||
+      annotationHighlightRef.current.root !== root ||
+      annotationHighlightRef.current.contentKey !== renderedHtml
+    ) {
+      annotationHighlightRef.current?.controller.dispose();
+      annotationHighlightRef.current = {
+        root,
+        contentKey: renderedHtml,
+        controller: createAnnotationHighlightController(root),
+      };
+    }
+
+    const current = annotations.filter(
+      (annotation) => normalizePathKey(annotation.path) === normalizePathKey(currentAnnotationPath),
+    );
+    const locations = annotationHighlightRef.current.controller.update(current);
+    setAnnotationLocations(locations);
+    const pending = pendingAnnotationIdRef.current;
+    if (pending && annotationHighlightRef.current.controller.scrollTo(pending)) {
+      pendingAnnotationIdRef.current = null;
+    }
+  }, [
+    annotations,
+    documentState?.path,
+    mode,
+    preferences.annotationEnabled,
+    progressiveReaderReady,
+    renderedHtml,
+    workspacePath,
+  ]);
+
+  useEffect(() => {
     return () => {
       searchHighlightRef.current?.controller.dispose();
       searchHighlightRef.current = null;
+      annotationHighlightRef.current?.controller.dispose();
+      annotationHighlightRef.current = null;
     };
   }, []);
 
@@ -4858,6 +4971,41 @@ export function App() {
     [documentPath, openTabs, workspaceIndex],
   );
   const canBookmark = Boolean(documentState && documentState.kind !== "pdf" && documentState.kind !== "image");
+  const canAnnotate = Boolean(
+    documentState &&
+    documentState.kind !== "pdf" &&
+    documentState.kind !== "image" &&
+    preferences.annotationEnabled &&
+    (Boolean(workspacePath) || documentState.path.startsWith("browser://")),
+  );
+  const currentAnnotationPath = useMemo(() => {
+    if (!documentState) return null;
+    if (documentState.path.startsWith("browser://")) return documentState.path;
+    return workspacePath ? workspaceRelativePath(workspacePath, documentState.path) : null;
+  }, [documentState, workspacePath]);
+  const persistAnnotations = useCallback(async (next: TextAnnotation[]): Promise<boolean> => {
+    if (!preferencesRef.current.annotationEnabled) return false;
+
+    const root = workspacePathRef.current;
+    if (!isTauriRuntime()) {
+      setAnnotations(next);
+      return true;
+    }
+    if (!root) {
+      setError("请先打开工作区，再保存阅读批注。");
+      return false;
+    }
+
+    try {
+      await writeAnnotations(root, next);
+      setAnnotations(next);
+      setError(null);
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "阅读批注保存失败。");
+      return false;
+    }
+  }, []);
   const readerBookmarkTarget = useMemo(
     () =>
       documentState && readerContextMenu
@@ -4922,6 +5070,88 @@ export function App() {
       if (!opened) pendingHeadingRef.current = null;
     },
     [handleSelectTab, mode, navigateToHeading, revealProgressiveReader],
+  );
+  const handleOpenAnnotationDialog = useCallback(() => {
+    const current = documentStateRef.current;
+    const selection = readerContextMenu?.annotationSelection;
+    if (!current || !selection) {
+      setError("请先在正文中选择要高亮的文字。");
+      return;
+    }
+
+    const relativePath = current.path.startsWith("browser://")
+      ? current.path
+      : workspacePathRef.current
+        ? workspaceRelativePath(workspacePathRef.current, current.path)
+        : null;
+    if (!relativePath) {
+      setError("当前文档不在已打开的工作区中，无法保存阅读批注。");
+      return;
+    }
+
+    setReaderContextMenu(null);
+    setAnnotationDialog({ relativePath, selection });
+  }, [readerContextMenu]);
+  const handleSaveAnnotation = useCallback(
+    (note: string) => {
+      if (!annotationDialog) return;
+
+      try {
+        const annotation = createAnnotation(annotationDialog.relativePath, annotationDialog.selection, note);
+        const next = addAnnotation(annotations, annotation);
+        pendingAnnotationIdRef.current = annotation.id;
+        void persistAnnotations(next).then((saved) => {
+          if (!saved) return;
+          setAnnotationDialog(null);
+          notify("批注已保存。");
+        });
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建阅读批注。");
+      }
+    },
+    [annotationDialog, annotations, notify, persistAnnotations],
+  );
+  const handleDeleteAnnotation = useCallback(
+    (annotation: TextAnnotation) => {
+      const next = removeAnnotation(annotations, annotation.id);
+      void persistAnnotations(next).then((saved) => {
+        if (saved) notify("已删除批注。");
+      });
+    },
+    [annotations, notify, persistAnnotations],
+  );
+  const handleOpenAnnotation = useCallback(
+    async (annotation: TextAnnotation) => {
+      const current = documentStateRef.current;
+      const root = workspacePathRef.current;
+      const targetPath = annotation.path.startsWith("browser:")
+        ? annotation.path
+        : root
+          ? workspaceEntryAbsolutePath(root, annotation.path)
+          : null;
+      if (!targetPath) {
+        setError("批注所属工作区尚未打开，请先添加对应文件夹。");
+        return;
+      }
+
+      pendingAnnotationIdRef.current = annotation.id;
+      if (current && isSameDocumentPath(targetPath, current.path)) {
+        if (mode !== "rendered") {
+          setMode("rendered");
+          return;
+        }
+        window.requestAnimationFrame(() => {
+          if (annotationHighlightRef.current?.controller.scrollTo(annotation.id)) {
+            pendingAnnotationIdRef.current = null;
+          }
+        });
+        return;
+      }
+
+      const opened = await handleSelectTab(targetPath);
+      if (!opened) pendingAnnotationIdRef.current = null;
+    },
+    [handleSelectTab, mode],
   );
   const availableTags = useMemo(
     () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
@@ -5435,6 +5665,7 @@ export function App() {
         }}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
+        annotationEnabled={preferences.annotationEnabled}
         onAllowRemoteResourcesChange={(allowed) => {
           setReaderPreferences({ allowRemoteResources: allowed });
           notify(allowed ? "已允许加载远程图片。" : "已禁止加载远程图片。");
@@ -5442,6 +5673,10 @@ export function App() {
         onStartupUpdateCheckChange={(enabled) => {
           setReaderPreferences({ startupUpdateCheck: enabled });
           notify(enabled ? "已开启启动时检查更新。" : "已关闭启动时检查更新。");
+        }}
+        onAnnotationEnabledChange={(enabled) => {
+          setReaderPreferences({ annotationEnabled: enabled });
+          notify(enabled ? "已开启阅读批注。" : "已关闭阅读批注。已有批注仍保留在工作区中。");
         }}
         onExportSettings={() => void exportPortableSettings()}
         onImportSettings={importPortableSettings}
@@ -5739,11 +5974,13 @@ export function App() {
                       <div className="print-document-title">{documentState.name}</div>
                     </header>
                   )}
-                  <ProgressiveReaderContent
-                    ref={progressiveReaderRef}
-                    html={documentState.rendered.html}
-                    onReady={handleProgressiveReaderReady}
-                  />
+                  <div ref={readerBodyRef} className="reader-body">
+                    <ProgressiveReaderContent
+                      ref={progressiveReaderRef}
+                      html={documentState.rendered.html}
+                      onReady={handleProgressiveReaderReady}
+                    />
+                  </div>
                 </article>
               </div>
             )}
@@ -5790,6 +6027,7 @@ export function App() {
               canEdit={canEdit}
               canBookmark={canBookmark}
               isBookmarked={readerBookmarkPresent}
+              canAnnotate={canAnnotate}
               editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}
               onCopySelection={(text) => void handleCopyReaderText(text)}
               onFindSelection={(text) => handleFindEditorText(text)}
@@ -5798,6 +6036,7 @@ export function App() {
               onEdit={toggleReadingEditing}
               onCopyDocumentPath={() => void handleCopyReaderDocumentPath()}
               onToggleBookmark={handleToggleReaderBookmark}
+              onAddAnnotation={handleOpenAnnotationDialog}
               onClose={() => setReaderContextMenu(null)}
             />
           )}
@@ -5821,6 +6060,10 @@ export function App() {
             backlinks={backlinks}
             outgoing={outgoing}
             bookmarks={bookmarks}
+            annotations={annotations}
+            annotationLocations={annotationLocations}
+            annotationEnabled={preferences.annotationEnabled}
+            currentAnnotationPath={currentAnnotationPath}
             knownPaths={bookmarkKnownPaths}
             canCreateNote={Boolean(workspacePath && isTauriRuntime())}
             selectedTag={selectedTag}
@@ -5835,6 +6078,8 @@ export function App() {
             onOpenFile={(path) => void handleSelectTab(path)}
             onOpenBookmark={(bookmark) => void handleOpenBookmark(bookmark)}
             onDeleteBookmark={handleDeleteBookmark}
+            onOpenAnnotation={(annotation) => void handleOpenAnnotation(annotation)}
+            onDeleteAnnotation={handleDeleteAnnotation}
             onCreateNote={(target) => void handleCreateNote(target)}
             onOpenGraph={() => setGraphOpen(true)}
             onSelectTag={setSelectedTag}
@@ -5959,6 +6204,13 @@ export function App() {
       {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
       {externalOverwriteConfirmationOpen && (
         <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
+      )}
+      {annotationDialog && (
+        <AnnotationDialog
+          quote={annotationDialog.selection.quote}
+          onCancel={() => setAnnotationDialog(null)}
+          onSave={handleSaveAnnotation}
+        />
       )}
       {guideOpen && (
         <GettingStartedDialog

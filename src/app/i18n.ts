@@ -32,6 +32,8 @@ export type MessageKey =
   | "settings.localFirst"
   | "settings.allowRemoteImages"
   | "settings.remoteImagesNote"
+  | "settings.annotations"
+  | "settings.annotationsNote"
   | "settings.startupUpdates"
   | "settings.startupUpdatesNote"
   | "settings.reading"
@@ -96,6 +98,8 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
     "settings.remoteImagesNote": "关闭时只显示本地附件，减少文档追踪请求。",
+    "settings.annotations": "启用阅读批注",
+    "settings.annotationsNote": "将高亮和备注保存在工作区 .moyang sidecar，不改动 Markdown 正文。",
     "settings.startupUpdates": "启动时检查更新",
     "settings.startupUpdatesNote": "关闭后仍可点击“更新”手动检查。",
     "settings.reading": "阅读排版",
@@ -159,6 +163,8 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",
     "settings.remoteImagesNote": "When off, only local attachments are shown and tracking requests are reduced.",
+    "settings.annotations": "Enable reading annotations",
+    "settings.annotationsNote": "Highlights and notes stay in the workspace .moyang sidecar, not in Markdown.",
     "settings.startupUpdates": "Check for updates on startup",
     "settings.startupUpdatesNote": "You can still check manually with the Update button.",
     "settings.reading": "Reading layout",

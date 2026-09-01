@@ -17,6 +17,7 @@ describe("reader preferences", () => {
     const preferences: ReaderPreferences = {
       allowRemoteResources: true,
       startupUpdateCheck: true,
+      annotationEnabled: false,
       readingScale: "large",
       readingZoom: 115,
       readingWidth: "wide",
@@ -36,6 +37,7 @@ describe("reader preferences", () => {
     expect(loadReaderPreferences()).toEqual({
       allowRemoteResources: true,
       startupUpdateCheck: false,
+      annotationEnabled: true,
       readingScale: "medium",
       readingZoom: 100,
       readingWidth: "standard",

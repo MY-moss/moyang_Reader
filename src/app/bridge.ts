@@ -10,6 +10,7 @@ import type {
   WorkspaceRefreshResult,
   WorkspaceSearchResult,
 } from "./types";
+import type { TextAnnotation } from "./annotations";
 
 export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
@@ -23,6 +24,18 @@ export async function readAppSettings(): Promise<string | null> {
 export async function writeAppSettings(contents: string): Promise<void> {
   if (!isTauriRuntime()) return;
   await invoke("write_app_settings", { contents });
+}
+
+export async function readAnnotations(root: string): Promise<TextAnnotation[]> {
+  if (!isTauriRuntime()) return [];
+  return invoke<TextAnnotation[]>("read_annotations", { root });
+}
+
+export async function writeAnnotations(root: string, annotations: readonly TextAnnotation[]): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error("浏览器预览模式不能保存本机阅读批注。");
+  }
+  await invoke("write_annotations", { root, annotations });
 }
 
 export async function openExternalUrl(url: string): Promise<void> {

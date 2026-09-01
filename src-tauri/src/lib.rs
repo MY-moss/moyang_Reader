@@ -93,6 +93,8 @@ pub fn run() {
             commands::close_window,
             commands::read_app_settings,
             commands::write_app_settings,
+            commands::read_annotations,
+            commands::write_annotations,
             commands::read_text_file,
             commands::read_previous_version,
             commands::read_binary_file,

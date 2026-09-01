@@ -212,7 +212,57 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "目录" })).toBeVisible();
-  await expect(page.getByRole("tab")).toHaveCount(4);
+  await expect(page.getByRole("tab")).toHaveCount(5);
+});
+
+test("creates and locates a reading annotation from a selected passage", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "annotation-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Annotation note\n\n这段内容可以被高亮并添加批注。"),
+  });
+
+  await expect(page.locator('.wysiwyg-editor [contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+  await switchToRenderedMode(page);
+  const paragraph = page.locator(".reader-body p").first();
+  await expect(paragraph).toBeVisible();
+  await paragraph.evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  await paragraph.click({ button: "right" });
+
+  const readerMenu = page.getByRole("menu", { name: "阅读内容菜单" });
+  await expect(readerMenu.getByRole("menuitem", { name: "高亮 / 批注" })).toBeEnabled();
+  await readerMenu.getByRole("menuitem", { name: "高亮 / 批注" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "添加高亮 / 批注" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("这段内容可以被高亮并添加批注。");
+  await dialog.getByRole("textbox", { name: "备注（可选）" }).fill("稍后回到这里整理");
+  await dialog.getByRole("button", { name: "保存批注" }).click();
+
+  await expect(page.getByRole("tab", { name: "批注" })).toBeVisible();
+  await page.getByRole("tab", { name: "批注" }).click();
+  await expect(page.locator(".annotation-item")).toHaveCount(1);
+  await expect(page.locator(".annotation-item")).toContainText("稍后回到这里整理");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const runtime = globalThis as unknown as {
+          CSS?: { highlights?: { get?: (name: string) => { size?: number } | undefined } };
+        };
+        return (
+          runtime.CSS?.highlights?.get?.("moyang-annotation")?.size ??
+          document.querySelectorAll("mark.moyang-annotation-hit").length
+        );
+      }),
+    )
+    .toBe(1);
 });
 
 test("keeps a direct read/edit action for immediate WYSIWYG editing", async ({ page }) => {

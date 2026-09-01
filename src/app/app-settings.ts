@@ -49,6 +49,10 @@ function parsePreferences(value: unknown): ReaderPreferences {
       typeof value.startupUpdateCheck === "boolean"
         ? value.startupUpdateCheck
         : defaultReaderPreferences.startupUpdateCheck,
+    annotationEnabled:
+      typeof value.annotationEnabled === "boolean"
+        ? value.annotationEnabled
+        : defaultReaderPreferences.annotationEnabled,
     readingScale,
     readingZoom: normalizeReadingZoom(value.readingZoom, readingZoomFromScale(readingScale)),
     readingWidth:
@@ -74,7 +78,8 @@ function parseSnapshot(value: unknown): AppSettingsSnapshot | null {
   const activeContextTab =
     value.activeContextTab === "backlinks" ||
     value.activeContextTab === "properties" ||
-    value.activeContextTab === "bookmarks"
+    value.activeContextTab === "bookmarks" ||
+    value.activeContextTab === "annotations"
       ? value.activeContextTab
       : "outline";
   const theme = value.theme === "light" || value.theme === "dark" ? value.theme : "system";
