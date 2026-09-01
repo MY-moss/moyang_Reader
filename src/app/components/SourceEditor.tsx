@@ -12,6 +12,8 @@ import type { EditorInsertAnchor } from "../editor-insert-position";
 import { applySourceEditorAction } from "../editor-context-actions";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
 import { applyEditorInsert, type EditorInsertKind, type EditorInsertRequest } from "../editor-insertion";
+import { insertTextAtSelection } from "../clipboard-image";
+import { clipboardPayloadHasContent, dispatchClipboardPaste, readClipboardPayload } from "../clipboard-paste";
 import { ContextMenu } from "./ContextMenu";
 import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorInsertPopover";
 import { EditorToolbar } from "./EditorToolbar";
@@ -191,6 +193,49 @@ export function SourceEditor({
     [focusSourceEditorPreservingViewport],
   );
 
+  const pasteFromClipboard = useCallback(
+    async (plainOnly: boolean, selectionStart: number, selectionEnd: number, initialValue: string) => {
+      try {
+        const payload = await readClipboardPayload();
+        if (!clipboardPayloadHasContent(payload)) {
+          onStatusMessageRef.current?.("剪贴板中没有可粘贴的内容。");
+          return;
+        }
+
+        // Source mode always stores Markdown text. For a normal paste, still
+        // dispatch image data through the native paste path so the app can
+        // save it as a workspace asset just like Ctrl+V.
+        if (!plainOnly && payload.files.length) {
+          const target = viewRef.current?.contentDOM ?? fallbackRef.current;
+          if (target && dispatchClipboardPaste(target, payload)) return;
+        }
+
+        if (!payload.text) {
+          onStatusMessageRef.current?.(
+            plainOnly
+              ? "剪贴板中没有可粘贴的文本；如需插入图片，请使用“粘贴”。"
+              : "剪贴板中没有可粘贴的文本；图片请使用 Ctrl+V 或切换到桌面版。",
+          );
+          return;
+        }
+
+        if (valueRef.current !== initialValue) {
+          onStatusMessageRef.current?.("正文内容已经变化，请重新执行粘贴，避免覆盖最新修改。");
+          return;
+        }
+
+        const safeStart = Math.max(0, Math.min(selectionStart, initialValue.length));
+        const safeEnd = Math.max(safeStart, Math.min(selectionEnd, initialValue.length));
+        const nextValue = insertTextAtSelection(initialValue, safeStart, safeEnd, payload.text);
+        const caret = safeStart + payload.text.length;
+        replaceSourceValue(nextValue, caret, caret);
+      } catch {
+        onStatusMessageRef.current?.("无法读取剪贴板，请检查应用权限后重试。");
+      }
+    },
+    [replaceSourceValue],
+  );
+
   const readCurrentSelection = useCallback(() => {
     const view = viewRef.current;
     if (view) {
@@ -363,23 +408,7 @@ export function SourceEditor({
     }
 
     if (action === "paste" || action === "paste-plain") {
-      const clipboard = navigator.clipboard;
-      if (!clipboard?.readText) {
-        onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
-        setContextMenu(null);
-        return;
-      }
-      void clipboard
-        .readText()
-        .then((pastedText) => {
-          if (!pastedText) return;
-          replaceSourceValue(
-            `${currentValue.slice(0, selectionStart)}${pastedText}${currentValue.slice(selectionEnd)}`,
-            selectionStart + pastedText.length,
-            selectionStart + pastedText.length,
-          );
-        })
-        .catch(() => onStatusMessageRef.current?.("无法读取剪贴板，请使用 Ctrl+V 或检查应用权限。"));
+      void pasteFromClipboard(action === "paste-plain", selectionStart, selectionEnd, currentValue);
       setContextMenu(null);
       return;
     }

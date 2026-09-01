@@ -659,6 +659,34 @@ test("opens an editor context menu and keeps the selected Markdown formatting", 
   await expect.poll(async () => readEditorText(source)).toContain("**选择这段文字。**");
 });
 
+test("pastes clipboard text from the editor context menu", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => "右键粘贴内容" },
+    });
+  });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "context-menu-paste.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Context menu paste\n\n原文\n"),
+  });
+
+  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 15_000 });
+  await page.locator(".wysiwyg-editor .editor p").filter({ hasText: "原文" }).click({ button: "right" });
+
+  const menu = page.getByRole("menu", { name: "正文编辑菜单" });
+  await expect(menu.getByRole("menuitem", { name: "粘贴 Ctrl V", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "粘贴为纯文本", exact: true })).toBeVisible();
+  await menu.getByRole("menuitem", { name: "粘贴 Ctrl V", exact: true }).click();
+
+  await clickToolbarAction(page, "源文本");
+  const source = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await expect.poll(async () => readEditorText(source)).toContain("右键粘贴内容");
+});
+
 test("finds selected text from the editor context menu", async ({ page }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles({
