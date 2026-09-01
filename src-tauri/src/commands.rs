@@ -14,6 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::Read, process::Command};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use pinyin::ToPinyin;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -293,6 +294,22 @@ fn is_cjk_search_char(character: char) -> bool {
             | '\u{F900}'..='\u{FAFF}'
             | '\u{20000}'..='\u{2FA1F}'
     )
+}
+
+/// Returns a compact, lowercase search key made from Chinese initials and ASCII filename characters.
+///
+/// This key is only an auxiliary index value: the original filename remains the source of truth,
+/// and characters that cannot be converted are intentionally omitted rather than guessed.
+fn pinyin_initials(value: &str) -> String {
+    let mut key = String::with_capacity(value.len());
+    for character in value.chars() {
+        if let Some(pinyin) = character.to_pinyin() {
+            key.push_str(pinyin.first_letter());
+        } else if character.is_ascii_alphanumeric() || character == '_' {
+            key.push(character.to_ascii_lowercase());
+        }
+    }
+    key
 }
 
 fn is_ascii_search_char(character: char) -> bool {
@@ -1168,6 +1185,7 @@ pub struct WorkspaceFile {
     pub path: String,
     pub name: String,
     pub relative_path: String,
+    pub pinyin_key: String,
     pub size: u64,
     pub modified_ms: Option<u64>,
     pub kind: String,
@@ -2064,6 +2082,7 @@ fn workspace_file(root: &Path, path: &Path) -> Result<WorkspaceFile, String> {
         path: path.to_string_lossy().into_owned(),
         name: name.to_string(),
         relative_path,
+        pinyin_key: pinyin_initials(name),
         size: metadata.len(),
         modified_ms: metadata
             .modified()
@@ -2318,7 +2337,8 @@ fn search_workspace_inner_with_cache_and_persistence(
     let mut results = Vec::new();
 
     for file in files {
-        let name_matches = file.name.to_lowercase().contains(&query);
+        let name_matches =
+            file.name.to_lowercase().contains(&query) || file.pinyin_key.contains(&query);
         let content_candidate = content_candidates
             .as_ref()
             .map(|paths| paths.contains(&access_path_key(Path::new(&file.path))))
@@ -4081,7 +4101,7 @@ mod tests {
         extract_wiki_links, has_pdf_header, index_workspace_inner,
         is_export_write_allowed_for_new_path, is_supported_document_path, is_supported_text_path,
         is_write_allowed_for_new_path, list_workspace_files_inner, normalize_access_path,
-        path_exists_inner, persistent_search_index_path, prune_search_entries,
+        path_exists_inner, persistent_search_index_path, pinyin_initials, prune_search_entries,
         read_annotations_inner, read_previous_version_inner, read_text_file_inner,
         refresh_workspace_inner, rename_workspace_entry_inner, search_workspace_inner,
         search_workspace_inner_with_cache, search_workspace_inner_with_cache_and_persistence,
@@ -4617,6 +4637,7 @@ mod tests {
             path: "C:/Notes/fallback.md".to_string(),
             name: "fallback.md".to_string(),
             relative_path: "fallback.md".to_string(),
+            pinyin_key: "fallbackmd".to_string(),
             size: 0,
             modified_ms: None,
             kind: "markdown".to_string(),
@@ -4631,6 +4652,37 @@ mod tests {
             "Frontmatter title"
         );
         assert_eq!(extract_title("body only", &file), "fallback");
+    }
+
+    #[test]
+    fn builds_lowercase_pinyin_initials_and_preserves_ascii_filename_parts() {
+        assert_eq!(pinyin_initials("北京笔记.md"), "bjbjmd");
+        assert_eq!(pinyin_initials("Notes_01.txt"), "notes_01txt");
+    }
+
+    #[test]
+    fn searches_chinese_filenames_by_pinyin_initials() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-search-pinyin-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create pinyin search workspace");
+        fs::write(root.join("北京笔记.md"), "这是一篇笔记").expect("write Chinese filename");
+        fs::write(root.join("other.md"), "普通文档").expect("write non-match");
+
+        let results = search_workspace_inner(root.clone(), "bj".to_string())
+            .expect("search Chinese filename initials");
+
+        assert_eq!(
+            results
+                .iter()
+                .map(|result| result.file.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["北京笔记.md"]
+        );
+
+        fs::remove_dir_all(root).expect("remove pinyin search workspace");
     }
 
     #[test]

@@ -2,6 +2,7 @@ export type QuickOpenCandidate = {
   path: string;
   name: string;
   relativePath?: string;
+  pinyinKey?: string;
   kind?: string;
   isRecent?: boolean;
 };
@@ -43,7 +44,12 @@ function fieldScore(field: string, token: string): number | null {
 }
 
 function candidateScore(candidate: QuickOpenCandidate, tokens: string[]): number | null {
-  const fields = [normalize(candidate.name), normalize(candidate.relativePath ?? ""), normalize(candidate.path)];
+  const fields = [
+    normalize(candidate.name),
+    normalize(candidate.relativePath ?? ""),
+    normalize(candidate.path),
+    normalize(candidate.pinyinKey ?? ""),
+  ];
   let score = candidate.isRecent ? 35 : 0;
 
   for (const token of tokens) {

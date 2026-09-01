@@ -35,4 +35,11 @@ describe("quick open ranking", () => {
       { ...target, isRecent: true },
     ]);
   });
+
+  it("matches Chinese filenames by their Rust-provided initials", () => {
+    const chinese = { ...item("notes/北京笔记.md"), pinyinKey: "bjbjmd" };
+    const english = item("notes/backup.md");
+
+    expect(rankQuickOpenItems([english, chinese], "bj").map((entry) => entry.name)).toEqual(["北京笔记.md"]);
+  });
 });

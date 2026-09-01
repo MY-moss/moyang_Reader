@@ -40,6 +40,8 @@ export type WorkspaceFile = {
   path: string;
   name: string;
   relativePath: string;
+  /** Rust-side filename initials used for lightweight Chinese quick-open/search matching. */
+  pinyinKey?: string;
   size: number;
   modifiedMs?: number | null;
   kind: DocumentKind;
