@@ -1,20 +1,19 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：STOPPED AFTER HANDOFF（#371 已完成并合并）。
-- 当前主线基线：`main@c4794bcc618401c36c5a826a07ab22f18f99900a`；#371 已由 PR #404 squash 合并，Issue #371 已以 `completed` 关闭。
+- 当前状态：STOPPED AFTER HANDOFF（#364 已完成并合并）。
+- 当前主线代码基线：`main@fcdc3463f16c561ec575d8067a8ef7d6c706ee09`；PR #406 已 squash 合并，Issue #364 已以 `completed` 关闭。
 - 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
 
-## 最近完成：#371 中文文件名拼音首字母匹配
+## 最近完成：#364 编辑器右键粘贴语义统一
 
-- 目标：让快速打开和工作区搜索支持中文文件名的轻量拼音首字母匹配，例如输入 `bj` 命中 `北京笔记.md`。
-- 非目标：不做全文内容拼音检索、多音字精确消歧或前端 JS 拼音库；不改变 Markdown 真源和已有非中文排序。
-- 实现：Rust 侧使用轻量 `pinyinKey` 辅助索引，快速打开和工作区搜索同时保留原文件名匹配；旧缓存缺少该字段时会自动刷新。
-- 验收：`北京笔记.md` 通过 `bj` 命中且不误命中其他文件；ASCII 文件名行为保持；Rust 拼音/搜索测试、前端快速打开/缓存测试覆盖。
-- 本地验证：Rust 全量库测试 54 项通过；前端定向测试 2 文件/10 项通过；TypeScript、Lint、格式检查和一次前端生产构建通过。
-- 远程验证：CI run `33506583653`（Quality checks）成功；Rust dependency audit run `33506583870` 成功；浏览器/无障碍、Windows desktop smoke、发布预检和 Rust 门禁均通过。
-- 交付：分支 `codex/pinyin-search-2026-09-01`、PR [#404](https://github.com/MY-moss/moyang_Reader/pull/404)、合并提交 `c4794bcc618401c36c5a826a07ab22f18f99900a`。
-- 风险与回滚：仅新增可选 IPC 字段和搜索辅助索引；回退 PR #404 不需要数据迁移，原文件名匹配仍是事实来源。
+- 目标：让右键「粘贴」与 Ctrl+V 使用一致的编辑器粘贴管线，同时保留「粘贴为纯文本」的明确差异。
+- 非目标：不新增运行时依赖，不改变 Ctrl+V 的既有文本行为，不在本切片生成安装包、Tag、Release 或 Cloudflare 镜像。
+- 实现：新增轻量剪贴板适配层，读取纯文本、HTML 和图片；所见即所得模式把普通粘贴交给 Milkdown，图片保存到工作区 `assets/`，源码模式复用现有图片资源流程；纯文本入口只插入纯文本。
+- 反馈：空剪贴板、图片误用纯文本粘贴、权限失败和异步期间正文变化都会显示明确提示，不再静默无操作或覆盖最新编辑。
+- 验收：本地完整单元测试 84 个文件/327 项通过；变更文件 ESLint、Prettier、生产构建和浏览器右键粘贴 E2E 通过；远程 Quality checks run `33515048213` 成功。
+- 交付：分支 `codex/paste-semantics-2026-09-01`、PR [#406](https://github.com/MY-moss/moyang_Reader/pull/406)、合并提交 `fcdc3463f16c561ec575d8067a8ef7d6c706ee09`；Issue #364 已以 `completed` 关闭。
+- 风险与回滚：剪贴板富文本读取依赖 Windows WebView 权限，失败时保留文本回退和状态提示；回退 PR #406 不需要数据迁移。
 - 发布边界：本切片不单独生成安装包；纳入 `v0.11.0` Windows x64 稳定批次。
 
 ## 下一次开发
