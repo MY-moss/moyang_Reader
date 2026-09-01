@@ -1,6 +1,13 @@
 # Moyang Reader 版本与发布政策
 
-当前稳定基线：`v0.10.13`。该版本的 tag、Windows x64 安装包、签名和 manifest 已在线核验；公开 Pages 镜像的 v0.10.13 资产也已核验，但 Release workflow 的自动镜像 job `33245475550` 仍因缺少 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` 失败，不得误判为自动同步全绿。
+当前稳定基线：`v0.10.14`。该版本的 tag、Windows x64 安装包、签名和 manifest 已在线核验；公开 Pages 镜像的 v0.10.14 资产也已核验，但 Release workflow 的自动镜像 job `33555344560` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效，不得误判为自动同步全绿。
+
+## v0.10.14 已发布（2026-09-02）
+
+- 发布代码：`main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`；Release run `33555344560` 的质量门禁、Windows 构建、签名和 GitHub Release 发布成功。
+- Windows x64 安装包：5,243,339 字节，SHA-256 `293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59`。
+- 签名文件：428 字节，SHA-256 `fd832a5689c9064118dd0bb8e9c3ba3d88e0a75da0c061bbd6809b069ab70adf`；`latest.json` 1,413 字节，SHA-256 `dfb110ba23f248d6c374d714613888511f99a4aae2b038219caeea27350af8cc`。
+- GitHub 和 Cloudflare Pages 资产均 HTTP 200，镜像安装包大小与 SHA-256 和 GitHub Release 一致；自动镜像仍需维护者配置 Secrets 后重跑验证。
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
