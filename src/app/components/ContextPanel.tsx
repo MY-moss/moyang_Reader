@@ -1,5 +1,8 @@
 import type { ContextPanelTab, OpenDocument, ReaderMode, TocItem, WorkspaceIndexEntry } from "../types";
 import type { DocumentBookmark } from "../bookmarks";
+import type { TextAnnotation } from "../annotations";
+import type { AnnotationLocation } from "../annotation-highlighter";
+import { AnnotationsPanel } from "./AnnotationsPanel";
 import { BookmarksPanel } from "./BookmarksPanel";
 import { Outline } from "./Outline";
 import { ReadingRail } from "./ReadingRail";
@@ -11,6 +14,10 @@ type ContextPanelProps = {
   backlinks: WorkspaceIndexEntry[];
   outgoing: Array<{ target: string; entry?: WorkspaceIndexEntry }>;
   bookmarks: DocumentBookmark[];
+  annotations: TextAnnotation[];
+  annotationLocations: readonly AnnotationLocation[];
+  annotationEnabled: boolean;
+  currentAnnotationPath?: string | null;
   knownPaths: string[];
   canCreateNote: boolean;
   selectedTag: string | null;
@@ -25,6 +32,8 @@ type ContextPanelProps = {
   onOpenFile: (path: string) => void;
   onOpenBookmark: (bookmark: DocumentBookmark) => void;
   onDeleteBookmark: (bookmark: DocumentBookmark) => void;
+  onOpenAnnotation: (annotation: TextAnnotation) => void;
+  onDeleteAnnotation: (annotation: TextAnnotation) => void;
   onCreateNote: (target: string) => void;
   onOpenGraph: () => void;
   onSelectTag: (tag: string | null) => void;
@@ -38,6 +47,7 @@ const tabs: Array<{ id: ContextPanelTab; label: string }> = [
   { id: "backlinks", label: "关联" },
   { id: "properties", label: "属性" },
   { id: "bookmarks", label: "书签" },
+  { id: "annotations", label: "批注" },
 ];
 
 function fileTypeLabel(kind: OpenDocument["kind"]): string {
@@ -62,6 +72,10 @@ export function ContextPanel({
   backlinks,
   outgoing,
   bookmarks,
+  annotations,
+  annotationLocations,
+  annotationEnabled,
+  currentAnnotationPath,
   knownPaths,
   canCreateNote,
   selectedTag,
@@ -76,6 +90,8 @@ export function ContextPanel({
   onOpenFile,
   onOpenBookmark,
   onDeleteBookmark,
+  onOpenAnnotation,
+  onDeleteAnnotation,
   onCreateNote,
   onOpenGraph,
   onSelectTag,
@@ -199,6 +215,16 @@ export function ContextPanel({
             currentHeadingId={activeHeadingId}
             onOpen={onOpenBookmark}
             onDelete={onDeleteBookmark}
+          />
+        )}
+        {activeTab === "annotations" && (
+          <AnnotationsPanel
+            annotations={annotations}
+            locations={annotationLocations}
+            currentPath={currentAnnotationPath}
+            enabled={annotationEnabled}
+            onOpen={onOpenAnnotation}
+            onDelete={onDeleteAnnotation}
           />
         )}
       </div>

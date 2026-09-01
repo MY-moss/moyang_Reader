@@ -47,6 +47,15 @@ const PDF_RENDER_WAIT_ATTEMPTS: usize = 150;
 const PDF_RENDER_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_APP_SETTINGS_BYTES: usize = 256 * 1024;
 const APP_SETTINGS_FILE_NAME: &str = "settings.json";
+const MAX_ANNOTATION_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_ANNOTATIONS: usize = 20_000;
+const MAX_ANNOTATION_ID_CHARS: usize = 128;
+const MAX_ANNOTATION_TEXT_CHARS: usize = 64 * 1024;
+const MAX_ANNOTATION_CONTEXT_CHARS: usize = 256;
+const MAX_ANNOTATION_NOTE_CHARS: usize = 16 * 1024;
+const ANNOTATIONS_DIRECTORY: &str = ".moyang";
+const ANNOTATIONS_FILE_NAME: &str = "annotations.json";
+const ANNOTATIONS_VERSION: u32 = 1;
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 async fn run_blocking<T, F>(operation: &'static str, task: F) -> Result<T, String>
@@ -65,6 +74,29 @@ pub struct AccessRegistry {
     write_entries: Mutex<Vec<PathBuf>>,
     workspace_entries: Mutex<Vec<PathBuf>>,
     export_entries: Mutex<Vec<PathBuf>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredAnnotation {
+    pub id: String,
+    pub path: String,
+    pub quote: String,
+    pub prefix: String,
+    pub suffix: String,
+    pub start: u64,
+    pub end: u64,
+    #[serde(default)]
+    pub note: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AnnotationStore {
+    version: u32,
+    annotations: Vec<StoredAnnotation>,
 }
 
 struct ActiveWorkspaceWatcher {
@@ -1560,6 +1592,181 @@ pub fn write_app_settings(app: AppHandle, contents: String) -> Result<(), String
     }
     let path = app_settings_path(&app)?;
     write_bytes_file_inner(path, contents.as_bytes(), false)
+}
+
+fn annotations_file_path(root: &Path) -> Result<PathBuf, String> {
+    let root = fs::canonicalize(root).map_err(|error| format!("无法读取工作区目录：{error}"))?;
+    if !root.is_dir() {
+        return Err("阅读批注只能保存到工作区文件夹。".to_string());
+    }
+
+    let directory = root.join(ANNOTATIONS_DIRECTORY);
+    match fs::symlink_metadata(&directory) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err("工作区批注目录不能是符号链接。".to_string())
+        }
+        Ok(metadata) if !metadata.is_dir() => Err("工作区批注目录不是文件夹。".to_string()),
+        Ok(_) => Ok(directory.join(ANNOTATIONS_FILE_NAME)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(directory.join(ANNOTATIONS_FILE_NAME))
+        }
+        Err(error) => Err(format!("无法读取工作区批注目录：{error}")),
+    }
+}
+
+fn normalize_annotation_path(raw_path: &str) -> Result<String, String> {
+    let path = raw_path.trim().replace('\\', "/");
+    if path.is_empty() || path.starts_with('/') || path.contains(':') {
+        return Err("批注文档路径必须是工作区内的相对路径。".to_string());
+    }
+
+    let parts = path
+        .split('/')
+        .map(validate_workspace_entry_name)
+        .collect::<Result<Vec<_>, _>>()?;
+    if parts.is_empty() {
+        return Err("批注文档路径不能为空。".to_string());
+    }
+    Ok(parts.join("/"))
+}
+
+fn validate_stored_annotation(annotation: &StoredAnnotation) -> Result<StoredAnnotation, String> {
+    if annotation.id.trim().is_empty() || annotation.id.chars().count() > MAX_ANNOTATION_ID_CHARS {
+        return Err("批注 ID 无效或过长。".to_string());
+    }
+
+    let path = normalize_annotation_path(&annotation.path)?;
+    let quote = annotation.quote.trim().to_string();
+    let prefix = annotation.prefix.trim().to_string();
+    let suffix = annotation.suffix.trim().to_string();
+    if quote.is_empty() || quote.chars().count() > MAX_ANNOTATION_TEXT_CHARS {
+        return Err("批注原文无效或过长。".to_string());
+    }
+    if prefix.chars().count() > MAX_ANNOTATION_CONTEXT_CHARS
+        || suffix.chars().count() > MAX_ANNOTATION_CONTEXT_CHARS
+    {
+        return Err("批注定位上下文过长。".to_string());
+    }
+    if annotation.end <= annotation.start
+        || annotation.end - annotation.start > MAX_ANNOTATION_TEXT_CHARS as u64
+    {
+        return Err("批注文字范围无效。".to_string());
+    }
+    if annotation
+        .note
+        .as_deref()
+        .is_some_and(|note| note.chars().count() > MAX_ANNOTATION_NOTE_CHARS)
+    {
+        return Err("批注备注过长。".to_string());
+    }
+
+    Ok(StoredAnnotation {
+        id: annotation.id.trim().to_string(),
+        path,
+        quote,
+        prefix,
+        suffix,
+        start: annotation.start,
+        end: annotation.end,
+        note: annotation
+            .note
+            .as_deref()
+            .map(str::trim)
+            .filter(|note| !note.is_empty())
+            .map(str::to_string),
+        created_at: annotation.created_at,
+        updated_at: annotation.updated_at,
+    })
+}
+
+fn normalize_annotation_store(
+    annotations: Vec<StoredAnnotation>,
+) -> Result<Vec<StoredAnnotation>, String> {
+    if annotations.len() > MAX_ANNOTATIONS {
+        return Err("阅读批注数量超过上限，已拒绝读取。".to_string());
+    }
+
+    let mut ids = HashSet::with_capacity(annotations.len());
+    let mut normalized = Vec::with_capacity(annotations.len());
+    for annotation in annotations {
+        let annotation = validate_stored_annotation(&annotation)?;
+        if !ids.insert(annotation.id.clone()) {
+            return Err("阅读批注包含重复 ID，已拒绝读取。".to_string());
+        }
+        normalized.push(annotation);
+    }
+    Ok(normalized)
+}
+
+fn read_annotations_inner(root: PathBuf) -> Result<Vec<StoredAnnotation>, String> {
+    let path = annotations_file_path(&root)?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("无法读取阅读批注文件信息：{error}")),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err("工作区阅读批注文件不是普通文件。".to_string());
+    }
+    if metadata.len() > MAX_ANNOTATION_BYTES {
+        return Err("阅读批注文件过大，已拒绝读取。".to_string());
+    }
+
+    let contents =
+        fs::read_to_string(&path).map_err(|error| format!("无法读取阅读批注：{error}"))?;
+    let store: AnnotationStore = serde_json::from_str(&contents)
+        .map_err(|error| format!("阅读批注文件格式无效：{error}"))?;
+    if store.version != ANNOTATIONS_VERSION {
+        return Err("阅读批注文件版本不受支持，请升级 Moyang Reader。".to_string());
+    }
+    normalize_annotation_store(store.annotations)
+}
+
+fn write_annotations_inner(
+    root: PathBuf,
+    annotations: Vec<StoredAnnotation>,
+) -> Result<(), String> {
+    let normalized = normalize_annotation_store(annotations)?;
+    let contents = serde_json::to_vec_pretty(&AnnotationStore {
+        version: ANNOTATIONS_VERSION,
+        annotations: normalized,
+    })
+    .map_err(|error| format!("生成阅读批注文件失败：{error}"))?;
+    if contents.len() as u64 > MAX_ANNOTATION_BYTES {
+        return Err("阅读批注文件过大，已拒绝保存。".to_string());
+    }
+
+    let path = annotations_file_path(&root)?;
+    write_bytes_file_inner(path, &contents, false)
+}
+
+#[tauri::command]
+pub async fn read_annotations(
+    root: String,
+    access: State<'_, AccessRegistry>,
+) -> Result<Vec<StoredAnnotation>, String> {
+    if !access.is_workspace_allowed(Path::new(&root)) {
+        return Err("拒绝读取未通过用户选择的工作区批注。请重新选择文件夹。".to_string());
+    }
+    run_blocking("读取阅读批注", move || {
+        read_annotations_inner(PathBuf::from(root))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn write_annotations(
+    root: String,
+    annotations: Vec<StoredAnnotation>,
+    access: State<'_, AccessRegistry>,
+) -> Result<(), String> {
+    if !access.is_workspace_allowed(Path::new(&root)) {
+        return Err("拒绝写入未通过用户选择的工作区批注。请重新选择文件夹。".to_string());
+    }
+    run_blocking("保存阅读批注", move || {
+        write_annotations_inner(PathBuf::from(root), annotations)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -3875,14 +4082,15 @@ mod tests {
         is_export_write_allowed_for_new_path, is_supported_document_path, is_supported_text_path,
         is_write_allowed_for_new_path, list_workspace_files_inner, normalize_access_path,
         path_exists_inner, persistent_search_index_path, prune_search_entries,
-        read_previous_version_inner, read_text_file_inner, refresh_workspace_inner,
-        rename_workspace_entry_inner, search_workspace_inner, search_workspace_inner_with_cache,
-        search_workspace_inner_with_cache_and_persistence, should_skip_directory,
-        sorted_workspace_directories, sorted_workspace_listing, source_search_tokens,
-        touch_indexed_file, transfer_workspace_entry_inner, validate_export_stream_parent,
-        validate_export_stream_temp_path, write_binary_file_chunk_inner, write_bytes_file_inner,
-        write_text_file_inner, AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath,
-        OpenPathKind, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
+        read_annotations_inner, read_previous_version_inner, read_text_file_inner,
+        refresh_workspace_inner, rename_workspace_entry_inner, search_workspace_inner,
+        search_workspace_inner_with_cache, search_workspace_inner_with_cache_and_persistence,
+        should_skip_directory, sorted_workspace_directories, sorted_workspace_listing,
+        source_search_tokens, touch_indexed_file, transfer_workspace_entry_inner,
+        validate_export_stream_parent, validate_export_stream_temp_path, write_annotations_inner,
+        write_binary_file_chunk_inner, write_bytes_file_inner, write_text_file_inner,
+        AccessRegistry, CachedSearchIndex, CachedSearchText, OpenPath, OpenPathKind,
+        StoredAnnotation, WorkspaceFile, WorkspaceSearchCache, MAX_READ_FILE_BYTES,
         MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES, MAX_SEARCH_INDEX_TOKENS_PER_FILE,
         MAX_SEARCH_INDEX_TOKEN_CHARS, MAX_WORKSPACE_DEPTH, MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
     };
@@ -4063,6 +4271,53 @@ mod tests {
         ));
 
         fs::remove_dir_all(root).expect("remove new file access workspace");
+    }
+
+    #[test]
+    fn persists_workspace_annotations_in_a_sidecar() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-annotations-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let vault = root.join("vault");
+        fs::create_dir_all(&vault).expect("create annotation workspace");
+
+        let annotation = StoredAnnotation {
+            id: "annotation-1".to_string(),
+            path: "notes\\today.md".to_string(),
+            quote: "important text".to_string(),
+            prefix: "before".to_string(),
+            suffix: "after".to_string(),
+            start: 4,
+            end: 18,
+            note: Some("review later".to_string()),
+            created_at: 1,
+            updated_at: 2,
+        };
+
+        write_annotations_inner(vault.clone(), vec![annotation])
+            .expect("write annotations sidecar");
+        let sidecar = vault.join(".moyang").join("annotations.json");
+        assert!(sidecar.is_file());
+        let stored = read_annotations_inner(vault.clone()).expect("read annotations sidecar");
+        assert_eq!(stored[0].path, "notes/today.md");
+        assert_eq!(stored[0].note.as_deref(), Some("review later"));
+
+        let invalid = StoredAnnotation {
+            id: "annotation-2".to_string(),
+            path: "../outside.md".to_string(),
+            quote: "text".to_string(),
+            prefix: String::new(),
+            suffix: String::new(),
+            start: 0,
+            end: 4,
+            note: None,
+            created_at: 1,
+            updated_at: 1,
+        };
+        assert!(write_annotations_inner(vault.clone(), vec![invalid]).is_err());
+        fs::remove_dir_all(root).expect("remove annotation workspace");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 export type ReaderMode = "rendered" | "source" | "wysiwyg";
 
-export type ContextPanelTab = "outline" | "backlinks" | "properties" | "bookmarks";
+export type ContextPanelTab = "outline" | "backlinks" | "properties" | "bookmarks" | "annotations";
 
 export type LayoutState = {
   leftPanelOpen: boolean;

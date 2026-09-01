@@ -4,6 +4,7 @@ import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 export type ReaderPreferences = {
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
+  annotationEnabled: boolean;
   readingScale: ReadingScale;
   readingZoom: number;
   readingWidth: ReadingWidth;
@@ -15,6 +16,7 @@ export type ReaderPreferences = {
 export const defaultReaderPreferences: ReaderPreferences = {
   allowRemoteResources: false,
   startupUpdateCheck: false,
+  annotationEnabled: true,
   readingScale: "medium",
   readingZoom: 100,
   readingWidth: "standard",
@@ -51,6 +53,10 @@ export function loadReaderPreferences(): ReaderPreferences {
         typeof parsed.startupUpdateCheck === "boolean"
           ? parsed.startupUpdateCheck
           : defaultReaderPreferences.startupUpdateCheck,
+      annotationEnabled:
+        typeof parsed.annotationEnabled === "boolean"
+          ? parsed.annotationEnabled
+          : defaultReaderPreferences.annotationEnabled,
       readingScale,
       readingZoom: normalizeReadingZoom(parsed.readingZoom, readingZoomFromScale(readingScale)),
       readingWidth:

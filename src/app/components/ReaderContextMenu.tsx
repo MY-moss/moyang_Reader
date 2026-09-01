@@ -1,4 +1,5 @@
 import { ContextMenu } from "./ContextMenu";
+import type { AnnotationSelection } from "../annotations";
 
 export type ReaderContextTarget = {
   x: number;
@@ -6,6 +7,7 @@ export type ReaderContextTarget = {
   selectedText: string;
   linkHref: string | null;
   headingId?: string | null;
+  annotationSelection?: AnnotationSelection | null;
   restoreFocusTarget?: HTMLElement | null;
   fallbackFocusTarget?: HTMLElement | null;
 };
@@ -16,6 +18,7 @@ type ReaderContextMenuProps = {
   canEdit: boolean;
   canBookmark?: boolean;
   isBookmarked?: boolean;
+  canAnnotate?: boolean;
   editLabel: string;
   onCopySelection: (text: string) => void;
   onFindSelection: (text: string) => void;
@@ -24,6 +27,7 @@ type ReaderContextMenuProps = {
   onEdit: () => void;
   onCopyDocumentPath: () => void;
   onToggleBookmark?: () => void;
+  onAddAnnotation?: () => void;
   onClose: () => void;
 };
 
@@ -33,6 +37,7 @@ export function ReaderContextMenu({
   canEdit,
   canBookmark = false,
   isBookmarked = false,
+  canAnnotate = false,
   editLabel,
   onCopySelection,
   onFindSelection,
@@ -41,6 +46,7 @@ export function ReaderContextMenu({
   onEdit,
   onCopyDocumentPath,
   onToggleBookmark,
+  onAddAnnotation,
   onClose,
 }: ReaderContextMenuProps) {
   const hasSelection = Boolean(target.selectedText.trim());
@@ -70,6 +76,16 @@ export function ReaderContextMenu({
               disabled: !hasSelection,
               onSelect: () => onFindSelection(target.selectedText),
             },
+            ...(canAnnotate
+              ? [
+                  {
+                    id: "reader-add-annotation",
+                    label: "高亮 / 批注",
+                    disabled: !hasSelection || !target.annotationSelection || !onAddAnnotation,
+                    onSelect: () => onAddAnnotation?.(),
+                  },
+                ]
+              : []),
           ],
         },
         ...(hasLink

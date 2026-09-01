@@ -52,6 +52,10 @@ function parsePreferences(value: unknown): ReaderPreferences {
       typeof value.startupUpdateCheck === "boolean"
         ? value.startupUpdateCheck
         : defaultReaderPreferences.startupUpdateCheck,
+    annotationEnabled:
+      typeof value.annotationEnabled === "boolean"
+        ? value.annotationEnabled
+        : defaultReaderPreferences.annotationEnabled,
     readingScale,
     readingZoom: normalizeReadingZoom(value.readingZoom, readingZoomFromScale(readingScale)),
     readingWidth:

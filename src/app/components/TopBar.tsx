@@ -74,8 +74,10 @@ type TopBarProps = {
   onCheckUpdates: () => void;
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
+  annotationEnabled: boolean;
   onAllowRemoteResourcesChange: (allowed: boolean) => void;
   onStartupUpdateCheckChange: (enabled: boolean) => void;
+  onAnnotationEnabledChange: (enabled: boolean) => void;
   onExportSettings: () => void;
   onImportSettings: () => void;
   onOpenGuide: () => void;
@@ -150,8 +152,10 @@ export function TopBar({
   onCheckUpdates,
   allowRemoteResources,
   startupUpdateCheck,
+  annotationEnabled,
   onAllowRemoteResourcesChange,
   onStartupUpdateCheckChange,
+  onAnnotationEnabledChange,
   onExportSettings,
   onImportSettings,
   onOpenGuide,
@@ -549,6 +553,17 @@ export function TopBar({
                     <span>
                       <strong>{t("settings.startupUpdates")}</strong>
                       <small>{t("settings.startupUpdatesNote")}</small>
+                    </span>
+                  </label>
+                  <label className="settings-option">
+                    <input
+                      type="checkbox"
+                      checked={annotationEnabled}
+                      onChange={(event) => onAnnotationEnabledChange(event.target.checked)}
+                    />
+                    <span>
+                      <strong>{t("settings.annotations")}</strong>
+                      <small>{t("settings.annotationsNote")}</small>
                     </span>
                   </label>
                   <div className="settings-divider">{t("settings.reading")}</div>

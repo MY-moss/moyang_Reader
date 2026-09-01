@@ -1,11 +1,20 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：MERGED（#368 文档书签第一切片已由 PR #397 合并）。
-- 当前主线基线：`main@fc51db210cf2142f4a317e713516dd39c6454edf`；PR #397 的 Quality checks 已通过并完成交接。
-- #367 的 Issue 已以 `completed` 关闭；本轮只保留一个下一项，不自动并行开发。
-- 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
+- 当前状态：CHECKPOINT READY（#368 第二切片：选中文本高亮批注；本地实现和门禁已完成，待提交/PR）。
+- 当前主线基线：`main@9f5f7934f0fdfcb2ac0b265eb29f574c9ba2c583`；#368 第一切片已由 PR #397 合并，交接文档由 PR #398 同步。
+- 本轮只处理一个垂直切片，不自动并行开发其他 Issue；稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
-- #368 第一切片已完成；Issue 保持 open，第二切片（选中文本高亮批注）及下一项必须重新检查 Issues/Ready 后再决定。
+
+## 当前 Ready 任务：#368 第二切片（选中文本高亮批注）
+
+- 目标：阅读模式选中文本后通过右键创建本机批注，在当前正文中用 CSS Custom Highlight 显示，并在右栏查看、定位和删除。
+- 非目标：不改写 Markdown，不做 DOCX/PDF/图片标注、编辑器内标注、尾注导出或跨设备同步；不引入数据库和新运行时依赖。
+- 数据边界：批注保存到已授权工作区的 `.moyang/annotations.json`，仅保存相对路径、引文、前后文、字符偏移、备注和时间；无法重新定位时保留条目并显示“待定位”。
+- 验收：Rust sidecar 读写走 `AccessRegistry`；选区锚点可跨内联节点定位；右键创建批注、设置开关、右栏列表/删除/跳转、失配保留、刷新后恢复；浏览器高亮与 Windows 桌面读写路径有针对性验证。
+- 预计文件：`src/app/annotations.ts`、`src/app/annotation-highlighter.ts`、`src/app/components/AnnotationDialog.tsx`、`src/app/components/AnnotationsPanel.tsx`、`ReaderContextMenu`、`ContextPanel`、`TopBar`、`App.tsx`、`bridge.ts`、`types.ts`、`preferences.ts`、`src-tauri/src/commands.rs`、相关测试和文档。
+- 风险与回滚：sidecar 是用户工作区新文件，写入失败不改变内存确认状态；关闭设置只停止读取/渲染并保留 sidecar；回滚本切片 PR 不需要迁移。
+- 本地验证：前端全量 83 文件/323 项、TypeScript、Lint、格式检查、一次生产构建、Rust 全量 52 项/clippy、浏览器批注 E2E 1/1、Windows desktop smoke 14/14、发布预检和构建产物检查通过；本轮不生成安装包。
+- 检查点：只推送 `codex/annotation-highlight-2026-09-01` 并创建一个 PR；CI 全绿且无真实冲突后合并，随后更新 #368、主线 SHA 和本文件，再停止，不自动开启下一切片。
 
 ## 最近完成：#369 回收站删除与保存上一版本保护
 
