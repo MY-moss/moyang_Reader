@@ -1,11 +1,11 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：IMPLEMENTED（#368 文档书签第一切片已完成，当前分支待 PR）。
-- 当前主线基线（#367 已完成）：`main@eb225d0834bdba363d45a66f4abaadfebd45c5bc`；#367 已通过 PR #395 合并并完成交接。
+- 当前状态：MERGED（#368 文档书签第一切片已由 PR #397 合并）。
+- 当前主线基线：`main@fc51db210cf2142f4a317e713516dd39c6454edf`；PR #397 的 Quality checks 已通过并完成交接。
 - #367 的 Issue 已以 `completed` 关闭；本轮只保留一个下一项，不自动并行开发。
 - 稳定版本：`v0.10.13`；当前 milestone：`v0.11.0`。
 - 本轮不生成安装包、Tag、Release 或 Cloudflare 镜像；稳定批次完成后统一发布 Windows x64 安装包。
-- #368 已完成本切片验证；完成 PR、Issue 状态和交接同步后停止。#368 第二切片及下一项必须重新检查 Issues。
+- #368 第一切片已完成；Issue 保持 open，第二切片（选中文本高亮批注）及下一项必须重新检查 Issues/Ready 后再决定。
 
 ## 最近完成：#369 回收站删除与保存上一版本保护
 
@@ -83,17 +83,17 @@
 - 远程验证：Quality checks run `33403555956` 重跑成功；首轮桌面性能基准的单次 318.5ms 抖动未重现，Windows desktop smoke、依赖审计、发布检查和 Rust 门禁均通过。
 - 发布/回滚：不单独生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0`；回退 PR #392，无数据迁移，保留现有存储格式。
 
-## 本轮实现：#368 文档书签第一切片（分支待 PR）
+## 本轮实现：#368 文档书签第一切片（已合并）
 
 - 优先级：Should / P2；风险级别：T2（阅读定位、本机状态和上下文面板交互）。
-- Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)；状态：实现完成，待 PR；计划版本：`v0.11.x`，不单独发布。
+- Issue：[#368](https://github.com/MY-moss/moyang_Reader/issues/368)；状态：第一切片已完成，Issue 继续 open 等待第二切片；PR：[#397](https://github.com/MY-moss/moyang_Reader/pull/397)；合并提交：`fc51db210cf2142f4a317e713516dd39c6454edf`；计划版本：`v0.11.x`，不单独发布。
 - 用户价值：在长文档和多文档阅读中保存可复用的定位，补齐“回到上次阅读位置”之外的阅读连续性闭环。
 - 范围：新增 `{path, headingId?, quote?, note?, createdAt}` 文档书签；本机 localStorage 存储；正文右键添加书签；右栏增加“书签”页签，支持点击跳转和删除；复用现有目录锚点跳转。
 - 非目标：本切片不做选中文本高亮/批注、sidecar 文件、DOCX/PDF/图片标注、跨设备同步或 Markdown 内容写回；迁移导出 v2 只保留为后续独立任务。
 - 验收：添加、列出、跳转、删除闭环；当前标题书签可准确定位，文档缺失时有明确状态；刷新后本机书签仍可用；Escape、焦点、未保存保护和现有目录/反向链接不回归；至少一条浏览器 E2E。
 - 实现：新增 `src/app/bookmarks.ts` 和 `BookmarksPanel`；右键标题/正文支持添加或移除书签；右栏新增第四个“书签”页签，支持跳转、删除和当前阅读库外状态提示；浏览器 `browser://` 书签只保留在当前会话。
 - 验证：书签、面板、右键菜单、存储与设置定向测试 5 个文件/27 项通过；快速打开与书签浏览器 E2E 2/2 通过；TypeScript、Lint、格式检查、`git diff --check` 和一次前端生产构建通过。
-- 风险与回滚：路径大小写、重命名和失效锚点不静默丢失；回滚为回退本切片 PR，保留未知 localStorage 数据；本轮不生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定 Windows x64 批次。
+- 风险与回滚：路径大小写、重命名和失效锚点不静默丢失；回滚为回退 PR #397，保留未知 localStorage 数据；本轮不生成安装包、Tag、Release 或 Cloudflare 镜像，纳入 `v0.11.0` 稳定 Windows x64 批次。
 
 ## 开始前快速检查
 
@@ -105,3 +105,4 @@
 ## 快速触发
 
 继续开发 Moyang Reader 时，只执行本文件唯一的 IN PROGRESS/READY 事项；若事项已完成，先更新本文件和交接，再从最新 `main` 重新检查 Issues，不得凭历史上下文猜测下一项。
+
