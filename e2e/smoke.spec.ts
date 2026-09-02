@@ -1878,6 +1878,58 @@ test("keeps compact toolbar actions discoverable without horizontal scrolling", 
   ).toBeVisible();
 });
 
+test("keeps toolbar icons consistent and readable at 900px", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 820 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "toolbar-icons.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Toolbar icons\n\nKeep high-frequency actions easy to scan."),
+  });
+  await expect(page.getByRole("heading", { name: "Toolbar icons" })).toBeVisible();
+
+  const visibleIconNames = await page
+    .locator(".topbar .toolbar .moyang-icon:visible")
+    .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("data-icon")));
+  expect(visibleIconNames).toEqual(["folder-open", "panel-left", "panel-right", "search", "more-horizontal"]);
+
+  const metrics = await page.evaluate(() => ({
+    viewportWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    toolbarScrollWidth: document.querySelector(".toolbar")?.scrollWidth ?? 0,
+    toolbarClientWidth: document.querySelector(".toolbar")?.clientWidth ?? 0,
+  }));
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.toolbarScrollWidth).toBe(metrics.toolbarClientWidth);
+
+  await openMoreMenu(page);
+  for (const iconName of ["settings", "printer", "download"] as const) {
+    await expect(page.locator(`.topbar .moyang-icon[data-icon="${iconName}"]`)).toBeVisible();
+  }
+
+  const renderState = await page.locator(".topbar .moyang-icon").evaluateAll((icons) =>
+    icons.map((icon) => ({
+      color: getComputedStyle(icon).color,
+      stroke: icon.getAttribute("stroke"),
+    })),
+  );
+  expect(renderState.every(({ color, stroke }) => color !== "rgba(0, 0, 0, 0)" && stroke === "currentColor")).toBe(
+    true,
+  );
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  await expect(page.locator(".topbar .moyang-icon").first()).toBeVisible();
+  await page.emulateMedia({ forcedColors: "active" });
+  await expect.poll(() => page.evaluate(() => window.matchMedia("(forced-colors: active)").matches)).toBe(true);
+  const highContrastState = await page
+    .locator(".topbar .moyang-icon")
+    .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("stroke")));
+  expect(highContrastState.every((stroke) => stroke === "currentColor")).toBe(true);
+  expect((await page.locator(".topbar").screenshot()).byteLength).toBeGreaterThan(0);
+});
+
 test("keeps core actions visible and secondary actions in More at Windows widths", async ({ page }) => {
   for (const width of [720, 960, 1180]) {
     await page.setViewportSize({ width, height: 820 });

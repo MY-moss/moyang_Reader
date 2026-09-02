@@ -12,6 +12,7 @@ import type {
 import { translate, type Locale, type MessageKey } from "../i18n";
 import type { UpdateStatus } from "../updater";
 import type { SettingsPersistenceStatus } from "../app-settings";
+import { Icon } from "./Icon";
 
 type TopBarProps = {
   fileName: string | null;
@@ -286,7 +287,7 @@ export function TopBar({
             title="文件已被外部修改，查看处理选项"
             onClick={onShowExternalChange}
           >
-            !
+            <Icon name="alert-triangle" size={13} />
           </button>
         )}
       </div>
@@ -301,7 +302,8 @@ export function TopBar({
           }}
           title="打开文件 (Ctrl+O)"
         >
-          {t("action.open")}
+          <Icon name="folder-open" size={15} />
+          <span className="toolbar-button-label">{t("action.open")}</span>
         </button>
         {sidebarCollapsed && (
           <button
@@ -318,7 +320,8 @@ export function TopBar({
                 : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (Ctrl+Shift+O)`
             }
           >
-            {workspaceOpen ? "添加阅读库" : t("action.folder")}
+            <Icon name="folder-plus" size={15} />
+            <span className="toolbar-button-label">{workspaceOpen ? "添加阅读库" : t("action.folder")}</span>
           </button>
         )}
         <button
@@ -330,7 +333,8 @@ export function TopBar({
           }}
           title="快速打开文档 (Ctrl+P)"
         >
-          {t("action.quickOpen")}
+          <Icon name="search" size={15} />
+          <span className="toolbar-button-label">{t("action.quickOpen")}</span>
         </button>
         {fileName && canEdit && (
           <button
@@ -345,7 +349,8 @@ export function TopBar({
             aria-keyshortcuts="Control+E"
             title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (Ctrl+E)`}
           >
-            {mode === "rendered" ? t("action.edit") : t("action.read")}
+            <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
+            <span className="toolbar-button-label">{mode === "rendered" ? t("action.edit") : t("action.read")}</span>
           </button>
         )}
         {draftCount > 0 && (
@@ -355,7 +360,10 @@ export function TopBar({
             onClick={onOpenRecovery}
             title="查看未保存草稿"
           >
-            {t("action.drafts")} {draftCount}
+            <Icon name="history" size={15} />
+            <span className="toolbar-button-label">
+              {t("action.drafts")} {draftCount}
+            </span>
           </button>
         )}
         <button
@@ -366,7 +374,10 @@ export function TopBar({
           aria-keyshortcuts="Control+Shift+B"
           title={sidebarCollapsed ? "显示侧栏 (Ctrl+Shift+B)" : "隐藏侧栏 (Ctrl+Shift+B)"}
         >
-          {sidebarCollapsed ? t("action.showSidebar") : t("action.hideSidebar")}
+          <Icon name="panel-left" size={15} />
+          <span className="toolbar-button-label">
+            {sidebarCollapsed ? t("action.showSidebar") : t("action.hideSidebar")}
+          </span>
         </button>
         <button
           type="button"
@@ -376,7 +387,10 @@ export function TopBar({
           aria-keyshortcuts="Control+Shift+R"
           title={rightPanelOpen ? "隐藏上下文面板 (Ctrl+Shift+R)" : "显示上下文面板 (Ctrl+Shift+R)"}
         >
-          {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
+          <Icon name="panel-right" size={15} />
+          <span className="toolbar-button-label">
+            {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
+          </span>
         </button>
         <button
           type="button"
@@ -385,21 +399,25 @@ export function TopBar({
           disabled={!fileName}
           title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
         >
-          {focusMode ? t("action.exitFocus") : t("action.focus")}
+          <Icon name="maximize" size={15} />
+          <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
         </button>
         <button type="button" className="toolbar-button" onClick={toggleSearch} title="查找文档内容 (Ctrl+F)">
-          {t("action.search")}
+          <Icon name="search" size={15} />
+          <span className="toolbar-button-label">{t("action.search")}</span>
         </button>
         <details ref={moreMenuRef} className="toolbar-overflow" onToggle={closeNestedMenusWhenClosed}>
           <summary className="toolbar-button toolbar-overflow-trigger" title={t("action.moreTools")}>
-            {t("action.more")}
+            <Icon name="more-horizontal" size={16} />
+            <span className="toolbar-button-label">{t("action.more")}</span>
           </summary>
           <div className="toolbar-overflow-panel">
             <div className="toolbar-overflow-group">
               <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
               <div className="toolbar-overflow-actions">
                 <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
-                  {t("action.commands")}
+                  <Icon name="command" size={15} />
+                  <span className="toolbar-button-label">{t("action.commands")}</span>
                 </button>
                 <button
                   type="button"
@@ -410,7 +428,8 @@ export function TopBar({
                   }}
                   title="快速打开文档 (Ctrl+P)"
                 >
-                  {t("action.quickOpen")}
+                  <Icon name="search" size={15} />
+                  <span className="toolbar-button-label">{t("action.quickOpen")}</span>
                 </button>
                 <button
                   type="button"
@@ -421,16 +440,20 @@ export function TopBar({
                   }}
                   disabled={!fileName || !canEdit}
                 >
-                  {mode === "rendered"
-                    ? documentKind === "markdown"
-                      ? t("action.edit")
-                      : t("action.source")
-                    : mode === "wysiwyg"
-                      ? t("action.source")
-                      : t("action.read")}
+                  <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
+                  <span className="toolbar-button-label">
+                    {mode === "rendered"
+                      ? documentKind === "markdown"
+                        ? t("action.edit")
+                        : t("action.source")
+                      : mode === "wysiwyg"
+                        ? t("action.source")
+                        : t("action.read")}
+                  </span>
                 </button>
                 <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
-                  {t("action.save")}
+                  <Icon name="save" size={15} />
+                  <span className="toolbar-button-label">{t("action.save")}</span>
                 </button>
                 <button
                   type="button"
@@ -439,11 +462,15 @@ export function TopBar({
                   disabled={!canCopy}
                   title="复制当前文档内容"
                 >
-                  {copyFeedback ? t("action.copied") : t("action.copy")}
+                  <Icon name="copy" size={15} />
+                  <span className="toolbar-button-label">{copyFeedback ? t("action.copied") : t("action.copy")}</span>
                 </button>
                 {draftCount > 0 && (
                   <button type="button" className="toolbar-button recovery-button" onClick={onOpenRecovery}>
-                    {t("action.drafts")} {draftCount}
+                    <Icon name="history" size={15} />
+                    <span className="toolbar-button-label">
+                      {t("action.drafts")} {draftCount}
+                    </span>
                   </button>
                 )}
                 {previousVersionAvailable && (
@@ -456,7 +483,8 @@ export function TopBar({
                     }}
                     title="查看并恢复上一保存版本"
                   >
-                    恢复上一版
+                    <Icon name="history" size={15} />
+                    <span className="toolbar-button-label">恢复上一版</span>
                   </button>
                 )}
                 <button
@@ -469,7 +497,8 @@ export function TopBar({
                   disabled={!fileName}
                   title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
                 >
-                  {focusMode ? t("action.exitFocus") : t("action.focus")}
+                  <Icon name="maximize" size={15} />
+                  <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
                 </button>
               </div>
             </div>
@@ -477,13 +506,16 @@ export function TopBar({
               <div className="toolbar-overflow-label">{t("action.appearance")}</div>
               <div className="toolbar-overflow-actions">
                 <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
-                  {locale === "en-US"
-                    ? theme === "system"
-                      ? t("action.theme.system")
-                      : theme === "light"
-                        ? t("action.theme.light")
-                        : t("action.theme.dark")
-                    : themeLabel}
+                  <Icon name="sun" size={15} />
+                  <span className="toolbar-button-label">
+                    {locale === "en-US"
+                      ? theme === "system"
+                        ? t("action.theme.system")
+                        : theme === "light"
+                          ? t("action.theme.light")
+                          : t("action.theme.dark")
+                      : themeLabel}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -492,7 +524,8 @@ export function TopBar({
                   disabled={updateStatus === "checking"}
                   title={updateTitle}
                 >
-                  {updateLabel}
+                  <Icon name="refresh-cw" size={15} />
+                  <span className="toolbar-button-label">{updateLabel}</span>
                 </button>
               </div>
             </div>
@@ -506,7 +539,8 @@ export function TopBar({
                 }}
               >
                 <summary className="toolbar-button" title="隐私与更新设置">
-                  {t("settings.title")}
+                  <Icon name="settings" size={15} />
+                  <span className="toolbar-button-label">{t("settings.title")}</span>
                 </summary>
                 <div className="settings-menu-panel">
                   <div className="settings-menu-title">{t("settings.localFirst")}</div>
@@ -651,7 +685,8 @@ export function TopBar({
             </div>
             <div className="toolbar-overflow-group toolbar-overflow-settings">
               <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
-                {exportLabel}
+                <Icon name="printer" size={15} />
+                <span className="toolbar-button-label">{exportLabel}</span>
               </button>
               {(canExportMarkdown || canExportHtml || canExportDocx) && (
                 <details
@@ -663,7 +698,8 @@ export function TopBar({
                   }}
                 >
                   <summary className="toolbar-button" title="导出文件">
-                    导出
+                    <Icon name="download" size={15} />
+                    <span className="toolbar-button-label">导出</span>
                   </summary>
                   <div className="export-menu-panel">
                     {canPreviewPrint && (
@@ -727,13 +763,13 @@ export function TopBar({
             {searchResultCount === 0 ? "无结果" : `${searchResultIndex + 1} / ${searchResultCount}`}
           </span>
           <button type="button" className="find-button" onClick={onSearchPrevious} aria-label="上一个结果">
-            ↑
+            <Icon name="chevron-up" size={15} />
           </button>
           <button type="button" className="find-button" onClick={onSearchNext} aria-label="下一个结果">
-            ↓
+            <Icon name="chevron-down" size={15} />
           </button>
           <button type="button" className="find-button" onClick={onCloseSearch} aria-label="关闭搜索">
-            ×
+            <Icon name="close" size={15} />
           </button>
         </div>
       )}

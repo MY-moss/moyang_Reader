@@ -329,6 +329,11 @@ a:focus-visible {
 .external-modified-indicator:hover {
   background: color-mix(in srgb, var(--accent-warm) 24%, transparent);
 }
+.moyang-icon {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+}
 .toolbar {
   display: flex;
   align-items: center;
@@ -337,6 +342,10 @@ a:focus-visible {
   min-width: 0;
 }
 .toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
@@ -383,7 +392,9 @@ a:focus-visible {
   position: relative;
 }
 .toolbar-overflow summary {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   list-style: none;
 }
@@ -759,8 +770,11 @@ a:focus-visible {
   text-align: center;
 }
 .find-button {
+  display: inline-grid;
+  place-items: center;
   width: 28px;
   height: 28px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 3px;
   background: var(--surface);
@@ -3537,6 +3551,9 @@ html.pane-resizing * {
   line-height: 1;
 }
 .editor-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 8px;
 }
 .editor-toolbar-button-icon,
