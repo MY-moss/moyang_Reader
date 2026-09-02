@@ -1,5 +1,6 @@
 import type { EditorContextAction } from "../editor-context-menu";
 import type { EditorInsertKind } from "../editor-insertion";
+import { Icon } from "./Icon";
 
 type EditorToolbarProps = {
   canUndo: boolean;
@@ -40,7 +41,7 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("undo")}
         >
-          ↶
+          <Icon name="undo" size={16} />
         </button>
         <button
           type="button"
@@ -51,7 +52,7 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("redo")}
         >
-          ↷
+          <Icon name="redo" size={16} />
         </button>
       </div>
 

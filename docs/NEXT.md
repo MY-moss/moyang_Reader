@@ -1,23 +1,23 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366 与 #370 步骤 1/2 均已合并；当前执行 #370 步骤 3（周统计与本机记录清理），分支为 `codex/reading-history-weekly-2026-09-02`，PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 等待远程门禁。
-- 发布代码主线基线：`main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`；PR #418、#419、#420、#421 已合并，Issue #363、#366、#416 以 `completed` 关闭，#370 待本步骤合并后收口。
-- 当前稳定版本：`v0.10.14`；#370 属于 `v0.11.x` 高频体验批次，不单独发布。
+- 当前状态：#416、#366 与 #370 三步均已合并；当前执行 #233 顶栏图标体系与操作密度，分支为 `codex/topbar-icons-2026-09-02`，PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 等待远程门禁。
+- 发布代码主线基线：`main@b7dc14358aee7025a83e86a7ba06d865914fddb1`；PR #418、#419、#420、#421、#422 已合并，Issue #363、#366、#370、#416 以 `completed` 关闭。
+- 当前稳定版本：`v0.10.14`；#233 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#370 周统计与本机记录清理（步骤 3/3）
+## 当前切片：#233 顶栏图标体系与窄窗口操作密度统一
 
-- 目标：在侧栏展示当前本地周一至周日的阅读时长柱状摘要、阅读文档数和累计时长，并提供清理本机阅读历史的确认入口。
-- 用户价值：用户无需离开阅读器即可回顾“这周读了什么量级”，也能明确删除本机阅读时长；原文档和其他阅读状态不会被误删。
-- 非目标：不做目标/提醒、云同步、匿名上报、图表库、分钟级精度、历史趋势或按文档排行；不涉及 HTML 源码编辑、脚本、插件或发布链路。
-- 验收标准：现有 `reading-history.ts` 以本地周一至周日聚合 7 个日桶并按路径去重；侧栏使用纯 CSS 柱状条显示 7 天、文档数和累计时长；空状态、当前日和无效数据安全呈现；清理前使用应用内确认弹层，确认后只移除阅读历史键并刷新为零，不影响最近打开、阅读位置、草稿或文档；组件测试、真实浏览器 E2E、全量单测、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/reading-history.ts`、`src/app/reading-history.test.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/components/ReadingHistoryPanel.tsx`、`src/app/components/ReadingHistoryPanel.test.tsx`、`src/app/components/ReadingHistoryClearConfirmationDialog.tsx`、对应测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、本文件、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：步骤 2 已提供本机 `dailySeconds` 数据、现有 `documentState` 生命周期、`localStorage`、Windows 路径规范化、统一 modal 行为和 React 状态；不新增运行时依赖、外部凭据或数据迁移。
-- 风险：周统计按本地时区计算，旧记录只有总秒数时不会臆测归入当前周；清理后当前打开文档仍可从新的阅读时长继续记录；localStorage 不可用时保持空状态，不阻塞阅读。
-- 回滚：回退本切片 PR 即可移除周统计、清理入口及摘要刷新逻辑；步骤 2 的阅读历史记录可继续保留，用户文档、最近打开、阅读位置和草稿不受影响。
-- 发布：本切片只做普通 UI/存储代码与针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
+- 目标：建立零依赖、统一 stroke 风格的内联 SVG 图标集，并接入顶栏和编辑器中的撤销/重做、外部修改、侧栏、搜索、设置与导出操作。
+- 用户价值：操作更容易扫读；900px 窄窗口仍保留高频入口、没有水平溢出；浅色、深色和 Windows 高对比度下图标继续使用语义颜色。
+- 非目标：不改变按钮动作、快捷键、命令注册或导出内容；不引入图标字体/组件库，不做完整主题或 CSS 令牌重构；不涉及 HTML 源码编辑、脚本、插件或发布链路。
+- 验收标准：所有图标使用 `currentColor`、1.8px round stroke 的内联 SVG；图标按钮和摘要保留可读名称、`title` 或 `aria-label`，撤销/重做保持原快捷键；900px 无水平溢出且 More 中设置/打印/下载入口可见；浅色、深色和 forced-colors 浏览器验证通过；组件测试、全量单测、覆盖率、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/components/Icon.tsx` 及测试、`src/app/components/TopBar.tsx`、`src/app/components/EditorToolbar.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、本文件、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 CSS 语义令牌和 #187 已有窄窗口 More 溢出策略；不新增运行时依赖、外部凭据或数据迁移。
+- 风险：图标语义不清或增加间距可能降低发现性；高频操作保留文字，图标只作辅助，并以 900px、深色和高对比度 E2E 锁定布局。回退本 PR 可恢复原文字/Unicode 图标，不影响命令注册或用户数据。
+- 回滚：回退本切片 PR 即可移除图标组件、接入和样式；不需要数据迁移，也不影响 #370 的本机阅读历史。
+- 发布：本切片只做普通 UI 代码与针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
 
 ## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
 
@@ -39,7 +39,7 @@
 
 ## 下一次开发
 
-- #370 步骤 3 是当前唯一执行切片；合并后 #370 完成，下一独立切片暂定为 #233 顶栏图标与操作密度，仍须重新检查 Issues 和开放 PR。
+- #233 是当前唯一执行切片；合并后下一独立切片暂定为 #191 键盘与读屏细节，仍须重新检查 Issues 和开放 PR。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。
