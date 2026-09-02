@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#428 左侧栏阅读库操作区 UI 修复已合并；当前执行更新入口“更多”工作流与不中断阅读切片，分支为 `codex/update-more-workflow-2026-09-03`，本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已创建，Quality checks run `33677345042` 排队中。
+- 当前状态：#428 左侧栏阅读库操作区 UI 修复已合并；当前执行更新入口“更多”工作流与不中断阅读切片，分支为 `codex/update-more-workflow-2026-09-03`，本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。
 - 发布代码主线基线：`main@8325982f12276e938084523966f02404ba2db041`；PR #418–#428 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
@@ -17,7 +17,7 @@
 - 依赖：现有 Tauri updater/process 插件、签名更新协议、通知视口和“更多”菜单；不新增运行时依赖、外部凭据、数据迁移或发布资产。
 - 风险：延迟重启会让旧进程继续运行到用户确认；重复点击不能销毁下载中的更新对象；真实旧版本下载、签名、替换和重启仍需 #241 的 Windows 实机条件验证。
 - 回滚：回退本切片 PR 即可恢复自动重启和原更新按钮行为；不需要数据迁移，不影响已下载文档或更新资产。
-- 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本地门禁已通过，远程 Quality checks run `33677345042` 排队中；本切片不生成安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
+- 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本地门禁已通过，远程 Quality checks run `33678077540` 已通过；本切片不生成安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
 
 ## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 

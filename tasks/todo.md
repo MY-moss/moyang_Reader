@@ -4,7 +4,7 @@
 
 ## 当前切片（执行中）
 
-- [ ] **用户反馈：更新入口“更多”工作流与不中断阅读**：启动前已重新核验无重复产品 PR；当前主线为 `main@8325982f12276e938084523966f02404ba2db041`，独立工作树/分支 `codex/update-more-workflow-2026-09-03`；修复已有更新状态被重复检查销毁、下载完成强制重启和更多面板未及时收起；本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已创建，Quality checks run `33677345042` 排队中。只做这一垂直切片，默认首页/旧 M 图标、#191 剩余读屏另行拆分。
+- [ ] **用户反馈：更新入口“更多”工作流与不中断阅读**：启动前已重新核验无重复产品 PR；当前主线为 `main@8325982f12276e938084523966f02404ba2db041`，独立工作树/分支 `codex/update-more-workflow-2026-09-03`；修复已有更新状态被重复检查销毁、下载完成强制重启和更多面板未及时收起；本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。只做这一垂直切片，默认首页/旧 M 图标、#191 剩余读屏另行拆分。
 
 已完成：左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
