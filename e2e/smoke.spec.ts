@@ -274,6 +274,56 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab")).toHaveCount(5);
 });
 
+test("keeps the quick-open highlight visible and announced as it moves", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 520 });
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles(
+    Array.from({ length: 20 }, (_, index) => ({
+      name: `quick-open-${String(index + 1).padStart(2, "0")}.md`,
+      mimeType: "text/markdown",
+      buffer: Buffer.from(`# Quick open ${index + 1}`),
+    })),
+  );
+
+  await page.keyboard.press("Control+P");
+  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开" });
+  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文档" });
+  const quickOpenResults = quickOpenDialog.getByRole("listbox", { name: "快速打开结果" });
+
+  await expect(quickOpenResults.getByRole("option")).toHaveCount(20);
+  await expect(quickOpenSearch).toHaveAttribute("aria-controls", "quick-open-results");
+  await expect(quickOpenSearch).toHaveAttribute("aria-activedescendant", "quick-open-option-0");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(quickOpenSearch).toHaveAttribute("aria-activedescendant", "quick-open-option-1");
+  await expect(quickOpenDialog.locator("#quick-open-option-1")).toHaveAttribute("aria-selected", "true");
+
+  for (let index = 0; index < 12; index += 1) {
+    await page.keyboard.press("ArrowDown");
+  }
+
+  const visibility = await quickOpenResults.evaluate((element) => {
+    const active = element.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!active) return null;
+
+    const containerRect = element.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const visibilityTolerance = 1;
+    return {
+      activeId: active.id,
+      scrollTop: element.scrollTop,
+      isVisible:
+        activeRect.top >= containerRect.top - visibilityTolerance &&
+        activeRect.bottom <= containerRect.bottom + visibilityTolerance,
+    };
+  });
+
+  expect(visibility?.activeId).toBe(await quickOpenSearch.getAttribute("aria-activedescendant"));
+  expect(visibility?.scrollTop).toBeGreaterThan(0);
+  expect(visibility?.isVisible).toBe(true);
+});
+
 test("creates and locates a reading annotation from a selected passage", async ({ page }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles({
