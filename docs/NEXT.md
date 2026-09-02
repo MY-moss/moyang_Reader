@@ -1,23 +1,23 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#428 左侧栏阅读库操作区 UI 修复已合并；当前执行更新入口“更多”工作流与不中断阅读切片，分支为 `codex/update-more-workflow-2026-09-03`，本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。
-- 发布代码主线基线：`main@8325982f12276e938084523966f02404ba2db041`；PR #418–#428 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
+- 当前状态：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已合并；当前执行默认首页与品牌视觉收口切片，分支为 `codex/default-home-brand-2026-09-03`，启动前已重新核验无重复产品 PR。
+- 发布代码主线基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #418–#429 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：更新入口“更多”工作流与不中断阅读（用户反馈，2026-09-03）
+## 当前切片：默认首页与品牌视觉收口（用户反馈，2026-09-03）
 
-- 目标：把更新按钮的状态操作固定在“更多”中；对已有更新、下载中和已安装状态重新打开当前提示，不重新检查或销毁已有更新对象；下载完成后等待用户明确重启。
-- 用户价值：用户可以在当前文档和编辑流程中检查、查看进度和安排重启，不因更新下载完成而被强制退出或丢失当前工作上下文。
-- 非目标：不改更新端点、签名校验、安装包格式、自动检查偏好、镜像/发布资产或旧版本实机升级；不处理默认首页、旧 M 图标、#191 读屏、HTML、脚本或插件边界。
-- 验收标准：点击“更多 → 更新”会先收起更多面板；“有更新/下载中/已更新”只恢复对应提示；隐藏下载提示不停止下载，更多入口可重新打开；下载完成不自动重启，提示提供明确的“重启应用”；当前文档保持不变；更新器单测、组件测试、浏览器 E2E、完整质量门禁通过。
-- 涉及文件：`src/app/App.tsx`、`src/app/updater.ts`、`src/app/updater.test.ts`、`src/app/components/TopBar.tsx`、`src/app/components/UpdateNotice.test.tsx`、`e2e/smoke.spec.ts`、`docs/UPDATE.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：现有 Tauri updater/process 插件、签名更新协议、通知视口和“更多”菜单；不新增运行时依赖、外部凭据、数据迁移或发布资产。
-- 风险：延迟重启会让旧进程继续运行到用户确认；重复点击不能销毁下载中的更新对象；真实旧版本下载、签名、替换和重启仍需 #241 的 Windows 实机条件验证。
-- 回滚：回退本切片 PR 即可恢复自动重启和原更新按钮行为；不需要数据迁移，不影响已下载文档或更新资产。
-- 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本地门禁已通过，远程 Quality checks run `33678077540` 已通过；本切片不生成安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
+- 目标：默认未打开文档的主界面复用顶栏正在使用的新 Logo，移除残留大写 M/旧手绘标记，并保持首次启动动作可用。
+- 用户价值：用户进入应用即可看到统一、可识别的 Moyang Reader 品牌，不再看到与 Windows/顶栏不一致的旧字母图标，默认首页更完整。
+- 非目标：不重新设计 Logo，不改阅读库创建/导出/挂载语义，不改侧栏、更新器、#191 读屏、视觉令牌、HTML、脚本、插件或发布资产。
+- 验收标准：默认空状态显示 `src/assets/moyang-reader-logo.png` 且图片实际加载；旧大写 M 标记不再渲染；首次启动按钮和已有阅读库空状态语义保持不变；组件测试、landing 浏览器 E2E、空状态无障碍/高对比度 E2E、全量前端单测、lint、格式和构建通过。
+- 涉及文件：`src/app/components/EmptyState.tsx`、`src/app/components/EmptyState.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 PNG Logo、React/Vite、现有 CSS 语义令牌和空状态操作回调；不新增运行时依赖、外部凭据、数据迁移或发布资产。
+- 风险：静态 Logo 在深色/高对比度环境中仍需保持可见；固定尺寸变化可能影响窄窗口空状态布局，已用无障碍 E2E 和实际 1440px/窄窗口页面检查覆盖；不改变持久化数据。
+- 回滚：回退本切片 PR 即恢复旧空状态 M 标记，不需要数据迁移，不影响文档、阅读库或安装资产。
+- 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
 
 ## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 

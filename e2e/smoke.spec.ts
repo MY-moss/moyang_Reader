@@ -92,6 +92,12 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
   await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
   await expect(page.locator(".brand-logo")).toBeVisible();
+  const emptyLogo = page.locator(".empty-logo");
+  await expect(emptyLogo).toBeVisible();
+  await expect(emptyLogo).toHaveAttribute("src", /moyang-reader-logo/);
+  await expect
+    .poll(() => emptyLogo.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
   await expect(page.locator('button[title="添加整个文件夹 (Ctrl+Shift+O)"]')).toHaveCount(0);
   await expect(page.locator("summary", { hasText: "批量导出" })).toHaveCount(0);
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();

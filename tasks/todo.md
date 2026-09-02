@@ -4,9 +4,9 @@
 
 ## 当前切片（执行中）
 
-- [ ] **用户反馈：更新入口“更多”工作流与不中断阅读**：启动前已重新核验无重复产品 PR；当前主线为 `main@8325982f12276e938084523966f02404ba2db041`，独立工作树/分支 `codex/update-more-workflow-2026-09-03`；修复已有更新状态被重复检查销毁、下载完成强制重启和更多面板未及时收起；本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。只做这一垂直切片，默认首页/旧 M 图标、#191 剩余读屏另行拆分。
+- [ ] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；当前主线为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，独立工作树/分支 `codex/default-home-brand-2026-09-03`；将默认空状态中的旧大写 M 替换为与顶栏共用的新 Logo，并保持首次启动操作不变。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
 
-已完成：左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
+已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 

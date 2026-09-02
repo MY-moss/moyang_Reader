@@ -25,6 +25,20 @@ function renderEmptyState(hasWorkspace: boolean, showWorkspaceAction: boolean) {
 }
 
 describe("EmptyState", () => {
+  it("uses the shared brand logo instead of the legacy letter mark", () => {
+    const { container, root } = renderEmptyState(false, true);
+
+    const logo = container.querySelector<HTMLImageElement>(".empty-logo");
+    expect(logo).not.toBeNull();
+    expect(logo?.getAttribute("src")).toMatch(/moyang-reader-logo/);
+    expect(logo?.alt).toBe("");
+    expect(logo?.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector(".empty-mark")?.textContent).not.toContain("M");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it("keeps the first-run folder action in the main empty state", () => {
     const { container, root } = renderEmptyState(false, true);
 
