@@ -5973,7 +5973,7 @@ export function App() {
         />
       </div>
       <div className="workspace-grid">
-        <aside className="sidebar">
+        <aside className="sidebar" tabIndex={0}>
           <WorkspacePanel
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             onCancelWorkspaceExport={handleCancelWorkspaceExport}
