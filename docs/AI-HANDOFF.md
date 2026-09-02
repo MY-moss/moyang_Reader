@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@42337e840f2266f31715bee914630fc9b42cde1d`；PR #415、#418、#419、#420、#421、#422、#423 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 发布代码主线基线：`main@a650f934429f8f19511dd6c72ef5b17541c694ff`；PR #415、#418、#419、#420、#421、#422、#423、#424 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；当前执行 [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
-- 当前开放 Issue/PR 快照（2026-09-02）：启动 #191 前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为功能 PR #424 与 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因第一个子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片已合并，当前执行标签栏 roving tabindex 子切片，分支为 `codex/tabs-roving-2026-09-02`，PR 待创建。
+- 当前开放 Issue/PR 快照（2026-09-02）：启动标签栏子切片前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -20,18 +20,23 @@
 - 工作区清理只回收可再生生成物和已确认合并/干净的临时工作树；根目录脏改动、未合并成果、用户文档和历史交接均保留，规则见 [`WORKSPACE-CLEANUP.md`](WORKSPACE-CLEANUP.md)。
 - HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
 
-## 当前切片：#191 快速打开高亮跟随与读屏语义（第 1 个子切片，2026-09-02）
+## 当前切片：#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片，2026-09-02）
 
-- 目标：让快速打开结果在方向键或鼠标高亮变化后自动滚入可视区，并用稳定的活动后代语义让读屏用户知道当前选择。
-- 用户价值：长文档列表中键盘用户不会丢失当前高亮；搜索框关联结果列表并指向当前项，Enter 仍打开当前文档。
-- 非目标：不实现标签栏、文件树或目录的 roving tabindex；不调整读屏播报/aria-live、专注模式、命令面板 Esc 互斥或其他 #191 子切片；不改变筛选、鼠标打开、文档内容、HTML、脚本、插件或发布链路。
-- 基线与分支：基于 `main@42337e840f2266f31715bee914630fc9b42cde1d` 创建项目内独立工作树；分支 `codex/quick-open-a11y-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
-- 验收标准：结果列表 option 有稳定 ID；搜索框通过 `aria-controls`/`aria-activedescendant` 指向当前 option；方向键/鼠标移动后 `aria-selected` 与高亮同步且活动项可见；空结果不残留无效活动 ID；组件测试、快速打开回归 E2E、窄窗口长列表 E2E、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/components/QuickOpenPalette.tsx`、`src/app/components/QuickOpenPalette.test.tsx`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、任务与交接文档。
-- 依赖：复用现有 Quick Open 排序、`useModalBehavior`、listbox/option 语义和原生最近滚动；不新增运行时依赖、外部凭据或数据迁移。
-- 风险：ARIA 关联可能影响旧 DOM 定位器；保留现有 searchbox/option 角色、按钮动作和快捷键，并用 E2E 锁定。回滚 PR #424 即可移除活动后代和滚动同步，不影响用户数据。
-- 验证：本地 QuickOpen 组件测试 2/2，快速打开回归与窄窗口长列表 E2E 2/2，构建、lint、类型感知、格式和 diff 检查通过；远程 Quality checks run `33632431268` 全部通过。
+- 目标：让已打开文档标签形成可预测的单 Tab 停靠点，方向键移动焦点并同步选择，Home/End 可快速到达首尾。
+- 用户价值：键盘和读屏用户在多个文档间切换时不必逐个经过关闭按钮，始终知道当前标签并能继续阅读。
+- 非目标：不实现文件树/目录 roving tabindex、读屏播报、焦点模式 Esc 互斥或其他 #191 子切片；不改变鼠标、中键关闭、拖拽排序、右键菜单、文档内容、HTML、脚本、插件或发布链路。
+- 基线与分支：基于已合并 `main@a650f934429f8f19511dd6c72ef5b17541c694ff` 创建项目内独立工作树；分支 `codex/tabs-roving-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR 待创建。
+- 验收标准：标签栏声明水平方向；仅当前 roving 标签进入 Tab 顺序；ArrowLeft/ArrowRight 循环移动焦点并选择文档，Home/End 定位首尾；`aria-pressed` 与当前文档同步；组件测试、双文档浏览器 E2E、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/components/Tabs.tsx`、`src/app/components/Tabs.test.tsx`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、任务与交接文档。
+- 依赖：复用现有 `Tabs` 的受控 `activePath`、`onSelect`、右键菜单焦点契约和原生按钮焦点；不新增运行时依赖、外部凭据或数据迁移。
+- 风险：异步切换或标签关闭可能暂时改变受控状态；本地 roving 路径在活动文档变化和条目移除时回退到有效标签，保留关闭/拖拽/菜单动作并以组件和浏览器回归锁定。回退本 PR 不影响用户数据。
+- 验证：本地 Tabs 组件测试 4/4，双文档标签栏浏览器 E2E 1/1，构建、lint、类型感知、格式和 diff 检查待本切片提交后记录；远程 Quality checks 待 PR 创建。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。
+
+## 已完成切片：#191 快速打开高亮跟随与读屏语义（第 1 个子切片，2026-09-02）
+
+- PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；Issue #191 保持开放。
+- 快速打开结果已具备稳定 option ID、`aria-controls`/`aria-activedescendant`、`aria-selected` 和活动项最近滚动；组件测试、长列表 E2E、构建、lint、类型感知和格式检查均通过。
 
 ## 已完成切片：#233 顶栏图标体系与窄窗口操作密度统一（2026-09-02）
 

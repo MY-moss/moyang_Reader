@@ -4,13 +4,15 @@
 
 ## 当前切片（执行中）
 
-- [ ] **#191 快速打开高亮跟随与读屏语义（第 1 个子切片）**：Issue 启动前已重新核验无重复产品 PR；当前主线为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，独立工作树/分支 `codex/quick-open-a11y-2026-09-02` 让 `aria-activedescendant` 跟随高亮并自动滚动活动 option；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。#191 保持开放，剩余 roving tabindex、播报和 Esc 互斥另行切片。
+- [ ] **#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）**：启动前已重新核验无重复产品 PR；当前主线为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，独立工作树/分支 `codex/tabs-roving-2026-09-02` 让已打开文档标签只有一个 Tab 停靠点，并用左右/Home/End 移动焦点和选择；PR 待创建。#191 保持开放，文件树、目录、播报和 Esc 互斥另行切片。
+
+已完成的 #191 第 1 个子切片：PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿。
 
 ## 下一批候选（完成当前 #191 子切片后重新检查）
 
 按“用户可见收益 / 无外部阻塞 / 可独立验收”排序：
 
-1. **#191 键盘与读屏导航剩余子切片**：完成快速打开子切片后重新核验 Issue，依次补标签/文件树/目录的 roving tabindex、读屏播报和 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
+1. **#191 键盘与读屏导航剩余子切片**：完成标签栏子切片后重新核验 Issue，依次补文件树/目录的 roving tabindex、读屏播报和 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
 2. **#171/#193 视觉令牌与焦点细节**：在图标切片后再拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
 
 条件旁路（不抢占普通切片）：#241 更新/镜像/PDF 实机矩阵、#51 Authenticode、#112 更新文档；只有外部环境满足时才改为 READY。

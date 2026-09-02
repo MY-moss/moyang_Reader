@@ -43,15 +43,15 @@
 
 ### Should：高频体验、可访问性与工程维护
 
-| Issue                                                       | 主题                               | 计划         | 状态/备注                                |
-| ----------------------------------------------------------- | ---------------------------------- | ------------ | ---------------------------------------- |
-| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航                     | v0.11.x      | 当前执行快速打开子切片；剩余部分继续拆分 |
-| [#171](https://github.com/MY-moss/moyang_Reader/issues/171) | CSS 设计令牌收敛与主题规则去重     | v0.11.x–v1.0 | 先令牌，后拆分规则                       |
-| [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、按钮、页签、字体和动效令牌 | v0.11.x      | 不与 #171 的大范围重构混做               |
-| [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档     | v0.11.x      | 合并重复文档，补清楚 GitHub/镜像各自状态 |
-| [#194](https://github.com/MY-moss/moyang_Reader/issues/194) | TS↔Rust 契约、路径谓词与重复实现   | v1.0 前      | 只按明确子契约拆小切片                   |
-| [#16](https://github.com/MY-moss/moyang_Reader/issues/16)   | `App.tsx` 状态、逻辑与页面组合拆分 | v1.0 前      | 按行为边界渐进迁移，不以行数为唯一目标   |
-| [#227](https://github.com/MY-moss/moyang_Reader/issues/227) | `SECURITY.md` 与私密披露入口       | v0.11.x      | 文档型独立切片，不能上传凭据             |
+| Issue                                                       | 主题                               | 计划         | 状态/备注                                                     |
+| ----------------------------------------------------------- | ---------------------------------- | ------------ | ------------------------------------------------------------- |
+| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航                     | v0.11.x      | 当前执行标签栏 roving tabindex；文件树/目录/播报/Esc 继续拆分 |
+| [#171](https://github.com/MY-moss/moyang_Reader/issues/171) | CSS 设计令牌收敛与主题规则去重     | v0.11.x–v1.0 | 先令牌，后拆分规则                                            |
+| [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、按钮、页签、字体和动效令牌 | v0.11.x      | 不与 #171 的大范围重构混做                                    |
+| [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档     | v0.11.x      | 合并重复文档，补清楚 GitHub/镜像各自状态                      |
+| [#194](https://github.com/MY-moss/moyang_Reader/issues/194) | TS↔Rust 契约、路径谓词与重复实现   | v1.0 前      | 只按明确子契约拆小切片                                        |
+| [#16](https://github.com/MY-moss/moyang_Reader/issues/16)   | `App.tsx` 状态、逻辑与页面组合拆分 | v1.0 前      | 按行为边界渐进迁移，不以行数为唯一目标                        |
+| [#227](https://github.com/MY-moss/moyang_Reader/issues/227) | `SECURITY.md` 与私密披露入口       | v0.11.x      | 文档型独立切片，不能上传凭据                                  |
 
 ### Could：低成本增强
 
