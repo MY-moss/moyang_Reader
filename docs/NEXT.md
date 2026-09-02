@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366、#370 三步、#233 和 #191 快速打开子切片均已合并；当前执行 #191 的标签栏 roving tabindex 子切片，分支为 `codex/tabs-roving-2026-09-02`，PR 待创建。
+- 当前状态：#416、#366、#370 三步、#233 和 #191 快速打开子切片均已合并；当前执行 #191 的标签栏 roving tabindex 子切片，分支为 `codex/tabs-roving-2026-09-02`，PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33638296839` 进行中。
 - 发布代码主线基线：`main@a650f934429f8f19511dd6c72ef5b17541c694ff`；PR #418、#419、#420、#421、#422、#423、#424 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。

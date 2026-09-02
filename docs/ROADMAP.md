@@ -6,7 +6,7 @@
 - 用户价值：键盘和读屏用户在多个已打开文档间切换时不必逐个经过关闭按钮，方向键能保持焦点与当前文档一致。
 - 交付边界：为已打开文档标签栏提供水平工具栏语义、单一 roving Tab 停靠点、左右循环和 Home/End 导航；文件树、目录、播报和 Esc 子切片另行交付。
 - 发布策略：这是一个普通 v0.11.x UI 维护切片；完成验收前不生成安装包、Release、签名、`latest.json` 或镜像。
-- 对应 Issue：[#191](https://github.com/MY-moss/moyang_Reader/issues/191)，当前分支 `codex/tabs-roving-2026-09-02`、PR 待创建；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
+- 对应 Issue：[#191](https://github.com/MY-moss/moyang_Reader/issues/191)，当前分支 `codex/tabs-roving-2026-09-02`、PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33638296839` 进行中；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
 
 ## v0.10.14 小版本发布（2026-09-02）
 
