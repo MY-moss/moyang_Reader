@@ -7,8 +7,8 @@
 - 发布代码主线基线：`main@b11539ea85bc816dbb9f002021084755d7c826b2`；PR #415 已 squash 合并，Issue #363 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已完成实现与本地 Windows 验收，分支 `codex/icon-consistency-2026-09-02` 待创建 PR/CI。
-- 当前开放 Issue 快照（2026-09-02）：15 个开放事项，其中 #416 是唯一 Ready，#373 是历史跟踪项，其余开放事项均为候选/条件项；当前没有开放的产品功能 PR，只有 6 个 Dependabot PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已完成实现与本地 Windows 验收，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 已创建，等待 CI/审查。
+- 当前开放 Issue/PR 快照（2026-09-02）：15 个开放 Issue，#416 是唯一 Ready；#373 是历史跟踪项；PR #418 是本次唯一产品 PR，另有 6 个 Dependabot PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
