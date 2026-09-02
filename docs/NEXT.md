@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；合并后下一独立切片为 #191 的读屏播报或 Esc 互斥，当前不自动启动。
-- 本切片基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #418–#430 已完成本轮代码与交接，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载剩余子切片。
+- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 主阅读区读屏播报收窄已在 PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 完成本切片，合并后下一独立切片只剩 Esc 互斥，当前不自动启动。
+- 本轮最新基线：`main@1e00683658e023405dcaee5be9c389adcbbd25c9`；PR #418–#430 已完成本轮代码与交接，PR #431 正在等待远端门禁；Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
@@ -22,8 +22,22 @@
 
 ## 当前唯一下一步：#191 键盘与读屏导航剩余子切片
 
-- 先重新核验 Issue #191 与开放 PR，再只选择“读屏播报”或“Escape 互斥”其中一个垂直切片；不把两个问题合并开发，不关闭 Issue，不改 HTML 安全路线。
+- 先重新核验 Issue #191 与开放 PR；主区读屏播报收窄已由 PR #431 完成，下一次只处理“Escape 互斥”这一垂直切片；不关闭 Issue，不改 HTML 安全路线。
 - 目标、用户价值、非目标、验收标准、涉及文件、依赖、风险和回滚方式必须在下一切片启动前补齐；本轮完成后停止，不自动开始下一项。
+
+## 最近完成：#191 主阅读区读屏播报收窄（第 5 个子切片，2026-09-03）
+
+- 目标：移除主阅读区 `main.content-area` 的宽范围 `aria-live`，避免长文正文因无关状态变化被读屏器整段重新播报；把打开文档的加载提示标为独立的 `status/polite`。
+- 用户价值：读屏用户可以连续阅读长文，不会因阅读区状态更新反复听到全文；缩放、渐进渲染和错误反馈仍保持明确、可获取的状态语义。
+- 非目标：不处理 #191 的 Escape 互斥、标签/文件树/目录导航，不改阅读内容、搜索、鼠标行为、HTML 安全路线、视觉令牌、脚本、插件或发布资产；不以本切片关闭 Issue #191。
+- 验收标准：主阅读区及其文章没有宽范围 live ancestor；打开文档加载状态、阅读缩放和渐进渲染状态使用显式 `role=status`/`aria-live=polite`，错误使用 `role=alert`；无障碍 E2E 锁定上述 DOM 契约并保持无 serious/critical axe 违规。
+- 涉及文件：`src/app/App.tsx`、`e2e/a11y.spec.ts`、`docs/ACCESSIBILITY-WINDOWS.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 React 状态提示、`ProgressiveReaderContent` 的显式 status、通知/错误语义和 Playwright axe 基线；不新增运行时依赖、外部凭据、数据迁移或发布资产。
+- 风险：移除祖先 live region 后，依赖非预期全文播报的辅助技术用户可能少收到整体变化提示；通过显式加载/缩放/渐进/错误状态保留必要反馈，并以浏览器回归锁定范围。
+- 回滚：回退 PR #431 即可恢复原主区 `aria-live` 行为和加载提示标记，不需要数据迁移，不影响用户文档或阅读库。
+- 验证：RED 测试先复现 `main.content-area[aria-live]`；修复后 `npm run test:e2e:a11y -- --workers=1` 8/8、`npm test` 94 个文件/372 项、lint、格式、类型感知和 build 通过；`git diff --check` 通过。
+- 发布：普通 T2 无障碍切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；纳入后续稳定批次。
+- 交付：分支 `codex/reader-live-region-2026-09-03`，PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431)，代码提交 `a4448d7`；远端 Quality checks 待完成，Issue #191 保持开放。
 
 ## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 

@@ -41,11 +41,13 @@ G-01 工程治理与清理（本轮）
 - [ ] **F-04 #112 更新与 opener 文档收口**：清理重复说明、补镜像失败回退/权限边界和用户可见故障排查；不重复实现更新器；T2/T3。
 - [x] **F-05 #366 统一确认语义（已合并）**：清空草稿、关闭窗口和未保存修改使用应用内弹层，说明草稿已自动留存，并提供保存并退出；不处理 `window.prompt` 系列、不改数据模型；PR #419 已合并为 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`，Issue #366 已关闭；T2。
 - [x] **F-06 #370 阅读历史与本地统计（已合并）**：步骤 1/2 已合并最近文档时间语义和本机前台可见性心跳；步骤 3 补齐本地周一至周日统计、去重文档数、累计时长和清理确认入口；仅本机、无联网/匿名上报、不引入图表库；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 已 squash 合并为 `main@b7dc14358aee7025a83e86a7ba06d865914fddb1`，Issue #370 已关闭；T1/T2。
-- [ ] **F-07 #191 键盘与读屏细节**：快速打开、标签栏、文件树和目录 roving/当前章节高亮四个子切片已合并；读屏播报和 Esc 互斥继续拆分；不引入新 UI 框架；T2。Issue #191 保持开放。
+- [ ] **F-07 #191 键盘与读屏细节**：快速打开、标签栏、文件树、目录 roving/当前章节高亮和主阅读区读屏播报收窄五个子切片已合并；Esc 互斥继续单独拆分；不引入新 UI 框架；T2。Issue #191 保持开放。
 - [x] **F-07a #191 快速打开子切片（已合并）**：PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；Issue #191 保持开放。
 - [x] **F-07b #191 标签栏子切片（已合并）**：PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；Issue #191 保持开放。
 - [x] **F-07c #191 文件树子切片（已合并）**：PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；Issue #191 保持开放。
 - [x] **F-07d #191 目录 roving 与当前章节高亮（已合并）**：目录使用 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End 和现有中央正文导航；当前高亮同步 `active`/`aria-current`/`aria-selected`；读屏播报和 Esc 互斥另行拆分；T2。PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
+- [x] **F-07e #191 主阅读区读屏播报收窄（本切片）**：移除 `main.content-area` 的宽范围 `aria-live`，打开文档加载状态改为显式 `status/polite`，保留缩放/渐进渲染状态和错误提示；补无障碍回归 E2E；T2。PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已创建，等待远端 Quality checks 后合并。
+- [ ] **F-07f #191 焦点模式 Escape 互斥**：专注模式/命令面板等嵌套交互只由最内层 Escape 关闭并正确归还焦点；不与读屏播报切片合并；T2。Issue #191 保持开放。
 - [x] **F-08 #233 顶栏图标与密度（已合并）**：统一当前文档操作、低频菜单和窄窗口溢出；不与完整主题重构混做；T2。PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 已 squash 合并为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，Issue #233 已关闭。
 - [ ] **F-09 #171/#193 视觉令牌治理**：先抽取颜色/间距/焦点/字体/动效令牌，再拆规则；不大改布局行为；T2。
 - [x] **F-09a 用户反馈：左侧栏阅读库操作区布局与菜单交互**：修复“新建、批量导出、添加/切换阅读库”在窄侧栏中的遮挡与操作中断；菜单进入布局流并互斥收起；不改变创建、导出、挂载的数据语义；T2；分支 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。

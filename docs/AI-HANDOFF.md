@@ -4,15 +4,26 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 发布代码主线基线：`main@1e00683658e023405dcaee5be9c389adcbbd25c9`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430 已 squash 合并，PR #431 正在等待远端门禁；Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；下一独立切片仍为 #191 的读屏播报或 Esc 互斥。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现默认首页、旧 M 或品牌图标重复产品 PR；本切片唯一功能 PR 为 #430，Quality checks run `33687800718` 已通过；其余开放 PR 为 6 个 Dependabot 更新；#191 不因已完成子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树、目录 roving/当前章节高亮和主阅读区读屏播报收窄子切片已完成，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；下一独立切片只剩 #191 的 Esc 互斥。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #191 与开放 PR，未发现读屏播报或 Escape 互斥重复产品 PR；本切片唯一功能 PR 为 #431，远端 Quality checks 待完成；其余开放 PR 为 6 个 Dependabot 更新；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
+
+## 已完成切片：#191 主阅读区读屏播报收窄（2026-09-03）
+
+- 目标与用户价值：移除 `main.content-area` 的宽范围 `aria-live`，避免长文正文因无关状态变化被读屏器整段重新播报；打开文档加载状态改为独立的 `role=status`/`aria-live=polite`，阅读缩放和渐进渲染状态、错误提示继续保持显式语义。
+- 非目标：不处理 #191 的 Escape 互斥、标签/文件树/目录导航，不改正文、搜索、鼠标行为、HTML 安全路线、视觉令牌、脚本、插件或发布资产；不关闭 Issue #191。
+- 基线与分支：基于 `main@1e00683658e023405dcaee5be9c389adcbbd25c9` 创建项目内独立工作树；分支 `codex/reader-live-region-2026-09-03`；启动前重新核验 Issue #191 与开放 PR，未发现重复产品 PR；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已创建，代码提交 `a4448d7`，远端 Quality checks 待完成。
+- 验收标准：主阅读区不再作为 live region 祖先包裹文章；动态加载/缩放/渐进渲染状态和错误可独立获取；无障碍 E2E 验证正文不在宽 live region 内且保留缩放状态语义，axe 不出现 serious/critical 违规。
+- 涉及文件：`src/app/App.tsx`、`e2e/a11y.spec.ts`、`docs/ACCESSIBILITY-WINDOWS.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖、风险与回滚：复用现有状态提示、`ProgressiveReaderContent` status 和通知/错误语义，不新增依赖、凭据或迁移；移除祖先播报后通过显式状态保留必要反馈；回退 PR #431 即可恢复原行为。
+- 验证：RED 测试先复现 `main.content-area[aria-live]`；修复后 `npm run test:e2e:a11y -- --workers=1` 8/8、`npm test` 94 个文件/372 项、lint、格式、类型感知、build 和 `git diff --check` 通过。
+- 发布/缓存：普通 T2 无障碍切片，不生成安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建生成物使用工作树既有清理流程，不恢复 C 盘旧缓存。
 
 ## 本轮工程治理与 HTML 路线
 
