@@ -84,6 +84,23 @@ describe("Tabs", () => {
     cleanup(container, root);
   });
 
+  it("leaves modified arrow shortcuts available to the application", () => {
+    const { container, root, onSelect } = mountTabs();
+    const labels = container.querySelectorAll<HTMLButtonElement>(".tab-label");
+    labels[1]?.focus();
+
+    act(() => {
+      labels[1]?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowLeft", ctrlKey: true, bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(labels[1]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([0, -1]);
+    cleanup(container, root);
+  });
+
   it("closes a tab on middle click", () => {
     const { container, root, onClose } = mountTabs();
     const tab = container.querySelector<HTMLElement>(".tab-item");
