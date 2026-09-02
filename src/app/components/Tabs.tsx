@@ -154,6 +154,8 @@ export function Tabs({
                   return;
                 }
 
+                if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
                 let nextIndex: number | null = null;
                 if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
                 if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
