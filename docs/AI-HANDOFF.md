@@ -4,21 +4,34 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`；PR #415、#418、#419、#420、#421 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭，#370 的步骤 3 正在交付。
+- 发布代码主线基线：`main@b7dc14358aee7025a83e86a7ba06d865914fddb1`；PR #415、#418、#419、#420、#421、#422 已 squash 合并，Issue #363、#366、#370、#416 已以 `completed` 关闭，#233 正在交付。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1/2 已完成；当前执行 #370 步骤 3 周统计与本机记录清理，分支为 `codex/reading-history-weekly-2026-09-02`，尚未创建产品 PR。
-- 当前开放 Issue/PR 快照（2026-09-02）：启动本切片前重新核验 Issue #370 未发现重复产品 PR；开放 PR 仅为 Dependabot 更新，当前分支将只创建一个功能 PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；当前执行 [#233](https://github.com/MY-moss/moyang_Reader/issues/233) 顶栏图标体系与操作密度，分支为 `codex/topbar-icons-2026-09-02`，PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 等待远程门禁。
+- 当前开放 Issue/PR 快照（2026-09-02）：启动 #233 前重新核验 Issue/开放 PR，未发现重复产品 PR；开放 PR 为当前功能 PR #423 与 6 个 Dependabot 更新，本切片只保留一个功能 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
-> 以下“本轮”段落是已完成切片的历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
+> 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
 ## 本轮工程治理与 HTML 路线
 
 - 全量流程、现有能力、缺口、Issue 映射、HTML 适配任务和 v1.0 以后边界见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)。
 - 工作区清理只回收可再生生成物和已确认合并/干净的临时工作树；根目录脏改动、未合并成果、用户文档和历史交接均保留，规则见 [`WORKSPACE-CLEANUP.md`](WORKSPACE-CLEANUP.md)。
 - HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
+
+## 当前切片：#233 顶栏图标体系与窄窗口操作密度统一（2026-09-02）
+
+- 目标：建立零依赖、统一 stroke 风格的内联 SVG 图标集，并接入顶栏和编辑器中的撤销/重做、外部修改、侧栏、搜索、设置与导出操作。
+- 用户价值：操作更容易扫读；900px 窄窗口仍保留高频入口、没有水平溢出；浅色、深色和 Windows 高对比度下图标继续使用语义颜色。
+- 非目标：不改变按钮动作、快捷键、命令注册或导出内容；不引入图标字体/组件库，不做完整主题或 CSS 令牌重构；不涉及 HTML 源码编辑、脚本、插件或发布链路。
+- 基线与分支：基于已合并 `main@b7dc14358aee7025a83e86a7ba06d865914fddb1` 创建项目内独立工作树；分支 `codex/topbar-icons-2026-09-02`；Issue [#233](https://github.com/MY-moss/moyang_Reader/issues/233) 未发现重复产品 PR；PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 等待远程门禁。
+- 验收标准：所有图标使用 `currentColor`、1.8px round stroke 的内联 SVG；图标按钮和摘要保留可读名称、`title` 或 `aria-label`，撤销/重做保持原快捷键；900px 无水平溢出且 More 中设置/打印/下载入口可见；浅色、深色和 forced-colors 浏览器验证通过；组件测试、全量单测、覆盖率、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/components/Icon.tsx` 及测试、`src/app/components/TopBar.tsx`、`src/app/components/EditorToolbar.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、任务与交接文档。
+- 依赖：复用现有 CSS 语义令牌和 #187 已有窄窗口 More 溢出策略；不新增运行时依赖、外部凭据或数据迁移。
+- 风险：图标语义不清或增加间距可能降低发现性；高频操作保留文字，图标只作辅助，并以 900px、深色和高对比度 E2E 锁定布局。
+- 回滚：回退本 PR 即可移除图标组件、接入和样式，不需要数据迁移，也不影响 #370 的本机阅读历史。
+- 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。
 
 ## 已完成切片：#416 Windows 外部图标一致性（2026-09-02）
 
@@ -53,18 +66,19 @@
 - 涉及文件：`src/app/types.ts`、`src/app/storage.ts`、`src/app/portable-settings.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`e2e/smoke.spec.ts`、任务与交接文档。
 - 回滚与发布：回退本切片即可恢复 12 条插入序列表，不需要数据迁移；本切片不生成 Windows x64 安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
 
-## 本次切片：#370 周统计与本机记录清理（步骤 3/3，2026-09-02）
+## 已完成切片：#370 周统计与本机记录清理（步骤 3/3，2026-09-02）
 
 - 目标：在侧栏展示本地周一至周日的阅读时长柱状摘要、去重阅读文档数和累计时长，并提供清理本机阅读历史的确认入口。
 - 用户价值：用户无需离开阅读器即可回顾本周阅读量级，也能明确删除本机阅读时长；原文档和其他阅读状态不会被误删。
 - 非目标：不做目标/提醒、云同步、匿名上报、图表库、分钟级精度、历史趋势或按文档排行；不涉及 HTML 源码编辑、脚本、插件或发布链路。
-- 基线与分支：基于已合并 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a` 创建项目内独立 worktree；分支 `codex/reading-history-weekly-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 未发现重复产品 PR；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 等待远程门禁。
+- 基线与分支：基于已合并 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a` 创建项目内独立 worktree；分支 `codex/reading-history-weekly-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 未发现重复产品 PR；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 已 squash 合并为 `main@b7dc14358aee7025a83e86a7ba06d865914fddb1`，Issue 已以 `completed` 关闭。
 - 验收标准：按本地周一至周日聚合 7 个日桶并按路径去重；侧栏使用纯 CSS 柱状条显示 7 天、文档数和累计时长；空状态、当前日和无效数据安全呈现；清理前使用应用内确认弹层，确认后只移除阅读历史键并刷新为零，不影响最近打开、阅读位置、草稿或文档；组件测试、浏览器 E2E、全量单测、构建、lint、格式和类型感知检查通过。
 - 涉及文件：`src/app/reading-history.ts` 及测试、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`src/app/components/ReadingHistoryPanel.tsx` 及测试、`src/app/components/ReadingHistoryClearConfirmationDialog.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、任务与交接文档。
 - 依赖：步骤 2 已提供本机 `dailySeconds` 数据；复用 `localStorage`、Windows 路径规范化、统一 modal 行为和 React 状态；不新增运行时依赖、外部凭据或数据迁移。
 - 风险：周统计按本地时区计算，只有总秒数的旧记录不会臆测归入当前周；清理后当前打开文档仍可从新的时长继续记录；localStorage 不可用时保持空状态，不阻塞阅读。
 - 回滚：回退本切片 PR 即可移除周统计、清理入口和摘要刷新逻辑；步骤 2 的历史记录可继续保留，用户文档、最近打开、阅读位置和草稿不受影响。
-- 发布：普通 T1/T2 UI/存储切片，不单独生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；稳定批次统一处理。
+- 验证：本地全量单测/覆盖率为 92 文件、357 项、`84.17% / 72.80% / 91.09% / 88.40%`；周统计清理 E2E 1/1；远程 Quality checks run `33624287810` 全部通过（含浏览器、无障碍、桌面 smoke、发布预检和 Rust 门禁）。
+- 发布：普通 T1/T2 UI/存储切片，不单独生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；稳定批次统一处理。回退 PR #422 无需数据迁移。
 
 ## 已完成切片：#370 前台阅读可见性心跳（步骤 2/3，PR #421，2026-09-02）
 
