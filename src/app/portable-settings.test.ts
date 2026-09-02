@@ -19,7 +19,7 @@ const input = {
       activeDocumentPath: "C:/Notes/today.md",
     },
   ],
-  openTabs: [{ path: "C:/Notes/today.md", name: "today.md" }],
+  openTabs: [{ path: "C:/Notes/today.md", name: "today.md", lastOpenedAt: 42 }],
   readingPositions: [
     { path: "C:/Notes/today.md", top: 420.6 },
     { path: "c:\\notes\\TODAY.md", top: 12 },
@@ -41,6 +41,7 @@ describe("portable settings", () => {
     expect(parsed.theme).toBe("dark");
     expect(parsed.mountedWorkspaces).toEqual([{ path: "C:/Notes", name: "Notes" }]);
     expect(parsed.workspaceSessions[0]?.tabs).toEqual([{ path: "C:/Notes/today.md", name: "today.md" }]);
+    expect(parsed.openTabs).toEqual([{ path: "C:/Notes/today.md", name: "today.md", lastOpenedAt: 42 }]);
     expect(parsed.readingPositions).toEqual([
       { path: "C:/Notes/today.md", top: 421 },
       { path: "C:/Notes/guide.md", top: 80 },

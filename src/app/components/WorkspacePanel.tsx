@@ -11,7 +11,7 @@ import type {
 import { WorkspaceTreeView, type WorkspaceEntryKind, type WorkspaceEntryTransferMode } from "./WorkspaceTree";
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
-import { MAX_MOUNTED_WORKSPACES } from "../storage";
+import { formatRecentFileTime, MAX_MOUNTED_WORKSPACES } from "../storage";
 
 const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
   { value: "all", label: "全部类型" },
@@ -486,6 +486,7 @@ export function WorkspacePanel({
                 >
                   <span>{file.name}</span>
                   <small>{file.path}</small>
+                  <small>最近打开：{formatRecentFileTime(file.lastOpenedAt)}</small>
                 </button>
               ))}
             </div>

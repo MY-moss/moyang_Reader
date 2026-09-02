@@ -14,7 +14,7 @@ const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
 const contextPanelOpenKey = "moyang-reader-context-panel-open";
 const contextPanelTabKey = "moyang-reader-context-panel-tab";
 const paneWidthsKey = "moyang-reader-pane-widths";
-const maxRecentFiles = 12;
+export const MAX_RECENT_FILES = 50;
 const maxRecentWorkspaces = 8;
 export const MAX_MOUNTED_WORKSPACES = 5;
 const maxOpenTabs = 16;
@@ -99,6 +99,51 @@ function comparablePath(path: string): string {
   return normalizePathKey(path);
 }
 
+function validRecentFileTimestamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function parseRecentFile(value: unknown): RecentFile | null {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as RecentFile).path !== "string" ||
+    typeof (value as RecentFile).name !== "string"
+  ) {
+    return null;
+  }
+
+  const file = value as RecentFile;
+  if (!file.path.trim() || !file.name.trim() || file.path.startsWith("browser://")) return null;
+  return validRecentFileTimestamp(file.lastOpenedAt)
+    ? { path: file.path, name: file.name, lastOpenedAt: file.lastOpenedAt }
+    : { path: file.path, name: file.name };
+}
+
+function sortRecentFiles(files: RecentFile[]): RecentFile[] {
+  return files
+    .map((file, index) => ({ file, index, timestamp: file.lastOpenedAt }))
+    .sort((left, right) => {
+      const leftTimestamp = validRecentFileTimestamp(left.timestamp) ? left.timestamp : undefined;
+      const rightTimestamp = validRecentFileTimestamp(right.timestamp) ? right.timestamp : undefined;
+      if (leftTimestamp !== undefined && rightTimestamp !== undefined) {
+        return rightTimestamp - leftTimestamp || left.index - right.index;
+      }
+      if (leftTimestamp !== undefined || rightTimestamp !== undefined) return leftTimestamp !== undefined ? -1 : 1;
+      return left.index - right.index;
+    })
+    .map(({ file }) => file);
+}
+
+function normalizeRecentFiles(value: unknown): RecentFile[] {
+  if (!Array.isArray(value)) return [];
+
+  return sortRecentFiles(value.map(parseRecentFile).filter((file): file is RecentFile => file !== null)).slice(
+    0,
+    MAX_RECENT_FILES,
+  );
+}
+
 export function loadWorkspacePath(): string | null {
   try {
     return localStorage.getItem(workspaceKey);
@@ -138,15 +183,8 @@ function parseOpenTabs(parsed: unknown): RecentFile[] {
 
   const seen = new Set<string>();
   return parsed
-    .filter(
-      (item): item is RecentFile =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as RecentFile).path === "string" &&
-        typeof (item as RecentFile).name === "string" &&
-        (item as RecentFile).path.trim().length > 0 &&
-        (item as RecentFile).name.trim().length > 0,
-    )
+    .map(parseRecentFile)
+    .filter((item): item is RecentFile => item !== null)
     .filter((item) => !item.path.startsWith("browser://"))
     .filter((item) => {
       const key = comparablePath(item.path);
@@ -405,32 +443,36 @@ export function loadRecentFiles(): RecentFile[] {
   try {
     const raw = localStorage.getItem(recentFilesKey);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (item): item is RecentFile =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof (item as RecentFile).path === "string" &&
-          typeof (item as RecentFile).name === "string",
-      )
-      .slice(0, maxRecentFiles);
+    return normalizeRecentFiles(JSON.parse(raw) as unknown);
   } catch {
     return [];
   }
 }
 
-export function rememberRecentFile(file: RecentFile): RecentFile[] {
-  const next = [file, ...loadRecentFiles().filter((item) => item.path !== file.path)].slice(0, maxRecentFiles);
+export function rememberRecentFile(file: RecentFile, openedAt = Date.now()): RecentFile[] {
+  const stampedFile = validRecentFileTimestamp(openedAt)
+    ? { path: file.path, name: file.name, lastOpenedAt: openedAt }
+    : { path: file.path, name: file.name };
+  const next = normalizeRecentFiles([stampedFile, ...loadRecentFiles().filter((item) => item.path !== file.path)]);
   saveRecentFiles(next);
   return next;
 }
 
 export function saveRecentFiles(files: RecentFile[]): void {
   try {
-    localStorage.setItem(recentFilesKey, JSON.stringify(files.slice(0, maxRecentFiles)));
+    localStorage.setItem(recentFilesKey, JSON.stringify(normalizeRecentFiles(files)));
   } catch {
     // Recent files remain available for the current session.
   }
+}
+
+export function formatRecentFileTime(lastOpenedAt?: number, now = Date.now()): string {
+  if (!validRecentFileTimestamp(lastOpenedAt)) return "打开时间未知";
+
+  const elapsedMinutes = Math.max(0, Math.floor((now - lastOpenedAt) / 60_000));
+  if (elapsedMinutes < 1) return "刚刚";
+  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours} 小时前`;
+  return `${Math.floor(elapsedHours / 24)} 天前`;
 }

@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RecentWorkspace } from "../types";
+import type { RecentFile, RecentWorkspace } from "../types";
 import { WorkspacePanel } from "./WorkspacePanel";
 
 function renderPanel(
@@ -114,6 +114,19 @@ describe("WorkspacePanel", () => {
     );
     expect(addButton?.hasAttribute("disabled")).toBe(true);
     expect(addButton?.getAttribute("title")).toContain("5 个阅读库上限");
+    cleanup(container, root);
+  });
+
+  it("shows relative open times and a safe fallback for legacy recent files", () => {
+    const recentFiles: RecentFile[] = [
+      { path: "C:\\Notes\\today.md", name: "today.md", lastOpenedAt: Date.now() - 3_600_000 },
+      { path: "C:\\Notes\\legacy.md", name: "legacy.md" },
+    ];
+    const { container, root } = renderPanel([], { workspacePath: null, recentFiles });
+
+    const recentSection = container.querySelector<HTMLElement>('[aria-label="最近打开"]');
+    expect(recentSection?.textContent).toContain("最近打开：1 小时前");
+    expect(recentSection?.textContent).toContain("打开时间未知");
     cleanup(container, root);
   });
 });

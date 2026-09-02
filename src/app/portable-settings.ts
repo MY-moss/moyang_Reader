@@ -39,6 +39,10 @@ function optionalPath(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function optionalTimestamp(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
 function parsePreferences(value: unknown): ReaderPreferences {
   if (!isRecord(value)) throw new Error("设置备份缺少有效的阅读偏好。");
 
@@ -86,7 +90,8 @@ function parseRecentFile(value: unknown): RecentFile | null {
   const path = optionalPath(value.path);
   const name = optionalPath(value.name);
   if (!path || !name || path.startsWith("browser://")) return null;
-  return { path, name };
+  const lastOpenedAt = optionalTimestamp(value.lastOpenedAt);
+  return lastOpenedAt === undefined ? { path, name } : { path, name, lastOpenedAt };
 }
 
 function parseRecentWorkspace(value: unknown): RecentWorkspace | null {

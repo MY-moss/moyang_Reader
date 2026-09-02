@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #415、#418 已 squash 合并，Issue #363、#416 已以 `completed` 关闭。
+- 发布代码主线基线：`main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`；PR #415、#418、#419 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)，唯一产品 PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 的 Quality checks run `33604977040` 已全绿，等待人工审查/合并。
-- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；产品 PR 为 [#419](https://github.com/MY-moss/moyang_Reader/pull/419)，另有 6 个 Dependabot PR；Issue #366 未发现重复开放 PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 与 [#366](https://github.com/MY-moss/moyang_Reader/issues/366) 已完成，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 和 [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 均已合并；当前执行 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1，尚未创建重复 PR。
+- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；在启动 #370 前无开放产品 PR，另有 6 个 Dependabot PR；Issue #370 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -35,14 +35,23 @@
 - 发布边界：只生成本地验收用 NSIS 包；本切片不创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，v0.10.14 稳定资产保持不变。若维护者将其纳入 v0.10.15 稳定批次，再按发布政策统一生成和核验。
 - 任务边界：本切片已由一个 `codex/` 分支和一个 PR 完成；合并后重新检查 Issue 并切换到 #366，不自动开始 #370、#233 或任何 HTML 工作。
 
-## 本次切片：#366 统一确认弹层与未保存修改语义（PR #419，2026-09-02）
+## 已完成切片：#366 统一确认弹层与未保存修改语义（PR #419，2026-09-02）
 
 - 目标与用户价值：统一“清空全部草稿”和关闭未保存文档的应用内确认体验；明确草稿已留存，并提供保存并退出，降低误操作和退出时的不确定感。
 - 非目标：本切片不处理 `window.prompt` 系列、不改草稿数据模型或其他确认入口、不改变 HTML/插件/发布边界。
 - 验收标准：原生清空确认被应用弹层替代；弹层支持 Escape、取消、确认和焦点契约；关闭文案准确说明草稿副本；保存并退出复用现有保存管线且保存失败不继续关闭；组件、浏览器 E2E、Windows 桌面关闭路径通过。
 - 涉及文件：`src/app/App.tsx`、确认弹层组件及测试、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、本文件、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖与风险：复用 `useModalBehavior`、草稿快照和 `saveDocument`；保存受外部修改/写入失败影响，弹层需保持焦点边界。无新增运行时依赖、无数据迁移。
-- 回滚与发布：回退本切片提交即可恢复原确认行为；本切片不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
+- 回滚与发布：PR #419 已 squash 合并为 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`，Issue #366 已以 `completed` 关闭；回退本切片即可恢复原确认行为。本切片不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
+
+## 本次切片：#370 最近阅读时间语义（步骤 1/3，2026-09-02）
+
+- 目标与用户价值：为本机最近打开文档记录可选 `lastOpenedAt`，上限由 12 提升到 50，按有效时间降序展示并显示中文相对日期，让“最近打开”真正可回顾；旧版 `{path,name}` 记录继续可读。
+- 非目标：不做阅读可见性心跳、阅读时长、本周统计、清理入口、联网/匿名上报、图表库、HTML 源码编辑、脚本或插件。
+- 基线与分支：从 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a` 创建项目内独立 worktree，分支 `codex/reading-history-2026-09-02`；PR 尚未创建。
+- 验收与风险：存储单测覆盖上限、旧数据、非法时间和排序；组件测试覆盖相对日期/未知时间；浏览器 E2E 覆盖启动列表。时间非法时丢弃时间字段并保留安全插入顺序；改名/移动保留时间元数据；不触碰用户文档。
+- 涉及文件：`src/app/types.ts`、`src/app/storage.ts`、`src/app/portable-settings.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`e2e/smoke.spec.ts`、任务与交接文档。
+- 回滚与发布：回退本切片即可恢复 12 条插入序列表，不需要数据迁移；本切片不生成 Windows x64 安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
 
 ## v0.10.14 发布交接（已完成）
 

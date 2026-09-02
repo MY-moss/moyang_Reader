@@ -103,6 +103,8 @@ export type WorkspaceRefreshResult = {
 export type RecentFile = {
   path: string;
   name: string;
+  /** Unix epoch milliseconds for the most recent explicit open, absent in legacy records. */
+  lastOpenedAt?: number;
 };
 
 export type RecentWorkspace = {
