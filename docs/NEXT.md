@@ -1,21 +1,26 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：READY（#416 图标一致性维护切片，尚未开始实现）。
-- 发布代码主线基线：`main@740049dc9de36c73941c3efcc01790c199edeea7`；PR #415 已合并，Issue #363 已以 `completed` 关闭。
+- 当前状态：#416 已完成实现与本地 Windows 验收；分支 `codex/icon-consistency-2026-09-02` 待创建 PR/CI。
+- 发布代码主线基线：`main@b11539ea85bc816dbb9f002021084755d7c826b2`；PR #415 已合并，Issue #363 已以 `completed` 关闭。
 - 当前稳定版本：`v0.10.14`；#416 完成后如需发布，候选版本为 `v0.10.15` Windows x64 patch。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## READY：#416 Windows 外部图标、快捷方式与文件关联图标一致性
+## 当前切片：#416 Windows 外部图标、快捷方式与文件关联图标一致性
 
 - 目标：让应用内部 Logo、Windows 可执行文件/安装包、桌面快捷方式、开始菜单、任务栏和 Markdown/TXT 文件关联使用同一套已确认 Logo。
+- 用户价值：安装、升级或打开 Markdown/TXT 文档时不再看到旧字母 M 或默认图标，用户能确认桌面入口与应用本体属于同一版本。
 - 非目标：不重新设计 Logo；不做 macOS/Linux/移动端图标；不清理用户工作区；不把删除 Windows 系统缓存作为唯一修复。
 - 现象边界：v0.10.14 远程源码已包含新的 `src/assets/moyang-reader-logo.png` 和 `src-tauri/icons/*`；旧本地工作树仍可能是字母 M，Windows 也可能缓存旧快捷方式或文件关联图标。
-- 实现范围：从最新 `main` 建立项目内 `.codex-worktrees/` 的干净工作树；显式声明 `bundle.icon` 的 Windows 图标路径；增加资源完整性检查和 Windows 安装/升级/关联验证记录。
-- 验收：资源不缺失、不为空、不回退到旧默认图标；全新安装与覆盖升级可验证；重新创建快捷方式后图标正确；`.md/.txt` 关联图标正确；无法由应用控制的 Windows 缓存边界有明确说明。
-- 发布：不默认构建安装包；只有验收证明用户可见修复且 Release 检查通过时，才准备 `v0.10.15`、`.sig`、`latest.json` 和镜像核验。
-- 预计文件：`src-tauri/tauri.conf.json`、`src-tauri/icons/*`、`scripts/release-check.mjs` 或新增资源检查脚本、对应测试、`docs/UPDATE.md`、`docs/AI-HANDOFF.md`、`CHANGELOG.md`（仅在决定发布时）。
+- 依赖：现有已确认的 Windows PNG/ICO 资源、Tauri NSIS 打包链和 Windows x64 验证环境；不新增运行时依赖。
+- 验收标准：资源存在且非空、尺寸/格式/哈希与确认 Logo 一致；`bundle.icon` 显式覆盖全部 Windows 资源；Release preflight 能拦截缺失、旧资源、旧 M 图标和不安全路径；全新安装、覆盖升级、桌面/开始菜单快捷方式、`.md/.txt` 关联均指向新可执行文件；Windows Shell 缓存边界有记录。
+- 风险：固定哈希会要求未来有意换 Logo 时同步更新测试；Windows 图标缓存不受应用完全控制；资源门禁过严时会在发布前暴露配置遗漏。
+- 回滚：回退本切片提交即可恢复原配置和校验逻辑，不涉及用户数据迁移；如需撤回已安装版本，按发布政策使用上一稳定版重新安装，不删除用户缓存。
+- 实现范围：从最新 `main` 建立项目内 `.codex-worktrees/` 的干净工作树；显式声明 `bundle.icon` 的 Windows 图标路径；删除未被引用且仍含旧字母 M 的 `src-tauri/icons/icon.svg`；增加资源完整性检查、单测和 Windows 安装/升级/关联验证记录。
+- 本地验收：release-check 11/11、Prettier、Tauri Windows x64 无安装包构建、NSIS 本地安装包、可执行文件图标提取、全新安装和覆盖升级均通过；验证环境已清理，原本机安装引用已恢复。
+- 发布：本切片只生成本地验收用 NSIS 包，不创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；若维护者将 #416 纳入 `v0.10.15` 稳定批次，再按发布政策统一生成并核验全部资产。
+- 涉及文件：`src-tauri/tauri.conf.json`、`src-tauri/icons/icon.svg`、`scripts/release-check.mjs`、`scripts/release-check.test.mjs`、`docs/UPDATE.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.10.md`、本文件和任务清单。
 
 ## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
 
@@ -37,7 +42,7 @@
 
 ## 下一次开发
 
-- 当前没有 IN PROGRESS 事项；唯一 READY 事项是 #416。完成 #416 的代码、验证、PR 和交接后必须停止，不自动开始下一切片。
+- #416 已完成代码和本地验收；PR/CI 和交接完成后必须停止，不自动开始下一切片。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。

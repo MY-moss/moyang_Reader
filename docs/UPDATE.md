@@ -23,6 +23,14 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
+## #416 Windows 图标一致性验证（未发布）
+
+- 代码基线：从 `main@b11539ea85bc816dbb9f002021084755d7c826b2` 的干净工作树完成；范围仅为 Windows x64 图标资源、Tauri bundle 配置和发布前门禁。
+- 修复内容：显式声明全部 Windows `bundle.icon` 资源；校验 PNG 尺寸/哈希、ICO 目录和同源图像，并阻止旧字母 M 图标或不安全路径进入发布流程。
+- 本地验收：release-check 单测 11/11，Tauri Windows x64 无安装包构建和 NSIS 本地验收包通过；全新安装与覆盖升级后，可执行文件、安装器、桌面/开始菜单快捷方式以及 `.md/.txt` 文件关联均解析到同一可执行文件图标。
+- Windows 边界：Explorer/任务栏可能继续显示系统缓存的旧缩略图；应用和安装器不能安全地强制删除系统缓存，重新创建快捷方式、刷新 Explorer、重新登录或重启属于用户侧缓存处理，不是本切片的唯一修复依赖。
+- 发布边界：本记录不代表 v0.10.15 已发布；没有创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，v0.10.14 稳定资产保持不变。若进入稳定批次，必须按发布政策重新生成并核验全部资产。
+
 ## v0.10.14 发布记录（2026-09-02）
 
 - GitHub Release：[v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开，发布代码为 `main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`。
