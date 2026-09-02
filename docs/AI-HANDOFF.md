@@ -7,7 +7,7 @@
 - 发布代码主线基线：`main@a650f934429f8f19511dd6c72ef5b17541c694ff`；PR #415、#418、#419、#420、#421、#422、#423、#424 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片已合并，当前执行标签栏 roving tabindex 子切片，分支为 `codex/tabs-roving-2026-09-02`，PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33638296839` 进行中。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片已合并，当前执行标签栏 roving tabindex 子切片，分支为 `codex/tabs-roving-2026-09-02`，PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33640484585` 进行中。
 - 当前开放 Issue/PR 快照（2026-09-02）：启动标签栏子切片前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为功能 PR #425 与 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
@@ -25,12 +25,12 @@
 - 目标：让已打开文档标签形成可预测的单 Tab 停靠点，方向键移动焦点并同步选择，Home/End 可快速到达首尾。
 - 用户价值：键盘和读屏用户在多个文档间切换时不必逐个经过关闭按钮，始终知道当前标签并能继续阅读。
 - 非目标：不实现文件树/目录 roving tabindex、读屏播报、焦点模式 Esc 互斥或其他 #191 子切片；不改变鼠标、中键关闭、拖拽排序、右键菜单、文档内容、HTML、脚本、插件或发布链路。
-- 基线与分支：基于已合并 `main@a650f934429f8f19511dd6c72ef5b17541c694ff` 创建项目内独立工作树；分支 `codex/tabs-roving-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33638296839` 进行中。
+- 基线与分支：基于已合并 `main@a650f934429f8f19511dd6c72ef5b17541c694ff` 创建项目内独立工作树；分支 `codex/tabs-roving-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33640484585` 进行中。
 - 验收标准：标签栏声明水平方向；仅当前 roving 标签进入 Tab 顺序；ArrowLeft/ArrowRight 循环移动焦点并选择文档，Home/End 定位首尾；`aria-pressed` 与当前文档同步；组件测试、双文档浏览器 E2E、构建、lint、格式和类型感知检查通过。
 - 涉及文件：`src/app/components/Tabs.tsx`、`src/app/components/Tabs.test.tsx`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、任务与交接文档。
 - 依赖：复用现有 `Tabs` 的受控 `activePath`、`onSelect`、右键菜单焦点契约和原生按钮焦点；不新增运行时依赖、外部凭据或数据迁移。
 - 风险：异步切换或标签关闭可能暂时改变受控状态；本地 roving 路径在活动文档变化和条目移除时回退到有效标签，保留关闭/拖拽/菜单动作并以组件和浏览器回归锁定。回退本 PR 不影响用户数据。
-- 验证：本地 Tabs 组件测试 4/4，双文档标签栏浏览器 E2E 1/1，构建、lint、类型感知、格式和 diff 检查均通过；远程 Quality checks run `33638296839` 进行中。
+- 验证：本地 Tabs 组件测试 5/5，双文档标签栏浏览器 E2E 1/1，构建、lint、类型感知、格式和 diff 检查均通过；远程 Quality checks run `33640484585` 进行中。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。
 
 ## 已完成切片：#191 快速打开高亮跟随与读屏语义（第 1 个子切片，2026-09-02）
