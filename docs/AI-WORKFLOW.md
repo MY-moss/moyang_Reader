@@ -38,7 +38,7 @@ Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预�
 ## 本地空间与工作树卫生
 
 - 项目源码只保留一个真实的 `node_modules`。工作树必须使用 `npm run worktree:prepare -- <worktree-path>` 建立 junction；禁止在每个工作树再次执行 `npm install`，也禁止把依赖目录复制到项目外。
-- 所有本地 Tauri/Cargo 命令必须通过 `npm run desktop`、`npm run tauri -- <args>` 或 `npm run rust -- <args>`；包装层会把构建目标固定到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`。同一项目的不同工作树和本地副本共用这一个目标目录；即使 `CARGO_TARGET_DIR` 误指向仓库内，也会自动改到受管缓存，禁止直接运行会写入项目的 `tauri`/`cargo` 构建命令。
+- 所有本地 Tauri/Cargo 命令必须通过 `npm run desktop`、`npm run tauri -- <args>` 或 `npm run rust -- <args>`；包装层默认把构建目标固定到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，也支持通过用户级 `MOYANG_BUILD_CACHE_DIR` 迁移到其他磁盘。同一项目的不同工作树和本地副本共用这一个目标目录；即使 `CARGO_TARGET_DIR` 误指向仓库内，也会自动改到受管缓存，禁止直接运行会写入项目的 `tauri`/`cargo` 构建命令。
 - 构建、测试和覆盖率目录都是可再生文件。开始新切片前先运行 `npm run cleanup:workspace` 预览；日常确认后使用 `npm run cleanup:workspace -- --apply` 清理非保护生成物。只有没有活动 Rust 构建且明确需要回收空间时，才额外使用 `--prune-targets`。
 - 清理器只认识明确的生成目录（`dist`、`coverage`、`test-results`、`playwright-report`、Vite/任务缓存和 Rust 目标）；使用 `--prune-targets` 时也会列出旧版按路径分组的共享 Rust 缓存，不会触碰源码、文档、用户笔记或主工作区 `node_modules`。
 - 工作树回收是额外动作：只有确认不再需要时才使用 `--apply --prune-worktrees`。脏工作树、包含 junction/符号链接的工作树会自动保留，不能使用 `git worktree remove --force`。

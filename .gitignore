@@ -3,6 +3,7 @@ node_modules/
 .codex-worktrees/
 .codex-cache/
 dist/
+build-cache/
 coverage/
 test-results/
 playwright-report/

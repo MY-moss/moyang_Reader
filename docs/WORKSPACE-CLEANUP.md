@@ -46,7 +46,7 @@ npm run cleanup:workspace -- --apply --prune-targets
 ## 3. 防止再次膨胀
 
 1. 新工作树只放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <path>` 复用唯一的 `node_modules`。
-2. Tauri/Cargo 只通过仓库包装脚本运行，目标统一到 `%LOCALAPPDATA%\Moyang Reader\build-cache\cargo-target`。
+2. Tauri/Cargo 只通过仓库包装脚本运行，默认目标统一到 `%LOCALAPPDATA%\Moyang Reader\build-cache\cargo-target`；如需迁移磁盘，在用户级环境变量设置 `MOYANG_BUILD_CACHE_DIR`，不要把目标放进源码仓库或工作树。
 3. 开发阶段不重复生成安装包；一个切片最多一次完整构建。
 4. 每个新切片开始前先预览清理器；日常只清理非保护生成物，Cargo target 按空闲状态和磁盘阈值清理。
 5. 资源管理器可能把 junction 目标重复计入目录大小；以清理器实际文件大小和 `git worktree list --porcelain` 为准。

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
 import {
   buildWorkspaceTree,
@@ -103,6 +103,35 @@ function findScrollParent(element: HTMLElement): HTMLElement | Window {
     parent = parent.parentElement;
   }
   return window;
+}
+
+function scrollWorkspaceTreeRowIntoView(treeRef: RefObject<HTMLDivElement>, index: number): void {
+  const treeElement = treeRef.current;
+  if (!treeElement) return;
+
+  const rowTop = index * WORKSPACE_TREE_ROW_HEIGHT;
+  const scrollParent = findScrollParent(treeElement);
+  if (scrollParent instanceof HTMLElement) {
+    const treeRect = treeElement.getBoundingClientRect();
+    const parentRect = scrollParent.getBoundingClientRect();
+    const absoluteRowTop = treeRect.top - parentRect.top + scrollParent.scrollTop + rowTop;
+    const absoluteRowBottom = absoluteRowTop + WORKSPACE_TREE_ROW_HEIGHT;
+    const viewportTop = scrollParent.scrollTop;
+    const viewportBottom = viewportTop + scrollParent.clientHeight;
+    if (absoluteRowTop < viewportTop) scrollParent.scrollTop = absoluteRowTop;
+    else if (absoluteRowBottom > viewportBottom) scrollParent.scrollTop = absoluteRowBottom - scrollParent.clientHeight;
+    return;
+  }
+
+  const treeRect = treeElement.getBoundingClientRect();
+  const absoluteRowTop = treeRect.top + window.scrollY + rowTop;
+  const absoluteRowBottom = absoluteRowTop + WORKSPACE_TREE_ROW_HEIGHT;
+  const viewportTop = window.scrollY;
+  const viewportBottom = viewportTop + window.innerHeight;
+  if (absoluteRowTop < viewportTop) window.scrollTo({ top: absoluteRowTop, behavior: "auto" });
+  else if (absoluteRowBottom > viewportBottom) {
+    window.scrollTo({ top: absoluteRowBottom - window.innerHeight, behavior: "auto" });
+  }
 }
 
 function useWorkspaceTreeWindow(treeRef: RefObject<HTMLDivElement>, rowCount: number) {
@@ -214,19 +243,42 @@ type WorkspaceFileButtonProps = {
   file: WorkspaceFile;
   activePath: string | null;
   depth: number;
+  tabIndex: number;
+  onFocus: () => void;
+  onRef: (element: HTMLButtonElement | null) => void;
   onOpenFile: (path: string) => void;
   onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
+  onNavigateKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 };
 
-function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContextMenu }: WorkspaceFileButtonProps) {
+function WorkspaceFileButton({
+  file,
+  activePath,
+  depth,
+  tabIndex,
+  onFocus,
+  onRef,
+  onOpenFile,
+  onOpenContextMenu,
+  onNavigateKeyDown,
+}: WorkspaceFileButtonProps) {
   const parentPath = parentRelativePath(file.relativePath);
   return (
     <button
       type="button"
+      role="treeitem"
       className={`workspace-file ${activePath === file.path ? "active" : ""}`}
       style={{ paddingLeft: `${7 + depth * 14}px` }}
+      aria-level={depth + 1}
+      aria-selected={activePath === file.path}
+      tabIndex={tabIndex}
+      ref={onRef}
       title={`${file.relativePath} · ${formatSize(file.size)}`}
-      onClick={() => onOpenFile(file.path)}
+      onFocus={onFocus}
+      onClick={() => {
+        onFocus();
+        onOpenFile(file.path);
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -251,25 +303,34 @@ function WorkspaceFileButton({ file, activePath, depth, onOpenFile, onOpenContex
         });
       }}
       onKeyDown={(event) => {
-        if (!isContextMenuKey(event)) return;
-        event.preventDefault();
-        onOpenContextMenu(
-          targetFromKeyboard(event, {
-            parentPath,
-            label: `“${file.relativePath}”`,
-            entryPath: file.relativePath,
-            entryKind: "file",
-            filePath: file.path,
-            details: {
-              kind: "file",
-              name: file.name,
-              relativePath: file.relativePath,
-              absolutePath: file.path,
-              documentKind: file.kind,
-              size: file.size,
-            },
-          }),
-        );
+        if (isContextMenuKey(event)) {
+          event.preventDefault();
+          onOpenContextMenu(
+            targetFromKeyboard(event, {
+              parentPath,
+              label: `“${file.relativePath}”`,
+              entryPath: file.relativePath,
+              entryKind: "file",
+              filePath: file.path,
+              details: {
+                kind: "file",
+                name: file.name,
+                relativePath: file.relativePath,
+                absolutePath: file.path,
+                documentKind: file.kind,
+                size: file.size,
+              },
+            }),
+          );
+          return;
+        }
+        if (event.key === "Enter" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+          event.preventDefault();
+          onFocus();
+          onOpenFile(file.path);
+          return;
+        }
+        onNavigateKeyDown(event);
       }}
     >
       <span>{file.name}</span>
@@ -282,26 +343,43 @@ type WorkspaceFolderButtonProps = {
   folder: WorkspaceTreeFolder;
   depth: number;
   isOpen: boolean;
+  tabIndex: number;
+  onFocus: () => void;
+  onRef: (element: HTMLButtonElement | null) => void;
   onToggleFolder: (path: string) => void;
   onOpenContextMenu: (target: WorkspaceTreeContextTarget) => void;
+  onNavigateKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 };
 
 function WorkspaceFolderButton({
   folder,
   depth,
   isOpen,
+  tabIndex,
+  onFocus,
+  onRef,
   onToggleFolder,
   onOpenContextMenu,
+  onNavigateKeyDown,
 }: WorkspaceFolderButtonProps) {
   const folderLabel = `“${folder.path}”`;
 
   return (
     <button
       type="button"
+      role="treeitem"
       className="workspace-folder"
       style={{ paddingLeft: `${7 + depth * 14}px` }}
       aria-expanded={isOpen}
-      onClick={() => onToggleFolder(folder.path)}
+      aria-level={depth + 1}
+      aria-selected={false}
+      tabIndex={tabIndex}
+      ref={onRef}
+      onFocus={onFocus}
+      onClick={() => {
+        onFocus();
+        onToggleFolder(folder.path);
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -323,22 +401,31 @@ function WorkspaceFolderButton({
         });
       }}
       onKeyDown={(event) => {
-        if (!isContextMenuKey(event)) return;
-        event.preventDefault();
-        onOpenContextMenu(
-          targetFromKeyboard(event, {
-            parentPath: folder.path,
-            label: folderLabel,
-            entryPath: folder.path,
-            entryKind: "folder",
-            details: {
-              kind: "folder",
-              name: folder.name,
-              relativePath: folder.path,
-              fileCount: folder.fileCount,
-            },
-          }),
-        );
+        if (isContextMenuKey(event)) {
+          event.preventDefault();
+          onOpenContextMenu(
+            targetFromKeyboard(event, {
+              parentPath: folder.path,
+              label: folderLabel,
+              entryPath: folder.path,
+              entryKind: "folder",
+              details: {
+                kind: "folder",
+                name: folder.name,
+                relativePath: folder.path,
+                fileCount: folder.fileCount,
+              },
+            }),
+          );
+          return;
+        }
+        if (event.key === "Enter" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+          event.preventDefault();
+          onFocus();
+          onToggleFolder(folder.path);
+          return;
+        }
+        onNavigateKeyDown(event);
       }}
     >
       <span className="workspace-folder-caret" aria-hidden="true">
@@ -380,6 +467,45 @@ export function WorkspaceTreeView({
   const rows = useMemo(() => flattenWorkspaceTree(tree, collapsedFolders), [tree, collapsedFolders]);
   const treeRef = useRef<HTMLDivElement>(null);
   const treeWindow = useWorkspaceTreeWindow(treeRef, rows.length);
+  const firstActiveRow = rows.find((row) => row.kind === "file" && row.file.path === activePath);
+  const [rovingRowKey, setRovingRowKey] = useState<string | null>(() => {
+    const initialRow = firstActiveRow ?? rows[0];
+    return initialRow ? workspaceTreeRowKey(initialRow) : null;
+  });
+  const previousActivePathRef = useRef(activePath);
+  const treeItemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pendingFocusKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const activePathChanged = activePath !== previousActivePathRef.current;
+    previousActivePathRef.current = activePath;
+    const activeRow = rows.find((row) => row.kind === "file" && row.file.path === activePath);
+    const rovingRowVisible = rows.some((row) => workspaceTreeRowKey(row) === rovingRowKey);
+    const preferredRowKey =
+      activePathChanged && activeRow
+        ? workspaceTreeRowKey(activeRow)
+        : rovingRowVisible
+          ? rovingRowKey
+          : activeRow
+            ? workspaceTreeRowKey(activeRow)
+            : rows[0]
+              ? workspaceTreeRowKey(rows[0])
+              : null;
+
+    if (preferredRowKey !== rovingRowKey) {
+      if (!rovingRowVisible) pendingFocusKeyRef.current = preferredRowKey;
+      setRovingRowKey(preferredRowKey);
+    }
+  }, [activePath, rovingRowKey, rows]);
+
+  useLayoutEffect(() => {
+    const pendingFocusKey = pendingFocusKeyRef.current;
+    if (!pendingFocusKey) return;
+    const button = treeItemRefs.current.get(pendingFocusKey);
+    if (!button) return;
+    pendingFocusKeyRef.current = null;
+    button.focus();
+  }, [rows, treeWindow]);
 
   useEffect(() => {
     if (!clipboard) return;
@@ -412,6 +538,82 @@ export function WorkspaceTreeView({
       else next.add(path);
       return next;
     });
+  };
+
+  const focusRowAt = (index: number) => {
+    const row = rows[index];
+    if (!row) return;
+    const rowKey = workspaceTreeRowKey(row);
+    pendingFocusKeyRef.current = rowKey;
+    setRovingRowKey(rowKey);
+    scrollWorkspaceTreeRowIntoView(treeRef, index);
+    const button = treeItemRefs.current.get(rowKey);
+    if (button) {
+      pendingFocusKeyRef.current = null;
+      button.focus();
+    }
+  };
+
+  const parentRowIndex = (index: number): number | null => {
+    const currentRow = rows[index];
+    if (!currentRow || currentRow.depth === 0) return null;
+    for (let candidate = index - 1; candidate >= 0; candidate -= 1) {
+      const row = rows[candidate];
+      if (row.kind === "folder" && row.depth < currentRow.depth) return candidate;
+    }
+    return null;
+  };
+
+  const handleTreeItemKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const row = rows[index];
+    if (!row) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusRowAt(Math.min(rows.length - 1, index + 1));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusRowAt(Math.max(0, index - 1));
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      focusRowAt(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      focusRowAt(rows.length - 1);
+      return;
+    }
+
+    if (event.key === "ArrowRight" && row.kind === "folder") {
+      event.preventDefault();
+      if (!row.expanded) {
+        toggleFolder(row.folder.path);
+        focusRowAt(index);
+      } else if (row.folder.files.length > 0 || row.folder.folders.length > 0) {
+        focusRowAt(index + 1);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      if (row.kind === "folder" && row.expanded) {
+        event.preventDefault();
+        toggleFolder(row.folder.path);
+        focusRowAt(index);
+        return;
+      }
+      const parentIndex = parentRowIndex(index);
+      if (parentIndex !== null) {
+        event.preventDefault();
+        focusRowAt(parentIndex);
+      }
+    }
   };
 
   const openContextMenu = (target: WorkspaceTreeContextTarget) => {
@@ -454,6 +656,9 @@ export function WorkspaceTreeView({
       ref={treeRef}
       className="workspace-tree"
       style={{ height: `${rows.length * WORKSPACE_TREE_ROW_HEIGHT}px` }}
+      role="tree"
+      aria-label="工作区文件树"
+      aria-orientation="vertical"
       tabIndex={-1}
       onContextMenu={(event) => {
         if (!canManage || event.target !== event.currentTarget) return;
@@ -483,16 +688,32 @@ export function WorkspaceTreeView({
                 file={row.file}
                 activePath={activePath}
                 depth={row.depth}
+                tabIndex={workspaceTreeRowKey(row) === rovingRowKey ? 0 : -1}
+                onFocus={() => setRovingRowKey(workspaceTreeRowKey(row))}
+                onRef={(element) => {
+                  const rowKey = workspaceTreeRowKey(row);
+                  if (element) treeItemRefs.current.set(rowKey, element);
+                  else treeItemRefs.current.delete(rowKey);
+                }}
                 onOpenFile={onOpenFile}
                 onOpenContextMenu={openContextMenu}
+                onNavigateKeyDown={(event) => handleTreeItemKeyDown(event, index)}
               />
             ) : (
               <WorkspaceFolderButton
                 folder={row.folder}
                 depth={row.depth}
                 isOpen={row.expanded}
+                tabIndex={workspaceTreeRowKey(row) === rovingRowKey ? 0 : -1}
+                onFocus={() => setRovingRowKey(workspaceTreeRowKey(row))}
+                onRef={(element) => {
+                  const rowKey = workspaceTreeRowKey(row);
+                  if (element) treeItemRefs.current.set(rowKey, element);
+                  else treeItemRefs.current.delete(rowKey);
+                }}
                 onToggleFolder={toggleFolder}
                 onOpenContextMenu={openContextMenu}
+                onNavigateKeyDown={(event) => handleTreeItemKeyDown(event, index)}
               />
             )}
           </div>
