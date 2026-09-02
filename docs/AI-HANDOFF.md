@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@0783b27c314749a3e1e1b0371b92674a0a77a247`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 发布代码主线基线：`main@e9cde556e48957f270828159890522b52ef51f89`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开和标签栏子切片已合并，当前执行文件树 roving tabindex 子切片，分支为 `codex/file-tree-roving-2026-09-02`，PR 待创建。
-- 当前开放 Issue/PR 快照（2026-09-03）：文件树子切片启动前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏和文件树子切片已合并，当前执行目录 roving tabindex/当前章节高亮子切片，分支为 `codex/outline-roving-2026-09-03`，PR 待创建。
+- 当前开放 Issue/PR 快照（2026-09-03）：目录子切片启动前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -21,20 +21,25 @@
 - 当前 Windows 开发环境已将旧 C 盘 `build-cache` 的 Cargo target 迁移到 `D:\AI-moyang\本地阅读工具-build-cache`，并通过用户级 `MOYANG_BUILD_CACHE_DIR` 复用；源目录已清理，清理器仍只在预览确认且无活动构建时回收可再生目标。
 - HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
 
-## 当前切片：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片，2026-09-03）
+## 当前切片：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片，2026-09-03）
 
-- 目标：让工作区文件和文件夹共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点，Left/Right 处理文件夹折叠、展开、父级和首个子项，Enter 保持打开/切换行为。
-- 用户价值：键盘和读屏用户在长文件树中可连续浏览、进入目录和打开文档，不必反复经过无关控件。
-- 非目标：不实现目录高亮、读屏 live announcement、焦点模式 Esc 互斥或其他 #191 子切片；不改变鼠标/中键、拖拽、右键菜单、文件管理语义、文档内容、HTML、脚本、插件或发布链路。
-- 基线与分支：基于已合并 `main@0783b27c314749a3e1e1b0371b92674a0a77a247` 创建项目内独立工作树；分支 `codex/file-tree-roving-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 启动前未发现重复产品 PR；PR 待创建。
-- 验收标准：容器声明 `role=tree`，条目声明 `role=treeitem`、层级和展开状态；可见条目恰有一个 `tabIndex=0`；方向键、Home/End、折叠/展开和 Enter 在虚拟列表中保持焦点与滚动；WorkspaceTree 组件测试、Windows 桌面 E2E、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/components/WorkspaceTree.tsx`、`src/app/components/WorkspaceTree.test.tsx`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`README.md`、`CONTRIBUTING.md`、`docs/AI-WORKFLOW.md`、`docs/WORKSPACE-CLEANUP.md`、任务与交接文档、`.gitignore`。
-- 依赖：复用现有工作区树索引、虚拟窗口、ContextMenu 焦点归还和原生按钮打开动作；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存通过用户级 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
-- 风险：虚拟窗口可能暂时没有目标 DOM；目标先滚入窗口，再在布局 effect 中恢复焦点；文件夹变化或异步索引更新时 roving key 回退到可见条目，保留既有文件管理和菜单行为。
-- 回滚：回退本 PR 即可移除文件树 roving 状态、ARIA/键盘处理、测试和忽略规则；不需要数据迁移，也不影响 #424/#425 已交付的快速打开和标签栏语义。
+- 目标：让非空文档目录共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点并调用现有中央正文定位，当前章节继续以视觉和 ARIA 语义高亮。
+- 用户价值：键盘和读屏用户可以在长文档目录中连续浏览并跳到章节，不必反复经过无关控件；阅读滚动或目录跳转后，当前章节位置仍然清晰可辨。
+- 非目标：不实现读屏 live announcement、焦点模式 Esc 互斥、目录折叠/展开或新的标题识别算法；不改变点击/鼠标、正文滚动算法、标签栏/文件树、文档内容、HTML、脚本、插件或发布链路。
+- 基线与分支：基于已合并 `main@e9cde556e48957f270828159890522b52ef51f89` 创建项目内独立工作树；分支 `codex/outline-roving-2026-09-03`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 启动前未发现重复产品 PR；PR 待创建。
+- 验收标准：目录声明 `role=tree`，条目声明 `role=treeitem`、`aria-level` 和当前选中状态；非空目录恰有一个 `tabIndex=0`；方向键、Home/End 在边界内移动焦点并复用现有章节导航，修饰键快捷键保持可用；当前标题同步 `active`、`aria-current` 和 `aria-selected`；Outline 单测、浏览器 E2E、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/components/Outline.tsx`、`src/app/components/Outline.test.tsx`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用 `TocItem`、`activeHeadingId`、既有 `navigateToHeading`/中央滚动容器和减少动画滚动策略；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存由 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
+- 风险：阅读滚动时焦点可能停留在用户最后操作的目录项，而当前章节独立更新；标题列表刷新时原焦点项可能消失，roving 停靠点需安全回退到当前或首项；平面 `aria-level` 需保持与标题深度一致。
+- 回滚：回退本 PR 即可移除目录 roving 状态、ARIA 键盘处理和测试，恢复原目录链接行为；不需要数据迁移，也不影响 #424/#425/#426 已交付的导航语义。
+- 验证：本地 Outline 组件测试 5/5；新增浏览器 E2E 1/1；构建已通过，lint、类型感知、格式和差异检查在提交前复跑；远程 Quality checks 待 PR 创建后记录。
 - 缓存处置：当前 Windows 开发环境已将 `C:\Users\HUAWEI\AppData\Local\Moyang Reader\build-cache` 的 Cargo target 迁移到 `D:\AI-moyang\本地阅读工具-build-cache`，源 C 盘目录已清理；新终端读取用户级环境变量后复用该目标，日常用清理器预览并清理非保护生成物，空闲时再显式回收 Cargo target。
-- 验证：本地 WorkspaceTree 组件测试 9/9；Windows 桌面 smoke 15/15；构建、lint、类型感知、格式和差异检查在提交前复跑；远程 Quality checks 待 PR 创建后记录。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。
+
+## 已完成切片：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片，2026-09-03）
+
+- PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`；Quality checks run `33653154436` 全部通过，Issue #191 保持开放。
+- 文件树已具备 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End、文件夹 Left/Right 和虚拟窗口焦点恢复；缓存治理和工作树保护规则同步落地。
 
 ## 已完成切片：#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片，2026-09-02）
 
