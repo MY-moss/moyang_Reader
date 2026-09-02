@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RecentFile, RecentWorkspace } from "../types";
+import type { RecentFile, RecentWorkspace, WorkspaceFile } from "../types";
 import { WorkspacePanel } from "./WorkspacePanel";
 
 function renderPanel(
@@ -14,6 +14,7 @@ function renderPanel(
   const root = createRoot(container);
   const onAddWorkspace = vi.fn();
   const onOpenWorkspace = vi.fn();
+  const onExportWorkspace = vi.fn();
 
   act(() => {
     root.render(
@@ -39,7 +40,7 @@ function renderPanel(
         workspaceLimitReached={false}
         onOpenWorkspace={onOpenWorkspace}
         onRemoveWorkspace={vi.fn()}
-        onExportWorkspace={vi.fn()}
+        onExportWorkspace={onExportWorkspace}
         onCancelWorkspaceExport={vi.fn()}
         workspaceExporting={false}
         workspaceExportProgress={null}
@@ -59,7 +60,7 @@ function renderPanel(
     );
   });
 
-  return { container, root, onAddWorkspace, onOpenWorkspace };
+  return { container, root, onAddWorkspace, onOpenWorkspace, onExportWorkspace };
 }
 
 function cleanup(container: HTMLElement, root: ReturnType<typeof createRoot>) {
@@ -102,6 +103,59 @@ describe("WorkspacePanel", () => {
     expect(archiveButton).toBeTruthy();
     act(() => archiveButton?.click());
     expect(onOpenWorkspace).toHaveBeenCalledWith("D:\\Archive");
+    cleanup(container, root);
+  });
+
+  it("keeps workspace action menus in one flow and dismisses them without overlap", () => {
+    const exportableFile: WorkspaceFile = {
+      path: "C:\\Notes\\guide.md",
+      name: "guide.md",
+      relativePath: "guide.md",
+      size: 24,
+      modifiedMs: null,
+      kind: "markdown",
+    };
+    const { container, root, onExportWorkspace } = renderPanel(
+      [
+        { path: "C:\\Notes", name: "Notes" },
+        { path: "D:\\Archive", name: "Archive" },
+      ],
+      {
+        exportableFiles: [exportableFile],
+        onCreateNote: vi.fn(),
+        onCreateFolder: vi.fn(),
+      },
+    );
+
+    const createMenu = container.querySelector<HTMLDetailsElement>(".workspace-create-menu");
+    const exportMenu = container.querySelector<HTMLDetailsElement>(".workspace-export-menu");
+    const switcherMenu = container.querySelector<HTMLDetailsElement>(".workspace-switcher");
+    expect(container.querySelector(".workspace-actions")?.getAttribute("aria-label")).toBe("阅读库操作");
+    expect(createMenu).toBeTruthy();
+    expect(exportMenu).toBeTruthy();
+    expect(switcherMenu).toBeTruthy();
+
+    act(() => (createMenu?.querySelector("summary") as HTMLElement | null)?.click());
+    expect(createMenu?.open).toBe(true);
+    expect(exportMenu?.open).toBe(false);
+
+    act(() => (exportMenu?.querySelector("summary") as HTMLElement | null)?.click());
+    expect(createMenu?.open).toBe(false);
+    expect(exportMenu?.open).toBe(true);
+
+    const htmlButton = Array.from(exportMenu?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((button) =>
+      button.textContent?.includes("HTML"),
+    );
+    act(() => htmlButton?.click());
+    expect(onExportWorkspace).toHaveBeenCalledWith("html");
+    expect(exportMenu?.open).toBe(false);
+
+    act(() => (switcherMenu?.querySelector("summary") as HTMLElement | null)?.click());
+    expect(switcherMenu?.open).toBe(true);
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    expect(switcherMenu?.open).toBe(false);
     cleanup(container, root);
   });
 

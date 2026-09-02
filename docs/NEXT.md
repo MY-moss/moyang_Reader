@@ -1,23 +1,28 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366、#370 三步、#233 和 #191 的快速打开/标签栏/文件树子切片均已合并；当前执行 #191 的目录 roving tabindex 与当前章节高亮子切片，分支为 `codex/outline-roving-2026-09-03`，PR 待创建。
-- 发布代码主线基线：`main@e9cde556e48957f270828159890522b52ef51f89`；PR #418、#419、#420、#421、#422、#423、#424、#425、#426 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 当前状态：#191 的快速打开、标签栏、文件树和目录键盘导航子切片均已合并；当前执行用户反馈的左侧栏阅读库操作区 UI 修复，分支为 `codex/sidebar-actions-ui-2026-09-03`，PR 待创建。
+- 发布代码主线基线：`main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；PR #418–#427 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）
+## 当前切片：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 
-- 目标：让非空文档目录共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点并调用现有中央正文定位，当前章节继续以视觉和 ARIA 语义高亮。
-- 用户价值：键盘和读屏用户可以在长文档目录中连续浏览并跳到章节，不必反复经过无关控件；阅读滚动或目录跳转后，当前章节位置仍然清晰可辨。
-- 非目标：不实现读屏 live announcement、焦点模式 Esc 互斥、目录折叠/展开或新的标题识别算法；不改变点击/鼠标、正文滚动算法、标签栏/文件树、文档内容、HTML、脚本、插件或发布链路。
-- 验收标准：目录声明 `role=tree`，条目声明 `role=treeitem`、`aria-level` 和当前选中状态；非空目录恰有一个 `tabIndex=0`；方向键、Home/End 在边界内移动焦点并复用现有章节导航，修饰键快捷键保持可用；当前标题同步 `active`、`aria-current` 和 `aria-selected`；Outline 单测、浏览器 E2E、构建、lint、格式和类型感知检查通过；桌面文件树 E2E 只在工作区树根内统计 treeitem，避免与目录树混淆。
-- 涉及文件：`src/app/components/Outline.tsx`、`src/app/components/Outline.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用 `TocItem`、`activeHeadingId`、既有 `navigateToHeading`/中央滚动容器和减少动画滚动策略；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存由 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
-- 风险：阅读滚动时焦点可能停留在用户最后操作的目录项，而当前章节独立更新；标题列表刷新时原焦点项可能消失，roving 停靠点需安全回退到当前或首项；平面 `aria-level` 需保持与标题深度一致。
-- 回滚：回退本 PR 即可移除目录 roving 状态、ARIA 键盘处理和测试，恢复原目录链接行为；不需要数据迁移，也不影响 #424/#425/#426 已交付的导航语义。
-- 发布：本切片只做普通 UI 代码与针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
+- 目标：让左侧栏的“新建、批量导出、添加阅读库、切换/管理阅读库”在窄侧栏中稳定排列；菜单展开时进入布局流，不遮挡文件树，也不被侧栏横向裁切。
+- 用户价值：用户可以在当前阅读流程内快速创建、导出、添加或切换阅读库，操作反馈清晰，不必反复关闭面板或猜测被遮挡的菜单项。
+- 非目标：不改创建/导出/挂载的数据语义，不实现更新器、默认首页重设计、旧 M 图标替换、读屏播报或 Esc 互斥，不改 HTML、脚本、插件、发布资产或跨平台范围。
+- 验收标准：操作区在 216px 及默认侧栏宽度内无横向溢出；新建、批量导出和切换菜单互斥，支持点外/Esc 关闭；菜单项执行后立即收起；切换阅读库仍保留挂载数量、路径和移除动作；组件测试、相关单测、Windows 桌面 UI E2E、lint、格式和 TypeScript 检查通过。
+- 涉及文件：`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/styles.css`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 WorkspacePanel 回调、Tauri 工作区授权/导出管线、`<details>` 原生键盘行为和现有语义令牌；不新增运行时依赖、外部凭据或数据迁移；本地 Cargo target 继续使用 D 盘 `MOYANG_BUILD_CACHE_DIR`。
+- 风险：流式菜单会增加侧栏高度并推动文件树下移；窄侧栏仍需保留可滚动空间；点外/Esc 监听必须只作用于三个操作菜单，不干扰文件树上下文菜单或全局快捷键。
+- 回滚：回退本 PR 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
+- 发布：普通 T2 UI 切片，只做针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；纳入后续稳定批次。
+
+## 最近完成：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）
+
+- PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；Quality checks run `33664518604` 全部通过，Issue #191 保持开放。
+- 目录已具备 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End 导航和当前章节高亮同步；读屏播报与 Esc 互斥仍拆为后续子切片。
 
 ## 最近完成：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片）
 
