@@ -4,6 +4,7 @@
 
 ## 最近完成切片
 
+- [x] **#191 主阅读区读屏播报收窄**：移除 `main.content-area` 的宽范围 `aria-live`，打开文档加载状态改为显式 `status/polite`，补无障碍 E2E；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已创建，等待远端门禁后合并。Issue #191 保持开放，Escape 互斥另行拆分。
 - [x] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 在独立工作树/分支 `codex/default-home-brand-2026-09-03` 完成默认空状态 Logo 替换，移除旧大写 M，保留首次启动操作；PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，Quality checks run `33687800718` 全部通过。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
 
 已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
@@ -14,7 +15,7 @@
 
 按“用户可见收益 / 无外部阻塞 / 可独立验收”排序：
 
-1. **#191 键盘与读屏导航剩余子切片**：重新核验 Issue 后只选择读屏播报或 Esc 互斥中的一个；T2；按子切片增加 axe/Windows 验收。
+1. **#191 键盘与读屏导航剩余子切片**：主阅读区读屏播报收窄已由 PR #431 完成，下一次重新核验后只选择 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
 2. **#171/#193 视觉令牌与焦点细节**：拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
 3. **#241/#51/#112 发布条件旁路**：仅在真实旧版本、签名环境和 Cloudflare Secret 可用时重新评估；不把受限环境记为通过。
 
@@ -33,7 +34,7 @@
 
 - [x] #366 统一确认弹层（PR #419 已合并，Issue 已关闭）。
 - [x] #370 阅读历史与本地统计（PR #422 已合并，Issue 已关闭）。
-- [ ] #191 键盘与读屏导航。
+- [ ] #191 键盘与读屏导航（主阅读区读屏播报收窄 PR #431 已完成，Esc 互斥仍待开发）。
 - [ ] #193 焦点、按钮、页签、字体和动效令牌细节。
 - [x] #233 顶栏图标体系与操作密度（PR #423 已合并，Issue 已关闭）。
 - [ ] #171 CSS 令牌治理。
