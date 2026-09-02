@@ -1,26 +1,23 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416 已完成实现与本地 Windows 验收；PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33591347377` 已全绿，等待人工审查/合并。
-- 发布代码主线基线：`main@b11539ea85bc816dbb9f002021084755d7c826b2`；PR #415 已合并，Issue #363 已以 `completed` 关闭。
-- 当前稳定版本：`v0.10.14`；#416 完成后如需发布，候选版本为 `v0.10.15` Windows x64 patch。
+- 当前状态：#416 已 squash 合并为 `main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`，Issue #416 已以 `completed` 关闭；当前执行 #366，PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 的 Quality checks run `33604977040` 已全绿，等待人工审查/合并。
+- 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #418 已合并，Issue #363 已以 `completed` 关闭。
+- 当前稳定版本：`v0.10.14`；#366 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#416 Windows 外部图标、快捷方式与文件关联图标一致性
+## 当前切片：#366 统一确认弹层与未保存修改语义（PR #419）
 
-- 目标：让应用内部 Logo、Windows 可执行文件/安装包、桌面快捷方式、开始菜单、任务栏和 Markdown/TXT 文件关联使用同一套已确认 Logo。
-- 用户价值：安装、升级或打开 Markdown/TXT 文档时不再看到旧字母 M 或默认图标，用户能确认桌面入口与应用本体属于同一版本。
-- 非目标：不重新设计 Logo；不做 macOS/Linux/移动端图标；不清理用户工作区；不把删除 Windows 系统缓存作为唯一修复。
-- 现象边界：v0.10.14 远程源码已包含新的 `src/assets/moyang-reader-logo.png` 和 `src-tauri/icons/*`；旧本地工作树仍可能是字母 M，Windows 也可能缓存旧快捷方式或文件关联图标。
-- 依赖：现有已确认的 Windows PNG/ICO 资源、Tauri NSIS 打包链和 Windows x64 验证环境；不新增运行时依赖。
-- 验收标准：资源存在且非空、尺寸/格式/哈希与确认 Logo 一致；`bundle.icon` 显式覆盖全部 Windows 资源；Release preflight 能拦截缺失、旧资源、旧 M 图标和不安全路径；全新安装、覆盖升级、桌面/开始菜单快捷方式、`.md/.txt` 关联均指向新可执行文件；Windows Shell 缓存边界有记录。
-- 风险：固定哈希会要求未来有意换 Logo 时同步更新测试；Windows 图标缓存不受应用完全控制；资源门禁过严时会在发布前暴露配置遗漏。
-- 回滚：回退本切片提交即可恢复原配置和校验逻辑，不涉及用户数据迁移；如需撤回已安装版本，按发布政策使用上一稳定版重新安装，不删除用户缓存。
-- 实现范围：从最新 `main` 建立项目内 `.codex-worktrees/` 的干净工作树；显式声明 `bundle.icon` 的 Windows 图标路径；删除未被引用且仍含旧字母 M 的 `src-tauri/icons/icon.svg`；增加资源完整性检查、单测和 Windows 安装/升级/关联验证记录。
-- 本地验收：release-check 11/11、Prettier、Tauri Windows x64 无安装包构建、NSIS 本地安装包、可执行文件图标提取、全新安装和覆盖升级均通过；验证环境已清理，原本机安装引用已恢复。
-- 发布：本切片只生成本地验收用 NSIS 包，不创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；若维护者将 #416 纳入 `v0.10.15` 稳定批次，再按发布政策统一生成并核验全部资产。
-- 涉及文件：`src-tauri/tauri.conf.json`、`src-tauri/icons/icon.svg`、`scripts/release-check.mjs`、`scripts/release-check.test.mjs`、`docs/UPDATE.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.10.md`、本文件和任务清单。
+- 目标：把“清空全部草稿”从原生 `window.confirm` 收口到应用内确认弹层；关闭有未保存修改的窗口时，明确告知草稿已自动留存，并提供“保存并退出”。
+- 用户价值：确认操作拥有一致的视觉、键盘和焦点行为；用户能准确知道退出是否会写回原文件、草稿是否可恢复，减少误清空与退出焦虑。
+- 非目标：不处理 `window.prompt` 新建/重命名系列；不改变草稿存储结构、保存冲突策略或无修改窗口的关闭行为；不改其他删除/覆盖确认；不涉及 HTML 源码编辑、脚本、插件或发布链路。
+- 验收标准：清空全部草稿不再调用原生确认，应用弹层支持取消、Escape、确认和焦点归还，确认后只清理本机草稿快照；关闭弹层说明退出前已保留草稿，保留“不保存退出”和“保存并退出”两个明确路径；“保存并退出”先复用现有保存管线，成功后再关闭窗口，失败时不宣称已保存；组件测试、浏览器 E2E 和 Windows 桌面关闭路径均通过。
+- 涉及文件：`src/app/App.tsx`、`src/app/components/CloseConfirmationDialog.tsx` 及测试、`src/app/components/DraftClearAllConfirmationDialog.tsx` 及测试、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、本文件、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 `useModalBehavior`、草稿快照 API、`saveDocument` 管线和 Tauri `closeWindow`；不新增运行时依赖，不需要数据迁移或外部凭据。
+- 风险：保存并退出会受外部文件修改和本机写入失败影响；多个弹层同时存在时需保持当前弹层的键盘焦点；旧浏览器自动化若依赖原生确认需改为应用弹层选择器。
+- 回滚：回退本切片提交即可恢复原生“清空全部”确认、原关闭文案和单一退出按钮；不触碰磁盘文档、草稿数据格式或用户设置，不需要迁移。
+- 发布：本切片只做 T2 代码与测试验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
 
 ## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
 
@@ -42,7 +39,7 @@
 
 ## 下一次开发
 
-- #416 已完成代码和本地验收，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) CI 已全绿；人工审查/合并后必须停止，不自动开始下一切片。
+- #366 是当前唯一执行切片；PR/CI 完成并交接后必须停止，不自动开始 #370、#233 或其他任务。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。

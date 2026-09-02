@@ -43,6 +43,10 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
     initialFocus?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const activeModal = activeElement instanceof HTMLElement ? activeElement.closest('[aria-modal="true"]') : null;
+      if (activeModal && activeModal !== modalContainer) return;
+
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -62,7 +66,6 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
         return;
       }
 
-      const activeElement = document.activeElement;
       const activeIndex = focusableElements.indexOf(activeElement as HTMLElement);
       if (activeIndex === -1) {
         event.preventDefault();

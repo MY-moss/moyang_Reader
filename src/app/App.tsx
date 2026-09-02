@@ -20,6 +20,7 @@ import { AnnotationDialog } from "./components/AnnotationDialog";
 import { FileDropOverlay } from "./components/FileDropOverlay";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
+import { DraftClearAllConfirmationDialog } from "./components/DraftClearAllConfirmationDialog";
 import {
   DraftRecoveryComparisonDialog,
   type RecoveryKind,
@@ -689,6 +690,7 @@ export function App() {
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
+  const [draftClearAllConfirmationOpen, setDraftClearAllConfirmationOpen] = useState(false);
   const [previousVersion, setPreviousVersion] = useState<{ path: string; source: string } | null>(null);
   const [draftComparison, setDraftComparison] = useState<DraftComparisonRequest | null>(null);
   const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
@@ -742,6 +744,7 @@ export function App() {
   const documentStateRef = useRef<OpenDocument | null>(null);
   const navigationHistoryRef = useRef<NavigationHistoryState>(navigationHistory);
   const closeConfirmationOpenRef = useRef(false);
+  const closeOperationRef = useRef(0);
   const sourceDraftRef = useRef(sourceDraft);
   const editorHistoryRef = useRef(editorHistory);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
@@ -1129,31 +1132,6 @@ export function App() {
     },
     [flushCurrentDraft],
   );
-
-  const cancelCloseConfirmation = useCallback(() => {
-    closeConfirmationOpenRef.current = false;
-    settingsCloseInFlightRef.current = false;
-    setCloseConfirmationOpen(false);
-  }, []);
-
-  const confirmClose = useCallback(() => {
-    closeConfirmationOpenRef.current = false;
-    setCloseConfirmationOpen(false);
-    settingsCloseInFlightRef.current = true;
-    void (async () => {
-      try {
-        if (!(await flushAppSettings())) {
-          notify("设置尚未成功写入本机，请稍后重试关闭窗口。", "error");
-          return;
-        }
-        await closeWindow();
-      } catch (cause) {
-        notify(cause instanceof Error ? cause.message : "关闭窗口失败。", "error");
-      } finally {
-        settingsCloseInFlightRef.current = false;
-      }
-    })();
-  }, [flushAppSettings, notify]);
 
   const exportPortableSettings = useCallback(async () => {
     try {
@@ -2615,6 +2593,57 @@ export function App() {
     }
   }, []);
 
+  const cancelCloseConfirmation = useCallback(() => {
+    closeOperationRef.current += 1;
+    closeConfirmationOpenRef.current = false;
+    settingsCloseInFlightRef.current = false;
+    setCloseConfirmationOpen(false);
+  }, []);
+
+  const confirmClose = useCallback(() => {
+    closeOperationRef.current += 1;
+    closeConfirmationOpenRef.current = false;
+    setCloseConfirmationOpen(false);
+    settingsCloseInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (!(await flushAppSettings())) {
+          notify("设置尚未成功写入本机，请稍后重试关闭窗口。", "error");
+          return;
+        }
+        await closeWindow();
+      } catch (cause) {
+        notify(cause instanceof Error ? cause.message : "关闭窗口失败。", "error");
+      } finally {
+        settingsCloseInFlightRef.current = false;
+      }
+    })();
+  }, [flushAppSettings, notify]);
+
+  const saveAndClose = useCallback(() => {
+    if (settingsCloseInFlightRef.current) return;
+    const operation = closeOperationRef.current + 1;
+    closeOperationRef.current = operation;
+    settingsCloseInFlightRef.current = true;
+    void (async () => {
+      try {
+        if (!(await saveDocument())) return;
+        if (closeOperationRef.current !== operation) return;
+        closeConfirmationOpenRef.current = false;
+        setCloseConfirmationOpen(false);
+        if (!(await flushAppSettings())) {
+          notify("设置尚未成功写入本机，请稍后重试关闭窗口。", "error");
+          return;
+        }
+        await closeWindow();
+      } catch (cause) {
+        notify(cause instanceof Error ? cause.message : "关闭窗口失败。", "error");
+      } finally {
+        settingsCloseInFlightRef.current = false;
+      }
+    })();
+  }, [flushAppSettings, notify, saveDocument]);
+
   const handleCreateNote = useCallback(
     async (target: string) => {
       if (!workspacePath || !documentState || documentState.path.startsWith("browser://")) {
@@ -3975,12 +4004,21 @@ export function App() {
     if (request.fromCenter) setDraftRecoveryOpen(remaining.length > 0);
   }, [draftDiscardRequest, draftRecovery?.path]);
 
-  const clearAllDrafts = useCallback(() => {
-    if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
+  const requestClearAllDrafts = useCallback(() => {
+    if (draftSnapshots.length === 0) return;
+    setDraftClearAllConfirmationOpen(true);
+  }, [draftSnapshots.length]);
+
+  const cancelClearAllDrafts = useCallback(() => {
+    setDraftClearAllConfirmationOpen(false);
+  }, []);
+
+  const confirmClearAllDrafts = useCallback(() => {
     clearAllDraftSnapshots();
     setDraftSnapshots([]);
     setDraftRecovery(null);
-  }, [draftSnapshots.length]);
+    setDraftClearAllConfirmationOpen(false);
+  }, []);
 
   const saveClipboardImageAsset = useCallback(async (image: File, documentPath: string): Promise<string> => {
     if (image.size > MAX_CLIPBOARD_IMAGE_BYTES) {
@@ -6266,11 +6304,14 @@ export function App() {
           onOpen={(path) => void openDraftSnapshot(path)}
           onPreview={previewDraftSnapshot}
           onDiscard={requestDraftDiscardByPath}
-          onClearAll={clearAllDrafts}
+          onClearAll={requestClearAllDrafts}
           onClose={() => setDraftRecoveryOpen(false)}
           activeDocumentPath={documentState?.path}
           activeDocumentSource={documentState?.source}
         />
+      )}
+      {draftClearAllConfirmationOpen && (
+        <DraftClearAllConfirmationDialog onCancel={cancelClearAllDrafts} onConfirm={confirmClearAllDrafts} />
       )}
       {draftComparison && (
         <DraftRecoveryComparisonDialog
@@ -6296,7 +6337,13 @@ export function App() {
           onConfirm={confirmDraftDiscard}
         />
       )}
-      {closeConfirmationOpen && <CloseConfirmationDialog onCancel={cancelCloseConfirmation} onConfirm={confirmClose} />}
+      {closeConfirmationOpen && (
+        <CloseConfirmationDialog
+          onCancel={cancelCloseConfirmation}
+          onConfirm={confirmClose}
+          onSaveAndClose={saveAndClose}
+        />
+      )}
       {externalOverwriteConfirmationOpen && (
         <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
       )}
