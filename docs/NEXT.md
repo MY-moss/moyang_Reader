@@ -1,13 +1,13 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416 已 squash 合并为 `main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`，Issue #416 已以 `completed` 关闭；当前执行 #366。
+- 当前状态：#416 已 squash 合并为 `main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`，Issue #416 已以 `completed` 关闭；当前执行 #366，PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 已上传，远端 Quality checks 运行中。
 - 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #418 已合并，Issue #363 已以 `completed` 关闭。
 - 当前稳定版本：`v0.10.14`；#366 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#366 统一确认弹层与未保存修改语义
+## 当前切片：#366 统一确认弹层与未保存修改语义（PR #419）
 
 - 目标：把“清空全部草稿”从原生 `window.confirm` 收口到应用内确认弹层；关闭有未保存修改的窗口时，明确告知草稿已自动留存，并提供“保存并退出”。
 - 用户价值：确认操作拥有一致的视觉、键盘和焦点行为；用户能准确知道退出是否会写回原文件、草稿是否可恢复，减少误清空与退出焦虑。

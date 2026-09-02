@@ -7,8 +7,8 @@
 - 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #415、#418 已 squash 合并，Issue #363、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)。
-- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；没有开放产品 PR，另有 6 个 Dependabot PR；Issue #366 未发现重复开放 PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)，唯一产品 PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 已上传，远端 Quality checks 运行中。
+- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；产品 PR 为 [#419](https://github.com/MY-moss/moyang_Reader/pull/419)，另有 6 个 Dependabot PR；Issue #366 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -35,7 +35,7 @@
 - 发布边界：只生成本地验收用 NSIS 包；本切片不创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，v0.10.14 稳定资产保持不变。若维护者将其纳入 v0.10.15 稳定批次，再按发布政策统一生成和核验。
 - 任务边界：本切片已由一个 `codex/` 分支和一个 PR 完成；合并后重新检查 Issue 并切换到 #366，不自动开始 #370、#233 或任何 HTML 工作。
 
-## 本次切片：#366 统一确认弹层与未保存修改语义（2026-09-02）
+## 本次切片：#366 统一确认弹层与未保存修改语义（PR #419，2026-09-02）
 
 - 目标与用户价值：统一“清空全部草稿”和关闭未保存文档的应用内确认体验；明确草稿已留存，并提供保存并退出，降低误操作和退出时的不确定感。
 - 非目标：本切片不处理 `window.prompt` 系列、不改草稿数据模型或其他确认入口、不改变 HTML/插件/发布边界。
