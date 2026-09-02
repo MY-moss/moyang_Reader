@@ -12,8 +12,8 @@
 - 目标：让非空文档目录共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点并调用现有中央正文定位，当前章节继续以视觉和 ARIA 语义高亮。
 - 用户价值：键盘和读屏用户可以在长文档目录中连续浏览并跳到章节，不必反复经过无关控件；阅读滚动或目录跳转后，当前章节位置仍然清晰可辨。
 - 非目标：不实现读屏 live announcement、焦点模式 Esc 互斥、目录折叠/展开或新的标题识别算法；不改变点击/鼠标、正文滚动算法、标签栏/文件树、文档内容、HTML、脚本、插件或发布链路。
-- 验收标准：目录声明 `role=tree`，条目声明 `role=treeitem`、`aria-level` 和当前选中状态；非空目录恰有一个 `tabIndex=0`；方向键、Home/End 在边界内移动焦点并复用现有章节导航，修饰键快捷键保持可用；当前标题同步 `active`、`aria-current` 和 `aria-selected`；Outline 单测、浏览器 E2E、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/components/Outline.tsx`、`src/app/components/Outline.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 验收标准：目录声明 `role=tree`，条目声明 `role=treeitem`、`aria-level` 和当前选中状态；非空目录恰有一个 `tabIndex=0`；方向键、Home/End 在边界内移动焦点并复用现有章节导航，修饰键快捷键保持可用；当前标题同步 `active`、`aria-current` 和 `aria-selected`；Outline 单测、浏览器 E2E、构建、lint、格式和类型感知检查通过；桌面文件树 E2E 只在工作区树根内统计 treeitem，避免与目录树混淆。
+- 涉及文件：`src/app/components/Outline.tsx`、`src/app/components/Outline.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：复用 `TocItem`、`activeHeadingId`、既有 `navigateToHeading`/中央滚动容器和减少动画滚动策略；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存由 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
 - 风险：阅读滚动时焦点可能停留在用户最后操作的目录项，而当前章节独立更新；标题列表刷新时原焦点项可能消失，roving 停靠点需安全回退到当前或首项；平面 `aria-level` 需保持与标题深度一致。
 - 回滚：回退本 PR 即可移除目录 roving 状态、ARIA 键盘处理和测试，恢复原目录链接行为；不需要数据迁移，也不影响 #424/#425/#426 已交付的导航语义。
