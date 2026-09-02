@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366、#370 三步和 #233 均已合并；当前执行 #191 的快速打开可访问性切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 等待远程门禁。
+- 当前状态：#416、#366、#370 三步和 #233 均已合并；当前执行 #191 的快速打开可访问性切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
 - 发布代码主线基线：`main@42337e840f2266f31715bee914630fc9b42cde1d`；PR #418、#419、#420、#421、#422、#423 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。

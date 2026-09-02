@@ -7,7 +7,7 @@
 - 发布代码主线基线：`main@42337e840f2266f31715bee914630fc9b42cde1d`；PR #415、#418、#419、#420、#421、#422、#423 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；当前执行 [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 等待远程门禁。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；当前执行 [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开子切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
 - 当前开放 Issue/PR 快照（2026-09-02）：启动 #191 前重新核验 Issue/开放 PR，未发现重复产品 PR；当前开放 PR 为功能 PR #424 与 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因第一个子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
@@ -25,12 +25,12 @@
 - 目标：让快速打开结果在方向键或鼠标高亮变化后自动滚入可视区，并用稳定的活动后代语义让读屏用户知道当前选择。
 - 用户价值：长文档列表中键盘用户不会丢失当前高亮；搜索框关联结果列表并指向当前项，Enter 仍打开当前文档。
 - 非目标：不实现标签栏、文件树或目录的 roving tabindex；不调整读屏播报/aria-live、专注模式、命令面板 Esc 互斥或其他 #191 子切片；不改变筛选、鼠标打开、文档内容、HTML、脚本、插件或发布链路。
-- 基线与分支：基于 `main@42337e840f2266f31715bee914630fc9b42cde1d` 创建项目内独立工作树；分支 `codex/quick-open-a11y-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 等待远程门禁。
+- 基线与分支：基于 `main@42337e840f2266f31715bee914630fc9b42cde1d` 创建项目内独立工作树；分支 `codex/quick-open-a11y-2026-09-02`；Issue [#191](https://github.com/MY-moss/moyang_Reader/issues/191) 未发现重复产品 PR；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
 - 验收标准：结果列表 option 有稳定 ID；搜索框通过 `aria-controls`/`aria-activedescendant` 指向当前 option；方向键/鼠标移动后 `aria-selected` 与高亮同步且活动项可见；空结果不残留无效活动 ID；组件测试、快速打开回归 E2E、窄窗口长列表 E2E、构建、lint、格式和类型感知检查通过。
 - 涉及文件：`src/app/components/QuickOpenPalette.tsx`、`src/app/components/QuickOpenPalette.test.tsx`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、任务与交接文档。
 - 依赖：复用现有 Quick Open 排序、`useModalBehavior`、listbox/option 语义和原生最近滚动；不新增运行时依赖、外部凭据或数据迁移。
 - 风险：ARIA 关联可能影响旧 DOM 定位器；保留现有 searchbox/option 角色、按钮动作和快捷键，并用 E2E 锁定。回滚 PR #424 即可移除活动后代和滚动同步，不影响用户数据。
-- 验证：本地 QuickOpen 组件测试 2/2，快速打开回归与窄窗口长列表 E2E 2/2，构建、lint、类型感知、格式和 diff 检查通过；远程门禁待 PR 完成后记录。
+- 验证：本地 QuickOpen 组件测试 2/2，快速打开回归与窄窗口长列表 E2E 2/2，构建、lint、类型感知、格式和 diff 检查通过；远程 Quality checks run `33632431268` 全部通过。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。
 
 ## 已完成切片：#233 顶栏图标体系与窄窗口操作密度统一（2026-09-02）

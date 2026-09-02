@@ -4,7 +4,7 @@
 
 ## 当前切片（执行中）
 
-- [ ] **#191 快速打开高亮跟随与读屏语义（第 1 个子切片）**：Issue 启动前已重新核验无重复产品 PR；当前主线为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，独立工作树/分支 `codex/quick-open-a11y-2026-09-02` 让 `aria-activedescendant` 跟随高亮并自动滚动活动 option；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 等待远程门禁。#191 保持开放，剩余 roving tabindex、播报和 Esc 互斥另行切片。
+- [ ] **#191 快速打开高亮跟随与读屏语义（第 1 个子切片）**：Issue 启动前已重新核验无重复产品 PR；当前主线为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，独立工作树/分支 `codex/quick-open-a11y-2026-09-02` 让 `aria-activedescendant` 跟随高亮并自动滚动活动 option；PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。#191 保持开放，剩余 roving tabindex、播报和 Esc 互斥另行切片。
 
 ## 下一批候选（完成当前 #191 子切片后重新检查）
 
