@@ -542,7 +542,7 @@ test("moves through the outline with one roving tab stop and follows the current
   await expect(items).toHaveCount(5);
 
   const currentIndex = await items.evaluateAll((elements) =>
-    elements.findIndex((element) => element.getAttribute("aria-current") === "location"),
+    elements.findIndex((element) => element.querySelector('[aria-current="location"]')),
   );
   expect(currentIndex).toBe(0);
   await items.nth(currentIndex).focus();
@@ -552,7 +552,7 @@ test("moves through the outline with one roving tab stop and follows the current
   await expect(items.nth(1)).toBeFocused();
   await expect(items.nth(1)).toHaveAttribute("tabindex", "0");
   await expect(items.nth(0)).toHaveAttribute("tabindex", "-1");
-  await expect.poll(() => items.nth(1).getAttribute("aria-current"), { timeout: 5_000 }).toBe("location");
+  await expect.poll(() => items.nth(1).locator("a").getAttribute("aria-current"), { timeout: 5_000 }).toBe("location");
 
   await page.keyboard.press("End");
   await expect(items.last()).toBeFocused();

@@ -16,7 +16,7 @@ function resolveRovingItemId(items: TocItem[], preferredId: string | null | unde
 export function Outline({ items, activeId = null, onNavigate }: OutlineProps) {
   const activeLinkRef = useRef<HTMLAnchorElement | null>(null);
   const outlineRef = useRef<HTMLOListElement | null>(null);
-  const linkRefs = useRef(new Map<string, HTMLAnchorElement>());
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
   const [rovingId, setRovingId] = useState(() => resolveRovingItemId(items, activeId));
 
   useEffect(() => {
@@ -41,12 +41,18 @@ export function Outline({ items, activeId = null, onNavigate }: OutlineProps) {
     if (!item) return;
 
     setRovingId(item.id);
-    linkRefs.current.get(item.id)?.focus();
+    itemRefs.current.get(item.id)?.focus();
     if (navigate) onNavigate(item);
   }
 
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLAnchorElement>, index: number) {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLLIElement>, index: number) {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onNavigate(items[index]);
+      return;
+    }
 
     let nextIndex: number | null = null;
     if (event.key === "ArrowDown") nextIndex = Math.min(items.length - 1, index + 1);
@@ -68,28 +74,33 @@ export function Outline({ items, activeId = null, onNavigate }: OutlineProps) {
       ) : (
         <ol ref={outlineRef} className="outline-list" role="tree" aria-label="文档目录" aria-orientation="vertical">
           {items.map((item, index) => (
-            <li key={`${item.id}-${item.depth}`} style={{ paddingLeft: `${Math.max(0, item.depth - 1) * 12}px` }}>
+            <li
+              ref={(element) => {
+                if (element) {
+                  itemRefs.current.set(item.id, element);
+                } else {
+                  itemRefs.current.delete(item.id);
+                }
+              }}
+              key={`${item.id}-${item.depth}`}
+              role="treeitem"
+              aria-level={Math.max(1, item.depth)}
+              aria-selected={item.id === activeId}
+              tabIndex={item.id === rovingId ? 0 : -1}
+              style={{ paddingLeft: `${Math.max(0, item.depth - 1) * 12}px` }}
+              onFocus={() => setRovingId(item.id)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+            >
               <a
-                ref={(element) => {
-                  if (element) {
-                    linkRefs.current.set(item.id, element);
-                  } else {
-                    linkRefs.current.delete(item.id);
-                  }
-                  if (item.id === activeId) activeLinkRef.current = element;
-                }}
-                role="treeitem"
-                aria-level={Math.max(1, item.depth)}
-                aria-selected={item.id === activeId}
-                tabIndex={item.id === rovingId ? 0 : -1}
+                ref={item.id === activeId ? activeLinkRef : undefined}
                 className={item.id === activeId ? "active" : undefined}
                 href={`#${encodeURIComponent(item.id)}`}
                 aria-current={item.id === activeId ? "location" : undefined}
-                onFocus={() => setRovingId(item.id)}
-                onKeyDown={(event) => handleKeyDown(event, index)}
+                tabIndex={-1}
                 onClick={(event) => {
                   event.preventDefault();
                   setRovingId(item.id);
+                  itemRefs.current.get(item.id)?.focus();
                   onNavigate(item);
                 }}
               >
