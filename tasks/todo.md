@@ -4,7 +4,7 @@
 
 ## 当前切片（执行中）
 
-- [ ] **#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）**：启动前已重新核验无重复产品 PR；当前主线为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，独立工作树/分支 `codex/tabs-roving-2026-09-02` 让已打开文档标签只有一个 Tab 停靠点，并用左右/Home/End 移动焦点和选择；PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33638296839` 进行中。#191 保持开放，文件树、目录、播报和 Esc 互斥另行切片。
+- [ ] **#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）**：启动前已重新核验无重复产品 PR；当前主线为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，独立工作树/分支 `codex/tabs-roving-2026-09-02` 让已打开文档标签只有一个 Tab 停靠点，并用左右/Home/End 移动焦点和选择；PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33640484585` 进行中。#191 保持开放，文件树、目录、播报和 Esc 互斥另行切片。
 
 已完成的 #191 第 1 个子切片：PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿。
 
