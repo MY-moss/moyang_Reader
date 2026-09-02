@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@a75ff75e6600d82bb0223741b91a0b1309d9a07a`；PR #415、#418、#419、#420 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭。
+- 发布代码主线基线：`main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`；PR #415、#418、#419、#420、#421 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭，#370 的步骤 3 正在交付。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1 已完成；当前执行 #370 步骤 2 前台阅读可见性心跳，分支为 `codex/reading-heartbeat-2026-09-02`，尚未创建产品 PR。
-- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；在启动 #370 前无开放产品 PR，另有 6 个 Dependabot PR；Issue #370 未发现重复开放 PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1/2 已完成；当前执行 #370 步骤 3 周统计与本机记录清理，分支为 `codex/reading-history-weekly-2026-09-02`，尚未创建产品 PR。
+- 当前开放 Issue/PR 快照（2026-09-02）：启动本切片前重新核验 Issue #370 未发现重复产品 PR；开放 PR 仅为 Dependabot 更新，当前分支将只创建一个功能 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -53,13 +53,26 @@
 - 涉及文件：`src/app/types.ts`、`src/app/storage.ts`、`src/app/portable-settings.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`e2e/smoke.spec.ts`、任务与交接文档。
 - 回滚与发布：回退本切片即可恢复 12 条插入序列表，不需要数据迁移；本切片不生成 Windows x64 安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
 
-## 本次切片：#370 前台阅读可见性心跳（步骤 2/3，2026-09-02）
+## 本次切片：#370 周统计与本机记录清理（步骤 3/3，2026-09-02）
+
+- 目标：在侧栏展示本地周一至周日的阅读时长柱状摘要、去重阅读文档数和累计时长，并提供清理本机阅读历史的确认入口。
+- 用户价值：用户无需离开阅读器即可回顾本周阅读量级，也能明确删除本机阅读时长；原文档和其他阅读状态不会被误删。
+- 非目标：不做目标/提醒、云同步、匿名上报、图表库、分钟级精度、历史趋势或按文档排行；不涉及 HTML 源码编辑、脚本、插件或发布链路。
+- 基线与分支：基于已合并 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a` 创建项目内独立 worktree；分支 `codex/reading-history-weekly-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 未发现重复产品 PR；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 等待远程门禁。
+- 验收标准：按本地周一至周日聚合 7 个日桶并按路径去重；侧栏使用纯 CSS 柱状条显示 7 天、文档数和累计时长；空状态、当前日和无效数据安全呈现；清理前使用应用内确认弹层，确认后只移除阅读历史键并刷新为零，不影响最近打开、阅读位置、草稿或文档；组件测试、浏览器 E2E、全量单测、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/reading-history.ts` 及测试、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`src/app/components/ReadingHistoryPanel.tsx` 及测试、`src/app/components/ReadingHistoryClearConfirmationDialog.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、任务与交接文档。
+- 依赖：步骤 2 已提供本机 `dailySeconds` 数据；复用 `localStorage`、Windows 路径规范化、统一 modal 行为和 React 状态；不新增运行时依赖、外部凭据或数据迁移。
+- 风险：周统计按本地时区计算，只有总秒数的旧记录不会臆测归入当前周；清理后当前打开文档仍可从新的时长继续记录；localStorage 不可用时保持空状态，不阻塞阅读。
+- 回滚：回退本切片 PR 即可移除周统计、清理入口和摘要刷新逻辑；步骤 2 的历史记录可继续保留，用户文档、最近打开、阅读位置和草稿不受影响。
+- 发布：普通 T1/T2 UI/存储切片，不单独生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；稳定批次统一处理。
+
+## 已完成切片：#370 前台阅读可见性心跳（步骤 2/3，PR #421，2026-09-02）
 
 - 目标：为当前打开的本机文档按前台可见性心跳累计整数阅读秒数；每条记录同时保留总秒数、最后阅读时间和近一年按本地日期的秒数，为下一步周统计提供稳定数据源。
 - 用户价值：用户实际阅读时长可在本机留存；窗口隐藏、失焦、页面离开、最小化或锁屏后的时间不计入，临时浏览器文档也不产生历史。
 - 非目标：不实现周统计/清理入口、目标提醒、图表库、联网/匿名上报、分钟级精度、HTML 源码编辑、脚本、插件或发布资产。
-- 基线与分支：基于已合并 `main@a75ff75e6600d82bb0223741b91a0b1309d9a07a` 的等价文件树创建项目内独立 worktree；分支 `codex/reading-heartbeat-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370)；PR 待创建。
-- 验收标准：`reading-history.ts` 提供安全 localStorage 读写和可注入时钟的追踪器；默认 60 秒心跳只在 document visible 且 window focused 时累计；pause/resume/stop 会刷出整数秒；非法记录、临时路径和存储异常不阻塞应用；单测覆盖跨大小写合并、日期分桶、损坏数据、前台心跳、暂停和恢复。
+- 基线与分支：基于已合并 `main@a75ff75e6600d82bb0223741b91a0b1309d9a07a` 的等价文件树创建项目内独立 worktree；分支 `codex/reading-heartbeat-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370)；PR [#421](https://github.com/MY-moss/moyang_Reader/pull/421) 已 squash 合并为 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`。
+- 验收标准：`reading-history.ts` 提供安全 localStorage 读写和可注入时钟的追踪器；默认 60 秒心跳只在 document visible 且 window focused 时累计；pause/resume/stop 会刷出整数秒；非法记录、临时路径和存储异常不阻塞应用；单测覆盖跨大小写合并、日期分桶、损坏数据、前台心跳、暂停和恢复。Quality checks run `33619405983` 全部通过。
 - 涉及文件：`src/app/reading-history.ts`、`src/app/reading-history.test.ts`、`src/app/App.tsx`、`vitest.config.ts`、`docs/UI-INTERACTION.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/NEXT.md`、本文件、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：现有 `documentState` 生命周期、`localStorage`、`normalizePathKey` 和 React effect cleanup；不新增运行时依赖，不需要外部凭据或数据迁移。
 - 风险：系统窗口事件可能延迟，心跳会再次检查可见性/焦点并保守丢弃无法确认的后台区间；localStorage 满或受限时只暂停持久化，不显示错误打断阅读。

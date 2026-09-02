@@ -12,6 +12,8 @@ import { WorkspaceTreeView, type WorkspaceEntryKind, type WorkspaceEntryTransfer
 import type { WorkspaceKindFilter } from "../workspace-filter";
 import { filterSwitchableWorkspaces } from "../workspace-switcher";
 import { formatRecentFileTime, MAX_MOUNTED_WORKSPACES } from "../storage";
+import { ReadingHistoryPanel } from "./ReadingHistoryPanel";
+import type { ReadingHistoryEntry } from "../reading-history";
 
 const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
   { value: "all", label: "全部类型" },
@@ -30,6 +32,8 @@ type WorkspacePanelProps = {
   visibleResultCount: number;
   exportableFiles: WorkspaceFile[];
   recentFiles: RecentFile[];
+  readingHistory: ReadingHistoryEntry[];
+  onRequestClearReadingHistory: () => void;
   recentWorkspaces: RecentWorkspace[];
   mountedWorkspaces: RecentWorkspace[];
   activePath: string | null;
@@ -95,6 +99,8 @@ export function WorkspacePanel({
   visibleResultCount,
   exportableFiles,
   recentFiles,
+  readingHistory,
+  onRequestClearReadingHistory,
   recentWorkspaces,
   mountedWorkspaces,
   activePath,
@@ -491,6 +497,8 @@ export function WorkspacePanel({
               ))}
             </div>
           )}
+
+          <ReadingHistoryPanel entries={readingHistory} onRequestClear={onRequestClearReadingHistory} />
         </>
       )}
     </section>

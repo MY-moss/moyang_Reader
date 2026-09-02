@@ -24,6 +24,8 @@ function renderPanel(
         visibleResultCount={0}
         exportableFiles={[]}
         recentFiles={[]}
+        readingHistory={[]}
+        onRequestClearReadingHistory={vi.fn()}
         recentWorkspaces={[]}
         mountedWorkspaces={mountedWorkspaces}
         activePath={null}

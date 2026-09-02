@@ -21,6 +21,7 @@ import { FileDropOverlay } from "./components/FileDropOverlay";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { DraftClearAllConfirmationDialog } from "./components/DraftClearAllConfirmationDialog";
+import { ReadingHistoryClearConfirmationDialog } from "./components/ReadingHistoryClearConfirmationDialog";
 import {
   DraftRecoveryComparisonDialog,
   type RecoveryKind,
@@ -48,7 +49,13 @@ import { UpdateNotice } from "./components/UpdateNotice";
 import { NotificationViewport } from "./components/NotificationViewport";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
-import { createReadingHistoryTracker } from "./reading-history";
+import {
+  clearReadingHistory,
+  createReadingHistoryTracker,
+  loadReadingHistory,
+  recordReadingSeconds,
+  type ReadingHistoryEntry,
+} from "./reading-history";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
 import { createSearchHighlightController, type SearchHighlightController } from "./search-highlighter";
 import {
@@ -655,6 +662,7 @@ export function App() {
   });
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndexEntry[]>([]);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>(loadRecentFiles);
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryEntry[]>(loadReadingHistory);
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
   const [mountedWorkspaces, setMountedWorkspaces] = useState<RecentWorkspace[]>(loadMountedWorkspaces);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
@@ -692,6 +700,7 @@ export function App() {
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
   const [draftClearAllConfirmationOpen, setDraftClearAllConfirmationOpen] = useState(false);
+  const [readingHistoryClearConfirmationOpen, setReadingHistoryClearConfirmationOpen] = useState(false);
   const [previousVersion, setPreviousVersion] = useState<{ path: string; source: string } | null>(null);
   const [draftComparison, setDraftComparison] = useState<DraftComparisonRequest | null>(null);
   const [draftDiscardRequest, setDraftDiscardRequest] = useState<{ path: string; fromCenter: boolean } | null>(null);
@@ -792,6 +801,26 @@ export function App() {
     };
     setNotifications((current) => appendNotification(current, notification));
   }, []);
+
+  const persistReadingHistory = useCallback((path: string, seconds: number, at: number) => {
+    recordReadingSeconds(path, seconds, at);
+    setReadingHistory(loadReadingHistory());
+  }, []);
+
+  const requestClearReadingHistory = useCallback(() => {
+    setReadingHistoryClearConfirmationOpen(true);
+  }, []);
+
+  const cancelClearReadingHistory = useCallback(() => {
+    setReadingHistoryClearConfirmationOpen(false);
+  }, []);
+
+  const confirmClearReadingHistory = useCallback(() => {
+    clearReadingHistory();
+    setReadingHistory(loadReadingHistory());
+    setReadingHistoryClearConfirmationOpen(false);
+    notify("本机阅读记录已清理。");
+  }, [notify]);
 
   const updateFileDropState = useCallback((source: FileDropSource, support: FileDropState["support"]) => {
     const next: FileDropState = { active: true, source, support };
@@ -1214,7 +1243,7 @@ export function App() {
     const path = documentState?.path;
     if (!path || path.toLowerCase().startsWith("browser://")) return;
 
-    const tracker = createReadingHistoryTracker(path);
+    const tracker = createReadingHistoryTracker(path, { write: persistReadingHistory });
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") tracker.resume();
       else tracker.pause();
@@ -1238,7 +1267,7 @@ export function App() {
       window.removeEventListener("pageshow", handleFocus);
       tracker.stop();
     };
-  }, [documentState?.path]);
+  }, [documentState?.path, persistReadingHistory]);
 
   useEffect(() => {
     sourceDraftRef.current = sourceDraft;
@@ -5944,7 +5973,7 @@ export function App() {
         />
       </div>
       <div className="workspace-grid">
-        <aside className="sidebar">
+        <aside className="sidebar" tabIndex={0}>
           <WorkspacePanel
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             onCancelWorkspaceExport={handleCancelWorkspaceExport}
@@ -5963,6 +5992,8 @@ export function App() {
             visibleResultCount={visibleWorkspaceResults.length}
             exportableFiles={workspaceExportFiles}
             recentFiles={recentFiles}
+            readingHistory={readingHistory}
+            onRequestClearReadingHistory={requestClearReadingHistory}
             recentWorkspaces={recentWorkspaces}
             mountedWorkspaces={mountedWorkspaces}
             activePath={documentState?.path ?? null}
@@ -6343,6 +6374,12 @@ export function App() {
       )}
       {draftClearAllConfirmationOpen && (
         <DraftClearAllConfirmationDialog onCancel={cancelClearAllDrafts} onConfirm={confirmClearAllDrafts} />
+      )}
+      {readingHistoryClearConfirmationOpen && (
+        <ReadingHistoryClearConfirmationDialog
+          onCancel={cancelClearReadingHistory}
+          onConfirm={confirmClearReadingHistory}
+        />
       )}
       {draftComparison && (
         <DraftRecoveryComparisonDialog

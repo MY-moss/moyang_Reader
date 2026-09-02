@@ -12,6 +12,20 @@ export type ReadingHistoryEntry = {
   dailySeconds: Record<string, number>;
 };
 
+export type ReadingHistoryDay = {
+  key: string;
+  label: string;
+  seconds: number;
+  isToday: boolean;
+};
+
+export type ReadingHistorySummary = {
+  days: ReadingHistoryDay[];
+  documentCount: number;
+  totalSeconds: number;
+  maxDaySeconds: number;
+};
+
 export type ReadingHistoryWriter = (path: string, seconds: number, at: number) => void;
 
 type ReadingHistoryTimer = ReturnType<typeof globalThis.setInterval>;
@@ -163,6 +177,14 @@ export function saveReadingHistory(entries: readonly ReadingHistoryEntry[]): voi
   }
 }
 
+export function clearReadingHistory(): void {
+  try {
+    localStorage.removeItem(READING_HISTORY_STORAGE_KEY);
+  } catch {
+    // Reading history is best-effort when local storage is unavailable.
+  }
+}
+
 export function recordReadingSeconds(path: string, seconds: number, at = Date.now()): void {
   const normalizedPath = path.trim();
   const normalizedSeconds = normalizeSeconds(seconds);
@@ -182,6 +204,61 @@ export function recordReadingSeconds(path: string, seconds: number, at = Date.no
     dailySeconds: normalizeDailySeconds(dailySeconds),
   };
   saveReadingHistory([nextEntry, ...history.filter((entry) => normalizePathKey(entry.path) !== key)]);
+}
+
+const READING_DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
+
+export function summarizeReadingHistory(
+  entries: readonly ReadingHistoryEntry[],
+  now = Date.now(),
+): ReadingHistorySummary {
+  const referenceTimestamp = isValidTimestamp(now) ? now : fallbackTimestamp();
+  const referenceDate = new Date(referenceTimestamp);
+  referenceDate.setHours(0, 0, 0, 0);
+  const daysFromMonday = (referenceDate.getDay() + 6) % 7;
+  referenceDate.setDate(referenceDate.getDate() - daysFromMonday);
+  const todayKey = readingDayKey(referenceTimestamp);
+  const days: ReadingHistoryDay[] = READING_DAY_LABELS.map((label, index) => {
+    const date = new Date(referenceDate);
+    date.setDate(referenceDate.getDate() + index);
+    const key = readingDayKey(date.getTime()) ?? "";
+    return { key, label, seconds: 0, isToday: key === todayKey };
+  });
+
+  const dayTotals = new Map(days.map((day) => [day.key, 0]));
+  const documents = new Set<string>();
+  for (const entry of normalizeReadingHistory(entries)) {
+    let hasWeeklyReading = false;
+    for (const day of days) {
+      const seconds = normalizeSeconds(entry.dailySeconds[day.key]);
+      if (seconds <= 0) continue;
+      dayTotals.set(day.key, addSeconds(dayTotals.get(day.key) ?? 0, seconds));
+      hasWeeklyReading = true;
+    }
+    if (hasWeeklyReading) documents.add(normalizePathKey(entry.path));
+  }
+
+  let maxDaySeconds = 0;
+  let totalSeconds = 0;
+  for (const day of days) {
+    day.seconds = dayTotals.get(day.key) ?? 0;
+    totalSeconds = addSeconds(totalSeconds, day.seconds);
+    maxDaySeconds = Math.max(maxDaySeconds, day.seconds);
+  }
+
+  return { days, documentCount: documents.size, totalSeconds, maxDaySeconds };
+}
+
+export function formatReadingDuration(seconds: number): string {
+  const normalizedSeconds = normalizeSeconds(seconds);
+  if (normalizedSeconds <= 0) return "0 分钟";
+  if (normalizedSeconds < 60) return "少于 1 分钟";
+
+  const totalMinutes = Math.floor(normalizedSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${totalMinutes} 分钟`;
+  return minutes > 0 ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`;
 }
 
 function defaultIsForeground(): boolean {
