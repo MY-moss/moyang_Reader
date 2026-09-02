@@ -4,7 +4,7 @@
 
 ## 当前切片（已完成实现，待 PR/CI）
 
-- [x] **#416 Windows 外部图标、快捷方式与文件关联一致性**：从 `main@b11539ea85bc816dbb9f002021084755d7c826b2` 创建项目内工作树；已完成资源检查、Windows 桌面验证和升级验证，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 等待 CI/审查，完成后停止。
+- [x] **#416 Windows 外部图标、快捷方式与文件关联一致性**：从 `main@b11539ea85bc816dbb9f002021084755d7c826b2` 创建项目内工作树；已完成资源检查、Windows 桌面验证和升级验证，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) CI 已全绿，等待人工审查/合并，完成后停止。
 
 ## 下一批候选（完成 #416 后重新检查，不自动启动）
 

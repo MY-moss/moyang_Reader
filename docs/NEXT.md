@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416 已完成实现与本地 Windows 验收；PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 已创建，等待 CI/审查。
+- 当前状态：#416 已完成实现与本地 Windows 验收；PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33591347377` 已全绿，等待人工审查/合并。
 - 发布代码主线基线：`main@b11539ea85bc816dbb9f002021084755d7c826b2`；PR #415 已合并，Issue #363 已以 `completed` 关闭。
 - 当前稳定版本：`v0.10.14`；#416 完成后如需发布，候选版本为 `v0.10.15` Windows x64 patch。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
@@ -42,7 +42,7 @@
 
 ## 下一次开发
 
-- #416 已完成代码和本地验收，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 已创建；CI/审查完成后必须停止，不自动开始下一切片。
+- #416 已完成代码和本地验收，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) CI 已全绿；人工审查/合并后必须停止，不自动开始下一切片。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。
