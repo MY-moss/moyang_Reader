@@ -2389,6 +2389,119 @@ html.pane-resizing * {
   color: var(--muted);
   font-size: 9px;
 }
+.reading-history-panel {
+  display: grid;
+  gap: 11px;
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.reading-history-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.reading-history-heading h3 {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+}
+.reading-history-range {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.reading-history-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.reading-history-metric {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+  padding: 8px 9px;
+}
+.reading-history-metric strong {
+  overflow: hidden;
+  color: var(--accent-deep);
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reading-history-metric span,
+.reading-history-day-value {
+  color: var(--muted);
+  font-size: 9px;
+}
+.reading-history-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 5px;
+}
+.reading-history-day {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 4px;
+}
+.reading-history-bar-track {
+  display: flex;
+  align-items: end;
+  width: 100%;
+  height: 58px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+}
+.reading-history-bar {
+  display: block;
+  width: 100%;
+  height: var(--reading-history-bar-height);
+  min-height: 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  transition: height 180ms ease;
+}
+.reading-history-day.is-today .reading-history-bar {
+  background: var(--accent-solid);
+}
+.reading-history-day-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.reading-history-day.is-today .reading-history-day-label {
+  color: var(--accent-deep);
+}
+.reading-history-day-value {
+  width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reading-history-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.reading-history-clear {
+  justify-self: start;
+  padding: 6px 9px;
+  font-size: 10px;
+}
 .workspace-result span {
   white-space: normal;
   line-height: 1.45;

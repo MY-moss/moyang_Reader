@@ -134,6 +134,39 @@ test("shows remembered files and workspaces on the next launch", async ({ page }
   await expect(page.locator('[aria-label="最近打开"]')).toContainText("打开时间未知");
 });
 
+test("shows weekly local reading history and clears it with confirmation", async ({ page }) => {
+  await page.addInitScript(() => {
+    const today = new Date();
+    const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    localStorage.setItem(
+      "moyang-reader-reading-history",
+      JSON.stringify([
+        {
+          path: "C:/Notes/Guide.md",
+          seconds: 600,
+          lastReadAt: Date.now(),
+          dailySeconds: { [dayKey]: 600 },
+        },
+      ]),
+    );
+  });
+  await page.goto("/");
+
+  const historyPanel = page.locator(".reading-history-panel");
+  await expect(historyPanel.getByRole("heading", { name: "本周阅读" })).toBeVisible();
+  await expect(historyPanel.locator('[aria-label^="本周阅读摘要"]')).toHaveAttribute("aria-label", /1 篇文档/);
+  await expect(historyPanel.locator('[aria-label^="本周阅读摘要"]')).toHaveAttribute("aria-label", /10 分钟/);
+
+  await historyPanel.getByTestId("reading-history-clear").click();
+  const clearDialog = page.getByRole("dialog", { name: "清理阅读记录？" });
+  await expect(clearDialog).toBeVisible();
+  await expect(page.getByTestId("reading-history-clear-cancel")).toBeFocused();
+  await page.getByTestId("reading-history-clear-confirm").click();
+  await expect(clearDialog).toHaveCount(0);
+  await expect(historyPanel).toContainText("还没有本机阅读记录。");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("moyang-reader-reading-history"))).toBeNull();
+});
+
 test("shows and manages local drafts from the recovery center", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
