@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   loadRecentFiles,
   loadMountedWorkspaces,
@@ -29,23 +29,60 @@ import {
   saveWorkspaceSession,
   saveWorkspaceSessions,
   forgetWorkspaceSession,
+  formatRecentFileTime,
 } from "./storage";
 import { normalizePathKey } from "./path-key";
 
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  vi.useRealTimers();
+  localStorage.clear();
+});
 
 describe("reader storage", () => {
-  it("deduplicates recent files and keeps the newest twelve", () => {
-    for (let index = 0; index < 14; index += 1) {
+  it("deduplicates recent files and keeps the newest fifty", () => {
+    for (let index = 0; index < 52; index += 1) {
       rememberRecentFile({ path: `C:/Notes/${index}.md`, name: `${index}.md` });
     }
 
     const files = loadRecentFiles();
-    expect(files).toHaveLength(12);
-    expect(files[0].name).toBe("13.md");
+    expect(files).toHaveLength(50);
+    expect(files[0].name).toBe("51.md");
 
     rememberRecentFile({ path: "C:/Notes/5.md", name: "renamed.md" });
     expect(loadRecentFiles()[0].name).toBe("renamed.md");
+  });
+
+  it("migrates legacy recent files and orders valid timestamps without trusting invalid values", () => {
+    localStorage.setItem(
+      "moyang-reader-recent-files",
+      JSON.stringify([
+        { path: "C:/Notes/legacy.md", name: "legacy.md" },
+        { path: "C:/Notes/newer.md", name: "newer.md", lastOpenedAt: 3_000 },
+        { path: "C:/Notes/older.md", name: "older.md", lastOpenedAt: 1_000 },
+        { path: "C:/Notes/invalid.md", name: "invalid.md", lastOpenedAt: "not-a-timestamp" },
+      ]),
+    );
+
+    expect(loadRecentFiles()).toEqual([
+      { path: "C:/Notes/newer.md", name: "newer.md", lastOpenedAt: 3_000 },
+      { path: "C:/Notes/older.md", name: "older.md", lastOpenedAt: 1_000 },
+      { path: "C:/Notes/legacy.md", name: "legacy.md" },
+      { path: "C:/Notes/invalid.md", name: "invalid.md" },
+    ]);
+  });
+
+  it("stamps a file when it is opened and formats relative open times", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-02T12:00:00.000Z"));
+
+    const files = rememberRecentFile({ path: "C:/Notes/today.md", name: "today.md" });
+
+    expect(files[0]).toEqual({
+      path: "C:/Notes/today.md",
+      name: "today.md",
+      lastOpenedAt: new Date("2026-09-02T12:00:00.000Z").getTime(),
+    });
+    expect(formatRecentFileTime(files[0].lastOpenedAt, Date.now())).toBe("刚刚");
   });
 
   it("persists a pruned recent-file list", () => {

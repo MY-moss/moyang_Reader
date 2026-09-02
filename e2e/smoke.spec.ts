@@ -120,13 +120,18 @@ test("shows remembered files and workspaces on the next launch", async ({ page }
     );
     localStorage.setItem(
       "moyang-reader-recent-files",
-      JSON.stringify([{ path: "C:/Notes/Library/today.md", name: "today.md" }]),
+      JSON.stringify([
+        { path: "C:/Notes/Library/today.md", name: "today.md", lastOpenedAt: Date.now() - 3_600_000 },
+        { path: "C:/Notes/Library/legacy.md", name: "legacy.md" },
+      ]),
     );
   });
   await page.goto("/");
 
   await expect(page.locator('button[title="C:/Notes/Library"]')).toBeVisible();
   await expect(page.getByRole("button", { name: /today\.md/ })).toBeVisible();
+  await expect(page.locator('[aria-label="最近打开"]')).toContainText("最近打开：1 小时前");
+  await expect(page.locator('[aria-label="最近打开"]')).toContainText("打开时间未知");
 });
 
 test("shows and manages local drafts from the recovery center", async ({ page }) => {

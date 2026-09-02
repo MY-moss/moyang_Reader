@@ -2746,7 +2746,7 @@ export function App() {
 
         const rebaseTab = (tab: RecentFile): RecentFile => {
           const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, renamedPath);
-          return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };
+          return nextPath === tab.path ? tab : { ...tab, path: nextPath, name: fileNameFromPath(nextPath) };
         };
         const nextTabs = openTabsRef.current.map(rebaseTab);
         openTabsRef.current = nextTabs;
@@ -2912,7 +2912,7 @@ export function App() {
         if (mode === "move") {
           const rebaseTab = (tab: RecentFile): RecentFile => {
             const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, transferredPath);
-            return nextPath === tab.path ? tab : { path: nextPath, name: fileNameFromPath(nextPath) };
+            return nextPath === tab.path ? tab : { ...tab, path: nextPath, name: fileNameFromPath(nextPath) };
           };
           const nextTabs = openTabsRef.current.map(rebaseTab);
           openTabsRef.current = nextTabs;
@@ -3205,7 +3205,7 @@ export function App() {
             try {
               const authorizedDocument = await authorizeStoredPath(tab.path, false);
               if (!active) return;
-              restoredTabs.push({ path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });
+              restoredTabs.push({ ...tab, path: authorizedDocument, name: fileNameFromPath(authorizedDocument) });
             } catch {
               // Stale tabs are discarded without blocking the next launch.
             }
