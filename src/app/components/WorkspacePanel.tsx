@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef } from "react";
+
 import type {
   RecentFile,
   RecentWorkspace,
@@ -144,143 +146,220 @@ export function WorkspacePanel({
   onKindChange,
   onClearFilters,
 }: WorkspacePanelProps) {
+  const createMenuRef = useRef<HTMLDetailsElement>(null);
+  const exportMenuRef = useRef<HTMLDetailsElement>(null);
+  const switcherMenuRef = useRef<HTMLDetailsElement>(null);
+  const workspaceMenuRefs = useMemo(() => [createMenuRef, exportMenuRef, switcherMenuRef], []);
   const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
   const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
   const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));
   const treeFolders = hasFilters ? [] : folders;
 
+  const closeOtherWorkspaceMenus = (activeMenu: HTMLDetailsElement | null) => {
+    for (const menuRef of workspaceMenuRefs) {
+      if (menuRef.current !== activeMenu) menuRef.current?.removeAttribute("open");
+    }
+  };
+
+  useEffect(() => {
+    const closeWorkspaceMenus = () => {
+      for (const menuRef of workspaceMenuRefs) {
+        menuRef.current?.removeAttribute("open");
+      }
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || workspaceMenuRefs.some((menuRef) => menuRef.current?.contains(target))) return;
+      closeWorkspaceMenus();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !workspaceMenuRefs.some((menuRef) => menuRef.current?.open)) return;
+      const target = event.target;
+      closeWorkspaceMenus();
+      event.preventDefault();
+      if (target instanceof Node && workspaceMenuRefs.some((menuRef) => menuRef.current?.contains(target))) {
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [workspaceMenuRefs]);
+
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
       <div className="workspace-heading">
-        <div>
+        <div className="workspace-heading-copy">
           <div className="panel-kicker">WORKSPACE</div>
           <h2 id="workspace-title">阅读库</h2>
         </div>
-        <div className="workspace-actions">
-          {workspacePath && onCreateNote && onCreateFolder && (
-            <details className="workspace-create-menu">
-              <summary className="quiet-button workspace-create-button">新建</summary>
-              <div className="workspace-create-menu-panel" role="menu">
-                <div className="workspace-switcher-label">阅读库根目录</div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={(event) => {
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                    onCreateNote("");
-                  }}
-                >
-                  新建笔记
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={(event) => {
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                    onCreateFolder("");
-                  }}
-                >
-                  新建文件夹
-                </button>
-              </div>
-            </details>
-          )}
-          {(canBatchExport || workspaceExporting) && (
-            <details className="export-menu workspace-export-menu">
-              <summary className="quiet-button">{workspaceExporting ? "导出中…" : "批量导出"}</summary>
-              <div className="export-menu-panel">
-                <button
-                  type="button"
-                  disabled={!canBatchExport || workspaceExporting}
-                  onClick={() => onExportWorkspace("html")}
-                >
-                  单文件 HTML
-                </button>
-                <button
-                  type="button"
-                  disabled={!canBatchExport || workspaceExporting}
-                  onClick={() => onExportWorkspace("docx")}
-                >
-                  单文件 Word
-                </button>
-                <button
-                  type="button"
-                  disabled={!canBatchExport || workspaceExporting}
-                  onClick={() => onExportWorkspace("pdf")}
-                >
-                  批量打印 / PDF
-                </button>
-              </div>
-            </details>
-          )}
-          {workspaceExporting && (
-            <button type="button" className="quiet-button workspace-export-cancel" onClick={onCancelWorkspaceExport}>
-              取消导出
-            </button>
-          )}
-          {workspacePath && (
-            <button
-              type="button"
-              className="quiet-button workspace-add-button"
-              onClick={onAddWorkspace}
-              disabled={workspaceLimitReached}
-              title={
-                workspaceLimitReached
-                  ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`
-                  : "添加另一个阅读库"
-              }
-            >
-              添加阅读库
-            </button>
-          )}
-        </div>
+        {workspacePath && (
+          <div className="workspace-actions" aria-label="阅读库操作">
+            {workspacePath && onCreateNote && onCreateFolder && (
+              <details
+                ref={createMenuRef}
+                className="workspace-create-menu workspace-action-menu"
+                onClick={() => closeOtherWorkspaceMenus(createMenuRef.current)}
+                onToggle={() => {
+                  if (createMenuRef.current?.open) closeOtherWorkspaceMenus(createMenuRef.current);
+                }}
+              >
+                <summary className="quiet-button workspace-create-button workspace-action-trigger">新建</summary>
+                <div className="workspace-create-menu-panel" role="menu">
+                  <div className="workspace-switcher-label">阅读库根目录</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onCreateNote("");
+                    }}
+                  >
+                    新建笔记
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onCreateFolder("");
+                    }}
+                  >
+                    新建文件夹
+                  </button>
+                </div>
+              </details>
+            )}
+            {(canBatchExport || workspaceExporting) && (
+              <details
+                ref={exportMenuRef}
+                className="export-menu workspace-export-menu workspace-action-menu"
+                onClick={() => closeOtherWorkspaceMenus(exportMenuRef.current)}
+                onToggle={() => {
+                  if (exportMenuRef.current?.open) closeOtherWorkspaceMenus(exportMenuRef.current);
+                }}
+              >
+                <summary className="quiet-button workspace-action-trigger">
+                  {workspaceExporting ? "导出中…" : "批量导出"}
+                </summary>
+                <div className="export-menu-panel">
+                  <button
+                    type="button"
+                    disabled={!canBatchExport || workspaceExporting}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onExportWorkspace("html");
+                    }}
+                  >
+                    单文件 HTML
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canBatchExport || workspaceExporting}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onExportWorkspace("docx");
+                    }}
+                  >
+                    单文件 Word
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canBatchExport || workspaceExporting}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onExportWorkspace("pdf");
+                    }}
+                  >
+                    批量打印 / PDF
+                  </button>
+                </div>
+              </details>
+            )}
+            {workspaceExporting && (
+              <button
+                type="button"
+                className="quiet-button workspace-export-cancel workspace-action-wide"
+                onClick={onCancelWorkspaceExport}
+              >
+                取消导出
+              </button>
+            )}
+            {workspacePath && (
+              <button
+                type="button"
+                className="quiet-button workspace-add-button workspace-action-wide"
+                onClick={onAddWorkspace}
+                disabled={workspaceLimitReached}
+                title={
+                  workspaceLimitReached
+                    ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`
+                    : "添加另一个阅读库"
+                }
+              >
+                添加阅读库
+              </button>
+            )}
+            {switchableWorkspaces.length > 0 && (
+              <details
+                ref={switcherMenuRef}
+                className="workspace-switcher workspace-action-menu workspace-action-wide"
+                onClick={() => closeOtherWorkspaceMenus(switcherMenuRef.current)}
+                onToggle={() => {
+                  if (switcherMenuRef.current?.open) closeOtherWorkspaceMenus(switcherMenuRef.current);
+                }}
+              >
+                <summary className="workspace-switcher-trigger workspace-action-trigger" aria-label="切换阅读库">
+                  切换阅读库
+                </summary>
+                <div className="workspace-switcher-menu" role="menu">
+                  <div className="workspace-switcher-label">
+                    已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
+                  </div>
+                  {switchableWorkspaces.map((workspace) => (
+                    <div className="workspace-switcher-item" role="none" key={workspace.path}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        title={workspace.path}
+                        onClick={(event) => {
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                          onOpenWorkspace(workspace.path);
+                        }}
+                      >
+                        <strong>{workspace.name}</strong>
+                        <span>{workspace.path}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="workspace-switcher-remove"
+                        title={`移除 ${workspace.name}`}
+                        aria-label={`从已挂载阅读库移除 ${workspace.name}`}
+                        onClick={() => onRemoveWorkspace(workspace.path)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
       {workspacePath ? (
         <div className="workspace-location" title={workspacePath}>
           <span className="workspace-dot" aria-hidden="true" />
-          <span>{pathName(workspacePath)}</span>
+          <span className="workspace-location-name">{pathName(workspacePath)}</span>
           <small>
             {files.length} 项 · {mountedWorkspaces.length} 个阅读库
           </small>
-          {switchableWorkspaces.length > 0 && (
-            <details className="workspace-switcher">
-              <summary className="workspace-switcher-trigger" aria-label="切换阅读库">
-                切换
-              </summary>
-              <div className="workspace-switcher-menu" role="menu">
-                <div className="workspace-switcher-label">
-                  已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
-                </div>
-                {switchableWorkspaces.map((workspace) => (
-                  <div className="workspace-switcher-item" role="none" key={workspace.path}>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      title={workspace.path}
-                      onClick={(event) => {
-                        event.currentTarget.closest("details")?.removeAttribute("open");
-                        onOpenWorkspace(workspace.path);
-                      }}
-                    >
-                      <strong>{workspace.name}</strong>
-                      <span>{workspace.path}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="workspace-switcher-remove"
-                      title={`移除 ${workspace.name}`}
-                      aria-label={`从已挂载阅读库移除 ${workspace.name}`}
-                      onClick={() => onRemoveWorkspace(workspace.path)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
         </div>
       ) : (
         <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>

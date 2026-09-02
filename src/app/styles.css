@@ -514,6 +514,14 @@ a:focus-visible {
   background: var(--surface-strong);
   box-shadow: var(--shadow-lifted);
 }
+.workspace-actions .export-menu-panel {
+  position: static;
+  z-index: auto;
+  width: 100%;
+  min-width: 0;
+  margin-top: 5px;
+  box-shadow: var(--shadow-soft);
+}
 .export-menu-panel button {
   border: 0;
   border-radius: 3px;
@@ -1875,27 +1883,53 @@ html.pane-resizing * {
   border-bottom: 1px solid var(--line);
 }
 .workspace-heading {
-  display: flex;
+  display: grid;
   align-items: start;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+}
+.workspace-heading-copy {
+  min-width: 0;
 }
 .workspace-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+.workspace-actions > .workspace-action-menu,
+.workspace-actions > .quiet-button {
+  min-width: 0;
+  width: 100%;
+}
+.workspace-actions > .workspace-action-menu {
+  position: static;
+}
+.workspace-action-wide {
+  grid-column: 1 / -1;
+}
+.workspace-action-trigger {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
+  justify-content: space-between;
   min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+.workspace-action-trigger::after {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  color: var(--muted);
+  content: "⌄";
+  font-size: 10px;
 }
 .workspace-actions .quiet-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 .workspace-create-menu {
-  position: relative;
-  flex: 0 0 auto;
+  min-width: 0;
 }
 .workspace-create-button {
   border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
@@ -1905,26 +1939,18 @@ html.pane-resizing * {
 .workspace-create-button::-webkit-details-marker {
   display: none;
 }
-.workspace-create-button::after {
-  display: inline-block;
-  margin-left: 6px;
-  color: var(--muted);
-  content: "⌄";
-  font-size: 10px;
-}
 .workspace-create-menu[open] .workspace-create-button,
 .workspace-create-button:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 .workspace-create-menu-panel {
-  position: absolute;
-  z-index: 12;
-  top: calc(100% + 7px);
-  right: 0;
+  position: static;
+  z-index: auto;
   display: grid;
-  width: 172px;
+  width: 100%;
   gap: 3px;
+  margin-top: 5px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
@@ -1932,6 +1958,8 @@ html.pane-resizing * {
   padding: 6px;
 }
 .workspace-create-menu-panel button {
+  min-width: 0;
+  width: 100%;
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
@@ -1985,7 +2013,8 @@ html.pane-resizing * {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  gap: 3px 7px;
   margin-top: 14px;
   overflow: visible;
   color: var(--ink);
@@ -1998,14 +2027,16 @@ html.pane-resizing * {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.workspace-location-name {
+  min-width: 0;
+}
 .workspace-location small {
   flex: 0 0 auto;
   color: var(--muted);
   font-size: 10px;
 }
 .workspace-switcher {
-  position: relative;
-  flex: 0 0 auto;
+  min-width: 0;
 }
 .workspace-switcher-trigger {
   display: inline-flex;
@@ -2019,6 +2050,7 @@ html.pane-resizing * {
   cursor: pointer;
   font-size: 9px;
   list-style: none;
+  text-align: left;
   transition:
     background 150ms ease,
     border-color 150ms ease;
@@ -2032,13 +2064,12 @@ html.pane-resizing * {
   background: var(--accent-soft);
 }
 .workspace-switcher-menu {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% + 7px);
-  right: 0;
+  position: static;
+  z-index: auto;
   display: grid;
-  width: min(260px, 62vw);
+  width: 100%;
   gap: 3px;
+  margin-top: 5px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface-strong);

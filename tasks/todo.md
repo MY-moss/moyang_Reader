@@ -4,16 +4,18 @@
 
 ## 当前切片（执行中）
 
-- [ ] **#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）**：启动前已重新核验无重复产品 PR；当前主线为 `main@e9cde556e48957f270828159890522b52ef51f89`，独立工作树/分支 `codex/outline-roving-2026-09-03` 让目录只有一个 Tab 停靠点，并用上下/Home/End 复用现有章节导航；PR 待创建。#191 保持开放，播报和 Esc 互斥另行切片。
+- [ ] **用户反馈：左侧栏阅读库操作区布局与菜单交互**：启动前已重新核验无重复产品 PR；当前主线为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，独立工作树/分支 `codex/sidebar-actions-ui-2026-09-03` 修复新建、批量导出、添加/切换阅读库在窄侧栏中的遮挡与操作中断；PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。只做这一垂直切片，更新器和默认首页/旧 M 图标另行拆分。
 
-已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿。
+已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 
-## 下一批候选（完成当前 #191 子切片后重新检查）
+## 下一批候选（完成当前切片后重新检查）
 
 按“用户可见收益 / 无外部阻塞 / 可独立验收”排序：
 
-1. **#191 键盘与读屏导航剩余子切片**：完成目录 roving/高亮后重新核验 Issue，依次补读屏播报和 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
-2. **#171/#193 视觉令牌与焦点细节**：在图标切片后再拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
+1. **更新入口的“更多”工作流**：核验更新下载、隐藏/关闭和刷新入口，确保在当前阅读流程内可重复打开并提供明确状态；单独拆分，不与本切片混做。
+2. **默认首页与品牌视觉收口**：基于现有新 Logo 资产检查主界面默认状态、残留大写 M 和未替换图标；单独拆分，不改阅读库数据语义。
+3. **#191 键盘与读屏导航剩余子切片**：重新核验 Issue 后依次补读屏播报和 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
+4. **#171/#193 视觉令牌与焦点细节**：拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
 
 条件旁路（不抢占普通切片）：#241 更新/镜像/PDF 实机矩阵、#51 Authenticode、#112 更新文档；只有外部环境满足时才改为 READY。
 
