@@ -104,7 +104,7 @@ npm run desktop
 
 `npm run tauri -- build --no-bundle` 已在 Windows 上成功生成：
 
-受管构建缓存中的 `release/moyang-reader.exe`（Windows 默认位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`）。所有工作树和同一项目的本地副本共用这一个目标目录，避免按路径重复生成数 GB 的 Rust 构建物。
+受管构建缓存中的 `release/moyang-reader.exe`（Windows 默认位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`）。所有工作树和同一项目的本地副本共用这一个目标目录，避免按路径重复生成数 GB 的 Rust 构建物；如需把缓存迁移到其他磁盘，可在用户级环境变量设置 `MOYANG_BUILD_CACHE_DIR`，再通过项目清理器预览和回收可再生文件。
 
 稳定批次生成的 NSIS 安装包预期路径：
 

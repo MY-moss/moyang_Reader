@@ -947,6 +947,180 @@ describe("Moyang Reader desktop runtime", () => {
     }
   });
 
+  it("navigates the workspace tree with one roving focus stop", async () => {
+    await resetDesktopSession();
+    const workspacePath = path.dirname(documentPath);
+    const folderName = "keyboard-roving-folder";
+    const nestedFileName = "keyboard-roving-note.md";
+    const folderPath = path.join(workspacePath, folderName);
+    const nestedFilePath = path.join(folderPath, nestedFileName);
+    fs.rmSync(folderPath, { recursive: true, force: true });
+    fs.mkdirSync(folderPath, { recursive: true });
+    fs.writeFileSync(nestedFilePath, "# Keyboard roving\n\n通过文件树键盘导航打开。\n", "utf8");
+
+    const readTreeState = () =>
+      browser.execute((expectedFileName) => {
+        const items = Array.from(document.querySelectorAll('[role="treeitem"]'));
+        return {
+          treeRole: document.querySelector('[role="tree"]')?.getAttribute("aria-label") ?? null,
+          tabStopCount: items.filter((item) => item.getAttribute("tabindex") === "0").length,
+          activeText: document.activeElement?.textContent?.trim() ?? "",
+          activeRole: document.activeElement?.getAttribute("role") ?? null,
+          nestedVisible: items.some((item) => item.textContent?.includes(expectedFileName)),
+          firstVisibleText: items[0]?.textContent?.trim() ?? "",
+          lastVisibleText: items.at(-1)?.textContent?.trim() ?? "",
+          visibleItemCount: items.length,
+        };
+      }, nestedFileName);
+
+    const dispatchTreeKey = (key) =>
+      browser.execute((expectedKey) => {
+        const target = document.activeElement;
+        if (!(target instanceof HTMLElement)) throw new Error("the workspace tree did not retain focus");
+        const KeyboardEventConstructor = target.ownerDocument.defaultView?.KeyboardEvent;
+        if (!KeyboardEventConstructor) throw new Error("the desktop document does not expose KeyboardEvent");
+        target.dispatchEvent(
+          new KeyboardEventConstructor("keydown", {
+            key: expectedKey,
+            code: expectedKey,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }, key);
+
+    try {
+      await waitForWorkspaceEntry(
+        ".workspace-folder",
+        folderName,
+        true,
+        "the keyboard tree folder fixture did not appear",
+      );
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        nestedFileName,
+        true,
+        "the keyboard tree nested file fixture did not appear",
+      );
+
+      const tree = await browser.$('[role="tree"][aria-label="工作区文件树"]');
+      await tree.waitForDisplayed();
+      const folder = await findWorkspaceElement(".workspace-folder", folderName);
+      assert.ok(folder, `workspace folder ${folderName} was not found for keyboard navigation`);
+      await folder.click();
+      await browser.waitUntil(
+        () =>
+          readTreeState().then(
+            (state) =>
+              state.tabStopCount === 1 && state.activeRole === "treeitem" && state.activeText.includes(folderName),
+          ),
+        {
+          timeout: 5_000,
+          timeoutMsg: "the workspace tree did not settle on one Tab stop after focusing the folder",
+        },
+      );
+
+      const initialState = await readTreeState();
+      assert.equal(initialState.treeRole, "工作区文件树");
+      assert.equal(initialState.tabStopCount, 1, "the workspace tree should expose one Tab stop");
+      assert.equal(initialState.activeRole, "treeitem");
+      assert.match(initialState.activeText, new RegExp(folderName));
+      assert.equal(initialState.nestedVisible, false, "the focused folder should be collapsed after the initial click");
+
+      await browser.keys("ArrowRight");
+      await browser.waitUntil(
+        async () => {
+          const state = await readTreeState();
+          return state.activeRole === "treeitem" && state.activeText.includes(folderName) && state.nestedVisible;
+        },
+        { timeout: 5_000, timeoutMsg: "ArrowRight did not expand the focused workspace folder" },
+      );
+      assert.equal((await readTreeState()).tabStopCount, 1);
+
+      await browser.keys("ArrowRight");
+      await browser.waitUntil(async () => (await readTreeState()).activeText.includes(nestedFileName), {
+        timeout: 5_000,
+        timeoutMsg: "ArrowRight did not focus the first child in the workspace tree",
+      });
+
+      await browser.keys("ArrowLeft");
+      await browser.waitUntil(async () => (await readTreeState()).activeText.includes(folderName), {
+        timeout: 5_000,
+        timeoutMsg: "ArrowLeft did not return focus to the parent folder",
+      });
+      await browser.keys("ArrowLeft");
+      await browser.waitUntil(
+        async () => {
+          const state = await readTreeState();
+          const folderElement = await browser.$(`button.workspace-folder[aria-expanded="false"]`);
+          return state.activeText.includes(folderName) && !state.nestedVisible && (await folderElement.isExisting());
+        },
+        { timeout: 5_000, timeoutMsg: "ArrowLeft did not collapse the focused workspace folder" },
+      );
+
+      await browser.keys("ArrowRight");
+      await browser.waitUntil(
+        async () => {
+          const state = await readTreeState();
+          return state.activeText.includes(folderName) && state.nestedVisible;
+        },
+        { timeout: 5_000, timeoutMsg: "ArrowRight did not expand the focused workspace folder" },
+      );
+
+      await dispatchTreeKey("End");
+      await browser.waitUntil(
+        async () => {
+          const state = await readTreeState();
+          return state.activeRole === "treeitem" && state.activeText === state.lastVisibleText;
+        },
+        { timeout: 5_000, timeoutMsg: "End did not focus the last visible workspace tree item" },
+      );
+
+      await dispatchTreeKey("Home");
+      await browser.waitUntil(
+        async () => {
+          const state = await readTreeState();
+          return state.activeRole === "treeitem" && state.activeText === state.firstVisibleText;
+        },
+        { timeout: 5_000, timeoutMsg: "Home did not focus the first visible workspace tree item" },
+      );
+      const visibleItemCount = (await readTreeState()).visibleItemCount;
+      let nestedFileFocused = false;
+      for (let index = 0; index < visibleItemCount + 2; index += 1) {
+        const state = await readTreeState();
+        if (state.activeText.includes(nestedFileName)) {
+          nestedFileFocused = true;
+          break;
+        }
+        await browser.keys("ArrowDown");
+      }
+      assert.equal(nestedFileFocused, true, "ArrowDown did not reach the nested workspace tree file");
+      await dispatchTreeKey("Enter");
+      await browser.waitUntil(
+        () =>
+          browser
+            .$(".document-title")
+            .getText()
+            .then((text) => text.includes(nestedFileName)),
+        { timeout: 15_000, timeoutMsg: "Enter did not open the focused workspace tree file" },
+      );
+    } finally {
+      fs.rmSync(folderPath, { recursive: true, force: true });
+      try {
+        const originalFileName = path.basename(documentPath);
+        await waitForWorkspaceEntry(
+          ".workspace-file",
+          originalFileName,
+          true,
+          "the desktop fixture document was not available after keyboard tree cleanup",
+        );
+        await clickWorkspaceFile(originalFileName);
+      } catch {
+        // Preserve the original test failure if the desktop session is already unavailable.
+      }
+    }
+  });
+
   it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
     await waitForWorkspaceEntry(
       ".workspace-file",

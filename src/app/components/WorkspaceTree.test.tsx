@@ -15,7 +15,97 @@ function file(index: number): WorkspaceFile {
   };
 }
 
+function workspaceFile(path: string, relativePath: string): WorkspaceFile {
+  return {
+    path,
+    name: relativePath.split(/[\\/]/).pop() ?? relativePath,
+    relativePath,
+    size: 1,
+    kind: "markdown",
+  };
+}
+
 describe("WorkspaceTreeView", () => {
+  it("uses one roving tree item and follows visible tree navigation", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onOpenFile = vi.fn();
+    const rootFile = workspaceFile("C:/vault/root.md", "root.md");
+    const nestedFile = workspaceFile("C:/vault/Archive/nested.md", "Archive/nested.md");
+
+    act(() => {
+      root.render(
+        <WorkspaceTreeView
+          files={[rootFile, nestedFile]}
+          folders={[{ path: "C:/vault/Archive", name: "Archive", relativePath: "Archive" }]}
+          activePath={rootFile.path}
+          onOpenFile={onOpenFile}
+        />,
+      );
+    });
+
+    const tree = container.querySelector<HTMLElement>('[role="tree"]');
+    const items = () => Array.from(container.querySelectorAll<HTMLButtonElement>('[role="treeitem"]'));
+    expect(tree?.getAttribute("aria-label")).toBe("工作区文件树");
+    expect(items()).toHaveLength(3);
+    expect(items().map((item) => item.tabIndex)).toEqual([0, -1, -1]);
+    expect(items()[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(items()[1]?.getAttribute("aria-expanded")).toBe("true");
+
+    act(() => {
+      items()[0]?.focus();
+      items()[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(items()[1]);
+    expect(items().map((item) => item.tabIndex)).toEqual([-1, 0, -1]);
+    expect(onOpenFile).not.toHaveBeenCalled();
+
+    act(() => {
+      items()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(items()[2]);
+    expect(items()[2]?.getAttribute("aria-level")).toBe("2");
+
+    act(() => {
+      items()[2]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+      items()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    });
+    expect(items()).toHaveLength(2);
+    expect(items()[1]?.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(items()[1]);
+
+    act(() => {
+      items()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    });
+    expect(items()).toHaveLength(3);
+    expect(document.activeElement).toBe(items()[1]);
+    expect(items()[1]?.getAttribute("aria-expanded")).toBe("true");
+
+    act(() => {
+      items()[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(items()[2]);
+    act(() => {
+      items()[2]?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(items()[0]);
+
+    act(() => {
+      items()[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", ctrlKey: true, bubbles: true }));
+    });
+    expect(document.activeElement).toBe(items()[0]);
+    act(() => {
+      items()[2]?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    });
+    expect(onOpenFile).toHaveBeenCalledWith(nestedFile.path);
+    act(() => items()[0]?.click());
+    expect(onOpenFile).toHaveBeenCalledWith(rootFile.path);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it("virtualizes the tree without an arbitrary display-all gate", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
