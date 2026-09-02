@@ -4,6 +4,8 @@
 
 ## 开始开发
 
+先读取 [`docs/NEXT.md`](docs/NEXT.md) 和 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。根目录已有未提交改动时不要直接开发；新切片放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 复用根目录依赖。完整路线和 HTML 边界见 [`docs/DEVELOPMENT-AUDIT.md`](docs/DEVELOPMENT-AUDIT.md)。
+
 ```powershell
 npm install
 npm run test
@@ -59,7 +61,7 @@ Pop-Location
 - Rust 格式、clippy 和测试通过。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
-- 本地 Tauri/Cargo 命令必须使用项目包装脚本；构建目标统一位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`。发现生成物膨胀时先运行 `npm run cleanup:workspace` 预览，再按输出使用 `--apply --prune-targets`；清理器不会触碰源码、用户笔记或主 `node_modules`。
+- 本地 Tauri/Cargo 命令必须使用项目包装脚本；构建目标统一位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`。发现生成物膨胀时先运行 `npm run cleanup:workspace` 预览，再按输出使用 `--apply`；只有没有活动 Rust 构建且明确需要回收空间时才加 `--prune-targets`。清理器不会触碰源码、用户笔记或主 `node_modules`，详细边界见 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md)。
 - 每个功能切片必须同步更新交接文档；没有目标、验收、测试结果和下一步的 PR 不算完成。
 - 开始阅读代码前先读取 [`docs/NEXT.md`](docs/NEXT.md) 和 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)；只在需要版本背景时读取当前交接摘要，不要把完整仓库、历史归档或整段流水线日志复制进 AI 上下文。
 
@@ -72,8 +74,8 @@ Pop-Location
 3. 实际运行过的检查命令及结果。
 4. 是否需要同步更新 Release、更新清单或用户文档。
 
-主分支不接受强制推送。发布版本通过版本标签触发，详见 [`docs/UPDATE.md`](docs/UPDATE.md)。
+主分支不接受强制推送。发布版本通过版本标签触发，详见 [`docs/UPDATE.md`](docs/UPDATE.md) 和 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。
 
 ## AI 交接
 
-功能分支与 `main` 无冲突且 Quality checks 全绿时可自动合并；权限、安全、更新器、发布工作流和数据迁移变更需要人工确认。代码、测试、需求/架构文档和下一步交接说明应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前唯一任务见 [`docs/NEXT.md`](docs/NEXT.md)。
+功能分支与 `main` 无冲突且 Quality checks 全绿时可自动合并；权限、安全、更新器、发布工作流和数据迁移变更需要人工确认。代码、测试、需求/架构文档和下一步交接说明应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前唯一任务见 [`docs/NEXT.md`](docs/NEXT.md)，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。

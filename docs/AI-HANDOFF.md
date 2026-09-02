@@ -1,15 +1,32 @@
 # Moyang Reader 当前交接摘要
 
-本文件只保留当前稳定事实、正在推进的版本和外部阻塞。下一位 AI 的可执行任务只以 [`NEXT.md`](NEXT.md) 为准；完整流程见 [`AI-WORKFLOW.md`](AI-WORKFLOW.md)，历史记录见 [`handoff/`](handoff/)。
+本文件只保留当前稳定事实、正在推进的版本和外部阻塞。下一位 AI 的可执行任务只以 [`NEXT.md`](NEXT.md) 为准；可复制的最小接手提示词见 [`AI-TAKEOVER-PROMPT.md`](AI-TAKEOVER-PROMPT.md)；完整流程见 [`AI-WORKFLOW.md`](AI-WORKFLOW.md)；全量审计和任务地图见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)、[`../tasks/plan.md`](../tasks/plan.md) 和 [`../tasks/todo.md`](../tasks/todo.md)；历史记录见 [`handoff/`](handoff/)。
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`；PR #414 已 squash 合并，Issue #363 已以 `completed` 关闭。
+- 发布代码主线基线：`main@740049dc9de36c73941c3efcc01790c199edeea7`；PR #415 已 squash 合并，Issue #363 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布并完成交接；下一项只能从重新检查后的 Ready backlog 选择，本轮不自动开启新功能。
+- 当前状态：v0.10.14 已发布并完成交接；唯一 Ready 事项为 [#416](https://github.com/MY-moss/moyang_Reader/issues/416)，尚未开始实现。
+- 当前开放 Issue 快照（2026-09-02）：15 个开放事项，其中 #416 是唯一 Ready，#373 是历史跟踪项，其余开放事项均为候选/条件项；当前没有开放的产品功能 PR，只有 6 个 Dependabot PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
+
+> 以下“本轮”段落是已完成切片的历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
+
+## 本轮工程治理与 HTML 路线
+
+- 全量流程、现有能力、缺口、Issue 映射、HTML 适配任务和 v1.0 以后边界见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)。
+- 工作区清理只回收可再生生成物和已确认合并/干净的临时工作树；根目录脏改动、未合并成果、用户文档和历史交接均保留，规则见 [`WORKSPACE-CLEANUP.md`](WORKSPACE-CLEANUP.md)。
+- HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
+
+## 下一项 Ready：#416 Windows 外部图标一致性
+
+- 目标：统一应用内 Logo 与 Windows 安装包、可执行文件、快捷方式、开始菜单、任务栏和 `.md/.txt` 文件关联图标。
+- 已知边界：远程 `main`/v0.10.14 已有新的 `src/assets/moyang-reader-logo.png` 与 `src-tauri/icons/*`；旧本机脏工作树可能仍是旧字母 M；Windows Shell 还可能保留旧图标缓存。
+- 必须做：显式检查并声明 `bundle.icon` Windows 路径；增加资源完整性/旧默认资源回退检查；覆盖全新安装、覆盖升级、快捷方式和文件关联验证；记录缓存无法由应用强制刷新的边界。
+- 不要做：不从脏根目录打包；不重新设计 Logo；不做跨平台图标；不删除系统缓存作为唯一修复；不在没有验收证据前创建 v0.10.15 Release。
+- 入口：先读 [`NEXT.md`](NEXT.md) 中 #416、GitHub [Issue #416](https://github.com/MY-moss/moyang_Reader/issues/416)、[`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，再从最新 `main` 创建项目内独立工作树。
 
 ## v0.10.14 发布交接（已完成）
 
