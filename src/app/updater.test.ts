@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { describeUpdateError } from "./updater";
+import { describeUpdateError, updateActionForStatus } from "./updater";
+
+describe("update toolbar actions", () => {
+  it("reopens an existing update instead of discarding it", () => {
+    expect(updateActionForStatus("available")).toBe("open");
+    expect(updateActionForStatus("downloading")).toBe("open");
+    expect(updateActionForStatus("ready")).toBe("open");
+  });
+
+  it("checks for a new update when there is no update to reopen", () => {
+    expect(updateActionForStatus("idle")).toBe("check");
+    expect(updateActionForStatus("checking")).toBe("check");
+    expect(updateActionForStatus("error")).toBe("check");
+    expect(updateActionForStatus("up-to-date")).toBe("check");
+  });
+});
 
 describe("update error messages", () => {
   it("explains signature failures without exposing implementation details", () => {

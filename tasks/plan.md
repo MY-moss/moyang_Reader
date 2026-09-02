@@ -48,7 +48,8 @@ G-01 工程治理与清理（本轮）
 - [x] **F-07d #191 目录 roving 与当前章节高亮（已合并）**：目录使用 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End 和现有中央正文导航；当前高亮同步 `active`/`aria-current`/`aria-selected`；读屏播报和 Esc 互斥另行拆分；T2。PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 - [x] **F-08 #233 顶栏图标与密度（已合并）**：统一当前文档操作、低频菜单和窄窗口溢出；不与完整主题重构混做；T2。PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 已 squash 合并为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，Issue #233 已关闭。
 - [ ] **F-09 #171/#193 视觉令牌治理**：先抽取颜色/间距/焦点/字体/动效令牌，再拆规则；不大改布局行为；T2。
-- [ ] **F-09a 用户反馈：左侧栏阅读库操作区布局与菜单交互**：修复“新建、批量导出、添加/切换阅读库”在窄侧栏中的遮挡与操作中断；菜单进入布局流并互斥收起；不改变创建、导出、挂载的数据语义；T2；分支 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
+- [x] **F-09a 用户反馈：左侧栏阅读库操作区布局与菜单交互**：修复“新建、批量导出、添加/切换阅读库”在窄侧栏中的遮挡与操作中断；菜单进入布局流并互斥收起；不改变创建、导出、挂载的数据语义；T2；分支 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
+- [ ] **F-09b 用户反馈：更新入口“更多”工作流与不中断阅读**：更新按钮固定在“更多”操作栏；已有更新、下载中和已安装状态可恢复查看，下载完成不自动重启；不改更新端点、签名和发布资产；T3；分支 `codex/update-more-workflow-2026-09-03`，PR 待创建。
 - [ ] **F-10 #16 App.tsx 渐进拆分**：一次只迁移一个 hook/服务边界，行为快照不变；不以行数为唯一目标；T1/T2。
 - [ ] **F-11 #194 TS↔Rust 契约收敛**：每次只处理一个 IPC/路径谓词族，补类型和测试；T1/T3。
 - [ ] **F-12 #227 安全披露文档**：新增 `SECURITY.md`、支持版本和私密报告入口；T0。

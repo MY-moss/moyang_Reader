@@ -1,13 +1,25 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#191 的快速打开、标签栏、文件树和目录键盘导航子切片均已合并；当前执行用户反馈的左侧栏阅读库操作区 UI 修复，分支为 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
-- 发布代码主线基线：`main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；PR #418–#427 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
+- 当前状态：#428 左侧栏阅读库操作区 UI 修复已合并；当前执行更新入口“更多”工作流与不中断阅读切片，分支为 `codex/update-more-workflow-2026-09-03`，本地完整质量门禁已通过，PR 尚未创建。
+- 发布代码主线基线：`main@8325982f12276e938084523966f02404ba2db041`；PR #418–#428 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
+## 当前切片：更新入口“更多”工作流与不中断阅读（用户反馈，2026-09-03）
+
+- 目标：把更新按钮的状态操作固定在“更多”中；对已有更新、下载中和已安装状态重新打开当前提示，不重新检查或销毁已有更新对象；下载完成后等待用户明确重启。
+- 用户价值：用户可以在当前文档和编辑流程中检查、查看进度和安排重启，不因更新下载完成而被强制退出或丢失当前工作上下文。
+- 非目标：不改更新端点、签名校验、安装包格式、自动检查偏好、镜像/发布资产或旧版本实机升级；不处理默认首页、旧 M 图标、#191 读屏、HTML、脚本或插件边界。
+- 验收标准：点击“更多 → 更新”会先收起更多面板；“有更新/下载中/已更新”只恢复对应提示；隐藏下载提示不停止下载，更多入口可重新打开；下载完成不自动重启，提示提供明确的“重启应用”；当前文档保持不变；更新器单测、组件测试、浏览器 E2E、完整质量门禁通过。
+- 涉及文件：`src/app/App.tsx`、`src/app/updater.ts`、`src/app/updater.test.ts`、`src/app/components/TopBar.tsx`、`src/app/components/UpdateNotice.test.tsx`、`e2e/smoke.spec.ts`、`docs/UPDATE.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 Tauri updater/process 插件、签名更新协议、通知视口和“更多”菜单；不新增运行时依赖、外部凭据、数据迁移或发布资产。
+- 风险：延迟重启会让旧进程继续运行到用户确认；重复点击不能销毁下载中的更新对象；真实旧版本下载、签名、替换和重启仍需 #241 的 Windows 实机条件验证。
+- 回滚：回退本切片 PR 即可恢复自动重启和原更新按钮行为；不需要数据迁移，不影响已下载文档或更新资产。
+- 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本地门禁已通过，远程 Quality checks 待 PR 创建后运行；本切片不生成安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
+
+## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 
 - 目标：让左侧栏的“新建、批量导出、添加阅读库、切换/管理阅读库”在窄侧栏中稳定排列；菜单展开时进入布局流，不遮挡文件树，也不被侧栏横向裁切。
 - 用户价值：用户可以在当前阅读流程内快速创建、导出、添加或切换阅读库，操作反馈清晰，不必反复关闭面板或猜测被遮挡的菜单项。
@@ -16,8 +28,8 @@
 - 涉及文件：`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/styles.css`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：复用现有 WorkspacePanel 回调、Tauri 工作区授权/导出管线、`<details>` 原生键盘行为和现有语义令牌；不新增运行时依赖、外部凭据或数据迁移；本地 Cargo target 继续使用 D 盘 `MOYANG_BUILD_CACHE_DIR`。
 - 风险：流式菜单会增加侧栏高度并推动文件树下移；窄侧栏仍需保留可滚动空间；点外/Esc 监听必须只作用于三个操作菜单，不干扰文件树上下文菜单或全局快捷键。
-- 回滚：回退本 PR 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
-- 发布：普通 T2 UI 切片，只做针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；纳入后续稳定批次。PR #428 合并后停止，不自动开始下一批。
+- 回滚：回退 PR #428 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
+- 发布：普通 T2 UI 切片，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；PR #428 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
 ## 最近完成：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）
 

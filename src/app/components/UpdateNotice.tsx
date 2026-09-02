@@ -42,7 +42,7 @@ export function UpdateNotice({
           {version && status !== "up-to-date" ? " · v" + version.replace(/^v/i, "") : ""}
         </strong>
         {status === "up-to-date" && <span>已向 Moyang Reader 更新服务完成检查。</span>}
-        {status === "available" && <span>下载后会校验签名，并在安装完成后重启应用。</span>}
+        {status === "available" && <span>下载后会校验签名，安装完成后可手动重启应用。</span>}
         {status === "downloading" && <span>{progressLabel}</span>}
         {status === "ready" && <span>应用已经更新，可以重启进入新版本。</span>}
         {isError && <span>{error ?? "请稍后重试。"}</span>}
