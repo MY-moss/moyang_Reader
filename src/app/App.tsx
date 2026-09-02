@@ -6055,7 +6055,7 @@ export function App() {
           />
         )}
 
-        <main ref={contentAreaRef} className="content-area" aria-live="polite" onWheel={handleReaderWheel}>
+        <main ref={contentAreaRef} className="content-area" onWheel={handleReaderWheel}>
           {readingZoomNotice !== null && (
             <div className="reading-zoom-hud" role="status" aria-live="polite">
               阅读缩放 {readingZoomNotice}%
@@ -6076,7 +6076,11 @@ export function App() {
               退出专注 <span>Esc</span>
             </button>
           )}
-          {loading && <div className="loading-state">正在打开文档…</div>}
+          {loading && (
+            <div className="loading-state" role="status" aria-live="polite">
+              正在打开文档…
+            </div>
+          )}
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
               fileName={documentState.name}

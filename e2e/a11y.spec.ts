@@ -125,6 +125,29 @@ test("keeps the reader state free of serious accessibility violations", async ({
   await expectNoSeriousA11yViolations(page, "reader");
 });
 
+test("keeps the reader article outside broad live regions", async ({ page }) => {
+  await loadReaderFixture(page);
+  await switchToRenderedMode(page);
+
+  const contentArea = page.locator("main.content-area");
+  await expect(contentArea).not.toHaveAttribute("aria-live");
+  await expect(contentArea.locator("article.reader-content")).toBeVisible();
+
+  await page.keyboard.press("Control+Equal");
+  const zoomStatus = contentArea.locator(".reading-zoom-hud");
+  await expect(zoomStatus).toHaveAttribute("role", "status");
+  await expect(zoomStatus).toHaveAttribute("aria-live", "polite");
+
+  const liveDescendants = await contentArea
+    .locator("[aria-live]")
+    .evaluateAll((elements) =>
+      elements.map(
+        (element) => element.getAttribute("class") ?? element.getAttribute("role") ?? element.tagName.toLowerCase(),
+      ),
+    );
+  expect(liveDescendants).toEqual(["reading-zoom-hud"]);
+});
+
 test("keeps the quick-open dialog free of serious accessibility violations", async ({ page }) => {
   await loadReaderFixture(page);
   await page.keyboard.press("Control+P");
