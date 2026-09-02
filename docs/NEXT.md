@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416 与 #366 均已 squash 合并，Issue #416、#366 已以 `completed` 关闭；当前执行 #370 步骤 1（最近阅读时间语义），PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，等待远程检查。
+- 当前状态：#416 与 #366 均已 squash 合并，Issue #416、#366 已以 `completed` 关闭；当前执行 #370 步骤 1（最近阅读时间语义），PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，Quality checks run `33611774822` 全部通过，准备合并。
 - 发布代码主线基线：`main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`；PR #418、#419 已合并，Issue #363、#416、#366 已以 `completed` 关闭。
 - 当前稳定版本：`v0.10.14`；#370 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。

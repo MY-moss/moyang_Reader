@@ -7,7 +7,7 @@
 - 发布代码主线基线：`main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`；PR #415、#418、#419 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 与 [#366](https://github.com/MY-moss/moyang_Reader/issues/366) 已完成，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 和 [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 均已合并；当前执行 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1，PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，等待远程检查。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 与 [#366](https://github.com/MY-moss/moyang_Reader/issues/366) 已完成，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 和 [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 均已合并；当前执行 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1，PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 的 Quality checks run `33611774822` 已全部通过，准备合并。
 - 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；在启动 #370 前无开放产品 PR，另有 6 个 Dependabot PR；Issue #370 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
@@ -48,7 +48,7 @@
 
 - 目标与用户价值：为本机最近打开文档记录可选 `lastOpenedAt`，上限由 12 提升到 50，按有效时间降序展示并显示中文相对日期，让“最近打开”真正可回顾；旧版 `{path,name}` 记录继续可读。
 - 非目标：不做阅读可见性心跳、阅读时长、本周统计、清理入口、联网/匿名上报、图表库、HTML 源码编辑、脚本或插件。
-- 基线与分支：从 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a` 创建项目内独立 worktree，分支 `codex/reading-history-2026-09-02`；PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，等待远程检查。
+- 基线与分支：从 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a` 创建项目内独立 worktree，分支 `codex/reading-history-2026-09-02`；PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，Quality checks run `33611774822` 全部通过，准备合并。
 - 验收与风险：存储单测覆盖上限、旧数据、非法时间和排序；组件测试覆盖相对日期/未知时间；浏览器 E2E 覆盖启动列表。时间非法时丢弃时间字段并保留安全插入顺序；改名/移动保留时间元数据；不触碰用户文档。
 - 涉及文件：`src/app/types.ts`、`src/app/storage.ts`、`src/app/portable-settings.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`e2e/smoke.spec.ts`、任务与交接文档。
 - 回滚与发布：回退本切片即可恢复 12 条插入序列表，不需要数据迁移；本切片不生成 Windows x64 安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
