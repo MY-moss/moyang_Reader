@@ -1,23 +1,28 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366、#370 三步、#233 和 #191 的快速打开/标签栏子切片均已合并；当前执行 #191 的文件树 roving tabindex 子切片，分支为 `codex/file-tree-roving-2026-09-02`，PR 待创建。
-- 发布代码主线基线：`main@0783b27c314749a3e1e1b0371b92674a0a77a247`；PR #418、#419、#420、#421、#422、#423、#424、#425 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 当前状态：#416、#366、#370 三步、#233 和 #191 的快速打开/标签栏/文件树子切片均已合并；当前执行 #191 的目录 roving tabindex 与当前章节高亮子切片，分支为 `codex/outline-roving-2026-09-03`，PR 待创建。
+- 发布代码主线基线：`main@e9cde556e48957f270828159890522b52ef51f89`；PR #418、#419、#420、#421、#422、#423、#424、#425、#426 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片）
+## 当前切片：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）
 
-- 目标：让工作区文件和文件夹共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点，Left/Right 处理文件夹折叠、展开、父级和首个子项，Enter 保持打开/切换行为。
-- 用户价值：键盘和读屏用户在长文件树中可连续浏览、进入目录和打开文档，不必反复经过无关控件。
-- 非目标：不实现目录高亮、读屏 live announcement、焦点模式 Esc 互斥或其他 #191 子切片；不改变鼠标/中键、拖拽、右键菜单、文件管理语义、文档内容、HTML、脚本、插件或发布链路。
-- 验收标准：容器声明 `role=tree`，条目声明 `role=treeitem`、层级和展开状态；可见条目恰有一个 `tabIndex=0`；方向键、Home/End、折叠/展开和 Enter 在虚拟列表中保持焦点与滚动；组件单测、Windows 桌面 E2E、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/components/WorkspaceTree.tsx`、`src/app/components/WorkspaceTree.test.tsx`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`、`.gitignore`。
-- 依赖：复用现有工作区树索引、虚拟窗口、ContextMenu 焦点归还和原生按钮打开动作；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存由 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
-- 风险：虚拟窗口可能暂时没有目标 DOM；目标先滚入窗口，再在布局 effect 中恢复焦点；文件夹变化或异步索引更新时 roving key 回退到可见条目，保留既有文件管理和菜单行为。
-- 回滚：回退本 PR 即可移除文件树 roving 状态、ARIA/键盘处理、测试和忽略规则；不需要数据迁移，也不影响 #424/#425 已交付的快速打开和标签栏语义。
+- 目标：让非空文档目录共享一个可预测的 Tab 停靠点；ArrowUp/ArrowDown、Home/End 移动焦点并调用现有中央正文定位，当前章节继续以视觉和 ARIA 语义高亮。
+- 用户价值：键盘和读屏用户可以在长文档目录中连续浏览并跳到章节，不必反复经过无关控件；阅读滚动或目录跳转后，当前章节位置仍然清晰可辨。
+- 非目标：不实现读屏 live announcement、焦点模式 Esc 互斥、目录折叠/展开或新的标题识别算法；不改变点击/鼠标、正文滚动算法、标签栏/文件树、文档内容、HTML、脚本、插件或发布链路。
+- 验收标准：目录声明 `role=tree`，条目声明 `role=treeitem`、`aria-level` 和当前选中状态；非空目录恰有一个 `tabIndex=0`；方向键、Home/End 在边界内移动焦点并复用现有章节导航，修饰键快捷键保持可用；当前标题同步 `active`、`aria-current` 和 `aria-selected`；Outline 单测、浏览器 E2E、构建、lint、格式和类型感知检查通过；桌面文件树 E2E 只在工作区树根内统计 treeitem，避免与目录树混淆。
+- 涉及文件：`src/app/components/Outline.tsx`、`src/app/components/Outline.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用 `TocItem`、`activeHeadingId`、既有 `navigateToHeading`/中央滚动容器和减少动画滚动策略；不新增运行时依赖、外部凭据或数据迁移；Windows 构建缓存由 `MOYANG_BUILD_CACHE_DIR` 指向仓库同级 D 盘专用目录。
+- 风险：阅读滚动时焦点可能停留在用户最后操作的目录项，而当前章节独立更新；标题列表刷新时原焦点项可能消失，roving 停靠点需安全回退到当前或首项；平面 `aria-level` 需保持与标题深度一致。
+- 回滚：回退本 PR 即可移除目录 roving 状态、ARIA 键盘处理和测试，恢复原目录链接行为；不需要数据迁移，也不影响 #424/#425/#426 已交付的导航语义。
 - 发布：本切片只做普通 UI 代码与针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
+
+## 最近完成：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片）
+
+- PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`；Quality checks run `33653154436` 全部通过，Issue #191 保持开放。
+- 文件树已具备 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End、文件夹 Left/Right 和虚拟窗口焦点恢复；缓存治理和工作树保护规则同步落地。
 
 ## 最近完成：#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）
 
@@ -49,7 +54,7 @@
 
 ## 下一次开发
 
-- 当前分支只覆盖 #191 的文件树子切片；合并后下一独立切片为 #191 的目录 roving tabindex/高亮或读屏播报，必须重新检查 Issues 和开放 PR。
+- 当前分支只覆盖 #191 的目录 roving tabindex/当前章节高亮子切片；合并后下一独立切片为 #191 的读屏播报或 Esc 互斥，必须重新检查 Issues 和开放 PR。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。

@@ -734,6 +734,7 @@ a:focus-visible {
 }
 .toolbar-button:focus-visible,
 .find-button:focus-visible,
+.outline-list [role="treeitem"]:focus-visible,
 .outline-list a:focus-visible,
 .tab-label:focus-visible,
 .tab-close:focus-visible {

@@ -503,6 +503,66 @@ test("keeps outline navigation inside the reader and supports resizable sidebars
     .toBe("376px");
 });
 
+test("moves through the outline with one roving tab stop and follows the current heading", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "outline-keyboard.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from(
+      [
+        "# Outline keyboard",
+        "",
+        "目录键盘导航测试。",
+        "",
+        ...Array.from({ length: 18 }, (_, index) => `开篇内容 ${index + 1}，用于验证当前章节高亮。`),
+        "",
+        "## 第一章",
+        "",
+        ...Array.from({ length: 18 }, (_, index) => `第一章内容 ${index + 1}。`),
+        "",
+        "### 第一节",
+        "",
+        ...Array.from({ length: 18 }, (_, index) => `第一节内容 ${index + 1}。`),
+        "",
+        "## 第二章",
+        "",
+        ...Array.from({ length: 18 }, (_, index) => `第二章内容 ${index + 1}。`),
+        "",
+        "## 第三章",
+        "",
+        ...Array.from({ length: 18 }, (_, index) => `第三章内容 ${index + 1}。`),
+      ].join("\n"),
+    ),
+  });
+
+  await switchToRenderedMode(page);
+  const outline = page.getByRole("tree", { name: "文档目录" });
+  const items = outline.getByRole("treeitem");
+  await expect(items).toHaveCount(5);
+
+  const currentIndex = await items.evaluateAll((elements) =>
+    elements.findIndex((element) => element.querySelector('[aria-current="location"]')),
+  );
+  expect(currentIndex).toBe(0);
+  await items.nth(currentIndex).focus();
+  await expect(items.nth(currentIndex)).toHaveAttribute("tabindex", "0");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(items.nth(1)).toBeFocused();
+  await expect(items.nth(1)).toHaveAttribute("tabindex", "0");
+  await expect(items.nth(0)).toHaveAttribute("tabindex", "-1");
+  await expect.poll(() => items.nth(1).locator("a").getAttribute("aria-current"), { timeout: 5_000 }).toBe("location");
+
+  await page.keyboard.press("End");
+  await expect(items.last()).toBeFocused();
+  await expect(items.last()).toHaveAttribute("tabindex", "0");
+
+  await page.keyboard.press("Home");
+  await expect(items.first()).toBeFocused();
+  await expect(items.first()).toHaveAttribute("tabindex", "0");
+});
+
 test("shares undo and redo history between WYSIWYG and source editing", async ({ page }) => {
   await page.goto("/");
   const initialSource = [

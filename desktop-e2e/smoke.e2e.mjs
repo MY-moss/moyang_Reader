@@ -960,9 +960,10 @@ describe("Moyang Reader desktop runtime", () => {
 
     const readTreeState = () =>
       browser.execute((expectedFileName) => {
-        const items = Array.from(document.querySelectorAll('[role="treeitem"]'));
+        const tree = document.querySelector('[role="tree"][aria-label="工作区文件树"]');
+        const items = Array.from(tree?.querySelectorAll('[role="treeitem"]') ?? []);
         return {
-          treeRole: document.querySelector('[role="tree"]')?.getAttribute("aria-label") ?? null,
+          treeRole: tree?.getAttribute("aria-label") ?? null,
           tabStopCount: items.filter((item) => item.getAttribute("tabindex") === "0").length,
           activeText: document.activeElement?.textContent?.trim() ?? "",
           activeRole: document.activeElement?.getAttribute("role") ?? null,
