@@ -1,13 +1,12 @@
 import { useRef } from "react";
 import { useModalBehavior } from "./useModalBehavior";
 
-type CloseConfirmationDialogProps = {
+type DraftClearAllConfirmationDialogProps = {
   onCancel: () => void;
   onConfirm: () => void;
-  onSaveAndClose: () => void;
 };
 
-export function CloseConfirmationDialog({ onCancel, onConfirm, onSaveAndClose }: CloseConfirmationDialogProps) {
+export function DraftClearAllConfirmationDialog({ onCancel, onConfirm }: DraftClearAllConfirmationDialogProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: cancelButtonRef, onClose: onCancel });
@@ -19,42 +18,36 @@ export function CloseConfirmationDialog({ onCancel, onConfirm, onSaveAndClose }:
         className="quick-open-dialog close-confirm-dialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="close-confirm-title"
-        aria-describedby="close-confirm-description"
+        aria-labelledby="draft-clear-all-title"
+        aria-describedby="draft-clear-all-description"
         tabIndex={-1}
       >
         <header className="quick-open-header">
           <div>
-            <div className="quick-open-kicker">UNSAVED CHANGES</div>
-            <h2 id="close-confirm-title">退出 Moyang Reader？</h2>
+            <div className="quick-open-kicker">CLEAR LOCAL DRAFTS</div>
+            <h2 id="draft-clear-all-title">清空全部草稿？</h2>
           </div>
         </header>
         <div className="close-confirm-body">
-          <p id="close-confirm-description">
-            当前文档有未保存修改。退出前已为你保留一份草稿副本，可随时在草稿恢复中心找回。选择“退出 Moyang
-            Reader”不会写回原文件，选择“保存并退出”会先保存当前修改。
-          </p>
+          <p id="draft-clear-all-description">确定清空全部未保存草稿吗？此操作无法撤销，原文件不会被修改。</p>
         </div>
         <footer className="quick-open-footer close-confirm-actions">
           <button
             ref={cancelButtonRef}
             type="button"
             className="quiet-button"
-            data-testid="close-confirm-cancel"
+            data-testid="draft-clear-all-cancel"
             onClick={onCancel}
           >
             取消
           </button>
-          <button type="button" className="quiet-button" data-testid="close-confirm-confirm" onClick={onConfirm}>
-            退出 Moyang Reader
-          </button>
           <button
             type="button"
             className="toolbar-button primary"
-            data-testid="close-confirm-save"
-            onClick={onSaveAndClose}
+            data-testid="draft-clear-all-confirm"
+            onClick={onConfirm}
           >
-            保存并退出
+            清空全部草稿
           </button>
         </footer>
       </section>

@@ -1701,7 +1701,12 @@ describe("Moyang Reader desktop runtime", () => {
   it("keeps the window and local edits after cancelling a close request", async () => {
     await requestCloseRequest();
     const firstDialog = await waitForCloseConfirmation();
-    assert.match(await firstDialog.getText(), /未保存修改/);
+    const firstDialogText = await firstDialog.getText();
+    assert.match(firstDialogText, /未保存修改/);
+    assert.match(firstDialogText, /草稿副本/);
+    assert.match(firstDialogText, /退出 Moyang Reader.*不会写回原文件/);
+    assert.match(firstDialogText, /保存并退出.*会先保存当前修改/);
+    assert.equal(await firstDialog.$('[data-testid="close-confirm-save"]').getText(), "保存并退出");
     await firstDialog.$('[data-testid="close-confirm-cancel"]').click();
     await browser.waitUntil(
       async () => {
@@ -1724,7 +1729,9 @@ describe("Moyang Reader desktop runtime", () => {
     await requestCloseRequest();
     const secondDialog = await waitForCloseConfirmation();
     assert.match(await secondDialog.getText(), /未保存修改/);
+    assert.match(await secondDialog.getText(), /草稿副本/);
     assert.equal(await secondDialog.$('[data-testid="close-confirm-confirm"]').getText(), "退出 Moyang Reader");
+    assert.equal(await secondDialog.$('[data-testid="close-confirm-save"]').getText(), "保存并退出");
     await secondDialog.$('[data-testid="close-confirm-cancel"]').click();
   });
 });

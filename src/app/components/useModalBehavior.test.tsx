@@ -10,12 +10,21 @@ function TestModal({ onClose }: { onClose: () => void }) {
   useModalBehavior({ containerRef, initialFocusRef, onClose });
 
   return (
-    <section ref={containerRef} role="dialog" tabIndex={-1}>
+    <section ref={containerRef} role="dialog" aria-modal="true" tabIndex={-1}>
       <button ref={initialFocusRef} type="button">
         first
       </button>
       <button type="button">last</button>
     </section>
+  );
+}
+
+function NestedTestModals({ lowerOnClose, upperOnClose }: { lowerOnClose: () => void; upperOnClose: () => void }) {
+  return (
+    <>
+      <TestModal onClose={lowerOnClose} />
+      <TestModal onClose={upperOnClose} />
+    </>
   );
 }
 
@@ -54,5 +63,48 @@ describe("useModalBehavior", () => {
     expect(document.activeElement).toBe(previousFocus);
     container.remove();
     previousFocus.remove();
+  });
+
+  it("lets only the modal that owns focus handle Escape when modals overlap", () => {
+    const lowerOnClose = vi.fn();
+    const upperOnClose = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<NestedTestModals lowerOnClose={lowerOnClose} upperOnClose={upperOnClose} />));
+    const buttons = container.querySelectorAll<HTMLButtonElement>("button");
+    buttons[2]?.focus();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    });
+
+    expect(lowerOnClose).not.toHaveBeenCalled();
+    expect(upperOnClose).toHaveBeenCalledOnce();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps Tab navigation inside the modal that owns focus when modals overlap", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<NestedTestModals lowerOnClose={vi.fn()} upperOnClose={vi.fn()} />));
+    const buttons = container.querySelectorAll<HTMLButtonElement>("button");
+    buttons[2]?.focus();
+    expect(document.activeElement).toBe(buttons[2]);
+    expect(buttons[2]?.closest('[aria-modal="true"]')).toBe(buttons[2]?.parentElement);
+    act(() => {
+      const event = new KeyboardEvent("keydown", { key: "Tab", cancelable: true });
+      document.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    expect(document.activeElement).toBe(buttons[2]);
+
+    act(() => root.unmount());
+    container.remove();
   });
 });

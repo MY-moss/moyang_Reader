@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@b11539ea85bc816dbb9f002021084755d7c826b2`；PR #415 已 squash 合并，Issue #363 已以 `completed` 关闭。
+- 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #415、#418 已 squash 合并，Issue #363、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已完成实现与本地 Windows 验收，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33591347377` 已全绿，等待人工审查/合并。
-- 当前开放 Issue/PR 快照（2026-09-02）：15 个开放 Issue，#416 是唯一 Ready；#373 是历史跟踪项；PR #418 是本次唯一产品 PR，另有 6 个 Dependabot PR。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)。
+- 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；没有开放产品 PR，另有 6 个 Dependabot PR；Issue #366 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -20,7 +20,7 @@
 - 工作区清理只回收可再生生成物和已确认合并/干净的临时工作树；根目录脏改动、未合并成果、用户文档和历史交接均保留，规则见 [`WORKSPACE-CLEANUP.md`](WORKSPACE-CLEANUP.md)。
 - HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
 
-## 本次切片：#416 Windows 外部图标一致性（2026-09-02）
+## 已完成切片：#416 Windows 外部图标一致性（2026-09-02）
 
 - 目标：统一应用内 Logo 与 Windows 可执行文件、NSIS 安装包、桌面/开始菜单快捷方式、任务栏和 `.md/.txt` 文件关联图标。
 - 用户价值：安装、升级或打开 Markdown/TXT 文档时不再看到旧字母 M 或默认图标，桌面入口与应用本体能保持一致。
@@ -33,7 +33,16 @@
 - 实现：显式列出 16 个 Windows 图标资源；校验 PNG 尺寸/哈希、ICO 目录/PNG 条目/尺寸/同源 256x256 图像、应用内 Logo 同源关系和旧 M SVG；将检查接入 `validateProject`，并补充资源夹具回归。
 - 验证：`release-check` 单测 11/11；Prettier、JSON 和差异检查通过；Tauri Windows x64 无安装包构建通过；本地 NSIS 包安装后可执行文件、安装器、桌面和开始菜单图标均可由 Windows 提取；全新安装和覆盖升级均返回成功，关联与快捷方式指向隔离安装目录。验证目录已清理，本机原有安装引用已恢复。
 - 发布边界：只生成本地验收用 NSIS 包；本切片不创建 GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，v0.10.14 稳定资产保持不变。若维护者将其纳入 v0.10.15 稳定批次，再按发布政策统一生成和核验。
-- 任务边界：本分支只对应一个垂直切片、一个 `codex/` 分支和一个 PR；PR/CI 完成后停止，不自动开始 #366、#370、#233 或任何 HTML 工作。
+- 任务边界：本切片已由一个 `codex/` 分支和一个 PR 完成；合并后重新检查 Issue 并切换到 #366，不自动开始 #370、#233 或任何 HTML 工作。
+
+## 本次切片：#366 统一确认弹层与未保存修改语义（2026-09-02）
+
+- 目标与用户价值：统一“清空全部草稿”和关闭未保存文档的应用内确认体验；明确草稿已留存，并提供保存并退出，降低误操作和退出时的不确定感。
+- 非目标：本切片不处理 `window.prompt` 系列、不改草稿数据模型或其他确认入口、不改变 HTML/插件/发布边界。
+- 验收标准：原生清空确认被应用弹层替代；弹层支持 Escape、取消、确认和焦点契约；关闭文案准确说明草稿副本；保存并退出复用现有保存管线且保存失败不继续关闭；组件、浏览器 E2E、Windows 桌面关闭路径通过。
+- 涉及文件：`src/app/App.tsx`、确认弹层组件及测试、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、本文件、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖与风险：复用 `useModalBehavior`、草稿快照和 `saveDocument`；保存受外部修改/写入失败影响，弹层需保持焦点边界。无新增运行时依赖、无数据迁移。
+- 回滚与发布：回退本切片提交即可恢复原确认行为；本切片不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
 
 ## v0.10.14 发布交接（已完成）
 

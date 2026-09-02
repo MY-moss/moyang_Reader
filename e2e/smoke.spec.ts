@@ -140,13 +140,20 @@ test("shows and manages local drafts from the recovery center", async ({ page })
           baseSource: "# Recovery note",
           savedAt: Date.now() - 60_000,
         },
+        {
+          path: "C:/Notes/second-draft.md",
+          draft: "# Second draft\n\n另一个未保存草稿",
+          baseSource: "# Second draft",
+          savedAt: Date.now() - 30_000,
+        },
       ]),
     );
   });
   await page.goto("/");
 
-  await page.getByRole("button", { name: "草稿 1" }).click();
-  const draftTrigger = page.getByRole("button", { name: "草稿 1" });
+  const draftTrigger = page.getByRole("button", { name: /^草稿 \d+$/ });
+  await expect(draftTrigger).toHaveAccessibleName("草稿 2");
+  await draftTrigger.click();
   await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
   await expect(page.getByRole("button", { name: "关闭草稿恢复中心" })).toBeFocused();
   await page.getByRole("button", { name: "查看 recovery-note.md 当前文件与草稿的差异" }).click();
@@ -173,7 +180,21 @@ test("shows and manages local drafts from the recovery center", async ({ page })
 
   await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
   await page.getByTestId("draft-discard-confirm").click();
-  await expect(page.getByRole("button", { name: "草稿 1" })).toHaveCount(0);
+  await expect(draftTrigger).toHaveAccessibleName("草稿 1");
+
+  await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
+  await page.getByRole("button", { name: "清空全部" }).click();
+  const clearAllDialog = page.getByRole("dialog", { name: "清空全部草稿？" });
+  await expect(clearAllDialog).toBeVisible();
+  await expect(clearAllDialog).toContainText("原文件不会被修改");
+  await expect(page.getByTestId("draft-clear-all-cancel")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(clearAllDialog).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "未保存草稿" })).toBeVisible();
+
+  await page.getByRole("button", { name: "清空全部" }).click();
+  await page.getByTestId("draft-clear-all-confirm").click();
+  await expect(draftTrigger).toHaveCount(0);
 });
 
 test("opens the quick-open palette from the keyboard", async ({ page }) => {
