@@ -16,6 +16,7 @@ function mountTabs() {
   const onClose = vi.fn();
   const onCloseMany = vi.fn();
   const onReorder = vi.fn();
+  const onSelect = vi.fn();
 
   act(() => {
     root.render(
@@ -24,7 +25,7 @@ function mountTabs() {
         activePath="C:/one.md"
         externallyModified={false}
         onShowExternalChange={vi.fn()}
-        onSelect={vi.fn()}
+        onSelect={onSelect}
         onClose={onClose}
         onCloseMany={onCloseMany}
         onReorder={onReorder}
@@ -32,7 +33,7 @@ function mountTabs() {
     );
   });
 
-  return { container, root, onClose, onCloseMany, onReorder };
+  return { container, root, onClose, onCloseMany, onReorder, onSelect };
 }
 
 function withDataTransfer(event: Event, dataTransfer: DataTransfer) {
@@ -46,6 +47,60 @@ function cleanup(container: HTMLElement, root: ReturnType<typeof createRoot>) {
 }
 
 describe("Tabs", () => {
+  it("keeps one document tab in the tab order and moves it with arrow keys", async () => {
+    const { container, root, onSelect } = mountTabs();
+    const labels = container.querySelectorAll<HTMLButtonElement>(".tab-label");
+
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([0, -1]);
+    labels[0]?.focus();
+
+    await act(async () => {
+      labels[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    });
+
+    expect(onSelect).toHaveBeenCalledWith("C:/two.md");
+    expect(document.activeElement).toBe(labels[1]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([-1, 0]);
+
+    await act(async () => {
+      labels[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    });
+
+    expect(onSelect).toHaveBeenLastCalledWith("C:/one.md");
+    expect(document.activeElement).toBe(labels[0]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([0, -1]);
+
+    await act(async () => {
+      labels[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(labels[1]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([-1, 0]);
+
+    await act(async () => {
+      labels[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(labels[0]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([0, -1]);
+    cleanup(container, root);
+  });
+
+  it("leaves modified arrow shortcuts available to the application", () => {
+    const { container, root, onSelect } = mountTabs();
+    const labels = container.querySelectorAll<HTMLButtonElement>(".tab-label");
+    labels[1]?.focus();
+
+    act(() => {
+      labels[1]?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowLeft", ctrlKey: true, bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(labels[1]);
+    expect(Array.from(labels).map((label) => label.tabIndex)).toEqual([0, -1]);
+    cleanup(container, root);
+  });
+
   it("closes a tab on middle click", () => {
     const { container, root, onClose } = mountTabs();
     const tab = container.querySelector<HTMLElement>(".tab-item");

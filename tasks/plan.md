@@ -41,7 +41,8 @@ G-01 工程治理与清理（本轮）
 - [ ] **F-04 #112 更新与 opener 文档收口**：清理重复说明、补镜像失败回退/权限边界和用户可见故障排查；不重复实现更新器；T2/T3。
 - [x] **F-05 #366 统一确认语义（已合并）**：清空草稿、关闭窗口和未保存修改使用应用内弹层，说明草稿已自动留存，并提供保存并退出；不处理 `window.prompt` 系列、不改数据模型；PR #419 已合并为 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`，Issue #366 已关闭；T2。
 - [x] **F-06 #370 阅读历史与本地统计（已合并）**：步骤 1/2 已合并最近文档时间语义和本机前台可见性心跳；步骤 3 补齐本地周一至周日统计、去重文档数、累计时长和清理确认入口；仅本机、无联网/匿名上报、不引入图表库；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 已 squash 合并为 `main@b7dc14358aee7025a83e86a7ba06d865914fddb1`，Issue #370 已关闭；T1/T2。
-- [ ] **F-07 #191 键盘与读屏细节（当前子切片）**：第 1 个子切片让快速打开高亮跟随方向键/鼠标并保持 `aria-activedescendant` 与可视区同步；剩余树导航、目录高亮、读屏播报和焦点归还继续拆分；不引入新 UI 框架；T2。PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
+- [ ] **F-07 #191 键盘与读屏细节（当前子切片）**：第 1 个子切片已合并快速打开高亮/活动后代同步；当前第 2 个子切片为已打开文档标签栏的 roving tabindex、左右/Home/End 导航和选中同步；文件树、目录高亮、读屏播报和焦点归还继续拆分；不引入新 UI 框架；T2。PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 的 Quality checks run `33640484585` 进行中。
+- [x] **F-07a #191 快速打开子切片（已合并）**：PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；Issue #191 保持开放。
 - [x] **F-08 #233 顶栏图标与密度（已合并）**：统一当前文档操作、低频菜单和窄窗口溢出；不与完整主题重构混做；T2。PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 已 squash 合并为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，Issue #233 已关闭。
 - [ ] **F-09 #171/#193 视觉令牌治理**：先抽取颜色/间距/焦点/字体/动效令牌，再拆规则；不大改布局行为；T2。
 - [ ] **F-10 #16 App.tsx 渐进拆分**：一次只迁移一个 hook/服务边界，行为快照不变；不以行数为唯一目标；T1/T2。

@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent as ReactDragEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent } from "react";
 import type { RecentFile } from "../types";
 import { ContextMenu } from "./ContextMenu";
 
@@ -25,6 +25,9 @@ export function Tabs({
 }: TabsProps) {
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [rovingPath, setRovingPath] = useState<string | null>(activePath);
+  const tabButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const previousActivePathRef = useRef(activePath);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -32,6 +35,18 @@ export function Tabs({
     restoreFocusTarget: HTMLElement | null;
     fallbackFocusTarget: HTMLElement | null;
   } | null>(null);
+
+  useEffect(() => {
+    const activePathChanged = activePath !== previousActivePathRef.current;
+    previousActivePathRef.current = activePath;
+    const preferredPath =
+      activePathChanged && activePath && tabs.some((tab) => tab.path === activePath)
+        ? activePath
+        : tabs.some((tab) => tab.path === rovingPath)
+          ? rovingPath
+          : (tabs[0]?.path ?? null);
+    if (preferredPath !== rovingPath) setRovingPath(preferredPath);
+  }, [activePath, rovingPath, tabs]);
 
   useEffect(() => {
     if (contextMenu && !tabs.some((tab) => tab.path === contextMenu.path)) setContextMenu(null);
@@ -56,10 +71,21 @@ export function Tabs({
 
   const isContextMenuKey = (event: KeyboardEvent<HTMLButtonElement>) =>
     event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
+  const rovingTabIndex = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.path === rovingPath),
+  );
+  const focusTabAt = (index: number) => {
+    const nextTab = tabs[index];
+    if (!nextTab) return;
+    setRovingPath(nextTab.path);
+    onSelect(nextTab.path);
+    tabButtonRefs.current.get(nextTab.path)?.focus();
+  };
 
   return (
-    <div className="tab-strip" role="toolbar" aria-label="已打开文档" tabIndex={-1}>
-      {tabs.map((tab) => {
+    <div className="tab-strip" role="toolbar" aria-label="已打开文档" aria-orientation="horizontal" tabIndex={-1}>
+      {tabs.map((tab, index) => {
         const active = tab.path === activePath;
         const isDragging = draggedPath === tab.path;
         const isDragTarget = dragOverPath === tab.path && draggedPath !== tab.path;
@@ -108,17 +134,37 @@ export function Tabs({
             <button
               type="button"
               aria-pressed={active}
+              tabIndex={index === rovingTabIndex ? 0 : -1}
               className="tab-label"
               title={tab.path}
+              ref={(element) => {
+                if (element) tabButtonRefs.current.set(tab.path, element);
+                else tabButtonRefs.current.delete(tab.path);
+              }}
               onClick={() => {
+                setRovingPath(tab.path);
                 onSelect(tab.path);
                 if (active && externallyModified) onShowExternalChange();
               }}
               onKeyDown={(event) => {
-                if (!isContextMenuKey(event)) return;
+                if (isContextMenuKey(event)) {
+                  event.preventDefault();
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  openContextMenu(tab.path, rect.left + Math.min(28, rect.width / 2), rect.bottom, event.currentTarget);
+                  return;
+                }
+
+                if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+                let nextIndex: number | null = null;
+                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+                if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+                if (event.key === "Home") nextIndex = 0;
+                if (event.key === "End") nextIndex = tabs.length - 1;
+                if (nextIndex === null) return;
+
                 event.preventDefault();
-                const rect = event.currentTarget.getBoundingClientRect();
-                openContextMenu(tab.path, rect.left + Math.min(28, rect.width / 2), rect.bottom, event.currentTarget);
+                focusTabAt(nextIndex);
               }}
             >
               {tab.name}

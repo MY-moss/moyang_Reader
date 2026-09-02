@@ -1,12 +1,12 @@
 # Moyang Reader 版本路线
 
-## v0.11.x 当前执行：#191 快速打开高亮跟随与读屏语义（第 1 个子切片）
+## v0.11.x 当前执行：#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）
 
-- 当前基线：稳定版本 `v0.10.14`，远程主线 `main@42337e840f2266f31715bee914630fc9b42cde1d`。
-- 用户价值：长文档列表中键盘用户不会丢失快速打开高亮；搜索框会把当前选择明确交给读屏用户，Enter 继续打开当前文档。
-- 交付边界：为快速打开结果提供稳定 option ID、`aria-controls`/`aria-activedescendant` 关联和活动项最近滚动；其余 #191 导航、播报和 Esc 子切片另行交付。
+- 当前基线：稳定版本 `v0.10.14`，远程主线 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`。
+- 用户价值：键盘和读屏用户在多个已打开文档间切换时不必逐个经过关闭按钮，方向键能保持焦点与当前文档一致。
+- 交付边界：为已打开文档标签栏提供水平工具栏语义、单一 roving Tab 停靠点、左右循环和 Home/End 导航；文件树、目录、播报和 Esc 子切片另行交付。
 - 发布策略：这是一个普通 v0.11.x UI 维护切片；完成验收前不生成安装包、Release、签名、`latest.json` 或镜像。
-- 对应 Issue：[#191](https://github.com/MY-moss/moyang_Reader/issues/191)，当前 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424)；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
+- 对应 Issue：[#191](https://github.com/MY-moss/moyang_Reader/issues/191)，当前分支 `codex/tabs-roving-2026-09-02`、PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425)，Quality checks run `33640484585` 进行中；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
 
 ## v0.10.14 小版本发布（2026-09-02）
 
@@ -16,7 +16,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-09-01）
 
-- 稳定基线：`v0.10.14`；当前远程主线代码为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，PR #423 已完成顶栏图标交接；PR #424 为 #191 的第一个可访问性子切片，Quality checks run `33632431268` 已全绿，仍待合并。
+- 稳定基线：`v0.10.14`；当前远程主线代码为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，PR #423/#424 已完成顶栏图标和快速打开可访问性交接；当前 PR 为 #191 的标签栏子切片。
 - 交付方式：一个切片、一个主要分支、一个 PR；合并后更新 [`NEXT.md`](NEXT.md) 与 [`AI-HANDOFF.md`](AI-HANDOFF.md)，完成交接后停止。
 - 发布方式：v0.10.14 已先以独立 patch Release 交付；后续中间切片仍不重复生成安装包，稳定批次达到验收标准后再准备 `v0.11.0` Windows x64 Release、签名、manifest 和镜像核验。
 

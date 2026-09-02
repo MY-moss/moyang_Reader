@@ -274,6 +274,46 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab")).toHaveCount(5);
 });
 
+test("moves the active document tab with horizontal keyboard navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "tab-one.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Tab one\n\n第一个标签页。"),
+    },
+    {
+      name: "tab-two.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Tab two\n\n第二个标签页。"),
+    },
+  ]);
+
+  const tabStrip = page.getByRole("toolbar", { name: "已打开文档" });
+  const labels = tabStrip.locator(".tab-label");
+  await expect(labels).toHaveCount(2);
+
+  const activeIndex = await labels.evaluateAll((elements) =>
+    elements.findIndex((element) => element.getAttribute("aria-pressed") === "true"),
+  );
+  expect(activeIndex).toBeGreaterThanOrEqual(0);
+  const nextIndex = (activeIndex + 1) % 2;
+
+  await labels.nth(activeIndex).focus();
+  await expect(labels.nth(activeIndex)).toHaveAttribute("tabindex", "0");
+  await expect(labels.nth(nextIndex)).toHaveAttribute("tabindex", "-1");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(labels.nth(nextIndex)).toBeFocused();
+  await expect(labels.nth(nextIndex)).toHaveAttribute("tabindex", "0");
+  await expect(labels.nth(nextIndex)).toHaveAttribute("aria-pressed", "true");
+  await expect(labels.nth(activeIndex)).toHaveAttribute("tabindex", "-1");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(labels.nth(activeIndex)).toBeFocused();
+  await expect(labels.nth(activeIndex)).toHaveAttribute("aria-pressed", "true");
+});
+
 test("keeps the quick-open highlight visible and announced as it moves", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 520 });
   await page.goto("/");
