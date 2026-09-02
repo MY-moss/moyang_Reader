@@ -4,7 +4,7 @@
 
 ## 当前切片（执行中）
 
-- [ ] **#370 阅读历史与本地统计（步骤 3/3）**：步骤 1 的 PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 和步骤 2 的 PR [#421](https://github.com/MY-moss/moyang_Reader/pull/421) 已 squash 合并，当前主线为 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`；当前独立工作树/分支 `codex/reading-history-weekly-2026-09-02` 增加本地周一至周日 7 日统计、去重文档数、累计时长、纯 CSS 柱状条和清理确认。步骤 3 代码与针对性验证已完成，等待本切片 PR/CI。
+- [ ] **#370 阅读历史与本地统计（步骤 3/3）**：步骤 1 的 PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 和步骤 2 的 PR [#421](https://github.com/MY-moss/moyang_Reader/pull/421) 已 squash 合并，当前主线为 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a`；当前独立工作树/分支 `codex/reading-history-weekly-2026-09-02` 增加本地周一至周日 7 日统计、去重文档数、累计时长、纯 CSS 柱状条和清理确认。步骤 3 代码与针对性验证已完成，PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 等待远程门禁。
 
 ## 下一批候选（完成 #370 当前切片后重新检查）
 

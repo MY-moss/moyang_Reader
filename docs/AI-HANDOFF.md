@@ -58,7 +58,7 @@
 - 目标：在侧栏展示本地周一至周日的阅读时长柱状摘要、去重阅读文档数和累计时长，并提供清理本机阅读历史的确认入口。
 - 用户价值：用户无需离开阅读器即可回顾本周阅读量级，也能明确删除本机阅读时长；原文档和其他阅读状态不会被误删。
 - 非目标：不做目标/提醒、云同步、匿名上报、图表库、分钟级精度、历史趋势或按文档排行；不涉及 HTML 源码编辑、脚本、插件或发布链路。
-- 基线与分支：基于已合并 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a` 创建项目内独立 worktree；分支 `codex/reading-history-weekly-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 未发现重复产品 PR；PR 待创建。
+- 基线与分支：基于已合并 `main@0ae85fc930a8a8f41db8f197734f5f1ef5d7db5a` 创建项目内独立 worktree；分支 `codex/reading-history-weekly-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 未发现重复产品 PR；PR [#422](https://github.com/MY-moss/moyang_Reader/pull/422) 等待远程门禁。
 - 验收标准：按本地周一至周日聚合 7 个日桶并按路径去重；侧栏使用纯 CSS 柱状条显示 7 天、文档数和累计时长；空状态、当前日和无效数据安全呈现；清理前使用应用内确认弹层，确认后只移除阅读历史键并刷新为零，不影响最近打开、阅读位置、草稿或文档；组件测试、浏览器 E2E、全量单测、构建、lint、格式和类型感知检查通过。
 - 涉及文件：`src/app/reading-history.ts` 及测试、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`src/app/components/ReadingHistoryPanel.tsx` 及测试、`src/app/components/ReadingHistoryClearConfirmationDialog.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、任务与交接文档。
 - 依赖：步骤 2 已提供本机 `dailySeconds` 数据；复用 `localStorage`、Windows 路径规范化、统一 modal 行为和 React 状态；不新增运行时依赖、外部凭据或数据迁移。
