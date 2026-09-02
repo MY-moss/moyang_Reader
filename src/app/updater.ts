@@ -3,6 +3,10 @@ import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 
 export type UpdateStatus = "idle" | "checking" | "available" | "downloading" | "ready" | "error" | "up-to-date";
 
+export function updateActionForStatus(status: UpdateStatus): "check" | "open" {
+  return status === "available" || status === "downloading" || status === "ready" ? "open" : "check";
+}
+
 export async function getCurrentAppVersion(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
 

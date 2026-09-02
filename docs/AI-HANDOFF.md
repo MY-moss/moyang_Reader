@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 发布代码主线基线：`main@8325982f12276e938084523966f02404ba2db041`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，当前执行用户反馈的左侧栏阅读库操作区 UI 修复，分支为 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现左侧栏操作区重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，#428 左侧栏阅读库操作区 UI 修复已合并，当前执行更新入口“更多”工作流与不中断阅读切片，分支为 `codex/update-more-workflow-2026-09-03`，本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现更新入口或阅读流程重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -21,17 +21,32 @@
 - 当前 Windows 开发环境已将旧 C 盘 `build-cache` 的 Cargo target 迁移到 `D:\AI-moyang\本地阅读工具-build-cache`，并通过用户级 `MOYANG_BUILD_CACHE_DIR` 复用；源目录已清理，清理器仍只在预览确认且无活动构建时回收可再生目标。
 - HTML 当前只作为导出目标；后续先做 H-01/H-05 安全只读预览，再评估 Markdown 白名单 HTML 和 HTML 源码编辑，不开放任意脚本执行。
 
-## 当前切片：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
+## 当前切片：更新入口“更多”工作流与不中断阅读（用户反馈，2026-09-03）
+
+- 目标：把更新按钮的状态操作固定在“更多”中；对已有更新、下载中和已安装状态重新打开当前提示，不重新检查或销毁已有更新对象；下载完成后等待用户明确重启。
+- 用户价值：用户可以在当前文档和编辑流程中检查、查看进度和安排重启，不因更新下载完成而被强制退出或丢失当前工作上下文。
+- 非目标：不改更新端点、签名校验、安装包格式、自动检查偏好、镜像/发布资产或旧版本实机升级；不处理默认首页、旧 M 图标、#191 读屏、HTML、脚本或插件边界。
+- 基线与分支：基于 `main@8325982f12276e938084523966f02404ba2db041` 创建项目内独立工作树；分支 `codex/update-more-workflow-2026-09-03`，当前远程提交 `7d60e33e5b7610b9af0d53581c6ea81d5c2391d8`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；本地完整质量门禁已通过，PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 的 Quality checks run `33678077540` 已通过，待合并。
+- 验收标准：点击“更多 → 更新”会先收起更多面板；“有更新/下载中/已更新”只恢复对应提示；隐藏下载提示不停止下载，更多入口可重新打开；下载完成不自动重启，提示提供明确的“重启应用”；当前文档保持不变；更新器单测、组件测试、浏览器 E2E、完整质量门禁通过。
+- 涉及文件：`src/app/App.tsx`、`src/app/updater.ts`、`src/app/updater.test.ts`、`src/app/components/TopBar.tsx`、`src/app/components/UpdateNotice.test.tsx`、`e2e/smoke.spec.ts`、`docs/UPDATE.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 Tauri updater/process 插件、签名更新协议、通知视口和“更多”菜单；不新增运行时依赖、外部凭据、数据迁移或发布资产。
+- 风险：延迟重启会让旧进程继续运行到用户确认；重复点击不能销毁下载中的更新对象；真实旧版本下载、签名、替换和重启仍需 #241 的 Windows 实机条件验证。
+- 回滚：回退本切片 PR 即可恢复自动重启和原更新按钮行为；不需要数据迁移，不影响已下载文档或更新资产。
+- 验证（当前）：更新器与完成态组件测试 8/8；前端覆盖率 94 个测试文件/371 个测试通过；浏览器 E2E 73/73；Windows 桌面 E2E 16/16；Actions、构建产物、依赖审计、发布检查/测试、Rust fmt/clippy/test 均通过；远程 Quality checks run `33678077540` 已通过。
+- 缓存处置：Cargo target 继续使用 `D:\AI-moyang\本地阅读工具-build-cache`；没有活动 Rust 构建时再用清理器回收可再生目标，不恢复 C 盘旧缓存目录。
+- 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本切片不生成 Windows 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续稳定批次。
+
+## 已完成切片：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 
 - 目标：让左侧栏的“新建、批量导出、添加阅读库、切换/管理阅读库”在窄侧栏中稳定排列；菜单展开时进入布局流，不遮挡文件树，也不被侧栏横向裁切。
 - 用户价值：用户可以在当前阅读流程内快速创建、导出、添加或切换阅读库，操作反馈清晰，不必反复关闭面板或猜测被遮挡的菜单项。
 - 非目标：不改创建/导出/挂载的数据语义，不实现更新器、默认首页重设计、旧 M 图标替换、读屏播报或 Esc 互斥，不改 HTML、脚本、插件、发布资产或跨平台范围。
-- 基线与分支：基于已合并 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2` 创建项目内独立工作树；分支 `codex/sidebar-actions-ui-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
+- 基线与分支：基于已合并 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2` 创建项目内独立工作树；分支 `codex/sidebar-actions-ui-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 - 验收标准：操作区在 216px 及默认侧栏宽度内无横向溢出；新建、批量导出和切换菜单互斥，支持点外/Esc 关闭；菜单项执行后立即收起；切换阅读库仍保留挂载数量、路径和移除动作；组件测试、相关单测、Windows 桌面 UI E2E、lint、格式和 TypeScript 检查通过。
 - 涉及文件：`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/styles.css`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：复用现有 WorkspacePanel 回调、Tauri 工作区授权/导出管线、`<details>` 原生键盘行为和现有语义令牌；不新增运行时依赖、外部凭据或数据迁移；本地 Cargo target 继续使用 D 盘 `MOYANG_BUILD_CACHE_DIR`。
 - 风险：流式菜单会增加侧栏高度并推动文件树下移；窄侧栏仍需保留可滚动空间；点外/Esc 监听必须只作用于三个操作菜单，不干扰文件树上下文菜单或全局快捷键。
-- 回滚：回退本 PR 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
+- 回滚：回退 PR #428 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
 - 验证：WorkspacePanel 定向组件/相关单测已通过；新增 Windows 桌面 UI E2E 负责 216px 窄侧栏布局和菜单互斥；构建、lint、类型感知、格式和差异检查在提交前复跑，远程 Quality checks 在 PR 创建后记录。
 - 缓存处置：当前 Windows 开发环境已将 `C:\Users\HUAWEI\AppData\Local\Moyang Reader\build-cache` 的 Cargo target 迁移到 `D:\AI-moyang\本地阅读工具-build-cache`，源 C 盘目录已清理；新终端读取用户级环境变量后复用该目标，日常用清理器预览并清理非保护生成物，空闲时再显式回收 Cargo target。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像；纳入后续 v0.11.x 稳定批次。

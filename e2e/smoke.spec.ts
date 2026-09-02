@@ -2028,6 +2028,30 @@ test("keeps compact toolbar actions discoverable without horizontal scrolling", 
   ).toBeVisible();
 });
 
+test("keeps update access in More without interrupting the current document", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "update-workflow.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Update workflow\n\nKeep reading while an update is checked."),
+  });
+  await expect(page.getByRole("heading", { name: "Update workflow" })).toBeVisible();
+
+  await openMoreMenu(page);
+  const updateButton = page.locator(".toolbar-overflow-panel").getByRole("button", { name: "更新", exact: true });
+  await expect(updateButton).toBeVisible();
+  await updateButton.click();
+
+  await expect(page.locator(".toolbar-overflow")).not.toHaveAttribute("open");
+  await expect(page.getByRole("alert")).toContainText("浏览器预览模式不支持应用更新。");
+  await expect(page.getByRole("heading", { name: "Update workflow" })).toBeVisible();
+
+  await openMoreMenu(page);
+  await expect(
+    page.locator(".toolbar-overflow-panel").getByRole("button", { name: "更新", exact: true }),
+  ).toBeVisible();
+});
+
 test("keeps toolbar icons consistent and readable at 900px", async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 820 });
   await page.goto("/");

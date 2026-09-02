@@ -116,6 +116,7 @@ import {
   getCurrentAppVersion,
   installAppUpdate,
   relaunchApp,
+  updateActionForStatus,
   type UpdateStatus,
 } from "./updater";
 import {
@@ -1826,11 +1827,6 @@ export function App() {
       setAvailableUpdate(null);
       await pending.close().catch(() => undefined);
       setUpdateStatus("ready");
-      try {
-        await relaunchApp();
-      } catch {
-        setUpdateError("更新已安装，但应用没有自动重启，请点击“重启应用”。");
-      }
     } catch (cause) {
       setUpdateStatus("error");
       const reason = describeUpdateError(cause);
@@ -5916,7 +5912,7 @@ export function App() {
         updateStatus={updateStatus}
         updateVersion={availableUpdate?.version ?? null}
         onCheckUpdates={() => {
-          if (updateStatus === "downloading") setUpdateNoticeVisible(true);
+          if (updateActionForStatus(updateStatus) === "open") setUpdateNoticeVisible(true);
           else void checkForUpdates(true);
         }}
         onSearchQueryChange={(query) => {

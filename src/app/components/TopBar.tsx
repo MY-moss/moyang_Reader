@@ -242,9 +242,11 @@ export function TopBar({
   const updateTitle =
     updateStatus === "downloading"
       ? "打开更新进度"
-      : updateVersion
-        ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
-        : "检查应用更新";
+      : updateStatus === "ready"
+        ? "打开更新完成提示"
+        : updateVersion
+          ? "发现 v" + updateVersion.replace(/^v/i, "") + "，打开更新提示"
+          : "检查应用更新";
   const settingsStatusLabel =
     settingsPersistenceStatus === "saving"
       ? locale === "en-US"
@@ -520,7 +522,10 @@ export function TopBar({
                 <button
                   type="button"
                   className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
-                  onClick={onCheckUpdates}
+                  onClick={() => {
+                    dismissTopbarOverlays();
+                    onCheckUpdates();
+                  }}
                   disabled={updateStatus === "checking"}
                   title={updateTitle}
                 >

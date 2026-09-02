@@ -2,9 +2,10 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
+import type { UpdateStatus } from "../updater";
 import { UpdateNotice } from "./UpdateNotice";
 
-function mountNotice(status: "available" | "downloading") {
+function mountNotice(status: Exclude<UpdateStatus, "idle" | "checking" | "error" | "up-to-date">) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -51,10 +52,29 @@ describe("UpdateNotice", () => {
 
     expect(installButton).toBeTruthy();
     expect(dismissButton).toBeTruthy();
+    expect(container.textContent).toContain("安装完成后可手动重启应用。");
+    expect(container.textContent).not.toContain("安装完成后重启应用。");
     expect(container.querySelector('[data-testid="update-hide"]')).toBeNull();
     act(() => dismissButton?.click());
     expect(props.onDismiss).toHaveBeenCalledOnce();
     expect(props.onHide).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps relaunch as an explicit action after an update is ready", () => {
+    const { container, root, props } = mountNotice("ready");
+
+    const relaunchButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("重启应用"),
+    );
+    expect(relaunchButton).toBeTruthy();
+    expect(container.textContent).toContain("应用已经更新，可以重启进入新版本。");
+    expect(props.onRelaunch).not.toHaveBeenCalled();
+
+    act(() => relaunchButton?.click());
+    expect(props.onRelaunch).toHaveBeenCalledOnce();
 
     act(() => root.unmount());
     container.remove();
