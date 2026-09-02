@@ -7,7 +7,7 @@
 - 发布代码主线基线：`main@45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；PR #415、#418 已 squash 合并，Issue #363、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)，唯一产品 PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 已上传，远端 Quality checks 运行中。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 已合并，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 的 CI run `33592512919` 成功，合并提交为 `45334c0b6cf9dc5f9b1bd39d2803b96181f0643e`；当前执行 [#366](https://github.com/MY-moss/moyang_Reader/issues/366)，唯一产品 PR [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 的 Quality checks run `33604977040` 已全绿，等待人工审查/合并。
 - 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；产品 PR 为 [#419](https://github.com/MY-moss/moyang_Reader/pull/419)，另有 6 个 Dependabot PR；Issue #366 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
