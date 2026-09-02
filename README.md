@@ -126,11 +126,11 @@ npm run desktop
 2. v0.11.0：稳定性与体验双轨交替，依次完成批量导出验收、统一通知、类型门禁、拖放反馈、发布条件项和右键键盘体验。
 3. v1.0：Windows x64 核心能力冻结，进入长期维护；跨平台、云同步和脚本插件仍不在当前范围。
 
-详细需求、交互契约和版本映射见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+详细需求、交互契约、版本映射和全量任务地图见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/DEVELOPMENT-AUDIT.md`](docs/DEVELOPMENT-AUDIT.md)。
 
 ## AI 快速接手
 
-任何新聊天只需使用下面一句话；当前任务只以 [`docs/NEXT.md`](docs/NEXT.md) 为准，流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，版本摘要见 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)。
+任何新聊天只需使用下面一句话；当前任务只以 [`docs/NEXT.md`](docs/NEXT.md) 为准，流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，版本摘要见 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)，可复制的完整接手提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
 
 ```text
 继续开发 Moyang Reader。严格读取并执行 docs/NEXT.md 中的唯一下一步，遵循 docs/AI-WORKFLOW.md，完成一个垂直切片、测试、PR 和交接后停止，不自动开始下一项。

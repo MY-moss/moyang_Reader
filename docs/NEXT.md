@@ -1,10 +1,21 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：STOPPED AFTER RELEASE（v0.10.14 已完成发布与交接）。
-- 发布代码主线基线：`main@ec76d3d0a812d1413a619c6b843972ffa57ffd47`；PR #414 已 squash 合并，Issue #363 已以 `completed` 关闭。
-- 当前稳定版本：`v0.10.14`；下一目标稳定批次仍为 `v0.11.0` Windows x64。
+- 当前状态：READY（#416 图标一致性维护切片，尚未开始实现）。
+- 发布代码主线基线：`main@740049dc9de36c73941c3efcc01790c199edeea7`；PR #415 已合并，Issue #363 已以 `completed` 关闭。
+- 当前稳定版本：`v0.10.14`；#416 完成后如需发布，候选版本为 `v0.10.15` Windows x64 patch。
+- 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
+
+## READY：#416 Windows 外部图标、快捷方式与文件关联图标一致性
+
+- 目标：让应用内部 Logo、Windows 可执行文件/安装包、桌面快捷方式、开始菜单、任务栏和 Markdown/TXT 文件关联使用同一套已确认 Logo。
+- 非目标：不重新设计 Logo；不做 macOS/Linux/移动端图标；不清理用户工作区；不把删除 Windows 系统缓存作为唯一修复。
+- 现象边界：v0.10.14 远程源码已包含新的 `src/assets/moyang-reader-logo.png` 和 `src-tauri/icons/*`；旧本地工作树仍可能是字母 M，Windows 也可能缓存旧快捷方式或文件关联图标。
+- 实现范围：从最新 `main` 建立项目内 `.codex-worktrees/` 的干净工作树；显式声明 `bundle.icon` 的 Windows 图标路径；增加资源完整性检查和 Windows 安装/升级/关联验证记录。
+- 验收：资源不缺失、不为空、不回退到旧默认图标；全新安装与覆盖升级可验证；重新创建快捷方式后图标正确；`.md/.txt` 关联图标正确；无法由应用控制的 Windows 缓存边界有明确说明。
+- 发布：不默认构建安装包；只有验收证明用户可见修复且 Release 检查通过时，才准备 `v0.10.15`、`.sig`、`latest.json` 和镜像核验。
+- 预计文件：`src-tauri/tauri.conf.json`、`src-tauri/icons/*`、`scripts/release-check.mjs` 或新增资源检查脚本、对应测试、`docs/UPDATE.md`、`docs/AI-HANDOFF.md`、`CHANGELOG.md`（仅在决定发布时）。
 
 ## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
 
@@ -26,7 +37,7 @@
 
 ## 下一次开发
 
-- 当前没有 IN PROGRESS/READY 事项；v0.10.14 发布与交接已完成，本轮已停止。
+- 当前没有 IN PROGRESS 事项；唯一 READY 事项是 #416。完成 #416 的代码、验证、PR 和交接后必须停止，不自动开始下一切片。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。
