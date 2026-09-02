@@ -7,7 +7,7 @@
 - 发布代码主线基线：`main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，当前执行用户反馈的左侧栏阅读库操作区 UI 修复，分支为 `codex/sidebar-actions-ui-2026-09-03`，PR 待创建。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，当前执行用户反馈的左侧栏阅读库操作区 UI 修复，分支为 `codex/sidebar-actions-ui-2026-09-03`，PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
 - 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现左侧栏操作区重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
@@ -26,7 +26,7 @@
 - 目标：让左侧栏的“新建、批量导出、添加阅读库、切换/管理阅读库”在窄侧栏中稳定排列；菜单展开时进入布局流，不遮挡文件树，也不被侧栏横向裁切。
 - 用户价值：用户可以在当前阅读流程内快速创建、导出、添加或切换阅读库，操作反馈清晰，不必反复关闭面板或猜测被遮挡的菜单项。
 - 非目标：不改创建/导出/挂载的数据语义，不实现更新器、默认首页重设计、旧 M 图标替换、读屏播报或 Esc 互斥，不改 HTML、脚本、插件、发布资产或跨平台范围。
-- 基线与分支：基于已合并 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2` 创建项目内独立工作树；分支 `codex/sidebar-actions-ui-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；PR 待创建。
+- 基线与分支：基于已合并 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2` 创建项目内独立工作树；分支 `codex/sidebar-actions-ui-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。
 - 验收标准：操作区在 216px 及默认侧栏宽度内无横向溢出；新建、批量导出和切换菜单互斥，支持点外/Esc 关闭；菜单项执行后立即收起；切换阅读库仍保留挂载数量、路径和移除动作；组件测试、相关单测、Windows 桌面 UI E2E、lint、格式和 TypeScript 检查通过。
 - 涉及文件：`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/styles.css`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：复用现有 WorkspacePanel 回调、Tauri 工作区授权/导出管线、`<details>` 原生键盘行为和现有语义令牌；不新增运行时依赖、外部凭据或数据迁移；本地 Cargo target 继续使用 D 盘 `MOYANG_BUILD_CACHE_DIR`。

@@ -4,7 +4,7 @@
 
 ## 当前切片（执行中）
 
-- [ ] **用户反馈：左侧栏阅读库操作区布局与菜单交互**：启动前已重新核验无重复产品 PR；当前主线为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，独立工作树/分支 `codex/sidebar-actions-ui-2026-09-03` 修复新建、批量导出、添加/切换阅读库在窄侧栏中的遮挡与操作中断；PR 待创建。只做这一垂直切片，更新器和默认首页/旧 M 图标另行拆分。
+- [ ] **用户反馈：左侧栏阅读库操作区布局与菜单交互**：启动前已重新核验无重复产品 PR；当前主线为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，独立工作树/分支 `codex/sidebar-actions-ui-2026-09-03` 修复新建、批量导出、添加/切换阅读库在窄侧栏中的遮挡与操作中断；PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已创建，Quality checks run `33670665767` 排队中。只做这一垂直切片，更新器和默认首页/旧 M 图标另行拆分。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 
