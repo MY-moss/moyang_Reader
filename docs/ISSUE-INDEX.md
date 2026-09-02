@@ -3,7 +3,7 @@
 > 更新时间：2026-09-02
 >
 > 适用范围：Moyang Reader，Windows x64、本地优先、轻量快速。
-> 当前数据：GitHub 15 个 OPEN Issue；14 个可执行事项、1 个历史跟踪事项；6 个开放 PR 全为 Dependabot。
+> 当前数据：GitHub 12 个 OPEN Issue；11 个可执行事项、1 个历史跟踪事项；7 个开放 PR 中 6 个为 Dependabot，另 1 个为当前功能切片。
 
 本文件只负责分类和状态入口，具体事实、验收和讨论以对应 GitHub Issue/PR 为准。当前唯一执行授权以 [`NEXT.md`](NEXT.md) 为准；全量产品任务与 HTML 路线见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 和 [`../tasks/plan.md`](../tasks/plan.md)。
 
@@ -36,20 +36,16 @@
 
 ### Must：核心稳定与发布条件
 
-| Issue                                                       | 主题                             | 计划          | 状态/备注                                       |
-| ----------------------------------------------------------- | -------------------------------- | ------------- | ----------------------------------------------- |
-| [#416](https://github.com/MY-moss/moyang_Reader/issues/416) | Windows 外部图标与文件关联一致性 | v0.10.15 候选 | 当前唯一 Ready；先做资源检查和 Windows 桌面验证 |
-| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归 | 发布条件项    | 依赖真实旧版本、镜像 Secret 和 Windows 安装环境 |
-| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验 | 发布条件项    | 依赖 Authenticode 证书或可审计的受限环境说明    |
+| Issue                                                       | 主题                             | 计划       | 状态/备注                                       |
+| ----------------------------------------------------------- | -------------------------------- | ---------- | ----------------------------------------------- |
+| [#241](https://github.com/MY-moss/moyang_Reader/issues/241) | PDF 落盘与旧版本自动更新实机回归 | 发布条件项 | 依赖真实旧版本、镜像 Secret 和 Windows 安装环境 |
+| [#51](https://github.com/MY-moss/moyang_Reader/issues/51)   | 安装包代码签名与手动发布版本校验 | 发布条件项 | 依赖 Authenticode 证书或可审计的受限环境说明    |
 
 ### Should：高频体验、可访问性与工程维护
 
 | Issue                                                       | 主题                               | 计划         | 状态/备注                                |
 | ----------------------------------------------------------- | ---------------------------------- | ------------ | ---------------------------------------- |
-| [#366](https://github.com/MY-moss/moyang_Reader/issues/366) | 统一确认弹层与关闭文案             | v0.11.x 候选 | 减少草稿清空、关闭和未保存操作的歧义     |
-| [#370](https://github.com/MY-moss/moyang_Reader/issues/370) | 阅读历史与本地阅读统计             | v0.11.x 候选 | 只记录本机有限数据，不做云同步           |
-| [#233](https://github.com/MY-moss/moyang_Reader/issues/233) | 顶栏图标体系与窄窗口操作密度       | v0.11.x 候选 | 与 #171/#193 协同但保持单独 PR           |
-| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航                     | v0.11.x      | 目录、树、搜索、播报和焦点归还           |
+| [#191](https://github.com/MY-moss/moyang_Reader/issues/191) | 键盘与读屏导航                     | v0.11.x      | 当前执行快速打开子切片；剩余部分继续拆分 |
 | [#171](https://github.com/MY-moss/moyang_Reader/issues/171) | CSS 设计令牌收敛与主题规则去重     | v0.11.x–v1.0 | 先令牌，后拆分规则                       |
 | [#193](https://github.com/MY-moss/moyang_Reader/issues/193) | 焦点环、按钮、页签、字体和动效令牌 | v0.11.x      | 不与 #171 的大范围重构混做               |
 | [#112](https://github.com/MY-moss/moyang_Reader/issues/112) | opener、镜像巡检和更新限制文档     | v0.11.x      | 合并重复文档，补清楚 GitHub/镜像各自状态 |
@@ -82,6 +78,7 @@
 | #357～#365                   | 菜单/插入浮层定位、撤销历史、视觉对比度、微成本、粘贴和图片浏览 |
 | #367～#372                   | 跳转历史、书签/批注、回收站/上一版本、拼音搜索和设置备份 v2     |
 | #363、#375                   | v0.10.14 导出可靠性、工作区和构建缓存治理                       |
+| #233、#366、#370、#416       | 顶栏图标密度、统一确认语义、阅读历史统计和 Windows 外部图标     |
 
 ## 4. 已归档 Issue
 
@@ -117,5 +114,5 @@
 ## 6. 维护记录
 
 - 2026-08-29：统一历史 Issue 的标题、正文结构和标签，归档 9 个历史汇总、重复、范围外或当前不计划事项。
-- 2026-09-02：重新查询 GitHub：15 个 OPEN（Must 3、Should 10、Could 1、Tracking 1），6 个开放 PR 全为 Dependabot；#416 是唯一 Ready。
+- 2026-09-02：重新查询 GitHub：12 个 OPEN（Must 2、Should 8、Could 1、Tracking 1），7 个开放 PR 中 6 个为 Dependabot；#191 快速打开子切片为当前功能 PR，Issue 继续开放承载剩余子切片。
 - 当前规则：开放表只列 OPEN；已完成事项进入第 3 节；探索性 HTML、Inbox/Daily、图谱、Mermaid、Canvas、分享包、URI/CLI、AI 和内部插件任务进入 `DEVELOPMENT-AUDIT.md`，准备好前不创建额外噪声 Issue。

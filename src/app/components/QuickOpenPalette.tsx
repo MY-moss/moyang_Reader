@@ -20,15 +20,24 @@ function kindLabel(kind: string | undefined): string {
 export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPaletteProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const results = useMemo(() => rankQuickOpenItems(items, query), [items, query]);
+  const activeResultIndex = results.length ? Math.min(activeIndex, results.length - 1) : 0;
 
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, onClose });
 
   useEffect(() => {
     setActiveIndex(0);
   }, [items, query]);
+
+  useEffect(() => {
+    if (!results.length) return;
+
+    const activeResult = resultsRef.current?.querySelector<HTMLElement>(`#quick-open-option-${activeResultIndex}`);
+    activeResult?.scrollIntoView?.({ block: "nearest" });
+  }, [activeResultIndex, results]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -42,15 +51,15 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
         setActiveIndex((current) => (results.length ? (current - 1 + results.length) % results.length : 0));
         return;
       }
-      if (event.key === "Enter" && results[activeIndex]) {
+      if (event.key === "Enter" && results[activeResultIndex]) {
         event.preventDefault();
-        onOpenFile(results[activeIndex].path);
+        onOpenFile(results[activeResultIndex].path);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, onClose, onOpenFile, results]);
+  }, [activeResultIndex, onOpenFile, results]);
 
   return (
     <div
@@ -81,13 +90,21 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
             ref={inputRef}
             type="search"
             aria-label="快速打开文档"
+            aria-controls="quick-open-results"
+            aria-activedescendant={results.length ? `quick-open-option-${activeResultIndex}` : undefined}
             placeholder="输入文件名或路径…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <kbd>Ctrl P</kbd>
         </label>
-        <div className="quick-open-results" role="listbox" aria-label="快速打开结果">
+        <div
+          ref={resultsRef}
+          id="quick-open-results"
+          className="quick-open-results"
+          role="listbox"
+          aria-label="快速打开结果"
+        >
           {results.length === 0 ? (
             <div className="quick-open-empty">
               <strong>{items.length ? "没有匹配的文档" : "还没有可打开的文档"}</strong>
@@ -98,8 +115,9 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
               <button
                 type="button"
                 role="option"
-                aria-selected={index === activeIndex}
-                className={`quick-open-item ${index === activeIndex ? "active" : ""}`}
+                id={`quick-open-option-${index}`}
+                aria-selected={index === activeResultIndex}
+                className={`quick-open-item ${index === activeResultIndex ? "active" : ""}`}
                 key={item.path}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => onOpenFile(item.path)}

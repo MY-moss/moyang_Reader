@@ -1,22 +1,22 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：#416、#366 与 #370 三步均已合并；当前执行 #233 顶栏图标体系与操作密度，分支为 `codex/topbar-icons-2026-09-02`，PR [#423](https://github.com/MY-moss/moyang_Reader/pull/423) 等待远程门禁。
-- 发布代码主线基线：`main@b7dc14358aee7025a83e86a7ba06d865914fddb1`；PR #418、#419、#420、#421、#422 已合并，Issue #363、#366、#370、#416 以 `completed` 关闭。
-- 当前稳定版本：`v0.10.14`；#233 属于 `v0.11.x` 高频体验批次，不单独发布。
+- 当前状态：#416、#366、#370 三步和 #233 均已合并；当前执行 #191 的快速打开可访问性切片，分支为 `codex/quick-open-a11y-2026-09-02`，PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 的远程 Quality checks run `33632431268` 已全绿，等待合并。
+- 发布代码主线基线：`main@42337e840f2266f31715bee914630fc9b42cde1d`；PR #418、#419、#420、#421、#422、#423 已合并，Issue #233、#363、#366、#370、#416 以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：#233 顶栏图标体系与窄窗口操作密度统一
+## 当前切片：#191 快速打开高亮跟随与读屏语义（第 1 个子切片）
 
-- 目标：建立零依赖、统一 stroke 风格的内联 SVG 图标集，并接入顶栏和编辑器中的撤销/重做、外部修改、侧栏、搜索、设置与导出操作。
-- 用户价值：操作更容易扫读；900px 窄窗口仍保留高频入口、没有水平溢出；浅色、深色和 Windows 高对比度下图标继续使用语义颜色。
-- 非目标：不改变按钮动作、快捷键、命令注册或导出内容；不引入图标字体/组件库，不做完整主题或 CSS 令牌重构；不涉及 HTML 源码编辑、脚本、插件或发布链路。
-- 验收标准：所有图标使用 `currentColor`、1.8px round stroke 的内联 SVG；图标按钮和摘要保留可读名称、`title` 或 `aria-label`，撤销/重做保持原快捷键；900px 无水平溢出且 More 中设置/打印/下载入口可见；浅色、深色和 forced-colors 浏览器验证通过；组件测试、全量单测、覆盖率、构建、lint、格式和类型感知检查通过。
-- 涉及文件：`src/app/components/Icon.tsx` 及测试、`src/app/components/TopBar.tsx`、`src/app/components/EditorToolbar.tsx` 及测试、`src/app/styles.css`、`e2e/smoke.spec.ts`、本文件、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用现有 CSS 语义令牌和 #187 已有窄窗口 More 溢出策略；不新增运行时依赖、外部凭据或数据迁移。
-- 风险：图标语义不清或增加间距可能降低发现性；高频操作保留文字，图标只作辅助，并以 900px、深色和高对比度 E2E 锁定布局。回退本 PR 可恢复原文字/Unicode 图标，不影响命令注册或用户数据。
-- 回滚：回退本切片 PR 即可移除图标组件、接入和样式；不需要数据迁移，也不影响 #370 的本机阅读历史。
+- 目标：让快速打开结果在方向键或鼠标高亮变化后自动滚入可视区，并用稳定的活动后代语义让读屏用户知道当前选择。
+- 用户价值：长文档列表中键盘用户不会丢失当前高亮；搜索输入框关联结果列表并指向当前项，Enter 仍打开当前文档。
+- 非目标：不实现标签栏、文件树或目录的 roving tabindex；不调整读屏播报/aria-live、专注模式、命令面板 Esc 互斥或其他 #191 子切片；不改变筛选、鼠标打开、文档内容、HTML、脚本、插件或发布链路。
+- 验收标准：结果列表拥有稳定 ID；搜索框以 `aria-controls`/`aria-activedescendant` 指向当前 option；方向键和鼠标移动后当前 option 使用 `aria-selected` 并保持可见；空结果不残留无效活动 ID；组件测试、快速打开回归 E2E、窄窗口长列表 E2E、构建、lint、格式和类型感知检查通过。
+- 涉及文件：`src/app/components/QuickOpenPalette.tsx`、`src/app/components/QuickOpenPalette.test.tsx`、`e2e/smoke.spec.ts`、本文件、`docs/UI-INTERACTION.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/ISSUE-INDEX.md`、`docs/ROADMAP.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 Quick Open 结果排序、`useModalBehavior`、原生 `scrollIntoView({ block: "nearest" })` 和现有 `role=listbox/option`；不新增运行时依赖、外部凭据或数据迁移。
+- 风险：ARIA 关联变更可能影响依赖旧 DOM 的定位器；保留现有 searchbox 角色、option 角色、按钮动作和快捷键，并以组件/浏览器无障碍回归锁定。回退本 PR 可恢复原高亮实现，不影响用户数据。
+- 回滚：回退 PR #424 即可移除活动后代 ID、滚动同步和新增测试；不需要数据迁移，也不影响 #233/#370 已交付内容。
 - 发布：本切片只做普通 UI 代码与针对性验证，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；稳定批次再统一打包。
 
 ## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
@@ -39,7 +39,7 @@
 
 ## 下一次开发
 
-- #233 是当前唯一执行切片；合并后下一独立切片暂定为 #191 键盘与读屏细节，仍须重新检查 Issues 和开放 PR。
+- 当前 PR #424 只覆盖 #191 的快速打开子切片；合并后下一独立切片仍为 #191 的 roving tabindex/方向键导航，必须重新检查 Issues 和开放 PR。
 - 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
 - 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
 - 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。

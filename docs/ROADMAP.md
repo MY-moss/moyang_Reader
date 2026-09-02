@@ -1,12 +1,12 @@
 # Moyang Reader 版本路线
 
-## v0.10.15 候选：#416 Windows 外部图标一致性（READY）
+## v0.11.x 当前执行：#191 快速打开高亮跟随与读屏语义（第 1 个子切片）
 
-- 当前基线：稳定版本 `v0.10.14`，远程主线 `main@740049dc9de36c73941c3efcc01790c199edeea7`。
-- 用户价值：解决应用内部 Logo 已更新，但安装包、可执行文件、快捷方式、任务栏或文件关联仍可能显示旧图标的问题。
-- 交付边界：显式声明 Windows bundle icon，校验图标资源完整性，覆盖全新安装/覆盖升级/快捷方式/文件关联验证，并记录 Windows Shell 缓存边界。
-- 发布策略：这是一个独立的 Windows 维护切片；完成验收前不生成安装包，验收通过后才决定是否发布 `v0.10.15` patch。
-- 对应 Issue：[#416](https://github.com/MY-moss/moyang_Reader/issues/416)；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
+- 当前基线：稳定版本 `v0.10.14`，远程主线 `main@42337e840f2266f31715bee914630fc9b42cde1d`。
+- 用户价值：长文档列表中键盘用户不会丢失快速打开高亮；搜索框会把当前选择明确交给读屏用户，Enter 继续打开当前文档。
+- 交付边界：为快速打开结果提供稳定 option ID、`aria-controls`/`aria-activedescendant` 关联和活动项最近滚动；其余 #191 导航、播报和 Esc 子切片另行交付。
+- 发布策略：这是一个普通 v0.11.x UI 维护切片；完成验收前不生成安装包、Release、签名、`latest.json` 或镜像。
+- 对应 Issue：[#191](https://github.com/MY-moss/moyang_Reader/issues/191)，当前 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424)；当前唯一可执行事项以 [`NEXT.md`](NEXT.md) 为准。
 
 ## v0.10.14 小版本发布（2026-09-02）
 
@@ -16,7 +16,7 @@
 
 ## v0.11.0 双轨稳定批次（2026-09-01）
 
-- 稳定基线：`v0.10.14`；当前远程主线代码为 `main@740049dc9de36c73941c3efcc01790c199edeea7`，PR #415 已完成发布交接文档同步；PR #414/#408/#406/#404/#402 的历史切片也已合入。
+- 稳定基线：`v0.10.14`；当前远程主线代码为 `main@42337e840f2266f31715bee914630fc9b42cde1d`，PR #423 已完成顶栏图标交接；PR #424 为 #191 的第一个可访问性子切片，Quality checks run `33632431268` 已全绿，仍待合并。
 - 交付方式：一个切片、一个主要分支、一个 PR；合并后更新 [`NEXT.md`](NEXT.md) 与 [`AI-HANDOFF.md`](AI-HANDOFF.md)，完成交接后停止。
 - 发布方式：v0.10.14 已先以独立 patch Release 交付；后续中间切片仍不重复生成安装包，稳定批次达到验收标准后再准备 `v0.11.0` Windows x64 Release、签名、manifest 和镜像核验。
 
