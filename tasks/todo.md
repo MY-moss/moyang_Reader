@@ -2,21 +2,21 @@
 
 > 执行授权只有 [`../docs/NEXT.md`](../docs/NEXT.md)；本清单用于交接和排序，不能绕过 READY 门禁自行并行。
 
-## 当前切片（执行中）
+## 最近完成切片
 
-- [ ] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；当前主线为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，独立工作树/分支 `codex/default-home-brand-2026-09-03`；将默认空状态中的旧大写 M 替换为与顶栏共用的新 Logo，并保持首次启动操作不变。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
+- [x] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 在独立工作树/分支 `codex/default-home-brand-2026-09-03` 完成默认空状态 Logo 替换，移除旧大写 M，保留首次启动操作；PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，Quality checks run `33687800718` 全部通过。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
 
 已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 
-## 下一批候选（完成当前切片后重新检查）
+## 下一批候选（下一切片开始前重新检查）
 
 按“用户可见收益 / 无外部阻塞 / 可独立验收”排序：
 
-1. **默认首页与品牌视觉收口**：基于现有新 Logo 资产检查主界面默认状态、残留大写 M 和未替换图标；单独拆分，不改阅读库数据语义。
-2. **#191 键盘与读屏导航剩余子切片**：重新核验 Issue 后依次补读屏播报和 Esc 互斥；T2；按子切片增加 axe/Windows 验收。
-3. **#171/#193 视觉令牌与焦点细节**：拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
+1. **#191 键盘与读屏导航剩余子切片**：重新核验 Issue 后只选择读屏播报或 Esc 互斥中的一个；T2；按子切片增加 axe/Windows 验收。
+2. **#171/#193 视觉令牌与焦点细节**：拆颜色、间距、焦点、字体和动效令牌；T2；不与大范围布局重构混做。
+3. **#241/#51/#112 发布条件旁路**：仅在真实旧版本、签名环境和 Cloudflare Secret 可用时重新评估；不把受限环境记为通过。
 
 条件旁路（不抢占普通切片）：#241 更新/镜像/PDF 实机矩阵、#51 Authenticode、#112 更新文档；只有外部环境满足时才改为 READY。
 

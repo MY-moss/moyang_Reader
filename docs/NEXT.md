@@ -1,13 +1,13 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已合并；当前执行默认首页与品牌视觉收口切片，分支为 `codex/default-home-brand-2026-09-03`，启动前已重新核验无重复产品 PR。
-- 发布代码主线基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #418–#429 已合并，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载读屏播报与 Esc 互斥剩余子切片。
+- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；合并后下一独立切片为 #191 的读屏播报或 Esc 互斥，当前不自动启动。
+- 本切片基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #418–#430 已完成本轮代码与交接，Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载剩余子切片。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
 - 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
 
-## 当前切片：默认首页与品牌视觉收口（用户反馈，2026-09-03）
+## 最近完成：默认首页与品牌视觉收口（用户反馈，2026-09-03）
 
 - 目标：默认未打开文档的主界面复用顶栏正在使用的新 Logo，移除残留大写 M/旧手绘标记，并保持首次启动动作可用。
 - 用户价值：用户进入应用即可看到统一、可识别的 Moyang Reader 品牌，不再看到与 Windows/顶栏不一致的旧字母图标，默认首页更完整。
@@ -18,6 +18,12 @@
 - 风险：静态 Logo 在深色/高对比度环境中仍需保持可见；固定尺寸变化可能影响窄窗口空状态布局，已用无障碍 E2E 和实际 1440px/窄窗口页面检查覆盖；不改变持久化数据。
 - 回滚：回退本切片 PR 即恢复旧空状态 M 标记，不需要数据迁移，不影响文档、阅读库或安装资产。
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
+- 交付：分支 `codex/default-home-brand-2026-09-03`，PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，代码提交 `b6ac4ba6ceb009ba4bd346765dd1650448dab8e6`；Quality checks run `33687800718` 全部通过；本地组件/前端单测、landing E2E、空状态无障碍/高对比度 E2E、lint、格式和构建均通过。
+
+## 当前唯一下一步：#191 键盘与读屏导航剩余子切片
+
+- 先重新核验 Issue #191 与开放 PR，再只选择“读屏播报”或“Escape 互斥”其中一个垂直切片；不把两个问题合并开发，不关闭 Issue，不改 HTML 安全路线。
+- 目标、用户价值、非目标、验收标准、涉及文件、依赖、风险和回滚方式必须在下一切片启动前补齐；本轮完成后停止，不自动开始下一项。
 
 ## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 

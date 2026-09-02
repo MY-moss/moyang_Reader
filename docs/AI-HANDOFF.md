@@ -7,8 +7,8 @@
 - 发布代码主线基线：`main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429 已 squash 合并，Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，#428 左侧栏阅读库操作区 UI 修复和 #429 更新入口“更多”工作流已合并；本分支执行默认首页与品牌视觉收口。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现默认首页、旧 M 或品牌图标重复产品 PR；当前开放 PR 为 6 个 Dependabot 更新，本切片只保留一个功能 PR；#191 不因已完成子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树和目录 roving/当前章节高亮子切片已合并，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；下一独立切片仍为 #191 的读屏播报或 Esc 互斥。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue/开放 PR，未发现默认首页、旧 M 或品牌图标重复产品 PR；本切片唯一功能 PR 为 #430，Quality checks run `33687800718` 已通过；其余开放 PR 为 6 个 Dependabot 更新；#191 不因已完成子切片合并而关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -36,16 +36,18 @@
 - 缓存处置：Cargo target 继续使用 `D:\AI-moyang\本地阅读工具-build-cache`；没有活动 Rust 构建时再用清理器回收可再生目标，不恢复 C 盘旧缓存目录。
 - 发布：更新器交互按 T3 执行完整质量门禁和一次构建；本切片不生成 Windows 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续稳定批次。
 
-## 当前切片：默认首页与品牌视觉收口（用户反馈，2026-09-03）
+## 已完成切片：默认首页与品牌视觉收口（用户反馈，2026-09-03）
 
 - 目标：默认未打开文档的主界面复用顶栏正在使用的新 Logo，移除残留大写 M/旧手绘标记，并保持首次启动动作可用。
 - 用户价值：用户进入应用即可看到统一、可识别的 Moyang Reader 品牌，不再看到与 Windows/顶栏不一致的旧字母图标，默认首页更完整。
 - 非目标：不重新设计 Logo，不改阅读库创建/导出/挂载语义，不改侧栏、更新器、#191 读屏、视觉令牌、HTML、脚本、插件或发布资产。
-- 基线与分支：基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 创建项目内独立工作树；分支 `codex/default-home-brand-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR。
+- 基线与分支：基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 创建项目内独立工作树；分支 `codex/default-home-brand-2026-09-03`；启动前重新核验 GitHub Issues/开放 PR，未发现重复产品 PR；PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 已完成本切片代码与交接，代码提交 `b6ac4ba6ceb009ba4bd346765dd1650448dab8e6`，Quality checks run `33687800718` 全部通过。
 - 验收标准：默认空状态显示并实际加载 `src/assets/moyang-reader-logo.png`；旧大写 M 标记不再渲染；首次启动按钮和已有阅读库空状态语义保持不变；组件测试、landing 浏览器 E2E、空状态无障碍/高对比度 E2E、全量前端单测、lint、格式和构建通过。
 - 涉及文件：`src/app/components/EmptyState.tsx`、`src/app/components/EmptyState.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md` 及任务/交接文档。
 - 依赖、风险与回滚：复用现有 PNG Logo、React/Vite、CSS 语义令牌和空状态回调，不新增依赖/迁移；Logo 在暗色/高对比度环境中需保持可见，固定尺寸变化需避免窄窗口溢出；回退本切片 PR 即恢复旧 M 标记，不影响用户数据。
 - 缓存与发布：继续使用 `D:\AI-moyang\本地阅读工具-build-cache`；本地生成物按清理器处理；普通 T2 UI 切片不生成 Windows 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续稳定批次。
+- 验证：`npm test` 94 个文件/372 项通过；landing 浏览器 E2E 1/1；空状态无障碍与 Windows 高对比度 E2E 2/2；`npm run lint`、`npm run format:check`、`npm run build` 和 `git diff --check` 通过；D 盘构建缓存未产生残留膨胀。
+- 下一独立切片：重新核验后从 #191 的读屏播报或 Escape 互斥中选择一个；不自动开始下一项。
 
 ## 已完成切片：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 
