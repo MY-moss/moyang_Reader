@@ -1,3 +1,5 @@
+import brandLogo from "../../assets/moyang-reader-logo.png";
+
 type EmptyStateProps = {
   onOpen: () => void;
   onChooseWorkspace: () => void;
@@ -16,8 +18,7 @@ export function EmptyState({
   return (
     <section className="empty-state" aria-labelledby="empty-title">
       <div className="empty-mark" aria-hidden="true">
-        <span>M</span>
-        <i />
+        <img className="empty-logo" src={brandLogo} alt="" aria-hidden="true" />
       </div>
       <div className="empty-eyebrow">{hasWorkspace ? "READING LIBRARY" : "READ LOCAL · STAY PORTABLE"}</div>
       <h1 id="empty-title">{hasWorkspace ? "从阅读库开始阅读。" : "把文档打开，专心阅读。"}</h1>
