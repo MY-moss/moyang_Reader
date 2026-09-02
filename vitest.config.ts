@@ -13,6 +13,7 @@ export default defineConfig({
       // Business modules are covered here; App/UI behavior is guarded by the Playwright smoke test.
       include: [
         "src/app/export.ts",
+        "src/app/reading-history.ts",
         "src/app/storage.ts",
         "src/app/updater.ts",
         "src/app/workspace-index.ts",

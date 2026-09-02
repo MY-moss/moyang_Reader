@@ -48,6 +48,7 @@ import { UpdateNotice } from "./components/UpdateNotice";
 import { NotificationViewport } from "./components/NotificationViewport";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import { createReadingPositionTracker } from "./reading-position";
+import { createReadingHistoryTracker } from "./reading-history";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
 import { createSearchHighlightController, type SearchHighlightController } from "./search-highlighter";
 import {
@@ -1208,6 +1209,36 @@ export function App() {
   useEffect(() => {
     documentStateRef.current = documentState;
   }, [documentState]);
+
+  useEffect(() => {
+    const path = documentState?.path;
+    if (!path || path.toLowerCase().startsWith("browser://")) return;
+
+    const tracker = createReadingHistoryTracker(path);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") tracker.resume();
+      else tracker.pause();
+    };
+    const handleFocus = () => tracker.resume();
+    const handleBlur = () => tracker.pause();
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("pagehide", handleBlur);
+    window.addEventListener("pageshow", handleFocus);
+    tracker.start();
+    handleVisibilityChange();
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("pagehide", handleBlur);
+      window.removeEventListener("pageshow", handleFocus);
+      tracker.stop();
+    };
+  }, [documentState?.path]);
 
   useEffect(() => {
     sourceDraftRef.current = sourceDraft;

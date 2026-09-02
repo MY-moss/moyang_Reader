@@ -4,10 +4,10 @@
 
 ## 当前基线（2026-09-02）
 
-- 发布代码主线基线：`main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`；PR #415、#418、#419 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭。
+- 发布代码主线基线：`main@a75ff75e6600d82bb0223741b91a0b1309d9a07a`；PR #415、#418、#419、#420 已 squash 合并，Issue #363、#366、#416 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416) 与 [#366](https://github.com/MY-moss/moyang_Reader/issues/366) 已完成，PR [#418](https://github.com/MY-moss/moyang_Reader/pull/418) 和 [#419](https://github.com/MY-moss/moyang_Reader/pull/419) 均已合并；当前执行 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1，PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 的 Quality checks run `33611774822` 已全部通过，准备合并。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 步骤 1 已完成；当前执行 #370 步骤 2 前台阅读可见性心跳，分支为 `codex/reading-heartbeat-2026-09-02`，尚未创建产品 PR。
 - 当前开放 Issue/PR 快照（2026-09-02）：14 个开放 Issue，#373 是历史跟踪项；在启动 #370 前无开放产品 PR，另有 6 个 Dependabot PR；Issue #370 未发现重复开放 PR。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
@@ -44,14 +44,26 @@
 - 依赖与风险：复用 `useModalBehavior`、草稿快照和 `saveDocument`；保存受外部修改/写入失败影响，弹层需保持焦点边界。无新增运行时依赖、无数据迁移。
 - 回滚与发布：PR #419 已 squash 合并为 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a`，Issue #366 已以 `completed` 关闭；回退本切片即可恢复原确认行为。本切片不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
 
-## 本次切片：#370 最近阅读时间语义（步骤 1/3，2026-09-02）
+## 已完成切片：#370 最近阅读时间语义（步骤 1/3，PR #420，2026-09-02）
 
 - 目标与用户价值：为本机最近打开文档记录可选 `lastOpenedAt`，上限由 12 提升到 50，按有效时间降序展示并显示中文相对日期，让“最近打开”真正可回顾；旧版 `{path,name}` 记录继续可读。
 - 非目标：不做阅读可见性心跳、阅读时长、本周统计、清理入口、联网/匿名上报、图表库、HTML 源码编辑、脚本或插件。
-- 基线与分支：从 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a` 创建项目内独立 worktree，分支 `codex/reading-history-2026-09-02`；PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已上传，Quality checks run `33611774822` 全部通过，准备合并。
+- 基线与分支：从 `main@f064b4621232dae9cbb292f6eaf200b5e3a3604a` 创建项目内独立 worktree，分支 `codex/reading-history-2026-09-02`；PR [#420](https://github.com/MY-moss/moyang_Reader/pull/420) 已 squash 合并，远端主线为 `main@a75ff75e6600d82bb0223741b91a0b1309d9a07a`，Quality checks run `33614168857` 全部通过。
 - 验收与风险：存储单测覆盖上限、旧数据、非法时间和排序；组件测试覆盖相对日期/未知时间；浏览器 E2E 覆盖启动列表。时间非法时丢弃时间字段并保留安全插入顺序；改名/移动保留时间元数据；不触碰用户文档。
 - 涉及文件：`src/app/types.ts`、`src/app/storage.ts`、`src/app/portable-settings.ts`、`src/app/App.tsx`、`src/app/components/WorkspacePanel.tsx` 及测试、`e2e/smoke.spec.ts`、任务与交接文档。
 - 回滚与发布：回退本切片即可恢复 12 条插入序列表，不需要数据迁移；本切片不生成 Windows x64 安装包、Release、签名、`latest.json` 或 Cloudflare 镜像，纳入后续 v0.11.x 稳定批次。
+
+## 本次切片：#370 前台阅读可见性心跳（步骤 2/3，2026-09-02）
+
+- 目标：为当前打开的本机文档按前台可见性心跳累计整数阅读秒数；每条记录同时保留总秒数、最后阅读时间和近一年按本地日期的秒数，为下一步周统计提供稳定数据源。
+- 用户价值：用户实际阅读时长可在本机留存；窗口隐藏、失焦、页面离开、最小化或锁屏后的时间不计入，临时浏览器文档也不产生历史。
+- 非目标：不实现周统计/清理入口、目标提醒、图表库、联网/匿名上报、分钟级精度、HTML 源码编辑、脚本、插件或发布资产。
+- 基线与分支：基于已合并 `main@a75ff75e6600d82bb0223741b91a0b1309d9a07a` 的等价文件树创建项目内独立 worktree；分支 `codex/reading-heartbeat-2026-09-02`；Issue [#370](https://github.com/MY-moss/moyang_Reader/issues/370)；PR 待创建。
+- 验收标准：`reading-history.ts` 提供安全 localStorage 读写和可注入时钟的追踪器；默认 60 秒心跳只在 document visible 且 window focused 时累计；pause/resume/stop 会刷出整数秒；非法记录、临时路径和存储异常不阻塞应用；单测覆盖跨大小写合并、日期分桶、损坏数据、前台心跳、暂停和恢复。
+- 涉及文件：`src/app/reading-history.ts`、`src/app/reading-history.test.ts`、`src/app/App.tsx`、`vitest.config.ts`、`docs/UI-INTERACTION.md`、`docs/DEVELOPMENT-AUDIT.md`、`docs/NEXT.md`、本文件、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 `documentState` 生命周期、`localStorage`、`normalizePathKey` 和 React effect cleanup；不新增运行时依赖，不需要外部凭据或数据迁移。
+- 风险：系统窗口事件可能延迟，心跳会再次检查可见性/焦点并保守丢弃无法确认的后台区间；localStorage 满或受限时只暂停持久化，不显示错误打断阅读。
+- 回滚与发布：回退本切片 PR 即可停止记录；不改用户文档、最近打开时间或阅读位置。本切片只运行普通代码的针对性测试、构建和规范检查，不生成 Windows 安装包、GitHub Release、签名、`latest.json` 或 Cloudflare 镜像。
 
 ## v0.10.14 发布交接（已完成）
 
