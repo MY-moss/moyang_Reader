@@ -252,3 +252,101 @@ test("keeps the page backdrop aligned with explicit and system dark themes", asy
     expect(forcedColors.backgroundImage).toBe("none");
   }
 });
+
+test("keeps annotation highlights legible across theme modes", async ({ page }) => {
+  const mountAnnotationFixture = () =>
+    page.evaluate(() => {
+      document.querySelector<HTMLElement>('[data-e2e="annotation-theme-fixture"]')?.remove();
+
+      const fixture = document.createElement("aside");
+      fixture.dataset.e2e = "annotation-theme-fixture";
+      fixture.className = "context-sidebar";
+      fixture.style.cssText = "position:fixed;left:0;top:0;width:320px;visibility:hidden;pointer-events:none;";
+
+      const quote = document.createElement("blockquote");
+      quote.className = "annotation-quote";
+      quote.textContent = "批注引用";
+
+      const item = document.createElement("div");
+      item.className = "annotation-item current";
+      const mark = document.createElement("span");
+      mark.className = "annotation-mark";
+      mark.textContent = "✦";
+      item.append(mark);
+
+      const highlighted = document.createElement("mark");
+      highlighted.className = "moyang-annotation-hit";
+      highlighted.textContent = "正文高亮";
+
+      fixture.append(item, quote);
+      document.body.append(fixture, highlighted);
+    });
+
+  const readAnnotationStyles = () =>
+    page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const quote = document.querySelector<HTMLElement>('[data-e2e="annotation-theme-fixture"] .annotation-quote');
+      const mark = document.querySelector<HTMLElement>('[data-e2e="annotation-theme-fixture"] .annotation-mark');
+      const highlighted = document.querySelector<HTMLElement>(".moyang-annotation-hit");
+      if (!quote || !mark || !highlighted) throw new Error("annotation theme fixture is missing");
+
+      const quoteStyles = getComputedStyle(quote);
+      const markStyles = getComputedStyle(mark);
+      const highlightedStyles = getComputedStyle(highlighted);
+      return {
+        tokens: {
+          border: root.getPropertyValue("--annotation-border").trim(),
+          surface: root.getPropertyValue("--annotation-surface").trim(),
+        },
+        quoteBorder: quoteStyles.borderLeftColor,
+        quoteBackground: quoteStyles.backgroundColor,
+        markColor: markStyles.color,
+        highlightBackground: highlightedStyles.backgroundColor,
+        viewport: {
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        },
+      };
+    });
+
+  await page.setViewportSize({ width: 720, height: 820 });
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "light";
+  });
+  await mountAnnotationFixture();
+  const light = await readAnnotationStyles();
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  const explicitDark = await readAnnotationStyles();
+
+  await page.emulateMedia({ colorScheme: "dark", forcedColors: "none" });
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+  const systemDark = await readAnnotationStyles();
+
+  expect(light.tokens).toEqual({ border: "#ad7d2d", surface: "#e7c768" });
+  expect(light.quoteBorder).toBe("rgb(173, 125, 45)");
+  expect(light.markColor).toBe("rgb(173, 125, 45)");
+  expect(explicitDark.tokens).toEqual({ border: "#f0d79a", surface: "#e7c768" });
+  expect(explicitDark.quoteBorder).toBe("rgb(240, 215, 154)");
+  expect(explicitDark.markColor).toBe("rgb(240, 215, 154)");
+  expect(systemDark).toEqual(explicitDark);
+  expect(light.highlightBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(explicitDark.quoteBackground).not.toBe(light.quoteBackground);
+  expect(light.viewport.bodyScrollWidth).toBeLessThanOrEqual(light.viewport.clientWidth);
+  expect(explicitDark.viewport.bodyScrollWidth).toBeLessThanOrEqual(explicitDark.viewport.clientWidth);
+
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "active" });
+  await page.goto("/");
+  await mountAnnotationFixture();
+  const forcedColors = await readAnnotationStyles();
+  expect(forcedColors.tokens).toEqual({ border: "Highlight", surface: "Highlight" });
+  expect(forcedColors.quoteBorder).not.toBe(light.quoteBorder);
+  expect(forcedColors.markColor).not.toBe(light.markColor);
+  expect(forcedColors.viewport.bodyScrollWidth).toBeLessThanOrEqual(forcedColors.viewport.clientWidth);
+});

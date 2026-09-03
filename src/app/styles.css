@@ -93,6 +93,8 @@
   --workspace-active-surface: var(--accent-soft);
   --related-hover-surface: var(--surface-strong);
   --unresolved-link-surface: var(--surface);
+  --annotation-border: #ad7d2d;
+  --annotation-surface: #e7c768;
   --page-background:
     radial-gradient(circle at 12% -10%, rgba(208, 225, 215, 0.72), transparent 32rem),
     linear-gradient(135deg, #f2efe7 0%, var(--canvas) 54%, #e8e5dc 100%);
@@ -1545,9 +1547,9 @@ a:focus-visible {
   max-height: 150px;
   margin: 0;
   overflow: auto;
-  border-left: 3px solid #ad7d2d;
+  border-left: 3px solid var(--annotation-border);
   border-radius: 0 7px 7px 0;
-  background: color-mix(in srgb, #e7c768 14%, var(--surface));
+  background: color-mix(in srgb, var(--annotation-surface) 14%, var(--surface));
   color: var(--ink);
   padding: 11px 13px;
   font-family: var(--font-reading);
@@ -3631,15 +3633,15 @@ html.pane-resizing * {
 }
 .moyang-annotation-hit {
   border-radius: 2px;
-  background: color-mix(in srgb, #e7c768 42%, transparent);
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, #ad7d2d 54%, transparent);
+  background: color-mix(in srgb, var(--annotation-surface) 42%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--annotation-border) 54%, transparent);
   color: inherit;
 }
 ::highlight(moyang-annotation) {
-  background-color: color-mix(in srgb, #e7c768 42%, transparent);
+  background-color: color-mix(in srgb, var(--annotation-surface) 42%, transparent);
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, #ad7d2d 60%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--annotation-border) 60%, transparent);
   text-decoration-thickness: 2px;
 }
 .editor-surface {
@@ -4400,6 +4402,8 @@ html.pane-resizing * {
     --workspace-active-surface: #2a3531;
     --related-hover-surface: #2a3531;
     --unresolved-link-surface: #252c2a;
+    --annotation-border: #f0d79a;
+    --annotation-surface: #e7c768;
     --page-background:
       radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--accent-soft) 60%, transparent), transparent 32rem),
       linear-gradient(
@@ -4464,6 +4468,8 @@ html.pane-resizing * {
   --workspace-active-surface: #2a3531;
   --related-hover-surface: #2a3531;
   --unresolved-link-surface: #252c2a;
+  --annotation-border: #f0d79a;
+  --annotation-surface: #e7c768;
   --page-background:
     radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--accent-soft) 60%, transparent), transparent 32rem),
     linear-gradient(
@@ -4500,6 +4506,8 @@ html.pane-resizing * {
     --primary-foreground: ButtonText;
     --shadow-primary: none;
     --page-background: Canvas;
+    --annotation-border: Highlight;
+    --annotation-surface: Highlight;
   }
 
   body,
@@ -4552,6 +4560,33 @@ html.pane-resizing * {
     background: Highlight;
     color: HighlightText;
     box-shadow: inset 0 -2px 0 Highlight;
+  }
+
+  .annotation-quote {
+    border-left-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .context-sidebar .annotation-item:hover,
+  .context-sidebar .annotation-item.current {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-sidebar .annotation-mark {
+    color: Highlight;
+  }
+
+  .moyang-annotation-hit {
+    background: Highlight;
+    box-shadow: inset 0 -2px 0 Highlight;
+  }
+
+  ::highlight(moyang-annotation) {
+    background-color: Highlight;
+    text-decoration-color: Highlight;
   }
 }
 
@@ -5364,8 +5399,8 @@ html.pane-resizing * {
   }
   .annotation-item:hover,
   .annotation-item.current {
-    border-color: color-mix(in srgb, #ad7d2d 50%, var(--line));
-    background: color-mix(in srgb, #e7c768 15%, var(--surface-strong));
+    border-color: color-mix(in srgb, var(--annotation-border) 50%, var(--line));
+    background: color-mix(in srgb, var(--annotation-surface) 15%, var(--surface-strong));
   }
   .annotation-open {
     display: flex;
@@ -5380,7 +5415,7 @@ html.pane-resizing * {
   }
   .annotation-mark {
     flex: 0 0 auto;
-    color: #ad7d2d;
+    color: var(--annotation-border);
     font-size: 12px;
     line-height: 1.2;
   }
