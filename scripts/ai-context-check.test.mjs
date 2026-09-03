@@ -49,7 +49,7 @@ test("accepts Windows line endings in the generated NEXT summary", () => {
   const root = copyFixture();
   try {
     const nextPath = path.join(root, "docs", "NEXT.md");
-    const next = fs.readFileSync(nextPath, "utf8").replaceAll("\n", "\r\n");
+    const next = fs.readFileSync(nextPath, "utf8").replaceAll("\r\n", "\n").replaceAll("\n", "\r\n");
     fs.writeFileSync(nextPath, next, "utf8");
     assert.deepEqual(validateAiContext(root, { inspectGit: false }), []);
   } finally {
