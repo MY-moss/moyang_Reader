@@ -26,6 +26,11 @@ const repositoryGeneratedPaths = [
 ];
 
 const legacyCargoCacheDirectoryPattern = /^[a-f0-9]{12}$/i;
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const bytesPerGib = 1024 ** 3;
+
+export const DEFAULT_BUILD_CACHE_BUDGET_BYTES = 4 * bytesPerGib;
+export const DEFAULT_BUILD_CACHE_IDLE_DAYS = 14;
 
 function runGit(args, cwd = projectRoot) {
   return execFileSync(gitCommand, args, {
@@ -100,21 +105,74 @@ export function findReparsePoints(root, limit = 16) {
   return found;
 }
 
-export function measurePath(candidate) {
+export function inspectPath(candidate) {
   const stat = readLinkSafe(candidate);
-  if (!stat || stat.isSymbolicLink()) return 0;
-  if (stat.isFile()) return stat.size;
-  if (!stat.isDirectory()) return 0;
+  if (!stat || stat.isSymbolicLink()) return { bytes: 0, lastActivityMs: null };
+  if (stat.isFile()) return { bytes: stat.size, lastActivityMs: stat.mtimeMs };
+  if (!stat.isDirectory()) return { bytes: 0, lastActivityMs: stat.mtimeMs };
 
-  let total = 0;
+  let bytes = 0;
+  let lastActivityMs = stat.mtimeMs;
   let entries;
   try {
     entries = fs.readdirSync(candidate, { withFileTypes: true });
   } catch {
-    return 0;
+    return { bytes, lastActivityMs };
   }
-  for (const entry of entries) total += measurePath(path.join(candidate, entry.name));
-  return total;
+  for (const entry of entries) {
+    const child = inspectPath(path.join(candidate, entry.name));
+    bytes += child.bytes;
+    if (child.lastActivityMs !== null) lastActivityMs = Math.max(lastActivityMs, child.lastActivityMs);
+  }
+  return { bytes, lastActivityMs };
+}
+
+export function measurePath(candidate) {
+  return inspectPath(candidate).bytes;
+}
+
+export function assessBuildCacheBudget(
+  artifact,
+  { nowMs = Date.now(), budgetBytes = DEFAULT_BUILD_CACHE_BUDGET_BYTES, idleDays = DEFAULT_BUILD_CACHE_IDLE_DAYS } = {},
+) {
+  const lastActivityMs = Number.isFinite(artifact.lastActivityMs) ? artifact.lastActivityMs : null;
+  const idleMs = lastActivityMs === null ? null : Math.max(0, nowMs - lastActivityMs);
+  const idleAgeDays = idleMs === null ? null : idleMs / millisecondsPerDay;
+  return {
+    bytes: artifact.bytes,
+    budgetBytes,
+    idleDays: idleAgeDays,
+    idleThresholdDays: idleDays,
+    overBudget: artifact.bytes > budgetBytes,
+    overIdle: idleAgeDays !== null && idleAgeDays >= idleDays,
+  };
+}
+
+function formatIdleAge(idleDays) {
+  if (idleDays === null) return "未知";
+  if (idleDays >= 1) return `${Math.floor(idleDays)} 天`;
+  const hours = idleDays * 24;
+  if (hours >= 1) return `${Math.floor(hours)} 小时`;
+  return `${Math.max(0, Math.floor(hours * 60))} 分钟`;
+}
+
+export function formatBuildCacheBudgetReport(artifact, options = {}) {
+  const assessment = assessBuildCacheBudget(artifact, options);
+  const summary =
+    `构建缓存：${artifact.path}；大小 ${formatBytes(assessment.bytes)}（预算 ${formatBytes(assessment.budgetBytes)}）；` +
+    `闲置 ${formatIdleAge(assessment.idleDays)}（阈值 ${assessment.idleThresholdDays} 天）。`;
+  if (!assessment.overBudget && !assessment.overIdle) {
+    return `${summary}预算状态：正常；受保护 target 默认只报告不删除。`;
+  }
+
+  const reasons = [];
+  if (assessment.overBudget) reasons.push(`超过大小预算 ${formatBytes(assessment.budgetBytes)}`);
+  if (assessment.overIdle) reasons.push(`超过闲置阈值 ${assessment.idleThresholdDays} 天`);
+  return (
+    `${summary}预算提示：${reasons.join("，")}。` +
+    "该受保护 target 默认只报告不删除；确认没有活动 Rust 构建后，可显式运行 " +
+    "npm run cleanup:workspace -- --apply --prune-targets 回收。"
+  );
 }
 
 function addArtifact(results, basePath, spec) {
@@ -124,11 +182,13 @@ function addArtifact(results, basePath, spec) {
 
 function addArtifactAt(results, artifactPath, label, protectedArtifact = false) {
   if (!readLinkSafe(artifactPath)) return;
+  const details = inspectPath(artifactPath);
   results.push({
     path: artifactPath,
     label,
     protected: protectedArtifact,
-    bytes: measurePath(artifactPath),
+    bytes: details.bytes,
+    lastActivityMs: details.lastActivityMs,
     reparsePoint: isReparsePoint(artifactPath),
   });
 }
@@ -193,6 +253,15 @@ export function formatBytes(bytes) {
   return `${bytes} B`;
 }
 
+function printBuildCacheBudget(artifacts) {
+  const cacheArtifacts = artifacts.filter((artifact) => artifact.protected && artifact.label.includes("Rust 构建"));
+  if (cacheArtifacts.length === 0) {
+    console.log("构建缓存预算：未发现受管 Cargo target。");
+    return;
+  }
+  for (const artifact of cacheArtifacts) console.log(formatBuildCacheBudgetReport(artifact));
+}
+
 function removeArtifact(artifact) {
   if (artifact.reparsePoint) {
     return { removed: false, reason: "reparse point，已跳过" };
@@ -203,6 +272,11 @@ function removeArtifact(artifact) {
 
 function main() {
   const args = new Set(process.argv.slice(2));
+  if (args.has("--apply") && args.has("--dry-run")) {
+    console.error("--apply 与 --dry-run 不能同时使用。");
+    process.exitCode = 2;
+    return;
+  }
   const apply = args.has("--apply");
   const pruneTargets = args.has("--prune-targets");
   const pruneWorktrees = args.has("--prune-worktrees");
@@ -219,6 +293,8 @@ function main() {
   const skipped = [];
   let removedBytes = 0;
   const failures = [];
+
+  printBuildCacheBudget(artifacts);
 
   for (const artifact of cleanableArtifacts) {
     if (!apply) continue;

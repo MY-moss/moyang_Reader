@@ -30,8 +30,8 @@ G-01 工程治理与清理（本轮）
 ### G：工程治理（本轮）
 
 - [x] **G-01 全量流程与交接整改**：更新 `DEVELOPMENT-AUDIT.md`、`WORKSPACE-CLEANUP.md`、`AI-WORKFLOW.md`、任务计划、待办和交接入口；修正开放 Issue 表与 ADR 编号；T0。
-- [x] **G-02 发布/交接状态结构化检查（已实现）**：新增只读 `release:status` 与 `docs/release-status.json`，校验三处版本、`NEXT.md` 唯一状态、CHANGELOG、Windows x64 Release 三项资产、公开/静态镜像、旧版本更新、Authenticode 和交接链接；不触发发布；T0/T1。分支 `codex/g02-release-state-2026-09-03`，PR 待创建，基线 `main@c8884859068642705761d6b398dbef869fddfc9e`。
-- [ ] **G-03 构建缓存预算提示**：仅增加大小/空闲时间提示和 dry-run，不自动删除正在使用的 Cargo target；超过预算给出明确清理建议；T1；不改变构建目标路径。
+- [x] **G-02 发布/交接状态结构化检查（已合并）**：新增只读 `release:status` 与 `docs/release-status.json`，校验三处版本、`NEXT.md` 唯一状态、CHANGELOG、Windows x64 Release 三项资产、公开/静态镜像、旧版本更新、Authenticode 和交接链接；不触发发布；T0/T1。分支 `codex/g02-release-state-2026-09-03`，PR [#441](https://github.com/MY-moss/moyang_Reader/pull/441) 已 squash 合并为 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b`，Quality checks run `33756198592` 与依赖审计 run `33756198652` 已通过。
+- [x] **G-03 构建缓存预算提示（已实现）**：清理器预览新增受管 Cargo target 的大小/闲置时间提示和显式 `--dry-run` 入口；超预算只报告路径、大小、年龄和明确清理建议，受保护 target 默认不删除；T1；不改变构建目标路径。分支 `codex/g03-build-cache-budget-2026-09-03`，PR 待创建，基线 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b`。
 
 ### F：核心稳定与高频体验
 

@@ -4,8 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  assessBuildCacheBudget,
   collectGeneratedArtifacts,
+  formatBuildCacheBudgetReport,
   findReparsePoints,
+  inspectPath,
   isManagedWorktreePath,
   measurePath,
   parseWorktreeList,
@@ -108,4 +111,76 @@ test("detects a junction without measuring or deleting its target", { skip: proc
   fs.unlinkSync(link);
   assert.equal(fs.existsSync(path.join(shared, "keep.txt")), true);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("inspects cache size and latest activity without following links", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-cache-inspect-"));
+  const target = path.join(root, "cargo-target");
+  const oldFile = path.join(target, "old.bin");
+  const recentFile = path.join(target, "recent.bin");
+  const oldActivity = Date.parse("2026-08-01T00:00:00Z");
+  const recentActivity = Date.parse("2026-09-02T00:00:00Z");
+
+  try {
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(oldFile, "old");
+    fs.writeFileSync(recentFile, "recent");
+    fs.utimesSync(oldFile, oldActivity / 1000, oldActivity / 1000);
+    fs.utimesSync(recentFile, recentActivity / 1000, recentActivity / 1000);
+    fs.utimesSync(target, recentActivity / 1000, recentActivity / 1000);
+
+    assert.deepEqual(inspectPath(target), { bytes: 9, lastActivityMs: recentActivity });
+    assert.equal(measurePath(target), 9);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("marks an oversized and idle protected target for a dry-run warning", () => {
+  const nowMs = Date.parse("2026-09-03T00:00:00Z");
+  const artifact = {
+    path: "D:/Moyang Reader/build-cache/cargo-target",
+    label: "共享 Rust 构建（用户缓存）",
+    protected: true,
+    bytes: 5 * 1024 ** 3,
+    lastActivityMs: Date.parse("2026-08-18T00:00:00Z"),
+  };
+
+  const assessment = assessBuildCacheBudget(artifact, {
+    nowMs,
+    budgetBytes: 4 * 1024 ** 3,
+    idleDays: 14,
+  });
+  const message = formatBuildCacheBudgetReport(artifact, {
+    nowMs,
+    budgetBytes: 4 * 1024 ** 3,
+    idleDays: 14,
+  });
+
+  assert.equal(assessment.overBudget, true);
+  assert.equal(assessment.overIdle, true);
+  assert.match(message, /D:\/Moyang Reader\/build-cache\/cargo-target/);
+  assert.match(message, /5\.00 GiB/);
+  assert.match(message, /闲置 16 天/);
+  assert.match(message, /只报告不删除/);
+  assert.match(message, /--apply --prune-targets/);
+});
+
+test("keeps a recent target quiet when it is inside both budgets", () => {
+  const artifact = {
+    path: "D:/Moyang Reader/build-cache/cargo-target",
+    label: "共享 Rust 构建（用户缓存）",
+    protected: true,
+    bytes: 256 * 1024 ** 2,
+    lastActivityMs: Date.parse("2026-09-02T12:00:00Z"),
+  };
+  const assessment = assessBuildCacheBudget(artifact, {
+    nowMs: Date.parse("2026-09-03T00:00:00Z"),
+    budgetBytes: 4 * 1024 ** 3,
+    idleDays: 14,
+  });
+
+  assert.equal(assessment.overBudget, false);
+  assert.equal(assessment.overIdle, false);
+  assert.equal(assessment.idleDays, 0.5);
 });
