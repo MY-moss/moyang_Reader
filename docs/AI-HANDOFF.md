@@ -8,7 +8,7 @@
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
 - 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉和 #193 交互视觉令牌已完成；当前正在推进 #171 CSS 颜色令牌治理第一批。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；唯一功能分支为 `codex/css-token-governance-2026-09-03`，PR 尚待创建；主线基线为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待后续令牌批次完成。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-governance-2026-09-03`，PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已创建，远端提交为 `92bc2ffb720d3e3c1ed4e0b0773875d552b59b33`；主线基线为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待后续令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -25,7 +25,7 @@
 - 依赖与风险：复用现有 CSS Custom Properties、Node test、Playwright/axe；颜色替换可能造成局部主题回归，因此只保持原值并用显式/系统深色对称 E2E 锁定。无新运行时依赖、凭据、数据迁移或发布资产。
 - 回滚：回退本批 PR 即可恢复原颜色声明和重复主题覆盖，不需要数据迁移。
 - 指标：`styles.css` 6073→5950 行；原始颜色字面量 245→219；自动/显式深色逐组件选择器 88→0。
-- 验证：工作流/令牌静态测试 15/15、主题对称浏览器 E2E 1/1、主题相关无障碍 E2E 4/4、前端 build 2 次（第 2 次由桌面 smoke 脚本强制触发）、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 因环境缺少 `tauri-driver` 未完成桌面会话，远端 Windows smoke 待 PR 门禁确认；本批不生成安装包、Tag、Release、签名、`latest.json` 或镜像。
+- 验证：工作流/令牌静态测试 15/15、主题对称浏览器 E2E 1/1、主题相关无障碍 E2E 4/4、前端 build 2 次（第 2 次由桌面 smoke 脚本强制触发）、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 的 Quality checks run `33709940611` 全部通过，含 Windows desktop smoke；依赖审计 run `33709940595` 已通过。本机桌面 smoke 因环境缺少 `tauri-driver` 未完成桌面会话；本批不生成安装包、Tag、Release、签名、`latest.json` 或镜像。
 
 ## 已完成切片：#193 交互视觉令牌（2026-09-03）
 

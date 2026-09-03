@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 的第一批 CSS 颜色令牌治理；当前分支 `codex/css-token-governance-2026-09-03`，PR 尚待创建；主线已核验为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`。
+- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 的第一批 CSS 颜色令牌治理；分支 `codex/css-token-governance-2026-09-03`，PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已创建，远端提交为 `92bc2ffb720d3e3c1ed4e0b0773875d552b59b33`；主线基线已核验为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`。
 - 基线与交付：从包含已合并 #193 代码的干净工作树建立独立分支；本批只处理诊断/内容/工作区颜色语义和自动/显式深色组件覆盖去重，不关闭仍需后续批次的 #171。
 - Issue/PR 核验：启动前已检查 #171、开放 Issue 与 PR；没有重复产品 PR；当前开放 PR 仅为 Dependabot 更新。
 - 稳定版本：`v0.10.14`；本切片属于 v0.11 高频体验批次，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
@@ -17,11 +17,11 @@
 - 风险：全局颜色令牌替换可能造成局部主题回归；本批只替换保持原值的公共颜色，并以浅/深色计算样式对称测试控制风险。
 - 回滚：回退本批 PR 即可恢复原颜色声明和重复主题覆盖，不需要数据迁移，不影响阅读库、文档或已下载更新。
 - 基线指标：`styles.css` 6073→5950 行；原始颜色字面量 245→219；自动/显式深色逐组件选择器 88→0。
-- 验证：工作流/令牌静态测试 15/15、主题对称浏览器 E2E 1/1、主题相关无障碍 E2E 4/4、前端 build 2 次（第 2 次由桌面 smoke 脚本强制触发）、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 因环境缺少 `tauri-driver` 未完成会话，等待远端 Windows desktop smoke。
+- 验证：工作流/令牌静态测试 15/15、主题对称浏览器 E2E 1/1、主题相关无障碍 E2E 4/4、前端 build 2 次（第 2 次由桌面 smoke 脚本强制触发）、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 的 Quality checks run `33709940611` 全部通过，含 Windows desktop smoke；依赖审计 run `33709940595` 已通过。本机桌面 smoke 因环境缺少 `tauri-driver` 未完成会话。
 
 ## 合并后唯一下一步：#171 CSS 令牌治理后续批次（重新核验后启动）
 
-- #171 尚未整体完成；下一批只从剩余硬编码颜色/间距/主题规则中重新选择一个边界，继续保持一个分支和一个 PR，不顺手处理 #194、#16 或 HTML 路线。
+- #171 尚未整体完成；合并本批后，下一批只从剩余硬编码颜色/间距/主题规则中重新选择一个边界，继续保持一个分支和一个 PR，不顺手处理 #194、#16 或 HTML 路线。
 - 依赖/风险/回滚：继续依赖 #193 与 #119 对比度基线；每批通过独立 PR 回退，不修改数据格式。
 
 ## 仍未开发的路线
@@ -31,4 +31,4 @@
 - HTML：先完成 H-01 安全只读预览与 H-05 CSP/清洗门禁，再评估 H-02 白名单 HTML、H-03 源码编辑和 H-04 资源/打印/分享；当前 HTML 仅为导出目标。
 - 知识结构：K-01 Inbox/Daily、K-02 图谱筛选、K-03 Mermaid 懒加载、K-04 JSON Canvas。
 
-执行授权仍只有本文件；完成 #193 后停止，不自动开始 #171。
+执行授权仍只有本文件；完成当前 #171 第一批后停止，不自动开始后续令牌批次。
