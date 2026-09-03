@@ -53,6 +53,7 @@ const typographyTokens = [
   "type-section",
   "type-heading",
 ];
+const motionTokens = ["motion-file-drop", "motion-quick-open-item"];
 const governedSpacingSelectors = [
   ".topbar",
   ".brand-block",
@@ -157,6 +158,10 @@ function countRawFontSizeLiterals(value) {
   return [...value.matchAll(/font-size\s*:\s*[^;{}]*\b\d+(?:\.\d+)?px\b/g)].length;
 }
 
+function countRawTransitionDurationLiterals(value) {
+  return [...value.matchAll(/transition\s*:\s*[^;{}]*\b\d+(?:\.\d+)?(?:ms|s)\b/g)].length;
+}
+
 test("keeps the governed palette behind semantic tokens", () => {
   for (const token of semanticTokens) {
     assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少语义令牌 --${token}`);
@@ -218,4 +223,30 @@ test("keeps app chrome and workspace typography behind size tokens", () => {
     countRawFontSizeLiterals(styles) <= 214,
     `原始字号声明超过本批预算：${countRawFontSizeLiterals(styles)} > 214`,
   );
+});
+
+test("keeps residual chrome transition durations behind motion tokens", () => {
+  for (const token of motionTokens) {
+    assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少动效令牌 --${token}`);
+  }
+
+  const governedMotionSelectors = [
+    [".file-drop-card", "motion-file-drop"],
+    [".quick-open-item", "motion-quick-open-item"],
+  ];
+
+  for (const [selector, token] of governedMotionSelectors) {
+    const matches = ruleBodies(selector);
+    assert.notEqual(matches.length, 0, `找不到受治理的动效规则：${selector}`);
+    for (const body of matches) {
+      assert.match(body, new RegExp(`transition\\s*:[^;{}]*var\\(--${token}\\)`, "s"));
+      assert.equal(
+        countRawTransitionDurationLiterals(body),
+        0,
+        `${selector} 仍直接写入 transition 时长，应使用 --${token}`,
+      );
+    }
+  }
+
+  assert.equal(countRawTransitionDurationLiterals(styles), 0, "样式表仍包含未令牌化的 transition 时长");
 });

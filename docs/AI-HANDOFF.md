@@ -4,17 +4,30 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@5dcf1962950d1e88615190a0948024136b054af6`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
+- 发布代码主线基线：`main@9dfe5d8dc806023ab2881c04300d24790e35c167`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批和间距第二批已完成；当前正在推进 #171 CSS 字体字号令牌第三批。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-font-token-2026-09-03`，PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436)，当前远端提交为 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`；主线基线为 `main@5dcf1962950d1e88615190a0948024136b054af6`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续动效/主题令牌批次完成。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批、间距第二批和字体字号第三批已完成；当前正在推进 #171 动效时长令牌治理。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-motion-token-2026-09-03`，PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)，远端功能提交为 `a1bf9fda50d228f2ba38e647e8dd21adca861236`；主线基线为 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）
+## 当前切片：#171 动效时长令牌治理（2026-09-03）
+
+- 目标：把 `.file-drop-card` 的 140ms 与 `.quick-open-item` 的 130ms transition 时长收敛到语义 `--motion-file-drop` 与 `--motion-quick-open-item`，保持原有时长、标准缓动和 reduced-motion 覆盖行为不变。
+- 用户价值：后续维护动效时从统一来源调整两个残余路径，减少样式漂移，不打断当前阅读流程。
+- 非目标：不重做动效、不改交互/数据/持久化/主题规则，不处理更新器、阅读库或默认首页，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
+- 验收标准：两个规则只引用语义动效令牌；样式表不含直接 transition 时长；静态令牌测试通过；720/900px 浏览器 E2E 验证正常与 reduced-motion 计算值且无横向溢出；Lint、格式、构建和 PR Quality checks 通过。
+- 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright；无新增运行时依赖、凭据、数据迁移或发布资产。
+- 风险与回滚：令牌误配可能改变微交互时序；本批保留 140/130ms 原值，并以静态规则和运行时 computed style 检查控制风险；回退 PR #437 即可恢复原声明，不涉及数据迁移。
+- 基线与分支：远端 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；分支 `codex/css-motion-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)，远端功能提交 `a1bf9fda50d228f2ba38e647e8dd21adca861236`。
+- 当前验证：RED 阶段已复现缺少动效令牌；修复后静态测试 5/5、CSS 治理 E2E 3/3（720/900px、正常/减少动效）、前端 build、Lint、Prettier 和 `git diff --check` 已通过；本机浏览器自动化桥接因 Chrome 远程调试授权未完成，使用 Playwright 完成定向验证；本机 Windows desktop smoke 仍受缺少 `tauri-driver` 影响，远端 PR Quality checks 待确认。
+- 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
+
+## 已合并切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）
 
 - 目标：将顶栏、更多/设置、查找栏、标签栏、左侧阅读库操作与文件条目、阅读历史摘要、状态栏的 9–19px 字号收敛到语义 `--type-*` 令牌，保持当前计算值和布局行为不变。
 - 用户价值：默认首页、更多操作和侧栏的信息层级更稳定；后续 UI/无障碍调整只需修改统一字号来源，减少窄窗口漂移和逐处微调。
@@ -23,8 +36,8 @@
 - 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright/axe；无新增运行时依赖、凭据、数据迁移或发布资产。
 - 风险与回滚：同值令牌替换若误配可能改变信息层级或造成窄窗口换行；静态选择器治理与 720/900px 计算样式/溢出 E2E 控制风险；回退本切片 PR 即可恢复原声明，不涉及数据迁移。
-- 基线与分支：远端 `main@5dcf1962950d1e88615190a0948024136b054af6`；分支 `codex/css-font-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436)，当前远端提交 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`。
-- 当前验证：字号静态令牌测试 4/4、新增字体治理 E2E 2/2、前端 build、Lint、类型感知 ESLint、Prettier 和 `git diff --check` 已通过；本机浏览器自动化桥接因 Chrome 远程调试授权未完成，使用 Playwright E2E 完成定向验证；本机 Windows desktop smoke 仍受缺少 `tauri-driver` 影响，远端 PR Quality checks 负责确认。
+- 基线与分支：远端 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；分支 `codex/css-font-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436) 已 squash 合并，代码提交 `49df300`/`f183c0c`，Quality checks run `33719109262` 通过。
+- 当前验证：字号静态令牌测试 4/4、新增字体治理 E2E 2/2、前端 build、Lint、类型感知 ESLint、Prettier 和 `git diff --check` 已通过；本机浏览器自动化桥接因 Chrome 远程调试授权未完成，使用 Playwright E2E 完成定向验证；本机 Windows desktop smoke 仍受缺少 `tauri-driver` 影响，远端 Quality checks 已确认 Windows smoke。
 - 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
 
 ## 已合并切片：#171 CSS 紧凑间距令牌治理第二批（2026-09-03）
