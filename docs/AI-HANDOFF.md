@@ -4,28 +4,25 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@c8884859068642705761d6b398dbef869fddfc9e`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436、#437、#438、#439、#440 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
+- 发布代码主线基线：`main@47a0c60a5775962cfa99dbef1c47b33315549b0b`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436、#437、#438、#439、#440、#441 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色/间距/字体/动效/页面背景/批注高亮/预览画布主题治理已完成；当前推进 G-02 发布/交接状态结构化检查。
-- 当前开放 Issue/PR 快照（2026-09-03）：G-02 启动前重新核验开放 Issue/PR，没有同类产品 Issue 或 PR；本切片分支为 `codex/g02-release-state-2026-09-03`，PR 待创建；主线基线为 `main@c8884859068642705761d6b398dbef869fddfc9e`；其余开放 PR 仅为 Dependabot 更新。结构化状态见 [`release-status.json`](release-status.json)，#241/#51 的外部阻塞保持显式记录。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色/间距/字体/动效/页面背景/批注高亮/预览画布主题治理已完成；G-02 发布状态检查和 G-03 构建缓存预算提示已完成；当前推进 #112 更新与 opener 文档收口。
+- 当前开放 Issue/PR 快照（2026-09-03）：G-03 启动前重新核验开放 Issue/PR，没有同类产品 Issue 或 PR；本切片分支为 `codex/g03-build-cache-budget-2026-09-03`，PR [#442](https://github.com/MY-moss/moyang_Reader/pull/442) 已创建，等待门禁；主线基线为 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b`；其余开放 PR 仅为 Dependabot 更新。结构化发布状态见 [`release-status.json`](release-status.json)，#241/#51 的外部阻塞保持显式记录。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：G-02 发布/交接状态结构化检查（2026-09-03）
+## 待提交切片：G-03 构建缓存预算提示（2026-09-03）
 
-- 目标：新增只读 `release:status` 校验，结构化核对项目版本、`CHANGELOG.md`、`NEXT.md` 唯一状态、Windows x64 Release 资产、镜像/旧版本更新/Authenticode 结论和交接链接。
-- 用户价值：发布和 AI 交接不再依赖容易漂移的散文状态；真实外部阻塞可以被审计并明确显示，不会被误报成全绿。
-- 非目标：不触发发布、不调用 GitHub/Cloudflare、不生成安装包或 `latest.json`，不读取或提交凭据，不改变更新器、业务功能、用户文件和 Windows x64 范围。
-- 验收标准：合法 v0.10.14 状态通过；重复/缺失 READY、版本漂移、CHANGELOG 缺段、资产缺失/路径不安全、缺少阻塞原因/证据和失效交接链接均阻断；`release:status` 接入 CI 与 Release 预检且保持只读。
-- 涉及文件：`scripts/release-status-check.mjs`、对应测试、`docs/release-status.json`、`package.json`、CI/Release workflow、`docs/RELEASE-POLICY.md`、本文件、`docs/NEXT.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：Node 文件系统、现有发布脚本和 Markdown/JSON 文档；无新增运行时依赖、凭据、数据迁移或外部服务调用。
-- 风险与回滚：状态格式过严可能阻断未来发布准备；支持 `planned/published` 生命周期并用 fixture 覆盖合法与非法状态，回退本 PR 即可移除状态门禁，不影响发布资产。
-- 基线与分支：远端 `main@c8884859068642705761d6b398dbef869fddfc9e`；分支 `codex/g02-release-state-2026-09-03`；无重复产品 Issue/PR；PR 待创建。
-- 当前验证：RED 阶段先确认缺少状态检查实现；完成后记录定向状态测试、`test:release`、lint/format、构建和远端 Quality run。
-- 发布/缓存：内部 T0/T1 工程治理，不生成 Windows x64 安装包、Tag、Release、签名或镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，只清理可再生生成物。
+- 目标与用户价值：清理器预览报告受管 Cargo target 的实际大小、最近活动和闲置时长；超过预算时给出可审计路径、大小、年龄和清理建议，避免构建缓存无提示膨胀。
+- 非目标：不改变 `D:\AI-moyang\本地阅读工具-build-cache` 或构建目标路径，不删除正在使用/受保护 target，不改变工作树保护、业务功能、发布资产或 Windows x64 范围。
+- 实现：`scripts/cleanup-workspace.mjs` 增加不跟随链接的目录统计、默认 4 GiB/14 天预算判断和显式 `--dry-run` 入口；默认及超限提示均为只读，显式 `--apply --prune-targets` 仍是用户确认后的既有回收边界。
+- 涉及文件：`scripts/cleanup-workspace.mjs`、`scripts/cleanup-workspace.test.mjs`、`docs/WORKSPACE-CLEANUP.md`、`CHANGELOG.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/AI-TAKEOVER-PROMPT.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 基线与分支：基于 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b` 建立 `codex/g03-build-cache-budget-2026-09-03`；启动前重新核验无重复 G-03 Issue/PR；PR [#442](https://github.com/MY-moss/moyang_Reader/pull/442) 已创建，等待门禁。
+- 验证：RED 阶段先确认缺少预算检查导出；随后定向清理测试 8/8、`npm run test:workflow` 24/24、`npm run cleanup:workspace -- --dry-run` 通过；未生成安装包、Release、签名、`latest.json` 或镜像。
+- 缓存状态：D 盘缓存目录存在但当前 0 字节，旧 C 盘路径不存在；本轮没有删除用户数据或活动构建目标。回退本切片 PR 即可恢复原清理预览输出。
 
 ## 已合并切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）
 

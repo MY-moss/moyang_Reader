@@ -43,6 +43,18 @@ npm run cleanup:workspace -- --apply --prune-targets
 
 需要回收已合并且干净的项目内工作树时，再额外加入 `--prune-worktrees`。清理器会自动跳过脏工作树和含 junction/符号链接的工作树；禁止使用强制删除绕过保护。
 
+### 构建缓存预算提示
+
+清理器会在预览输出中检查受管的 Cargo target，并报告实际大小、最近一次文件/目录修改时间推算出的闲置时长，以及默认预算：4 GiB 或连续闲置 14 天。超过任一阈值时会输出完整路径、实际大小、超限原因和清理建议；该提示只读，不会自动删除缓存。
+
+也可以显式使用 `--dry-run` 表达只读意图：
+
+```text
+npm run cleanup:workspace -- --dry-run
+```
+
+受保护或可能正在使用的 Cargo target 默认只报告不删除。只有确认没有活动 Rust 构建、并检查预览路径后，才允许显式使用 `npm run cleanup:workspace -- --apply --prune-targets`；清理器不会替用户自动加上这个参数，也不会改变 D 盘 `MOYANG_BUILD_CACHE_DIR` 目标路径。
+
 ## 3. 防止再次膨胀
 
 1. 新工作树只放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <path>` 复用唯一的 `node_modules`。
