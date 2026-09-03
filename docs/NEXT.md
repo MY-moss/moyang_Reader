@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
 - 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 批注/高亮主题令牌化；范围锁定为批注引文、当前批注卡、正文批注高亮和 CSS Highlight 的琥珀色语义令牌，不扩展到其他主题规则。
-- 基线与分支：远端 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；独立分支 `codex/css-theme-followup-2026-09-03`，当前提交待上传；启动前已核验 #171、开放 Issue/PR，无重复产品 PR；其余开放 PR 仅为 Dependabot。
+- 基线与分支：远端 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；独立分支 `codex/css-theme-followup-2026-09-03`，提交 `fccaafa`，PR [#439](https://github.com/MY-moss/moyang_Reader/pull/439)；启动前已核验 #171、开放 Issue/PR，无重复产品 PR；其余开放 PR 仅为 Dependabot。
 - 稳定版本与发布：当前稳定版 `v0.10.14`；本切片是 v0.11 高频体验批次的 T2 样式治理，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
 - 构建缓存：统一使用 `D:\AI-moyang\本地阅读工具-build-cache`；C 盘旧 `build-cache` 已清理，切片结束时只回收可再生生成物，不触碰脏工作树或 junction。
 

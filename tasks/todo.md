@@ -24,7 +24,7 @@
 - 非目标：不改批注数据、定位、保存、删除、编辑器、HTML 导出/编辑、布局尺寸、阅读库、更新器、脚本、插件或重型默认模块，不生成发布资产。
 - 验收：相关选择器只通过语义令牌取色；静态测试 7/7；720/900px CSS 治理 E2E 5/5，覆盖浅色、显式/系统深色、forced-colors 和无横向溢出；Lint、格式、构建、`git diff --check` 和 PR Quality checks 通过。
 - 风险/回滚：暗色或系统色对比度配置不当可能降低批注辨识度；通过主题计算样式 E2E 控制，回退本切片 PR 即可恢复原批注颜色声明，不涉及数据迁移。
-- 分支：`codex/css-theme-followup-2026-09-03`；当前 PR 尚未创建；基线 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；启动前已核验 Issue #171 与开放 PR 无重复产品 PR。
+- 分支：`codex/css-theme-followup-2026-09-03`；提交 `fccaafa`；PR [#439](https://github.com/MY-moss/moyang_Reader/pull/439)；基线 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；启动前已核验 Issue #171 与开放 PR 无重复产品 PR。
 - 验证：RED 阶段先复现缺少批注令牌；修复后静态测试 7/7、CSS 治理 E2E 5/5、前端 build、Lint、格式和 `git diff --check` 通过；desktop smoke 待远端 Quality checks 复核。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。

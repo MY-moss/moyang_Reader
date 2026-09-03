@@ -8,7 +8,7 @@
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
 - 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批、间距第二批、字体字号第三批、动效时长和页面背景治理已完成；当前正在推进 #171 批注/高亮主题令牌化。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-theme-followup-2026-09-03`，当前 PR 尚未创建；主线基线为 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-theme-followup-2026-09-03`，提交 `fccaafa`，PR [#439](https://github.com/MY-moss/moyang_Reader/pull/439)；主线基线为 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -23,7 +23,7 @@
 - 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright；无新增运行时依赖、凭据、数据迁移或发布资产。
 - 风险与回滚：暗色或系统色对比度配置不当可能降低批注辨识度；本批保持浅色原值、分别验证显式/系统深色并覆盖 forced-colors；回退本切片 PR 即可恢复批注选择器原有颜色声明，不涉及数据迁移。
-- 基线与分支：远端 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；分支 `codex/css-theme-followup-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；当前 PR 尚未创建。
+- 基线与分支：远端 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`；分支 `codex/css-theme-followup-2026-09-03`，提交 `fccaafa`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#439](https://github.com/MY-moss/moyang_Reader/pull/439)。
 - 当前验证：RED 阶段先复现缺少批注令牌；修复后静态测试 7/7、CSS 治理 E2E 5/5、前端 build、Lint、格式和 `git diff --check` 通过；本机浏览器桥接等待 Chrome 远程调试授权时使用 Playwright，desktop smoke 待 PR Quality checks 复核。
 - 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
 
