@@ -4,15 +4,27 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431 已 squash 合并；Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 待本切片合并后关闭。
+- 发布代码主线基线：`main@38ed9a03a11654986afa8656b2347d5784f35c34`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432 已 squash 合并；Issue #233、#363、#366、#370、#416、#191 已以 `completed` 关闭，#193 由当前唯一 PR #433 承载。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树、目录 roving/当前章节高亮、主阅读区读屏播报收窄和 Escape 互斥子切片已完成，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；Escape 互斥由 PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 承载，待合并后关闭 #191，下一独立切片为 #171/#193 视觉令牌治理。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #191 与开放 PR，未发现读屏播报或 Escape 互斥重复产品 PR；本切片唯一功能分支为 `codex/escape-mutex-2026-09-03`，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 已创建并待远端门禁；其余开放 PR 为该快照中的 Dependabot 更新；#191 待 PR #432 合并后关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉和当前 #193 视觉令牌切片已完成实现。下一独立切片为 #171 CSS 令牌治理，当前批次完成后停止。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #193 与开放 PR，未发现重复产品 PR；唯一功能分支为 `codex/visual-token-focus-2026-09-03`，PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 已创建，远端提交 `8fbad61841db1684ac41f22409a9568c606a35e9`；其余开放 PR 为该快照中的 Dependabot 更新；#171 仍开放并排在下一项。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
+
+## 当前切片：#193 交互视觉令牌（2026-09-03）
+
+- 目标：补齐查找框焦点环、关系图 primary 主按钮和上下文页签的普通/悬停/激活/聚焦状态，并抽取焦点、动效和等宽字体令牌。
+- 用户价值：键盘焦点可见、页签状态不混淆、关系图入口更易发现；深色、减少动画和 Windows 高对比度模式保持一致反馈。
+- 非目标：不改布局、阅读库/文档/更新器/数据语义、HTML 安全路线、脚本/插件边界或发布资产；不新增重型默认模块。
+- 验收标准：浅色/深色焦点和页签状态可区分；关系图按钮具备 primary 语义；令牌覆盖动效与等宽字体；reduced-motion/forced-colors 可用；定向单测、浏览器 E2E、构建和质量检查通过。
+- 涉及文件：`src/app/styles.css`、`src/app/components/RelatedPanel.tsx`、`src/app/components/RelatedPanel.test.tsx`、`e2e/a11y.spec.ts`，以及本次同步的交互/无障碍/任务/交接文档。
+- 依赖：现有 CSS 语义色、`aria-selected` 页签语义、React/Vite、Vitest、Playwright；无新运行时依赖、凭据或迁移。
+- 风险与回滚：令牌时序或主题对比度变化可能影响局部反馈；回退 PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 即可恢复，不影响用户数据。
+- 验证：RelatedPanel 单测 1/1、相关无障碍浏览器 E2E 1/1、build、Lint、类型感知 ESLint、格式和 diff 检查通过；桌面 smoke 已完成原生编译，但本机缺少 `tauri-driver`，未记为通过。
+- 发布/缓存：普通 T2 UI 切片，不生成安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`。
 
 ## 已完成切片：#191 主阅读区读屏播报收窄（2026-09-03）
 
