@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 主阅读区读屏播报收窄已在 PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 完成本切片，合并后下一独立切片只剩 Esc 互斥，当前不自动启动。
-- 本轮最新基线：`main@1e00683658e023405dcaee5be9c389adcbbd25c9`；PR #418–#430 已完成本轮代码与交接，PR #431 正在等待远端门禁；Issue #233、#363、#366、#370、#416 已关闭，#191 保持开放以承载剩余子切片。
+- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 的主阅读区读屏播报收窄和 Escape 互斥已完成本轮实现，PR 合并后 #191 可关闭，下一独立切片为 #171/#193 视觉令牌治理；本次完成后不自动启动下一项。
+- 本轮最新基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #418–#431 已完成本轮代码与交接，当前分支只补 #191 Escape 互斥；Issue #233、#363、#366、#370、#416 已关闭，#191 待本切片合并后关闭。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
@@ -20,10 +20,22 @@
 - 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
 - 交付：分支 `codex/default-home-brand-2026-09-03`，PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，代码提交 `b6ac4ba6ceb009ba4bd346765dd1650448dab8e6`；Quality checks run `33687800718` 全部通过；本地组件/前端单测、landing E2E、空状态无障碍/高对比度 E2E、lint、格式和构建均通过。
 
-## 当前唯一下一步：#191 键盘与读屏导航剩余子切片
+## 当前唯一下一步：#191 Escape 互斥（本切片）
 
-- 先重新核验 Issue #191 与开放 PR；主区读屏播报收窄已由 PR #431 完成，下一次只处理“Escape 互斥”这一垂直切片；不关闭 Issue，不改 HTML 安全路线。
-- 目标、用户价值、非目标、验收标准、涉及文件、依赖、风险和回滚方式必须在下一切片启动前补齐；本轮完成后停止，不自动开始下一项。
+- 启动前已重新核验 Issue #191 与开放 PR；本切片只处理“Escape 互斥”，不与读屏播报合并，不改 HTML 安全路线。完成并合并后关闭 #191，下一独立切片改为 #171/#193。
+- 本轮完成后停止，不自动开始下一项。
+
+## 本轮切片：#191 焦点模式 Escape 互斥（2026-09-03）
+
+- 目标：嵌套命令面板/快速打开打开时，`Escape` 只关闭拥有当前焦点的最内层弹层；焦点模式进入后聚焦可见的退出入口，弹层关闭后焦点可安全归还。
+- 用户价值：用户可以在专注阅读中查看命令而不退出当前模式；一次按键只完成一个动作，不丢失键盘工作位置，也不会因全局快捷键抢先关闭外层模式。
+- 非目标：不改命令内容、更新器、侧栏布局、读屏 live region、文档正文、搜索、HTML 安全预览/源码编辑、视觉令牌、脚本、插件、数据模型、发布资产或跨平台范围。
+- 验收标准：共享模态只让当前焦点所属弹层处理 Escape，并立即阻断后续全局监听；专注模式中命令面板第一次 Escape 后仍保持专注且焦点在“退出专注”，第二次才退出；既有弹层 Tab/Escape/焦点归还回归不变。
+- 涉及文件：`src/app/components/useModalBehavior.ts`、`src/app/components/useModalBehavior.test.tsx`、`src/app/App.tsx`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/ACCESSIBILITY-WINDOWS.md`、`CHANGELOG.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用现有 `aria-modal="true"` 模态契约、命令面板、专注模式按钮和 Playwright/Windows UI 测试基础设施；不新增依赖、凭据或数据迁移。
+- 风险：立即消费 Escape 会阻断同一窗口上后续的非模态快捷键；这是模态互斥所需行为，已有嵌套模态单测和专注模式浏览器 E2E 锁定范围；进入专注模式新增一次焦点移动，需保留可见退出入口。
+- 回滚：回退本切片 PR 即可恢复原 `stopPropagation` 和专注模式焦点行为，不影响文档、阅读库数据或已下载更新。
+- 发布：普通 T2 可访问性/UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续稳定批次。
 
 ## 最近完成：#191 主阅读区读屏播报收窄（第 5 个子切片，2026-09-03）
 

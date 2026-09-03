@@ -86,6 +86,50 @@ describe("useModalBehavior", () => {
     container.remove();
   });
 
+  it("prevents later global Escape listeners after the focused modal closes", () => {
+    const onClose = vi.fn();
+    const globalShortcut = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<TestModal onClose={onClose} />));
+    const first = container.querySelector<HTMLButtonElement>("button");
+    window.addEventListener("keydown", globalShortcut, true);
+
+    act(() => {
+      first?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(globalShortcut).not.toHaveBeenCalled();
+
+    window.removeEventListener("keydown", globalShortcut, true);
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("ignores Escape after the modal node detaches", () => {
+    const onClose = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<TestModal onClose={onClose} />));
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    if (dialog) Object.defineProperty(dialog, "isConnected", { configurable: true, value: false });
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it("keeps Tab navigation inside the modal that owns focus when modals overlap", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
