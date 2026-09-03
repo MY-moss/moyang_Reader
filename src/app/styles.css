@@ -93,6 +93,23 @@
   --motion-ease-enter: ease-out;
   --motion-ease-emphasized: cubic-bezier(0.2, 0.75, 0.25, 1);
   --radius: 5px;
+  /* Compact chrome scale: preserve the current density while centralizing spacing values. */
+  --space-1: 3px;
+  --space-2: 4px;
+  --space-3: 5px;
+  --space-4: 6px;
+  --space-5: 7px;
+  --space-6: 8px;
+  --space-7: 9px;
+  --space-8: 10px;
+  --space-9: 11px;
+  --space-10: 12px;
+  --space-11: 13px;
+  --space-12: 14px;
+  --space-13: 16px;
+  --space-14: 18px;
+  --space-15: 22px;
+  --space-16: 24px;
 }
 
 .editor-insert-popover.is-floating {
@@ -317,10 +334,10 @@ a:focus-visible {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: var(--space-15);
   min-width: 0;
   min-height: 68px;
-  padding: 12px 24px;
+  padding: var(--space-10) var(--space-16);
   border-bottom: 1px solid var(--line);
   background: var(--chrome-topbar-surface);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.58);
@@ -329,7 +346,7 @@ a:focus-visible {
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: var(--space-9);
   min-width: 178px;
 }
 .brand-logo {
@@ -403,19 +420,19 @@ a:focus-visible {
   display: flex;
   align-items: center;
   flex: 0 1 auto;
-  gap: 6px;
+  gap: var(--space-4);
   min-width: 0;
 }
 .toolbar-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
   color: var(--ink);
-  padding: 8px 11px;
+  padding: var(--space-6) var(--space-9);
   font-size: 11px;
   white-space: nowrap;
   transition:
@@ -472,12 +489,12 @@ a:focus-visible {
   top: 76px;
   right: 24px;
   display: grid;
-  gap: 12px;
+  gap: var(--space-10);
   width: min(380px, calc(100vw - 48px));
   max-height: min(calc(100vh - 92px), 680px);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 13px;
+  padding: var(--space-11);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface-strong) 97%, var(--accent-soft));
@@ -485,10 +502,10 @@ a:focus-visible {
 }
 .toolbar-overflow-group {
   display: grid;
-  gap: 7px;
+  gap: var(--space-5);
 }
 .toolbar-overflow-group + .toolbar-overflow-group {
-  padding-top: 11px;
+  padding-top: var(--space-9);
   border-top: 1px solid var(--line);
 }
 .toolbar-overflow-label {
@@ -501,7 +518,7 @@ a:focus-visible {
 .toolbar-overflow-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-4);
 }
 .toolbar-overflow-settings > .settings-menu,
 .toolbar-overflow-settings > .export-menu {
@@ -516,7 +533,7 @@ a:focus-visible {
 }
 .toolbar-overflow-settings > .settings-menu > summary::after,
 .toolbar-overflow-settings > .export-menu > summary::after {
-  margin-left: 12px;
+  margin-left: var(--space-10);
   color: var(--muted);
   content: "+";
   font-size: 15px;
@@ -536,8 +553,8 @@ a:focus-visible {
   min-width: 0;
   max-height: none;
   overflow: visible;
-  margin-top: 8px;
-  padding: 11px 0 0;
+  margin-top: var(--space-6);
+  padding: var(--space-9) 0 0;
   border: 0;
   border-top: 1px solid var(--line);
   border-radius: 0;
@@ -550,7 +567,7 @@ a:focus-visible {
 }
 .toolbar-overflow-panel .export-menu-panel {
   display: grid;
-  gap: 4px;
+  gap: var(--space-2);
 }
 .toolbar-overflow-panel .export-menu-panel button {
   white-space: normal;
@@ -812,8 +829,8 @@ a:focus-visible {
   right: 24px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px;
+  gap: var(--space-5);
+  padding: var(--space-6);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
@@ -1889,7 +1906,7 @@ a:focus-visible {
   scrollbar-gutter: stable;
   border-right: 1px solid var(--line);
   background: var(--chrome-sidebar-surface);
-  padding: 24px 16px;
+  padding: var(--space-16) var(--space-13);
 }
 .pane-resize-handle {
   position: absolute;
@@ -1942,13 +1959,13 @@ html.pane-resizing * {
   user-select: none !important;
 }
 .workspace-panel {
-  padding-bottom: 24px;
+  padding-bottom: var(--space-16);
   border-bottom: 1px solid var(--line);
 }
 .workspace-heading {
   display: grid;
   align-items: start;
-  gap: 12px;
+  gap: var(--space-10);
 }
 .workspace-heading-copy {
   min-width: 0;
@@ -1957,7 +1974,7 @@ html.pane-resizing * {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 6px;
+  gap: var(--space-4);
   min-width: 0;
   width: 100%;
 }
@@ -1982,7 +1999,7 @@ html.pane-resizing * {
 }
 .workspace-action-trigger::after {
   flex: 0 0 auto;
-  margin-left: 8px;
+  margin-left: var(--space-6);
   color: var(--muted);
   content: "⌄";
   font-size: 10px;
@@ -2012,13 +2029,13 @@ html.pane-resizing * {
   z-index: auto;
   display: grid;
   width: 100%;
-  gap: 3px;
-  margin-top: 5px;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
   box-shadow: var(--shadow-soft);
-  padding: 6px;
+  padding: var(--space-4);
 }
 .workspace-create-menu-panel button {
   min-width: 0;
@@ -2027,7 +2044,7 @@ html.pane-resizing * {
   border-radius: 5px;
   background: transparent;
   color: var(--ink);
-  padding: 8px 9px;
+  padding: var(--space-6) var(--space-7);
   text-align: left;
   cursor: pointer;
   font-size: 11px;
@@ -2048,7 +2065,7 @@ html.pane-resizing * {
   color: var(--accent-warm);
 }
 .workspace-heading h2 {
-  margin: 7px 0 0;
+  margin: var(--space-5) 0 0;
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 500;
@@ -2425,7 +2442,7 @@ html.pane-resizing * {
   border-radius: 4px;
   background: transparent;
   color: var(--workspace-foreground);
-  padding: 8px 9px;
+  padding: var(--space-6) var(--space-7);
   text-align: left;
   transition:
     background var(--motion-fast) var(--motion-ease-standard),
@@ -2436,14 +2453,14 @@ html.pane-resizing * {
 .workspace-folder {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-3);
   min-width: 0;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: var(--workspace-foreground);
-  padding: 8px 9px;
+  padding: var(--space-6) var(--space-7);
   text-align: left;
   transition:
     background var(--motion-fast) var(--motion-ease-standard),
@@ -4293,9 +4310,9 @@ html.pane-resizing * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-13);
   overflow: hidden;
-  padding: 0 18px;
+  padding: 0 var(--space-14);
   border-top: 1px solid var(--line);
   background: var(--chrome-statusbar-surface);
   color: var(--statusbar-foreground);
@@ -4529,8 +4546,8 @@ html.pane-resizing * {
 
 @media screen and (max-width: 1180px) {
   .topbar {
-    gap: 14px;
-    padding-inline: 18px;
+    gap: var(--space-12);
+    padding-inline: var(--space-14);
   }
   .brand-block {
     min-width: 160px;
@@ -4540,7 +4557,7 @@ html.pane-resizing * {
     max-width: 100%;
     flex-wrap: wrap;
     overflow: visible;
-    gap: 4px;
+    gap: var(--space-2);
   }
   .toolbar-optional {
     display: none;
@@ -4550,7 +4567,7 @@ html.pane-resizing * {
     flex: 0 0 auto;
   }
   .toolbar-button {
-    padding-inline: 8px;
+    padding-inline: var(--space-6);
   }
   .toolbar-overflow-panel {
     position: fixed;
@@ -4564,8 +4581,8 @@ html.pane-resizing * {
 @media screen and (max-width: 840px) {
   .topbar {
     flex-wrap: wrap;
-    gap: 10px 14px;
-    padding: 12px 16px;
+    gap: var(--space-8) var(--space-12);
+    padding: var(--space-10) var(--space-13);
   }
   .brand-block {
     min-width: 160px;
@@ -4771,8 +4788,8 @@ html.pane-resizing * {
     gap: 5px;
   }
   .statusbar {
-    gap: 8px;
-    padding: 0 10px;
+    gap: var(--space-6);
+    padding: 0 var(--space-8);
   }
   .statusbar span:nth-child(2) {
     display: none;
@@ -4781,7 +4798,7 @@ html.pane-resizing * {
 
 @media screen and (max-width: 720px) {
   .toolbar {
-    row-gap: 6px;
+    row-gap: var(--space-4);
   }
   .toolbar-overflow-panel {
     top: 168px;

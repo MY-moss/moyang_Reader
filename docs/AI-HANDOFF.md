@@ -4,23 +4,37 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@9a7017747c1121d977489a42aba2f7809e6e0892`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭。
+- 发布代码主线基线：`main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉和 #193 交互视觉令牌已完成；当前正在推进 #171 CSS 颜色令牌治理第一批。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-governance-2026-09-03`，PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已创建，远端提交为 `92bc2ffb720d3e3c1ed4e0b0773875d552b59b33`；主线基线为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待后续令牌批次完成。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌和 #171 CSS 颜色第一批已完成；当前正在推进 #171 CSS 紧凑间距第二批。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-followup-2026-09-03`，PR 待创建；主线基线为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#171 CSS 颜色令牌治理第一批（2026-09-03）
+## 当前切片：#171 CSS 紧凑间距令牌治理第二批（2026-09-03）
+
+- 目标：把顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏的紧凑间距集中到 `--space-*` 令牌，保持现有密度值和布局行为不变。
+- 用户价值：后续调整更新、阅读库、More 和文件树 UI 时只需修改统一间距来源，减少窄窗口遮挡、间距漂移和重复微调。
+- 非目标：不重做视觉设计，不改交互、阅读库/文档/更新器数据语义，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
+- 验收标准：受治理选择器的 `gap`/`margin`/`padding` 不直接写入像素值；16 个 `--space-*` 令牌保留现有值；原始间距声明 476→437；720/900px E2E 无横向溢出；静态检查、相关主题/无障碍 E2E、构建、Lint、类型感知、格式和 diff 检查通过。
+- 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts` 及本次同步的任务/交接文档。
+- 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright/axe；不新增运行时依赖、凭据、数据迁移或发布资产。
+- 风险：间距令牌误用可能造成局部溢出或密度变化；本批只替换保持原值的顶栏/工作区公共间距，并用 720/900px 计算样式和横向溢出检查控制风险。
+- 回滚：回退本批 PR 即可恢复原间距声明，不需要数据迁移，不影响阅读库、文档或已下载更新。
+- 基线与分支：基于 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a` 的等价干净工作树建立分支 `codex/css-token-followup-2026-09-03`；Issue #171 启动前未发现重复产品 PR；PR 待创建。
+- 当前验证：静态令牌测试 3/3；新增紧凑宽度 E2E 1/1；主题/设置无障碍 E2E 5/5；More、工具栏图标、窄工具栏和顶栏互斥回归 4/4；前端 build、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 受缺少 `tauri-driver` 阻塞，远端 Windows smoke 待 PR 门禁确认。
+- 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
+
+## 已完成切片：#171 CSS 颜色令牌治理第一批（2026-09-03）
 
 - 目标：将错误/警告、代码块/行内代码、文件卡片、状态栏和工作区列表的重复颜色收敛到语义令牌，并让自动深色与显式深色共享同一组令牌覆盖。
 - 用户价值：浅色、深色和系统主题的内容/状态反馈更一致；后续无障碍或品牌色修复只需改语义令牌，减少漏改和主题漂移。
 - 非目标：不重写整份 `styles.css`，不改布局、业务逻辑、阅读库/文档/更新器语义，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
 - 验收标准：本批涉及的公共颜色均通过语义令牌；深色逐组件覆盖为 0；硬编码颜色计数有可复核下降；显式/系统深色计算样式一致；静态检查、浏览器 E2E、构建、Lint、类型感知、格式和 diff 检查通过。
-- 基线与分支：从已包含 #193 合并代码的干净工作树建立 `codex/css-token-governance-2026-09-03`；发布主线基线 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；Issue #171 启动前未发现重复产品 PR。
+- 基线与分支：从已包含 #193 合并代码的干净工作树建立 `codex/css-token-governance-2026-09-03`；发布主线基线 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；Issue #171 启动前未发现重复产品 PR；PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已 squash 合并为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`。
 - 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`package.json`、`e2e/a11y.spec.ts` 及本次同步的任务/交接文档。
 - 依赖与风险：复用现有 CSS Custom Properties、Node test、Playwright/axe；颜色替换可能造成局部主题回归，因此只保持原值并用显式/系统深色对称 E2E 锁定。无新运行时依赖、凭据、数据迁移或发布资产。
 - 回滚：回退本批 PR 即可恢复原颜色声明和重复主题覆盖，不需要数据迁移。
