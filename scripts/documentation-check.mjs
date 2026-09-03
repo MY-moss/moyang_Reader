@@ -70,7 +70,7 @@ function validateMarkdownLinks(projectRoot, relativePath, text, errors) {
     const withoutFragment = target.split(/[?#]/, 1)[0];
     if (!withoutFragment) continue;
 
-    let decodedTarget = withoutFragment;
+    let decodedTarget;
     try {
       decodedTarget = decodeURIComponent(withoutFragment);
     } catch {
