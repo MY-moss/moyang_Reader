@@ -1,120 +1,36 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 的主阅读区读屏播报收窄和 Escape 互斥已完成本轮实现，Escape 互斥已提交到 PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432)，待远端门禁通过后合并并关闭 #191；下一独立切片为 #171/#193 视觉令牌治理，本次完成后不自动启动下一项。
-- 本轮最新基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #418–#431 已完成本轮代码与交接，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 承载当前 #191 Escape 互斥切片；Issue #233、#363、#366、#370、#416 已关闭，#191 待 PR #432 合并后关闭。
-- 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
-- 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
-- GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
-- 本轮镜像子任务未通过：`Publish updater mirror` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效；公开 Cloudflare Pages 的 v0.10.14 manifest、安装包和签名已单独验证 HTTP 200、大小与 SHA-256 一致。
+- 当前切片：#193 交互视觉令牌已实现并上传到唯一 PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433)，等待远端门禁后合并；合并并核验后立即停止，不自动启动下一批。
+- 基线：`main@38ed9a03a11654986afa8656b2347d5784f35c34`；本地提交 `bf390ed`，远端分支提交 `8fbad61841db1684ac41f22409a9568c606a35e9`。
+- Issue/PR 核验：启动前已检查开放 Issue 与 PR；没有重复的 #193 产品 PR，其他开放 PR 为 Dependabot 更新；#171 是合并后唯一下一项。
+- 稳定版本：`v0.10.14`；本切片属于 v0.11 高频体验批次，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
+- 构建缓存：统一使用 `D:\AI-moyang\本地阅读工具-build-cache`；C 盘旧 `build-cache` 内容已清理，后续只在无活动构建时回收 D 盘可再生目标。
 
-## 最近完成：默认首页与品牌视觉收口（用户反馈，2026-09-03）
+## 本轮切片：#193 交互视觉令牌（2026-09-03）
 
-- 目标：默认未打开文档的主界面复用顶栏正在使用的新 Logo，移除残留大写 M/旧手绘标记，并保持首次启动动作可用。
-- 用户价值：用户进入应用即可看到统一、可识别的 Moyang Reader 品牌，不再看到与 Windows/顶栏不一致的旧字母图标，默认首页更完整。
-- 非目标：不重新设计 Logo，不改阅读库创建/导出/挂载语义，不改侧栏、更新器、#191 读屏、视觉令牌、HTML、脚本、插件或发布资产。
-- 验收标准：默认空状态显示 `src/assets/moyang-reader-logo.png` 且图片实际加载；旧大写 M 标记不再渲染；首次启动按钮和已有阅读库空状态语义保持不变；组件测试、landing 浏览器 E2E、空状态无障碍/高对比度 E2E、全量前端单测、lint、格式和构建通过。
-- 涉及文件：`src/app/components/EmptyState.tsx`、`src/app/components/EmptyState.test.tsx`、`src/app/styles.css`、`e2e/smoke.spec.ts`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用现有 PNG Logo、React/Vite、现有 CSS 语义令牌和空状态操作回调；不新增运行时依赖、外部凭据、数据迁移或发布资产。
-- 风险：静态 Logo 在深色/高对比度环境中仍需保持可见；固定尺寸变化可能影响窄窗口空状态布局，已用无障碍 E2E 和实际 1440px/窄窗口页面检查覆盖；不改变持久化数据。
-- 回滚：回退本切片 PR 即恢复旧空状态 M 标记，不需要数据迁移，不影响文档、阅读库或安装资产。
-- 发布：普通 T2 UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续 Windows x64 稳定批次。
-- 交付：分支 `codex/default-home-brand-2026-09-03`，PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，代码提交 `b6ac4ba6ceb009ba4bd346765dd1650448dab8e6`；Quality checks run `33687800718` 全部通过；本地组件/前端单测、landing E2E、空状态无障碍/高对比度 E2E、lint、格式和构建均通过。
+- 目标：补齐查找框可见焦点环、关系图主按钮样式、上下文页签的普通/悬停/激活/聚焦状态，并抽取焦点、动效和等宽字体令牌。
+- 用户价值：键盘用户能立即看见当前焦点；页签当前状态和可悬停状态不再混淆；关系图入口更易发现；主题、减少动画和高对比度模式的交互反馈一致。
+- 非目标：不重构整体布局、不改阅读库/文档/更新器/数据语义，不改 HTML 预览或源码编辑，不执行脚本、不引入插件绕过安全边界、不新增重型默认模块，不生成发布资产。
+- 验收标准：浅色/深色下查找框焦点环可见；上下文页签激活与非激活背景可区分、悬停有独立反馈、聚焦有焦点环；关系图按钮使用 primary 语义；动效/等宽字体使用令牌；reduced-motion 与 Windows forced-colors 保持可用；定向单测、相关无障碍浏览器 E2E、构建、Lint、类型感知、格式和 diff 检查通过。
+- 涉及文件：`src/app/styles.css`、`src/app/components/RelatedPanel.tsx`、`src/app/components/RelatedPanel.test.tsx`、`e2e/a11y.spec.ts`，以及同步的交互、无障碍、变更日志、计划和交接文档。
+- 依赖：现有 CSS 语义颜色、`aria-selected` 页签状态、React/Vite、Vitest、Playwright；不新增运行时依赖、凭据、数据迁移或发布资产。
+- 风险：统一动效令牌可能改变局部过渡时序；主按钮和焦点颜色需在暗色/强制高对比度下保持可辨识；仅通过语义令牌和回归检查控制风险，不改变业务流程。
+- 回滚：回退 PR #433 即可移除本切片的令牌、状态样式和测试；不需要数据迁移，不影响阅读库、文档或已下载更新。
+- 验证：RelatedPanel 单测 1/1、相关无障碍浏览器 E2E 1/1、前端 build、Lint、类型感知 ESLint、Prettier 和 `git diff --check` 通过；Windows desktop smoke 已完成原生编译，但本机缺少 `tauri-driver`，运行器无法完成桌面会话，已在 PR 中标明，不伪造通过。
 
-## 当前唯一下一步：#191 Escape 互斥（本切片）
+## 合并后唯一下一步：#171 CSS 令牌治理
 
-- 启动前已重新核验 Issue #191 与开放 PR；本切片只处理“Escape 互斥”，不与读屏播报合并，不改 HTML 安全路线。完成并合并后关闭 #191，下一独立切片改为 #171/#193。
-- 本轮完成后停止，不自动开始下一项。
+- 目标：盘点剩余硬编码颜色/间距/焦点规则和暗色覆盖，按小批次收敛公共令牌并保持现有选择器和布局行为。
+- 用户价值：后续主题和无障碍修复可以在稳定令牌上迭代，减少同一语义多份颜色/规则造成的回归。
+- 非目标：不做整份 `styles.css` 重写、不做布局重构、不改变业务逻辑、不提前进入 HTML 源码编辑或插件/脚本能力。
+- 验收标准：完成令牌盘点与分批改动，量化硬编码减少；浅色/深色截图与对比度检查无回归；每批有针对性测试和交接记录。
+- 依赖/风险/回滚：依赖 #193 与既有 #119 对比度基线；大范围替换可能产生主题回归，必须继续拆薄切片；每批通过独立 PR 回退，不修改数据格式。
 
-## 本轮切片：#191 焦点模式 Escape 互斥（2026-09-03）
+## 仍未开发的路线
 
-- 目标：嵌套命令面板/快速打开打开时，`Escape` 只关闭拥有当前焦点的最内层弹层；焦点模式进入后聚焦可见的退出入口，弹层关闭后焦点可安全归还。
-- 用户价值：用户可以在专注阅读中查看命令而不退出当前模式；一次按键只完成一个动作，不丢失键盘工作位置，也不会因全局快捷键抢先关闭外层模式。
-- 非目标：不改命令内容、更新器、侧栏布局、读屏 live region、文档正文、搜索、HTML 安全预览/源码编辑、视觉令牌、脚本、插件、数据模型、发布资产或跨平台范围。
-- 验收标准：共享模态只让当前焦点所属弹层处理 Escape，并立即阻断后续全局监听；专注模式中命令面板第一次 Escape 后仍保持专注且焦点在“退出专注”，第二次才退出；既有弹层 Tab/Escape/焦点归还回归不变。
-- 涉及文件：`src/app/components/useModalBehavior.ts`、`src/app/components/useModalBehavior.test.tsx`、`src/app/App.tsx`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/ACCESSIBILITY-WINDOWS.md`、`CHANGELOG.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用现有 `aria-modal="true"` 模态契约、命令面板、专注模式按钮和 Playwright/Windows UI 测试基础设施；不新增依赖、凭据或数据迁移。
-- 风险：立即消费 Escape 会阻断同一窗口上后续的非模态快捷键；这是模态互斥所需行为，已有嵌套模态单测和专注模式浏览器 E2E 锁定范围；进入专注模式新增一次焦点移动，需保留可见退出入口。
-- 回滚：回退本切片 PR 即可恢复原 `stopPropagation` 和专注模式焦点行为，不影响文档、阅读库数据或已下载更新。
-- 发布：普通 T2 可访问性/UI 切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像，纳入后续稳定批次。
+- 条件项：#241 更新/镜像/PDF 实机矩阵、#51 Windows 安装包签名、#112 更新与 opener 文档。
+- 工程项：#16 `App.tsx` 渐进拆分、#194 TS↔Rust 契约收敛、#227 安全披露、#111 轻量 i18n/错误码、G-02/G-03 治理收口。
+- HTML：先完成 H-01 安全只读预览与 H-05 CSP/清洗门禁，再评估 H-02 白名单 HTML、H-03 源码编辑和 H-04 资源/打印/分享；当前 HTML 仅为导出目标。
+- 知识结构：K-01 Inbox/Daily、K-02 图谱筛选、K-03 Mermaid 懒加载、K-04 JSON Canvas。
 
-## 最近完成：#191 主阅读区读屏播报收窄（第 5 个子切片，2026-09-03）
-
-- 目标：移除主阅读区 `main.content-area` 的宽范围 `aria-live`，避免长文正文因无关状态变化被读屏器整段重新播报；把打开文档的加载提示标为独立的 `status/polite`。
-- 用户价值：读屏用户可以连续阅读长文，不会因阅读区状态更新反复听到全文；缩放、渐进渲染和错误反馈仍保持明确、可获取的状态语义。
-- 非目标：不处理 #191 的 Escape 互斥、标签/文件树/目录导航，不改阅读内容、搜索、鼠标行为、HTML 安全路线、视觉令牌、脚本、插件或发布资产；不以本切片关闭 Issue #191。
-- 验收标准：主阅读区及其文章没有宽范围 live ancestor；打开文档加载状态、阅读缩放和渐进渲染状态使用显式 `role=status`/`aria-live=polite`，错误使用 `role=alert`；无障碍 E2E 锁定上述 DOM 契约并保持无 serious/critical axe 违规。
-- 涉及文件：`src/app/App.tsx`、`e2e/a11y.spec.ts`、`docs/ACCESSIBILITY-WINDOWS.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用现有 React 状态提示、`ProgressiveReaderContent` 的显式 status、通知/错误语义和 Playwright axe 基线；不新增运行时依赖、外部凭据、数据迁移或发布资产。
-- 风险：移除祖先 live region 后，依赖非预期全文播报的辅助技术用户可能少收到整体变化提示；通过显式加载/缩放/渐进/错误状态保留必要反馈，并以浏览器回归锁定范围。
-- 回滚：回退 PR #431 即可恢复原主区 `aria-live` 行为和加载提示标记，不需要数据迁移，不影响用户文档或阅读库。
-- 验证：RED 测试先复现 `main.content-area[aria-live]`；修复后 `npm run test:e2e:a11y -- --workers=1` 8/8、`npm test` 94 个文件/372 项、lint、格式、类型感知和 build 通过；`git diff --check` 通过。
-- 发布：普通 T2 无障碍切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；纳入后续稳定批次。
-- 交付：分支 `codex/reader-live-region-2026-09-03`，PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431)，代码提交 `a4448d7`；已 squash 合并为 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605`，Quality checks run `33693407155` 全部通过，Issue #191 保持开放至 Escape 互斥切片完成。
-
-## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
-
-- 目标：让左侧栏的“新建、批量导出、添加阅读库、切换/管理阅读库”在窄侧栏中稳定排列；菜单展开时进入布局流，不遮挡文件树，也不被侧栏横向裁切。
-- 用户价值：用户可以在当前阅读流程内快速创建、导出、添加或切换阅读库，操作反馈清晰，不必反复关闭面板或猜测被遮挡的菜单项。
-- 非目标：不改创建/导出/挂载的数据语义，不实现更新器、默认首页重设计、旧 M 图标替换、读屏播报或 Esc 互斥，不改 HTML、脚本、插件、发布资产或跨平台范围。
-- 验收标准：操作区在 216px 及默认侧栏宽度内无横向溢出；新建、批量导出和切换菜单互斥，支持点外/Esc 关闭；菜单项执行后立即收起；切换阅读库仍保留挂载数量、路径和移除动作；组件测试、相关单测、Windows 桌面 UI E2E、lint、格式和 TypeScript 检查通过。
-- 涉及文件：`src/app/components/WorkspacePanel.tsx`、`src/app/components/WorkspacePanel.test.tsx`、`src/app/styles.css`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：复用现有 WorkspacePanel 回调、Tauri 工作区授权/导出管线、`<details>` 原生键盘行为和现有语义令牌；不新增运行时依赖、外部凭据或数据迁移；本地 Cargo target 继续使用 D 盘 `MOYANG_BUILD_CACHE_DIR`。
-- 风险：流式菜单会增加侧栏高度并推动文件树下移；窄侧栏仍需保留可滚动空间；点外/Esc 监听必须只作用于三个操作菜单，不干扰文件树上下文菜单或全局快捷键。
-- 回滚：回退 PR #428 即可恢复原有标题同行布局和绝对定位菜单，不需要数据迁移，不影响已合并的 #191 导航语义。
-- 发布：普通 T2 UI 切片，不生成 Windows 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；PR #428 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
-
-## 最近完成：#191 目录 roving tabindex 与当前章节高亮（第 4 个子切片）
-
-- PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`；Quality checks run `33664518604` 全部通过，Issue #191 保持开放。
-- 目录已具备 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End 导航和当前章节高亮同步；读屏播报与 Esc 互斥仍拆为后续子切片。
-
-## 最近完成：#191 文件树 roving tabindex 与方向键导航（第 3 个子切片）
-
-- PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`；Quality checks run `33653154436` 全部通过，Issue #191 保持开放。
-- 文件树已具备 `tree/treeitem` 语义、单一 roving Tab 停靠点、上下/Home/End、文件夹 Left/Right 和虚拟窗口焦点恢复；缓存治理和工作树保护规则同步落地。
-
-## 最近完成：#191 标签栏 roving tabindex 与方向键导航（第 2 个子切片）
-
-- PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`；Quality checks run `33642980506` 全部通过，Issue #191 保持开放。
-- 标签栏已具备水平工具栏语义、单一 roving Tab 停靠点、左右循环、Home/End 定位和当前文档选中同步；关闭、拖拽、右键菜单和焦点归还保持原行为。
-
-## 最近完成：#191 快速打开高亮跟随与读屏语义（第 1 个子切片）
-
-- PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；Issue #191 保持开放。
-- 快速打开结果已具备稳定 option ID、`aria-controls`/`aria-activedescendant`、`aria-selected` 和活动项最近滚动；组件测试、长列表 E2E、构建、lint、类型感知和格式检查均通过。
-
-## 最近完成：v0.10.14 / #363 DOCX 导出可靠性修复
-
-- 目标：让批量 Word 导出在大文件场景减少逐块刷盘，并在 Worker 部分输出后失败时清理临时卷、回放当前卷；取消操作不误触发回退。
-- 验收：前端 338 项、Rust 54 项、浏览器和 Windows 桌面 E2E、Release 检查、构建与远程 Quality checks 均通过；旧 Release 首次构建发现产物路径问题，已由 PR #414 修复并重新发布。
-- 交付：PR [#413](https://github.com/MY-moss/moyang_Reader/pull/413) 完成 v0.10.14 版本元数据，PR [#414](https://github.com/MY-moss/moyang_Reader/pull/414) 修复 Release 构建产物发现；Issue [#363](https://github.com/MY-moss/moyang_Reader/issues/363) 已关闭。
-- 回滚：回退 #363 代码和 #414 工作流修复均不需要数据迁移；如需撤回发布，保留 v0.10.14 资产并按发布政策准备新的 patch 版本，不覆盖用户安装状态。
-
-## 最近完成：#365 插入浮层焦点与图片浏览体验
-
-- 目标：让插入面板支持键盘导航、关闭后可靠归还编辑器焦点，并可从当前 Windows 工作区选择图片。
-- 非目标：不改变 Markdown 插入语义、渲染协议或编辑器架构；不处理 DOCX/PDF 图片编辑；不在本切片生成安装包、Tag、Release 或 Cloudflare 镜像。
-- 实现：插入类型 tab 使用 roving tabindex，支持方向键、Home/End；外部 pointerdown 关闭时阻止焦点漂移；图片选择器限定图片扩展名，并按当前文档计算工作区内相对路径，拒绝工作区外和不安全路径。
-- 反馈：图片选择中的加载、取消、失败和桌面版限制均有明确状态；手动路径、截图粘贴和拖入提示保持可见。
-- 验收：定向单测 2 文件/6 项、变更文件 ESLint/Prettier、一次前端生产构建、Rust fmt/test/clippy、浏览器插入面板 E2E 2/2、Windows 桌面烟测和远程 Quality checks run `33526998019` 均通过。
-- 交付：分支 `codex/insert-popover-2026-09-01`、PR [#408](https://github.com/MY-moss/moyang_Reader/pull/408)、合并提交 `4544c926a9a0485c1f02b6ac20f9982f81877da3`；Issue #365 已以 `completed` 关闭。
-- 风险与回滚：图片选择只允许当前已授权工作区，回退 PR #408 不需要数据迁移；未选择的工作区外文件不会被复制或写入。
-- 发布边界：本切片不单独生成安装包；纳入 `v0.11.0` Windows x64 稳定批次。
-
-## 下一次开发
-
-- 当前分支只覆盖 #191 的目录 roving tabindex/当前章节高亮子切片；合并后下一独立切片为 #191 的读屏播报或 Esc 互斥，必须重新检查 Issues 和开放 PR。
-- 下一次必须从最新 `main` 重新检查 Issues、开放 PR 和 Ready backlog，再选择一个单一垂直切片。
-- 不从历史上下文自动开启下一项；若没有 Ready 事项，先输出候选事项和选择理由。
-- 合并后必须重新创建项目内 `.codex-worktrees/` 下的干净工作树；根目录已有的未提交改动不得覆盖。
-
-## 开始前快速检查
-
-1. 查看 Issues/PR，确认没有重复工作；记录提交 SHA、PR 和 CI run_id。
-2. 读取 [`AI-WORKFLOW.md`](AI-WORKFLOW.md) 和本文件，只读取当前切片相关的源码、测试及一个相似实现。
-3. 保持原始工作目录不动；新切片使用项目内 `.codex-worktrees/` 的独立工作树，并复用主工作区依赖。
-4. 完成验证、提交、推送、PR 和交接后停止，不自动开始下一项。
-
-## 快速触发
-
-继续开发 Moyang Reader 时，只执行本文件唯一的 IN PROGRESS/READY 事项；若事项已完成，先更新本文件和交接，再从最新 `main` 重新检查 Issues，不得凭历史上下文猜测下一项。
+执行授权仍只有本文件；完成 #193 后停止，不自动开始 #171。
