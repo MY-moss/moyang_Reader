@@ -97,6 +97,8 @@
   --motion-fast: 150ms;
   --motion-quick: 160ms;
   --motion-panel: 180ms;
+  --motion-file-drop: 140ms;
+  --motion-quick-open-item: 130ms;
   --motion-slow: 520ms;
   --motion-reduced: 0.01ms;
   --motion-ease-standard: ease;
@@ -293,8 +295,8 @@ a:focus-visible {
   box-shadow: var(--shadow-lifted);
   color: var(--ink);
   transition:
-    border-color 140ms ease,
-    transform 140ms ease;
+    border-color var(--motion-file-drop) var(--motion-ease-standard),
+    transform var(--motion-file-drop) var(--motion-ease-standard);
 }
 .file-drop-glyph {
   display: grid;
@@ -981,9 +983,9 @@ a:focus-visible {
   padding: 10px 11px;
   text-align: left;
   transition:
-    border-color 130ms ease,
-    background 130ms ease,
-    transform 130ms ease;
+    border-color var(--motion-quick-open-item) var(--motion-ease-standard),
+    background var(--motion-quick-open-item) var(--motion-ease-standard),
+    transform var(--motion-quick-open-item) var(--motion-ease-standard);
 }
 .quick-open-item:hover,
 .quick-open-item.active {

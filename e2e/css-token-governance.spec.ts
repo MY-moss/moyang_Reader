@@ -141,3 +141,60 @@ test("keeps chrome and workspace typography on the semantic type scale", async (
     expect(metrics.viewport.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewport.clientWidth);
   }
 });
+
+test("keeps residual chrome motion tokenized and reduced-motion safe", async ({ page }) => {
+  const readMotion = () =>
+    page.evaluate(() => {
+      const fixture = document.createElement("div");
+      fixture.style.cssText = "position:fixed;inset:0 auto auto 0;width:440px;visibility:hidden;pointer-events:none;";
+
+      const fileDropCard = document.createElement("div");
+      fileDropCard.className = "file-drop-card";
+      const quickOpenItem = document.createElement("button");
+      quickOpenItem.className = "quick-open-item";
+      fixture.append(fileDropCard, quickOpenItem);
+      document.body.append(fixture);
+
+      const root = getComputedStyle(document.documentElement);
+      const read = (element: HTMLElement) => getComputedStyle(element).transitionDuration;
+      const result = {
+        tokens: {
+          fileDrop: root.getPropertyValue("--motion-file-drop").trim(),
+          quickOpenItem: root.getPropertyValue("--motion-quick-open-item").trim(),
+          reduced: root.getPropertyValue("--motion-reduced").trim(),
+        },
+        transitions: {
+          fileDrop: read(fileDropCard),
+          quickOpenItem: read(quickOpenItem),
+        },
+        viewport: {
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        },
+      };
+
+      fixture.remove();
+      return result;
+    });
+
+  for (const width of [720, 900]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/");
+
+    const normal = await readMotion();
+    expect(normal.tokens).toEqual({ fileDrop: ".14s", quickOpenItem: ".13s", reduced: ".01ms" });
+    expect(normal.transitions).toEqual({
+      fileDrop: "0.14s, 0.14s",
+      quickOpenItem: "0.13s, 0.13s, 0.13s",
+    });
+    expect(normal.viewport.bodyScrollWidth).toBeLessThanOrEqual(normal.viewport.clientWidth);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reduced = await readMotion();
+    expect(reduced.transitions).toEqual({
+      fileDrop: "1e-05s",
+      quickOpenItem: "1e-05s",
+    });
+  }
+});
