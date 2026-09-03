@@ -350,3 +350,110 @@ test("keeps annotation highlights legible across theme modes", async ({ page }) 
   expect(forcedColors.markColor).not.toBe(light.markColor);
   expect(forcedColors.viewport.bodyScrollWidth).toBeLessThanOrEqual(forcedColors.viewport.clientWidth);
 });
+
+test("keeps document preview canvases legible across theme modes", async ({ page }) => {
+  const mountPreviewFixture = () =>
+    page.evaluate(() => {
+      document.querySelector<HTMLElement>('[data-e2e="preview-theme-fixture"]')?.remove();
+
+      const fixture = document.createElement("div");
+      fixture.dataset.e2e = "preview-theme-fixture";
+      fixture.style.cssText =
+        "position:fixed;left:0;top:0;width:320px;height:240px;visibility:hidden;pointer-events:none;";
+
+      const pdfPreview = document.createElement("section");
+      pdfPreview.className = "pdf-preview";
+      pdfPreview.style.cssText = "width:320px;height:120px;margin:0;";
+
+      const imagePreview = document.createElement("section");
+      imagePreview.className = "image-preview";
+      imagePreview.style.cssText = "width:320px;height:120px;margin:0;";
+
+      const imageCanvas = document.createElement("div");
+      imageCanvas.className = "image-canvas";
+      imagePreview.append(imageCanvas);
+      fixture.append(pdfPreview, imagePreview);
+      document.body.append(fixture);
+    });
+
+  const readPreviewStyles = () =>
+    page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const pdfPreview = document.querySelector<HTMLElement>('[data-e2e="preview-theme-fixture"] .pdf-preview');
+      const imagePreview = document.querySelector<HTMLElement>('[data-e2e="preview-theme-fixture"] .image-preview');
+      const imageCanvas = document.querySelector<HTMLElement>('[data-e2e="preview-theme-fixture"] .image-canvas');
+      if (!pdfPreview || !imagePreview || !imageCanvas) throw new Error("preview theme fixture is missing");
+
+      return {
+        tokens: {
+          surface: root.getPropertyValue("--preview-surface").trim(),
+          checkerLight: root.getPropertyValue("--preview-checker-light").trim(),
+          checkerDark: root.getPropertyValue("--preview-checker-dark").trim(),
+        },
+        pdfBackground: getComputedStyle(pdfPreview).backgroundColor,
+        imageBackground: getComputedStyle(imagePreview).backgroundColor,
+        canvasBackground: getComputedStyle(imageCanvas).backgroundImage,
+        viewport: {
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        },
+      };
+    });
+
+  await page.setViewportSize({ width: 720, height: 820 });
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "light";
+  });
+  await mountPreviewFixture();
+  const light = await readPreviewStyles();
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  const explicitDark = await readPreviewStyles();
+
+  await page.emulateMedia({ colorScheme: "dark", forcedColors: "none" });
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+  const systemDark = await readPreviewStyles();
+
+  expect(light.tokens).toEqual({
+    surface: "#e7e3db",
+    checkerLight: "#ebe8e1",
+    checkerDark: "#e2ded6",
+  });
+  expect(light.pdfBackground).toBe("rgb(231, 227, 219)");
+  expect(light.imageBackground).toBe(light.pdfBackground);
+  expect(light.canvasBackground).toContain("rgb(235, 232, 225)");
+  expect(light.canvasBackground).toContain("rgb(226, 222, 214)");
+
+  expect(explicitDark.tokens).toEqual({
+    surface: "#222826",
+    checkerLight: "#323a37",
+    checkerDark: "#252c2a",
+  });
+  expect(explicitDark.pdfBackground).toBe("rgb(34, 40, 38)");
+  expect(explicitDark.imageBackground).toBe(explicitDark.pdfBackground);
+  expect(explicitDark.canvasBackground).not.toContain("rgb(235, 232, 225)");
+  expect(explicitDark.canvasBackground).not.toContain("rgb(226, 222, 214)");
+  expect(systemDark).toEqual(explicitDark);
+  expect(light.viewport.bodyScrollWidth).toBeLessThanOrEqual(light.viewport.clientWidth);
+  expect(explicitDark.viewport.bodyScrollWidth).toBeLessThanOrEqual(explicitDark.viewport.clientWidth);
+
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "active" });
+  await page.goto("/");
+  await mountPreviewFixture();
+  const forcedColors = await readPreviewStyles();
+  expect(forcedColors.tokens).toEqual({
+    surface: "Canvas",
+    checkerLight: "Canvas",
+    checkerDark: "Canvas",
+  });
+  expect(forcedColors.canvasBackground).toBe("none");
+  expect(forcedColors.pdfBackground).not.toBe(light.pdfBackground);
+  expect(forcedColors.imageBackground).not.toBe(light.imageBackground);
+  expect(forcedColors.viewport.bodyScrollWidth).toBeLessThanOrEqual(forcedColors.viewport.clientWidth);
+});

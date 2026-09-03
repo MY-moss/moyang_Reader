@@ -228,6 +228,37 @@ test("keeps annotation highlights behind semantic theme tokens", () => {
   );
 });
 
+test("keeps document preview canvases behind semantic theme tokens", () => {
+  for (const token of ["preview-surface", "preview-checker-light", "preview-checker-dark"]) {
+    assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少文档预览主题令牌 --${token}`);
+  }
+
+  assert.match(styles, /\.pdf-preview\s*\{[^}]*background:\s*var\(--preview-surface\)/s);
+  assert.match(styles, /\.image-preview\s*\{[^}]*background:\s*var\(--preview-surface\)/s);
+  assert.match(
+    styles,
+    /\.image-canvas\s*\{[^}]*background:\s*repeating-conic-gradient\(\s*var\(--preview-checker-light\)\s+0 25%,\s*var\(--preview-checker-dark\)\s+0 50%\s*\)/s,
+  );
+
+  const darkThemes = [
+    styles.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root:not\(\[data-theme\]\)\s*\{([^}]*)\}/s),
+    styles.match(/:root\[data-theme="dark"\]\s*\{([^}]*)\}/s),
+  ];
+  for (const darkTheme of darkThemes) {
+    assert.ok(darkTheme, "找不到深色主题令牌规则");
+    assert.match(darkTheme[1], /--preview-surface\s*:\s*var\(--surface\)\s*;/);
+    assert.match(darkTheme[1], /--preview-checker-light\s*:\s*var\(--inline-code-surface\)\s*;/);
+    assert.match(darkTheme[1], /--preview-checker-dark\s*:\s*var\(--file-card-surface\)\s*;/);
+  }
+
+  const forcedColorsTheme = styles.match(/@media\s*\(forced-colors:\s*active\)\s*\{\s*:root\s*\{([^}]*)\}/s);
+  assert.ok(forcedColorsTheme, "找不到强制高对比度主题规则");
+  assert.match(forcedColorsTheme[1], /--preview-surface\s*:\s*Canvas\s*;/);
+  assert.match(forcedColorsTheme[1], /--preview-checker-light\s*:\s*Canvas\s*;/);
+  assert.match(forcedColorsTheme[1], /--preview-checker-dark\s*:\s*Canvas\s*;/);
+  assert.match(styles, /\.pdf-preview,\s*\.image-preview,\s*\.image-canvas\s*\{[^}]*background:\s*Canvas\s*;/s);
+});
+
 test("keeps app chrome and workspace density behind spacing tokens", () => {
   for (const token of spacingTokens) {
     assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少间距令牌 --${token}`);
