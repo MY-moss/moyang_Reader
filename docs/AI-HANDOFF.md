@@ -8,7 +8,7 @@
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
 - 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色/间距/字体/动效/页面背景/批注高亮/预览画布主题治理已完成；G-02 发布状态检查和 G-03 构建缓存预算提示已完成；当前推进 #112 更新与 opener 文档收口。
-- 当前开放 Issue/PR 快照（2026-09-03）：G-03 启动前重新核验开放 Issue/PR，没有同类产品 Issue 或 PR；本切片分支为 `codex/g03-build-cache-budget-2026-09-03`，PR 待创建；主线基线为 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b`；其余开放 PR 仅为 Dependabot 更新。结构化发布状态见 [`release-status.json`](release-status.json)，#241/#51 的外部阻塞保持显式记录。
+- 当前开放 Issue/PR 快照（2026-09-03）：G-03 启动前重新核验开放 Issue/PR，没有同类产品 Issue 或 PR；本切片分支为 `codex/g03-build-cache-budget-2026-09-03`，PR [#442](https://github.com/MY-moss/moyang_Reader/pull/442) 已创建，等待门禁；主线基线为 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b`；其余开放 PR 仅为 Dependabot 更新。结构化发布状态见 [`release-status.json`](release-status.json)，#241/#51 的外部阻塞保持显式记录。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -20,7 +20,7 @@
 - 非目标：不改变 `D:\AI-moyang\本地阅读工具-build-cache` 或构建目标路径，不删除正在使用/受保护 target，不改变工作树保护、业务功能、发布资产或 Windows x64 范围。
 - 实现：`scripts/cleanup-workspace.mjs` 增加不跟随链接的目录统计、默认 4 GiB/14 天预算判断和显式 `--dry-run` 入口；默认及超限提示均为只读，显式 `--apply --prune-targets` 仍是用户确认后的既有回收边界。
 - 涉及文件：`scripts/cleanup-workspace.mjs`、`scripts/cleanup-workspace.test.mjs`、`docs/WORKSPACE-CLEANUP.md`、`CHANGELOG.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/AI-TAKEOVER-PROMPT.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 基线与分支：基于 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b` 建立 `codex/g03-build-cache-budget-2026-09-03`；启动前重新核验无重复 G-03 Issue/PR；PR 待创建。
+- 基线与分支：基于 `main@47a0c60a5775962cfa99dbef1c47b33315549b0b` 建立 `codex/g03-build-cache-budget-2026-09-03`；启动前重新核验无重复 G-03 Issue/PR；PR [#442](https://github.com/MY-moss/moyang_Reader/pull/442) 已创建，等待门禁。
 - 验证：RED 阶段先确认缺少预算检查导出；随后定向清理测试 8/8、`npm run test:workflow` 24/24、`npm run cleanup:workspace -- --dry-run` 通过；未生成安装包、Release、签名、`latest.json` 或镜像。
 - 缓存状态：D 盘缓存目录存在但当前 0 字节，旧 C 盘路径不存在；本轮没有删除用户数据或活动构建目标。回退本切片 PR 即可恢复原清理预览输出。
 
