@@ -42,6 +42,17 @@ const spacingTokens = [
   "space-15",
   "space-16",
 ];
+const typographyTokens = [
+  "type-kicker",
+  "type-caption",
+  "type-control",
+  "type-body",
+  "type-emphasis",
+  "type-icon",
+  "type-brand",
+  "type-section",
+  "type-heading",
+];
 const governedSpacingSelectors = [
   ".topbar",
   ".brand-block",
@@ -58,6 +69,67 @@ const governedSpacingSelectors = [
   ".workspace-create-menu-panel",
   ".workspace-file, .workspace-result",
   ".workspace-folder",
+  ".statusbar",
+];
+const governedTypographySelectors = [
+  ".brand-name",
+  ".brand-subtitle",
+  ".document-title",
+  ".external-modified-indicator",
+  ".toolbar-button",
+  ".toolbar-overflow-label",
+  ".toolbar-overflow-settings > .export-menu > summary::after",
+  ".export-menu-panel button",
+  ".settings-menu-title",
+  ".settings-option",
+  ".settings-option small",
+  ".settings-divider",
+  ".settings-select-option",
+  ".settings-select-option select",
+  ".settings-range-option",
+  ".settings-range-footer small",
+  ".settings-range-footer .quiet-button",
+  ".settings-note",
+  ".settings-persistence-status",
+  ".settings-guide-button",
+  ".settings-actions .quiet-button",
+  ".findbar input",
+  ".find-count",
+  ".tab-label",
+  ".tab-external-indicator",
+  ".tab-close",
+  ".workspace-action-trigger::after",
+  ".workspace-create-menu-panel button",
+  ".workspace-heading h2",
+  ".quiet-button",
+  ".workspace-location",
+  ".workspace-location small",
+  ".workspace-switcher-trigger",
+  ".workspace-switcher-label",
+  ".workspace-switcher-menu button strong",
+  ".workspace-switcher-menu button span",
+  ".workspace-switcher-remove",
+  ".workspace-filter-summary",
+  ".workspace-clear-filter",
+  ".workspace-export-note",
+  ".workspace-help",
+  ".workspace-search",
+  ".tag-filter",
+  ".tag-filter select",
+  ".workspace-subheading",
+  ".workspace-folder-name",
+  ".workspace-folder-icon",
+  ".workspace-folder small",
+  ".workspace-folder-caret",
+  ".workspace-result strong",
+  ".workspace-result span",
+  ".reading-history-heading h3",
+  ".reading-history-range",
+  ".reading-history-metric strong",
+  ".reading-history-day-value",
+  ".reading-history-day-label",
+  ".reading-history-empty",
+  ".reading-history-clear",
   ".statusbar",
 ];
 
@@ -79,6 +151,10 @@ function countRawSpacingLiterals(value) {
       /(?:gap|margin(?:-(?:top|right|bottom|left|block|inline))?|padding(?:-(?:top|right|bottom|left|block|inline))?)\s*:\s*[^;{}]*\b\d+(?:\.\d+)?px\b/g,
     ),
   ].length;
+}
+
+function countRawFontSizeLiterals(value) {
+  return [...value.matchAll(/font-size\s*:\s*[^;{}]*\b\d+(?:\.\d+)?px\b/g)].length;
 }
 
 test("keeps the governed palette behind semantic tokens", () => {
@@ -120,5 +196,26 @@ test("keeps app chrome and workspace density behind spacing tokens", () => {
   assert.ok(
     countRawSpacingLiterals(styles) <= 445,
     `原始间距声明超过本批预算：${countRawSpacingLiterals(styles)} > 445`,
+  );
+});
+
+test("keeps app chrome and workspace typography behind size tokens", () => {
+  for (const token of typographyTokens) {
+    assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少字号令牌 --${token}`);
+  }
+
+  const blocks = governedTypographySelectors.flatMap((selector) => {
+    const matches = ruleBodies(selector);
+    assert.notEqual(matches.length, 0, `找不到受治理的字号规则：${selector}`);
+    return matches.map((body) => ({ selector, body }));
+  });
+
+  for (const { selector, body } of blocks) {
+    assert.equal(countRawFontSizeLiterals(body), 0, `${selector} 仍直接写入字号像素值，应使用 --type-* 令牌`);
+  }
+
+  assert.ok(
+    countRawFontSizeLiterals(styles) <= 214,
+    `原始字号声明超过本批预算：${countRawFontSizeLiterals(styles)} > 214`,
   );
 });

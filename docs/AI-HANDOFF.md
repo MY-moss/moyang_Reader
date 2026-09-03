@@ -4,17 +4,30 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
+- 发布代码主线基线：`main@5dcf1962950d1e88615190a0948024136b054af6`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌和 #171 CSS 颜色第一批已完成；当前正在推进 #171 CSS 紧凑间距第二批。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建，远端提交为 `44e3c08fe54051545f2ac6ee60d7d14816bc09eb`；主线基线为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续令牌批次完成。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批和间距第二批已完成；当前正在推进 #171 CSS 字体字号令牌第三批。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-font-token-2026-09-03`，PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436)，当前远端提交为 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`；主线基线为 `main@5dcf1962950d1e88615190a0948024136b054af6`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续动效/主题令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#171 CSS 紧凑间距令牌治理第二批（2026-09-03）
+## 当前切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）
+
+- 目标：将顶栏、更多/设置、查找栏、标签栏、左侧阅读库操作与文件条目、阅读历史摘要、状态栏的 9–19px 字号收敛到语义 `--type-*` 令牌，保持当前计算值和布局行为不变。
+- 用户价值：默认首页、更多操作和侧栏的信息层级更稳定；后续 UI/无障碍调整只需修改统一字号来源，减少窄窗口漂移和逐处微调。
+- 非目标：不改阅读正文、编辑器或打印排版，不改变交互/数据/持久化，不处理 HTML 源码编辑、脚本、插件或跨平台范围，不生成发布资产。
+- 验收标准：受治理选择器不直接写入字号像素；9 个字号值由 `--type-*` 令牌表达；直接字号声明从 256 降至不高于 214；720/900px 运行时字号与无横向溢出检查通过；静态测试、Lint、类型感知、格式、构建、相关 E2E 和 PR Quality checks 通过。
+- 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright/axe；无新增运行时依赖、凭据、数据迁移或发布资产。
+- 风险与回滚：同值令牌替换若误配可能改变信息层级或造成窄窗口换行；静态选择器治理与 720/900px 计算样式/溢出 E2E 控制风险；回退本切片 PR 即可恢复原声明，不涉及数据迁移。
+- 基线与分支：远端 `main@5dcf1962950d1e88615190a0948024136b054af6`；分支 `codex/css-font-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436)，当前远端提交 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`。
+- 当前验证：字号静态令牌测试 4/4、新增字体治理 E2E 2/2、前端 build、Lint、类型感知 ESLint、Prettier 和 `git diff --check` 已通过；本机浏览器自动化桥接因 Chrome 远程调试授权未完成，使用 Playwright E2E 完成定向验证；本机 Windows desktop smoke 仍受缺少 `tauri-driver` 影响，远端 PR Quality checks 负责确认。
+- 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
+
+## 已合并切片：#171 CSS 紧凑间距令牌治理第二批（2026-09-03）
 
 - 目标：把顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏的紧凑间距集中到 `--space-*` 令牌，保持现有密度值和布局行为不变。
 - 用户价值：后续调整更新、阅读库、More 和文件树 UI 时只需修改统一间距来源，减少窄窗口遮挡、间距漂移和重复微调。
