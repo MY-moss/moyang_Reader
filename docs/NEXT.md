@@ -1,6 +1,6 @@
 # Moyang Reader 唯一下一步
 
-- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 的第二批 CSS 紧凑间距令牌治理；分支 `codex/css-token-followup-2026-09-03`，PR 待创建；主线基线已核验为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`。
+- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 的第二批 CSS 紧凑间距令牌治理；分支 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建，远端提交为 `44e3c08fe54051545f2ac6ee60d7d14816bc09eb`；主线基线已核验为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`。
 - 基线与交付：从包含已合并 #171 第一批和 #193 代码的干净工作树建立独立分支；本批只处理顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏的间距来源，不关闭仍需后续批次的 #171。
 - Issue/PR 核验：启动前已检查 #171、开放 Issue 与 PR；没有重复产品 PR；当前开放 PR 仅为 Dependabot 更新。
 - 稳定版本：`v0.10.14`；本切片属于 v0.11 高频体验批次，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
@@ -17,7 +17,7 @@
 - 风险：间距令牌替换若误写可能造成局部溢出或密度变化；本批只替换保持原值的顶栏/工作区公共间距，并用 720/900px 计算样式和横向溢出检查控制风险。
 - 回滚：回退本批 PR 即可恢复原间距声明，不需要数据迁移，不影响阅读库、文档或已下载更新。
 - 基线指标：`styles.css` 5950→5967 行；原始间距声明 476→437；原始颜色字面量保持 219；受治理选择器直接间距像素值为 0。
-- 验证：间距/颜色静态令牌测试 3/3；新增紧凑宽度 E2E 1/1；主题/设置无障碍 E2E 5/5；More、工具栏图标、窄工具栏和顶栏互斥回归 4/4；前端 build、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 仍受缺少 `tauri-driver` 阻塞，远端 Windows smoke 由 PR 门禁确认。
+- 验证：间距/颜色静态令牌测试 3/3；新增紧凑宽度 E2E 1/1；主题/设置无障碍 E2E 5/5；More、工具栏图标、窄工具栏和顶栏互斥回归 4/4；前端 build、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 仍受缺少 `tauri-driver` 阻塞，远端 Windows smoke 由 PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 门禁确认。
 
 ## 合并后唯一下一步：#171 CSS 令牌治理后续批次（重新核验后启动）
 

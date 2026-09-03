@@ -19,7 +19,7 @@
 - 非目标：不重做视觉设计，不改交互、阅读库/文档/更新器数据语义，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
 - 验收：受治理选择器的 `gap`/`margin`/`padding` 不直接写入像素值；16 个 `--space-*` 令牌保留现有值；原始间距声明 476→437；720/900px E2E 无横向溢出；静态检查、相关主题/无障碍 E2E、build、Lint、类型感知、格式和 diff 检查通过。
 - 风险/回滚：仅替换同值 CSS 声明，风险是局部溢出或误覆盖；回退本切片 PR 即可恢复，不涉及数据迁移。
-- 分支：`codex/css-token-followup-2026-09-03`；PR 待创建；基线 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`。
+- 分支：`codex/css-token-followup-2026-09-03`；PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建；基线 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 

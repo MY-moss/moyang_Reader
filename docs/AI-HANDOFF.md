@@ -8,7 +8,7 @@
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
 - 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌和 #171 CSS 颜色第一批已完成；当前正在推进 #171 CSS 紧凑间距第二批。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-followup-2026-09-03`，PR 待创建；主线基线为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续令牌批次完成。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建，远端提交为 `44e3c08fe54051545f2ac6ee60d7d14816bc09eb`；主线基线为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待本批及后续令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -24,7 +24,7 @@
 - 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright/axe；不新增运行时依赖、凭据、数据迁移或发布资产。
 - 风险：间距令牌误用可能造成局部溢出或密度变化；本批只替换保持原值的顶栏/工作区公共间距，并用 720/900px 计算样式和横向溢出检查控制风险。
 - 回滚：回退本批 PR 即可恢复原间距声明，不需要数据迁移，不影响阅读库、文档或已下载更新。
-- 基线与分支：基于 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a` 的等价干净工作树建立分支 `codex/css-token-followup-2026-09-03`；Issue #171 启动前未发现重复产品 PR；PR 待创建。
+- 基线与分支：基于 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a` 的等价干净工作树建立分支 `codex/css-token-followup-2026-09-03`；Issue #171 启动前未发现重复产品 PR；PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建，远端提交为 `44e3c08fe54051545f2ac6ee60d7d14816bc09eb`。
 - 当前验证：静态令牌测试 3/3；新增紧凑宽度 E2E 1/1；主题/设置无障碍 E2E 5/5；More、工具栏图标、窄工具栏和顶栏互斥回归 4/4；前端 build、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 受缺少 `tauri-driver` 阻塞，远端 Windows smoke 待 PR 门禁确认。
 - 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
 
