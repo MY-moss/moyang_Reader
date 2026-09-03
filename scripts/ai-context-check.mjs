@@ -45,6 +45,10 @@ function readText(projectRoot, relativePath, errors) {
   }
 }
 
+function normalizeLineEndings(value) {
+  return value.replaceAll("\r\n", "\n");
+}
+
 function runGit(projectRoot, args) {
   return execFileSync(gitCommand, args, {
     cwd: projectRoot,
@@ -142,7 +146,7 @@ export function validateAiContext(projectRoot = defaultRoot, { inspectGit = true
   }
   errors.push(...validatePolicy(policy), ...validatePlan(plan, policy), ...validateState(state, plan, policy));
 
-  if (documents.get(governanceFiles.next) !== renderNext(plan, state)) {
+  if (normalizeLineEndings(documents.get(governanceFiles.next) ?? "") !== renderNext(plan, state)) {
     errors.push("docs/NEXT.md 与结构化状态不一致；请运行 npm run ai:render，禁止手工修改。");
   }
 

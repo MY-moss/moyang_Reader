@@ -45,6 +45,18 @@ test("rejects a hand-edited generated NEXT summary", () => {
   }
 });
 
+test("accepts Windows line endings in the generated NEXT summary", () => {
+  const root = copyFixture();
+  try {
+    const nextPath = path.join(root, "docs", "NEXT.md");
+    const next = fs.readFileSync(nextPath, "utf8").replaceAll("\n", "\r\n");
+    fs.writeFileSync(nextPath, next, "utf8");
+    assert.deepEqual(validateAiContext(root, { inspectGit: false }), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("rejects duplicated development state in release metadata", () => {
   const root = copyFixture();
   try {
