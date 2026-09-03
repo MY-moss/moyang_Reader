@@ -64,7 +64,6 @@
     "summary": "docs/AI-HANDOFF.md",
     "takeover": "docs/AI-TAKEOVER-PROMPT.md",
     "versionArchive": "docs/handoff/v0.11.md",
-    "releasePolicy": "docs/RELEASE-POLICY.md",
-    "nextStatus": "READY"
+    "releasePolicy": "docs/RELEASE-POLICY.md"
   }
 }

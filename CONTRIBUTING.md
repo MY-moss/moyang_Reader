@@ -4,7 +4,7 @@
 
 ## 开始开发
 
-先读取 [`docs/NEXT.md`](docs/NEXT.md) 和 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。根目录已有未提交改动时不要直接开发；新切片放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 复用根目录依赖。完整路线和 HTML 边界见 [`docs/DEVELOPMENT-AUDIT.md`](docs/DEVELOPMENT-AUDIT.md)。
+AI 先遵循 [`AGENTS.md`](AGENTS.md)，再运行 `npm run ai:context` 和 `npm run ai:start`。根目录已有未提交改动时不要直接开发；新切片放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 在目标工作树执行独立的 `npm ci --prefer-offline`。流程和路线分别见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md) 与 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
 ```powershell
 npm install
@@ -57,13 +57,13 @@ Pop-Location
 ## 提交前检查
 
 - 开始新任务前先查看 [Issues](https://github.com/MY-moss/moyang_Reader/issues)，避免重复修复。
-- `npm run lint`、`npm run format:check`、`npm test -- --run`、`npm run test:coverage`、`npm run build` 和 `npm run test:e2e` 全部通过。
-- Rust 格式、clippy 和测试通过。
+- 按 `AGENTS.md` 的 T0–T3 风险级别运行最小充分验证；T3 才默认要求完整前端、Rust、浏览器和 Windows 桌面门禁。
+- AI/交接文档改动运行 `npm run ai:check`；更新/opener 文档运行 `npm run check:docs`。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
-- 本地 Tauri/Cargo 命令必须使用项目包装脚本；默认构建目标位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，需要迁移磁盘时可在用户级环境变量设置 `MOYANG_BUILD_CACHE_DIR`。发现生成物膨胀时先运行 `npm run cleanup:workspace` 预览，再按输出使用 `--apply`；只有没有活动 Rust 构建且明确需要回收空间时才加 `--prune-targets`。清理器不会触碰源码、用户笔记或主 `node_modules`，详细边界见 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md)。
-- 每个功能切片必须同步更新交接文档；没有目标、验收、测试结果和下一步的 PR 不算完成。
-- 开始阅读代码前先读取 [`docs/NEXT.md`](docs/NEXT.md) 和 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)；只在需要版本背景时读取当前交接摘要，不要把完整仓库、历史归档或整段流水线日志复制进 AI 上下文。
+- 本地 Tauri/Cargo 命令使用项目包装脚本。构建缓存位置、预算和安全清理参数只以 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md) 为准，不在多处复制。
+- 每个功能切片必须通过 `npm run ai:finish` 更新结构化状态；没有目标、验收、测试结果和下一队列位置的 PR 不算完成。
+- 开始阅读代码前先运行 `npm run ai:context`；只在需要版本背景时读取交接摘要，不要把完整仓库、历史归档或整段流水线日志复制进 AI 上下文。
 
 ## 提交与 Pull Request
 
@@ -78,4 +78,4 @@ Pop-Location
 
 ## AI 交接
 
-功能分支与 `main` 无冲突且 Quality checks 全绿时可自动合并；权限、安全、更新器、发布工作流和数据迁移变更需要人工确认。代码、测试、需求/架构文档和下一步交接说明应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前唯一任务见 [`docs/NEXT.md`](docs/NEXT.md)，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
+批准队列内的 T0–T2 在 G03 保护探针通过、无治理文件变化且 Quality checks 全绿时可以自动交付。T3、治理策略、权限、安全、更新器、发布工作流、凭据和数据迁移必须人工确认。代码、测试、必要文档和结构化状态应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前任务使用 `npm run ai:context`，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "planId": "moyang-v1",
+  "currentTaskId": "G03",
+  "queueIndex": 2,
+  "status": "AWAITING_APPROVAL",
+  "branch": "codex/ai-context-reset-2026-09-03",
+  "baseSha": "2a90448a065c2f5e98792106c93df2a3752bd79d",
+  "completedTaskIds": ["G01", "G02"],
+  "remoteCheck": null,
+  "approval": null,
+  "verification": [],
+  "blocker": {
+    "reason": "需要仓库所有者配置独立 AI bot、治理文件 Code Owner 审批，并完成两个探针 PR。",
+    "nextAction": "人工审查并合并治理切片；完成 G03 设置和探针后，合入与 G03 任务摘要绑定的审批凭证。"
+  },
+  "deliveryEvidence": null,
+  "lastCompleted": {
+    "taskId": "G02",
+    "summary": "已建立结构化 AI 控制面、状态机、生成摘要和本地治理门禁。",
+    "verification": [
+      { "command": "npm run test:workflow", "result": "pass" },
+      { "command": "npm run ai:check", "result": "pass" },
+      { "command": "git diff --check", "result": "pass" }
+    ],
+    "deliveryEvidence": {
+      "summary": "G01/G02 治理切片已在独立工作树验证，等待首次人工审查。",
+      "recordedAt": "2026-09-03T19:12:20.021Z"
+    }
+  },
+  "updatedAt": "2026-09-03T19:12:20.021Z"
+}

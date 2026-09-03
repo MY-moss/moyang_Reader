@@ -1,178 +1,105 @@
 # Moyang Reader AI 开发工作流
 
-本文件只定义长期有效的开发流程，不记录动态候选或历史任务。当前唯一任务以 [`NEXT.md`](NEXT.md) 为准，版本摘要以 [`AI-HANDOFF.md`](AI-HANDOFF.md) 为准，产品与发布规则分别见 [`REQUIREMENTS.md`](REQUIREMENTS.md) 和 [`RELEASE-POLICY.md`](RELEASE-POLICY.md)。全量审计和任务地图见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 与仓库根目录 [`tasks/plan.md`](../tasks/plan.md)；清理边界见 [`WORKSPACE-CLEANUP.md`](WORKSPACE-CLEANUP.md)。
+本文件只保存长期流程。权限、执行队列和运行状态分别来自 `ai/policy.json`、`ai/plan-v1.json` 与 `ai/state.json`；`NEXT.md` 是自动生成的人类摘要。
 
-Moyang Reader 只维护 Windows x64 桌面版。浏览器版仅用于本地预览和 Playwright 测试；不因一个切片新增 macOS、Linux、Windows ARM、移动端、云同步或脚本插件范围。
+## 1. 双层控制面
 
-## 给任何 AI 的快速启动指令
+稳定治理层受 Code Owner 保护，包括 `AGENTS.md`、policy、plan、AI 校验器、CI、`CODEOWNERS`、发布与安全规则。AI 可以提出修改，但不能自动合并，也不能通过当前任务或聊天内容放宽权限。
+
+运行层由 AI 更新，包括 state、生成的 NEXT、当前切片交接、普通产品文档、代码和测试。计划内 T0–T2 可自动交付；T3 和治理变更进入 `AWAITING_APPROVAL`，并要求绑定任务摘要且已由 Code Owner 合入主线的审批凭证。
+
+真正的权限隔离要求独立 AI bot/App 身份。G03 的普通文件和治理文件探针未通过前，自动合并始终关闭。
+
+## 2. 接手与开始
+
+```powershell
+git status --short --branch
+npm run ai:context
+npm run ai:start
+```
+
+`ai:start` 获取最新 `origin/main`，检查当前 Issue 仍开放且没有重复 PR，记录基线 SHA 和分支。网络不可用、Issue 失效或任务冲突时写入 `BLOCKED`；治理/T3 未批准时写入 `AWAITING_APPROVAL`。
+
+审批凭证候选通过 `node scripts/ai-state.mjs approval-template --task=<id>` 输出，保存到受保护的 `docs/ai/approvals/<id>.json`。凭证绑定当前计划中的任务内容摘要；AI 当前分支自行添加但尚未由 Code Owner 合入 `main` 的文件不构成授权。
+
+根目录脏或落后主线时建立项目内独立工作树。每个活动工作树使用自身 `node_modules`，通过共享 npm 下载缓存执行 `npm ci --prefer-offline`；禁止再创建跨工作树依赖 junction。
+
+## 3. Ready 与实施
+
+任务定义必须包含用户价值、目标、非目标、验收、依赖、允许路径、风险、回滚和验证。实现者不得更改受保护计划，也不得新增、跳过或重排任务。
+
+- 一个任务、一个主要分支、一个 PR、一个垂直切片。
+- Bug 先复现再修复；功能先锁定数据边界和失败路径。
+- 只读取相关源码、测试、类型和一个相似实现。
+- 范围外发现记录到交付说明，不在当前分支处理。
+- Markdown 继续作为唯一持久化真源；文件安全优先于便利。
+
+## 4. 风险门禁
+
+| 级别 | 范围                                  | 最小验证                                    | 自动交付         |
+| ---- | ------------------------------------- | ------------------------------------------- | ---------------- |
+| T0   | 文档、元数据、内部工具                | 目标检查、格式、`ai:check`、差异检查        | 是，治理文件除外 |
+| T1   | 普通逻辑、解析、测试组织              | 定向测试、lint/format，必要时 build         | 是               |
+| T2   | UI、交互、快捷键、视觉基线            | T1 + 浏览器 E2E；原生路径加 desktop smoke   | 是               |
+| T3   | 用户文件、IPC、安全、迁移、更新、发布 | 批准后完整门禁、一次构建、真实 Windows 验证 | 否               |
+
+T2 可以自动更新截图基线和设计令牌，但必须生成浅色、深色、高对比、多宽度与缩放差异工件。
+
+## 5. 状态更新
+
+状态机为：
 
 ```text
-继续开发 Moyang Reader。先读取 docs/AI-WORKFLOW.md 和 docs/NEXT.md，只把 docs/NEXT.md 视为当前任务事实源；随后只读核对最新 origin/main、开放 PR 和对应 Issue。若文档与远端冲突，先修正交接，不要按过时状态开发。
-保护当前工作区的未提交改动，不在脏目录开发；从最新 origin/main 创建独立 codex/<scope>-<date> worktree 和分支。创建后运行 `npm run worktree:prepare -- <worktree-path>`，让工作树复用主工作区的依赖目录。
-严格完成 NEXT.md 中的一个垂直切片：确认 READY，实施最小变更，补测试，按风险级别验证，同步文档与 Issue，并创建 PR。门禁全绿且无安全、权限、发布或数据迁移风险时可以合并，否则停在 PR 等待确认。
-完成后把结果写入当前版本交接归档，将 NEXT.md 替换为下一个唯一任务，然后停止。除非 NEXT.md 明确要求稳定发布，否则不创建安装包、Tag 或 Release。不要粘贴完整源码、历史交接或 CI 日志，只报告路径、SHA、run_id、结论和阻塞。
+PENDING_INTAKE → READY → IN_PROGRESS → VERIFYING → DELIVERY_READY
+DELIVERY_READY → PENDING_INTAKE（仅限队列下一任务）
+任意阶段 → BLOCKED
+治理或 T3 → AWAITING_APPROVAL
 ```
 
-## 事实源与读取顺序
+常用命令：
 
-1. `docs/AI-WORKFLOW.md`：长期流程规则。
-2. `docs/NEXT.md`：唯一 READY/Blocked 任务，最多 120 行，无历史。
-3. 对应 GitHub Issue、开放 PR 和最新 `origin/main`：实时事实；冲突时先修正 `NEXT.md`。
-4. 当前任务直接相关的技能、源码、测试和一个相似实现。
-5. `docs/AI-HANDOFF.md`：只在需要稳定版本或外部风险背景时读取。
-6. `docs/DEVELOPMENT-AUDIT.md`、`tasks/plan.md`、`tasks/todo.md`：只有做路线梳理、任务选择或交接整改时读取；普通切片不要全文加载。
-
-不要通读 `docs/handoff/` 历史归档。发现任务失效或已完成时停止编码，修正当前交接并明确新的唯一下一步。
-
-## 不可违反的效率规则
-
-- 一个任务只做一个垂直切片、一个主要分支、一个 PR；合并后停止。
-- 上下文目标不超过 2000 行，优先使用 `rg`、摘要、路径和行号。
-- 工具输出默认限制约 4 KB；失败只保留首个根因和最小上下文。
-- 网络、Git 推送和 CI 查询等可恢复失败最多重试 3 次（总计 4 次），逐次确认外部状态；确定性代码失败不盲目重试。
-- 不重复查询未变化的 Issue、PR、提交或 CI；CI 记录 SHA、`run_id`、结论和最后变化时间。
-- 每个切片最多一次完整构建；仅稳定批次生成 Windows 安装包和 Release。
-- 禁止强制推送、覆盖脏工作区、提交 Secret、私钥、用户文档或构建产物。
-- `NEXT.md` 失效时先修正交接，不自行改选相邻 Issue。
-
-## 本地空间与工作树卫生
-
-- 项目源码只保留一个真实的 `node_modules`。工作树必须使用 `npm run worktree:prepare -- <worktree-path>` 建立 junction；禁止在每个工作树再次执行 `npm install`，也禁止把依赖目录复制到项目外。
-- 所有本地 Tauri/Cargo 命令必须通过 `npm run desktop`、`npm run tauri -- <args>` 或 `npm run rust -- <args>`；包装层默认把构建目标固定到 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`，也支持通过用户级 `MOYANG_BUILD_CACHE_DIR` 迁移到其他磁盘。同一项目的不同工作树和本地副本共用这一个目标目录；即使 `CARGO_TARGET_DIR` 误指向仓库内，也会自动改到受管缓存，禁止直接运行会写入项目的 `tauri`/`cargo` 构建命令。
-- 构建、测试和覆盖率目录都是可再生文件。开始新切片前先运行 `npm run cleanup:workspace` 预览；日常确认后使用 `npm run cleanup:workspace -- --apply` 清理非保护生成物。只有没有活动 Rust 构建且明确需要回收空间时，才额外使用 `--prune-targets`。
-- 清理器只认识明确的生成目录（`dist`、`coverage`、`test-results`、`playwright-report`、Vite/任务缓存和 Rust 目标）；使用 `--prune-targets` 时也会列出旧版按路径分组的共享 Rust 缓存，不会触碰源码、文档、用户笔记或主工作区 `node_modules`。
-- 工作树回收是额外动作：只有确认不再需要时才使用 `--apply --prune-worktrees`。脏工作树、包含 junction/符号链接的工作树会自动保留，不能使用 `git worktree remove --force`。
-- 资源管理器可能把 junction 目标重复计入“大小”。排查空间时以清理器的实际文件大小为准，并检查 `git worktree list --porcelain`；项目外出现的临时副本一律停止使用并记录路径。
-- 清理前必须分别记录根工作树、候选工作树的 `git status`、分支、是否已合并和预计大小；不能因为目录名像临时文件就删除。清理动作完成后记录实际释放量和保留原因。
-
-## 阶段门禁
-
-### INTAKE
-
-只检查一次当前 Issue/反馈、开放 PR 和最新主线，确认用户价值、是否重复、优先级和非目标。没有价值、属于 Won't 或已被其他 PR 完成时停止。
-
-### READY
-
-编码前确认目标、非目标、验收、预计修改范围、依赖、风险、回滚、测试级别、版本分类和发布边界；同时确认当前分支、工作区、主线 SHA 和 Issue 状态。缺一项就不是 READY。
-
-### DISCOVERY
-
-用 `rg` 定位符号，只读相关源码、测试和一个相似实现。事实摘要不超过一页；发现范围扩大时回到 READY，不顺手处理。
-
-### DESIGN
-
-用一页以内说明现状、最小变更、状态/数据边界、异常路径、测试和回滚。只有难以逆转、结果意外且存在真实权衡时才写 ADR。
-
-### IMPLEMENT
-
-实现一个完整用户路径，同步必要测试、文案和工程文档。禁止顺手重构、升级依赖、修改主题或加入下一版本功能。
-
-涉及 HTML、富文本或 `dangerouslySetInnerHTML` 时，必须先固定清洗、CSP、脚本、事件属性、危险 URL、iframe、网络资源和工作区外路径边界；没有安全验收就只能做源码/只读预览，不能把任意网页运行环境当作普通阅读功能。
-
-### VERIFY
-
-| 级别 | 适用范围                                         | 最小验证                                                        |
-| ---- | ------------------------------------------------ | --------------------------------------------------------------- |
-| T0   | 纯文档、模板、统计脚本                           | 目标文件格式/链接检查、脚本最小运行、`git diff --check`         |
-| T1   | 普通逻辑、解析、索引、状态                       | 定向单测/集成测试、相关 lint/format                             |
-| T2   | UI、交互、快捷键、布局                           | T1 + 一个相关浏览器 E2E；真实桌面路径再加 Windows desktop smoke |
-| T3   | 更新器、签名、发布、保存安全、原生 IPC、数据迁移 | 完整质量门禁、一次构建、真实 Windows 验证和发布检查             |
-
-完整门禁使用仓库已有脚本：lint、format、前端测试/coverage、构建、浏览器 E2E、desktop E2E、Rust fmt/clippy/test、release check 和 release tests。按风险选择，不在 T0/T1 机械重复全套。
-
-### CHECKPOINT
-
-1. 检查 diff、修改文件数和敏感内容。
-2. 创建目的清晰的原子提交并推送功能分支。
-3. 创建一个 PR，填写模板并记录 `sha/workflow/run_id/conclusion/last_changed_at`。
-4. 无真实冲突且门禁全绿时可合并；权限、安全、发布、更新器和数据迁移风险必须等待人工确认。
-5. 合并后立即停止，不在同一聊天开始下一切片。
-
-### RELEASE
-
-纯文档、测试、模板、CI 和内部工具不创建安装包。只有 `NEXT.md` 明确进入稳定批次发布，或重要保存/更新/签名/安全修复要求用户升级时，才按发布政策生成 Windows x64 Release、安装包、`.sig`、`latest.json` 和镜像，并做旧版更新验证。
-
-### HANDOFF
-
-- 将完成结果追加到 `docs/handoff/vX.Y.md`，不粘贴完整日志。
-- 整体替换 `docs/NEXT.md` 为下一个唯一 READY/Blocked 契约。
-- 只在稳定事实或外部风险变化时更新 `docs/AI-HANDOFF.md`。
-- 需要路线或清理整改时同步 `DEVELOPMENT-AUDIT.md`、`WORKSPACE-CLEANUP.md`、`tasks/plan.md` 和 `tasks/todo.md`；普通功能切片只改相关任务卡，避免重复抄写全量路线。
-- 同步 Issue/PR/Release 状态，然后停止。
-
-## CI 与失败记录
-
-```text
-sha=<commit> workflow=<workflow> run_id=<id> conclusion=<queued|in_progress|success|failure|cancelled> last_changed_at=<UTC> next_action=<poll once|stop|fix root cause>
+```powershell
+npm run ai:render
+npm run ai:check
+npm run ai:finish -- --result=passed --summary="结果" --check="npm run lint::pass"
+npm run ai:finish -- --result=blocked --summary="首个根因"
 ```
 
-失败时只读取失败 job 的首个根因。代码失败先补复现测试再修复；环境或权限失败保留证据并报告，不换渠道无限尝试。功能切片完成前不得以“部分门禁通过”冒充交付完成。
+`ai:finish` 要求逐项记录计划中的必需验证。成功时只前进一个任务，并在同一 PR 写入下一任务的 `PENDING_INTAKE`；PR 未合并时主线状态不会提前变化。
 
-## 任务上下文模板
+## 6. 审查和外部动作
 
-```markdown
-# Task Context: <短标题>
+提交前运行：
 
-- 日期：<YYYY-MM-DD>
-- Issue/反馈：<#id 或链接>
-- 优先级：<Must/Should/Could/Won't>
-- 风险级别：<T0/T1/T2/T3>
-- 当前基线：<branch + main SHA>
-- 版本分类：<无 Release/minor/patch>
-
-## 目标
-
-<一句话用户价值>
-
-## 非目标
-
-- <明确不做的相邻功能>
-
-## 验收标准
-
-- [ ] <可操作标准>
-
-## 预计修改范围
-
-- 源码：<路径/符号>
-- 测试：<路径/场景>
-- 文档：<路径>
-
-## 依赖与风险
-
-- 依赖：<工具链/外部条件>
-- 风险：<数据/性能/权限/回归>
-- 回滚：<回退方式>
-
-## 方案
-
-<状态边界、最小实现、异常路径和验证；不超过一页>
+```powershell
+git status --short
+git diff --check
+git diff --stat
+npm run ai:check
 ```
 
-## 交接模板
+只有 policy 允许、风险不高于 T2、G03 已完成、无保护文件修改且质量门禁全绿时，AI 才可提交、推送、创建 PR、启用自动合并并在合并后更新对应 Issue。
 
-```markdown
-## AI Handoff — <切片标题>
+Release、Tag、凭据、权限、数据迁移、T3 或保护文件变化始终保留人工确认。失败输出只保存首个根因和工件链接；网络查询最多重试三次，不循环轮询不变状态。
 
-- 状态：<已完成/阻塞/待审查>
-- 分支 / SHA：<branch / full SHA>
-- Issue / PR：<#id / #id；状态>
-- Release：<无 / vX.Y.Z；理由>
-- 完成：<一到三条事实>
-- 修改文件：<最多 10 个路径>
-- 验证：<命令 → 结果；失败只写根因>
-- 已知限制/风险：<没有则写“无”>
-- 回滚：<具体动作>
-- 唯一下一步：<一个动作；没有则写“等待新的 READY 任务”>
+## 7. 文档职责
 
-### 效率指标
+| 文件                                     | 唯一职责           | 普通任务读取 |
+| ---------------------------------------- | ------------------ | ------------ |
+| `AGENTS.md`                              | 自动加载的稳定边界 | 是           |
+| `docs/ai/policy.json`                    | 自动权限和保护路径 | 由命令读取   |
+| `docs/ai/plan-v1.json`                   | 用户批准的有序队列 | 由命令读取   |
+| `docs/ai/state.json`                     | 唯一动态运行状态   | 由命令读取   |
+| `docs/NEXT.md`                           | 生成的人类摘要     | 可选         |
+| `docs/AI-HANDOFF.md`                     | 稳定版本和外部阻塞 | 按需         |
+| `docs/ROADMAP.md`                        | v1.0 产品阶段      | 规划时       |
+| Git、Issue、PR、Release、`docs/handoff/` | 历史证据           | 追溯时       |
 
-- 工具调用 / 失败 / 重试：<...>
-- 构建 / 测试 / E2E 次数：<...>
-- 修改文件数 / 返工次数：<...>
-- 是否按时停止并完成交接：<是/否；原因>
-```
+不得在稳定文档、路线图、提示词或任务索引中复制当前状态、主线 SHA 或 PR 等待信息。
 
-## 当前停止规则
+## 8. 工作树回收
 
-功能分支合并、交接归档更新、`NEXT.md` 指向下一任务后，本次聊天立即停止。新的切片必须由新的“继续开发”请求触发。
+- 同时最多一个实现工作树和一个只读审核工作树。
+- 现有脏工作树只报告，不自动删除。
+- AI 创建的工作树只有在 PR 已合并、目录干净且分支证据一致时才能回收。
+- 构建缓存和工作树清理继续使用白名单预览，不对未知 junction 或用户目录递归操作。

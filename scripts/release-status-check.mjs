@@ -53,20 +53,6 @@ function readText(projectRoot, relativePath, label, errors) {
   }
 }
 
-function validateNext(nextText, errors) {
-  const statusMatches = [...nextText.matchAll(/^-\s*状态：(READY|BLOCKED)\s*$/gm)];
-  if (statusMatches.length !== 1) {
-    errors.push("docs/NEXT.md 必须包含恰好一个唯一状态（READY 或 BLOCKED）。");
-  }
-  if (!/^# Moyang Reader 唯一下一步\s*$/m.test(nextText)) {
-    errors.push("docs/NEXT.md 缺少唯一下一步标题。");
-  }
-  if ((nextText.match(/^## Task Context[：:]\s*/gm) ?? []).length !== 1) {
-    errors.push("docs/NEXT.md 必须包含恰好一个 Task Context。");
-  }
-  return statusMatches[0]?.[1] ?? null;
-}
-
 function validateChangelog(changelogText, version, errors) {
   if (!/^## \[Unreleased\]\s*$/m.test(changelogText)) {
     errors.push("CHANGELOG.md 必须包含 [Unreleased] 段落。");
@@ -188,13 +174,10 @@ function validateReleaseAssets(projectRoot, release, version, errors) {
   }
 }
 
-function validateHandoff(projectRoot, handoff, nextStatus, errors) {
+function validateHandoff(projectRoot, handoff, errors) {
   if (!handoff || typeof handoff !== "object" || Array.isArray(handoff)) {
     errors.push("release-status.json 缺少 handoff 状态对象。");
     return;
-  }
-  if (handoff.nextStatus !== nextStatus) {
-    errors.push("handoff.nextStatus 与 docs/NEXT.md 的唯一状态不一致。");
   }
   const links = [
     ["NEXT", handoff.next],
@@ -232,15 +215,13 @@ export function validateReleaseStatus(projectRoot = defaultRoot) {
   }
   if (status.schemaVersion !== 1) errors.push("release-status.json 的 schemaVersion 必须是 1。");
 
-  const nextText = readText(projectRoot, "docs/NEXT.md", "docs/NEXT.md", errors);
-  const nextStatus = validateNext(nextText, errors);
   validateChangelog(readText(projectRoot, "CHANGELOG.md", "CHANGELOG.md", errors), version, errors);
   validateReleaseAssets(projectRoot, status.release, version, errors);
   validateStatusEntry(projectRoot, status.mirror?.publicAssets, "公开镜像资产", errors);
   validateStatusEntry(projectRoot, status.mirror?.staticWorkflow, "静态镜像工作流", errors);
   validateStatusEntry(projectRoot, status.externalChecks?.oldVersionUpdate, "旧版本自动更新", errors);
   validateStatusEntry(projectRoot, status.externalChecks?.authenticode, "Authenticode", errors);
-  validateHandoff(projectRoot, status.handoff, nextStatus, errors);
+  validateHandoff(projectRoot, status.handoff, errors);
   return errors;
 }
 

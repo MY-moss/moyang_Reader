@@ -122,16 +122,19 @@ npm run desktop
 
 ## 后续版本路线
 
-1. v0.10.14：当前稳定发布批次，包含批量 Word 导出可靠性与大文件性能修复，目标为 Windows x64 安装包和自动更新资产。
-2. v0.11.0：稳定性与体验双轨交替，依次完成批量导出验收、统一通知、类型门禁、拖放反馈、发布条件项和右键键盘体验。
-3. v1.0：Windows x64 核心能力冻结，进入长期维护；跨平台、云同步和脚本插件仍不在当前范围。
+1. v0.10.14：当前稳定 Windows x64 版本。
+2. v0.11.x：安全披露、发布条件、契约治理、样式维护和渐进结构拆分。
+3. v0.12–v0.13：通过安全门禁后再推进 HTML 只读预览、知识流、本地分享和受控自动化。
+4. v1.0：Windows x64 核心能力冻结并进入长期维护；跨平台、云同步和任意脚本插件不在当前范围。
 
 详细需求、交互契约、版本映射和全量任务地图见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/DEVELOPMENT-AUDIT.md`](docs/DEVELOPMENT-AUDIT.md)。
 
 ## AI 快速接手
 
-任何新聊天只需使用下面一句话；当前任务只以 [`docs/NEXT.md`](docs/NEXT.md) 为准，流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，版本摘要见 [`docs/AI-HANDOFF.md`](docs/AI-HANDOFF.md)，可复制的完整接手提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
+根目录 [`AGENTS.md`](AGENTS.md) 提供自动加载规则。新聊天只需使用下面一句话；当前任务通过 `npm run ai:context` 获取，[`docs/NEXT.md`](docs/NEXT.md) 只是生成摘要，完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。
 
 ```text
-继续开发 Moyang Reader。严格读取并执行 docs/NEXT.md 中的唯一下一步，遵循 docs/AI-WORKFLOW.md，完成一个垂直切片、测试、PR 和交接后停止，不自动开始下一项。
+继续开发 Moyang Reader。遵循 AGENTS.md，运行 npm run ai:context 和 npm run ai:start，只执行批准队列中的当前垂直切片；完成后用 ai:finish 与 ai:check 交接。
 ```
+
+需要转交到不自动读取仓库规则的 AI 时，使用 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
