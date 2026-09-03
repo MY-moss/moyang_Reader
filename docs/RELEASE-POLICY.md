@@ -8,6 +8,7 @@
 - Windows x64 安装包：5,243,339 字节，SHA-256 `293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59`。
 - 签名文件：428 字节，SHA-256 `fd832a5689c9064118dd0bb8e9c3ba3d88e0a75da0c061bbd6809b069ab70adf`；`latest.json` 1,413 字节，SHA-256 `dfb110ba23f248d6c374d714613888511f99a4aae2b038219caeea27350af8cc`。
 - GitHub 和 Cloudflare Pages 资产均 HTTP 200，镜像安装包大小与 SHA-256 和 GitHub Release 一致；自动镜像仍需维护者配置 Secrets 后重跑验证。
+- `docs/release-status.json` 记录当前版本、Windows x64 Release 三项资产、公开/静态镜像状态、旧版本更新与 Authenticode 外部结论，以及交接文件路径；`npm run release:status` 只读校验这些状态，不触发发布。
 
 本文件是所有 AI、贡献者和维护者判断“是否升版本、是否生成安装包、是否创建 Release”的共同规则。功能切片可以快速合并，但不能长期只累积代码而不提供可用的稳定安装包。
 
@@ -76,7 +77,7 @@ Cloudflare 镜像只由 `.github/workflows/mirror-release.yml` 负责，并由 R
 
 准备发布 `vX.Y.Z` 时，按以下顺序执行：
 
-1. 检查 Issues、PR、CHANGELOG、`docs/NEXT.md` 和 `docs/AI-HANDOFF.md`，确认唯一下一步、当前风险与稳定批次没有遗漏阻塞问题。
+1. 检查 Issues、PR、CHANGELOG、`docs/NEXT.md`、`docs/AI-HANDOFF.md` 和 `docs/release-status.json`，确认唯一下一步、当前风险与稳定批次没有遗漏阻塞问题；运行 `npm run release:status -- --version=vX.Y.Z`，不通过时不得把外部阻塞记为已完成。
 2. 在同一个发布提交中同步修改 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 的版本号。
 3. 更新 CHANGELOG、README/路线图和交接文档中的稳定基线。
 4. 运行前端、Rust、浏览器桌面 E2E、发布检查和 Release 测试。
@@ -97,6 +98,7 @@ npm run build
 npm run test:e2e
 npm run test:e2e:desktop
 npm run release:check -- --version=vX.Y.Z
+npm run release:status -- --version=vX.Y.Z
 npm run test:release
 npm run rust -- fmt --manifest-path src-tauri/Cargo.toml -- --check
 npm run rust -- clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

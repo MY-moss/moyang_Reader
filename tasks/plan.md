@@ -30,7 +30,7 @@ G-01 工程治理与清理（本轮）
 ### G：工程治理（本轮）
 
 - [x] **G-01 全量流程与交接整改**：更新 `DEVELOPMENT-AUDIT.md`、`WORKSPACE-CLEANUP.md`、`AI-WORKFLOW.md`、任务计划、待办和交接入口；修正开放 Issue 表与 ADR 编号；T0。
-- [ ] **G-02 发布/交接状态结构化检查**：在现有 `release:check` 或独立脚本中校验版本、`NEXT.md` 唯一 Ready、CHANGELOG、Release 资产、镜像状态和交接链接；不触发发布；T0/T1；依赖 #241/#51 的真实状态格式。
+- [x] **G-02 发布/交接状态结构化检查（已实现）**：新增只读 `release:status` 与 `docs/release-status.json`，校验三处版本、`NEXT.md` 唯一状态、CHANGELOG、Windows x64 Release 三项资产、公开/静态镜像、旧版本更新、Authenticode 和交接链接；不触发发布；T0/T1。分支 `codex/g02-release-state-2026-09-03`，PR 待创建，基线 `main@c8884859068642705761d6b398dbef869fddfc9e`。
 - [ ] **G-03 构建缓存预算提示**：仅增加大小/空闲时间提示和 dry-run，不自动删除正在使用的 Cargo target；超过预算给出明确清理建议；T1；不改变构建目标路径。
 
 ### F：核心稳定与高频体验
@@ -61,7 +61,7 @@ G-01 工程治理与清理（本轮）
 - [x] **F-09g2 #171 CSS 动效时长令牌治理（已合并）**：将 `.file-drop-card` 的 140ms 与 `.quick-open-item` 的 130ms transition 时长收敛到语义令牌，保持原有计算值和 reduced-motion 行为；补静态约束与 720/900px 浏览器回归；不与主题、#194、#16 或 HTML 安全路线混做；T2；分支 `codex/css-motion-token-2026-09-03`，PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437) 已 squash 合并为 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`，Quality checks run `33722999974` 已通过。
 - [x] **F-09g3 #171 CSS 页面背景主题令牌治理（已合并）**：将 `body` 固定浅色渐变收敛到 `--page-background`，为系统/显式深色提供一致深色底色，并保留 forced-colors 的 `Canvas`；补静态约束与 720/900px 浏览器回归；不与 #194、#16 或 HTML 安全路线混做；T2；分支 `codex/css-theme-token-2026-09-03`，PR [#438](https://github.com/MY-moss/moyang_Reader/pull/438) 已 squash 合并为 `main@e2757abb2d5d2fac2f6510ae4003770ca491c6a8`，Quality checks run `33728344916` 通过。
 - [x] **F-09g4 #171 CSS 批注/高亮主题令牌化（已合并）**：新增 `--annotation-border` 与 `--annotation-surface`，统一批注引文、当前批注卡、正文命中和 CSS Highlight 的颜色；补静态约束、浅色/显式与系统深色、forced-colors 和 720/900px 浏览器回归；不与 #194、#16 或 HTML 安全路线混做；T2；分支 `codex/css-theme-followup-2026-09-03`，PR [#439](https://github.com/MY-moss/moyang_Reader/pull/439) 已 squash 合并为 `main@fbd5079f8346ba53df20ae53693b8608461ba083`，Quality checks run `33747138348` 已通过。
-- [ ] **F-09g5 #171 CSS PDF/图片预览画布主题令牌化（本切片）**：新增 `--preview-surface`、`--preview-checker-light` 与 `--preview-checker-dark`，统一 `.pdf-preview`、`.image-preview` 和 `.image-canvas` 的主题表面；补浅色/显式与系统深色、forced-colors 和 720px 浏览器回归；不与 #194、#16 或 HTML 安全路线混做；T2；分支 `codex/css-theme-next-2026-09-03`，提交 `c37c91f`，PR [#440](https://github.com/MY-moss/moyang_Reader/pull/440) 等待 Quality checks 与合并。
+- [x] **F-09g5 #171 CSS PDF/图片预览画布主题令牌化（已合并）**：新增 `--preview-surface`、`--preview-checker-light` 与 `--preview-checker-dark`，统一 `.pdf-preview`、`.image-preview` 和 `.image-canvas` 的主题表面；补浅色/显式与系统深色、forced-colors 和 720px 浏览器回归；不与 #194、#16 或 HTML 安全路线混做；T2；分支 `codex/css-theme-next-2026-09-03`，PR [#440](https://github.com/MY-moss/moyang_Reader/pull/440) 已 squash 合并为 `main@c8884859068642705761d6b398dbef869fddfc9e`，Quality checks run `33751210344` 全绿。
 - [ ] **F-10 #16 App.tsx 渐进拆分**：一次只迁移一个 hook/服务边界，行为快照不变；不以行数为唯一目标；T1/T2。
 - [ ] **F-11 #194 TS↔Rust 契约收敛**：每次只处理一个 IPC/路径谓词族，补类型和测试；T1/T3。
 - [ ] **F-12 #227 安全披露文档**：新增 `SECURITY.md`、支持版本和私密报告入口；T0。

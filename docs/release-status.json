@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.10.14",
+    "tag": "v0.10.14",
+    "status": "published",
+    "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14",
+    "githubRelease": {
+      "status": "verified",
+      "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14"
+    },
+    "assets": [
+      {
+        "kind": "installer",
+        "status": "verified",
+        "name": "Moyang.Reader_0.10.14_x64-setup.exe",
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/Moyang.Reader_0.10.14_x64-setup.exe",
+        "size": 5243339,
+        "sha256": "293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59"
+      },
+      {
+        "kind": "signature",
+        "status": "verified",
+        "name": "Moyang.Reader_0.10.14_x64-setup.exe.sig",
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/Moyang.Reader_0.10.14_x64-setup.exe.sig",
+        "size": 428,
+        "sha256": "fd832a5689c9064118dd0bb8e9c3ba3d88e0a75da0c061bbd6809b069ab70adf"
+      },
+      {
+        "kind": "manifest",
+        "status": "verified",
+        "name": "latest.json",
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/latest.json",
+        "size": 1413,
+        "sha256": "dfb110ba23f248d6c374d714613888511f99a4aae2b038219caeea27350af8cc"
+      }
+    ]
+  },
+  "mirror": {
+    "publicAssets": {
+      "status": "verified",
+      "evidence": "https://moyang-reader-mirror.pages.dev/latest.json"
+    },
+    "staticWorkflow": {
+      "status": "blocked",
+      "reason": "Release workflow 的 Cloudflare Secrets 尚未生效，静态镜像上传未完成。",
+      "evidence": "docs/RELEASE-POLICY.md"
+    }
+  },
+  "externalChecks": {
+    "oldVersionUpdate": {
+      "status": "blocked",
+      "reason": "缺少可重复使用的旧版本 Windows 安装环境，暂不能把自动更新闭环记为通过。",
+      "evidence": "docs/RELEASE-POLICY.md"
+    },
+    "authenticode": {
+      "status": "blocked",
+      "reason": "当前没有可用于 NSIS Authenticode 的证书；Tauri updater 签名不等同于安装包 Authenticode。",
+      "evidence": "docs/RELEASE-POLICY.md"
+    }
+  },
+  "handoff": {
+    "next": "docs/NEXT.md",
+    "summary": "docs/AI-HANDOFF.md",
+    "takeover": "docs/AI-TAKEOVER-PROMPT.md",
+    "versionArchive": "docs/handoff/v0.11.md",
+    "releasePolicy": "docs/RELEASE-POLICY.md",
+    "nextStatus": "READY"
+  }
+}
