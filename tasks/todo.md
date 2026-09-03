@@ -4,6 +4,8 @@
 
 ## 最近完成切片
 
+- [x] **#171 CSS 动效时长令牌治理（已合并）**：`.file-drop-card` 与 `.quick-open-item` 的 transition 时长已收敛到语义令牌，保持原值和 reduced-motion 行为；分支 `codex/css-motion-token-2026-09-03`，PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437) 已 squash 合并为 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`，Quality checks run `33722999974` 通过，Issue #171 保持开放。
+
 - [x] **#193 交互视觉令牌（已合并）**：查找框焦点环、关系图 primary 主按钮、上下文页签状态和焦点/动效/等宽字体令牌已完成；相关单测 1/1、无障碍浏览器 E2E 1/1、build、Lint、类型感知、格式和 diff 检查通过。PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 已 squash 合并为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`，Quality checks run `33706502133` 全部通过，包含 Windows desktop smoke；本机桌面运行器因缺少 `tauri-driver` 未完成本地会话，Issue #193 已关闭。
 - [x] **#171 CSS 颜色令牌治理第一批（已合并）**：错误/警告、代码块/行内代码、文件卡片、状态栏和工作区列表已改用语义令牌；自动/显式深色逐组件覆盖从 88 降为 0，原始颜色字面量从 245 降为 219；静态工作流测试 15/15、主题对称浏览器 E2E 1/1、build、Lint、类型感知、格式和 diff 检查通过；分支 `codex/css-token-governance-2026-09-03`，PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已 squash 合并为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`，Quality checks run `33711636497` 和依赖审计 `33711636526` 已通过，Issue #171 保持开放。
 - [x] **#191 焦点模式 Escape 互斥（已合并）**：共享模态只消费当前焦点所属的最内层 Escape，并阻断后续全局监听；专注模式进入时聚焦可见退出入口，命令面板关闭后焦点安全归还；分支 `codex/escape-mutex-2026-09-03`，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 已 squash 合并为 `main@38ed9a03a11654986afa8656b2347d5784f35c34`，Quality checks run `33701530614` 全部通过，Issue #191 已关闭。
@@ -14,15 +16,15 @@
 
 已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
-## 当前切片：#171 动效时长令牌治理
+## 当前切片：#171 页面背景主题令牌治理
 
-- 目标：把 `.file-drop-card` 的 140ms 与 `.quick-open-item` 的 130ms transition 时长收敛到语义 `--motion-file-drop` 与 `--motion-quick-open-item`，保持原有时长、标准缓动和 reduced-motion 覆盖行为不变。
-- 用户价值：后续维护动效时从统一来源调整两个残余路径，减少样式漂移，不打断当前阅读流程。
-- 非目标：不重做动效、不改交互/数据/持久化/主题规则，不处理更新器、阅读库或默认首页，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
-- 验收：两个规则只引用语义动效令牌；样式表不含直接 transition 时长；静态测试 5/5；720/900px 浏览器 E2E 3/3 覆盖正常/减少动效 computed style 与无横向溢出；Lint、格式、构建和 PR Quality checks 通过。
-- 风险/回滚：令牌误配可能改变微交互时序；同值替换、静态规则和运行时 computed style 检查控制风险；回退 PR #437 即可恢复原声明，不涉及数据迁移。
-- 分支：`codex/css-motion-token-2026-09-03`；PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)；远端提交 `a1bf9fda50d228f2ba38e647e8dd21adca861236`；基线 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；启动前已核验无重复产品 PR。
-- 验证：RED 阶段已复现缺少动效令牌；修复后静态测试 5/5、CSS 治理 E2E 3/3（720/900px、正常/减少动效）、build、Lint、Prettier 和 `git diff --check` 通过；本机 desktop smoke 待远端 Quality checks 确认。
+- 目标：把 `body` 的页面背景收敛到语义 `--page-background`，保留现有浅色渐变，并为系统/显式深色提供一致的深色渐变；Windows 高对比度继续使用 `Canvas`。
+- 用户价值：深色主题下窗口边缘、滚动露底和空白区域不再残留浅色页面底，应用壳层与页面背景保持同一主题，不打断阅读流程。
+- 非目标：不改组件配色、布局尺寸、交互、阅读库/更新器/文档数据语义，不处理 #194、#16、发布条件项、HTML 源码编辑、脚本、插件或重型默认模块，不生成发布资产。
+- 验收：`body` 通过 `--page-background` 渲染；系统深色和显式深色计算样式一致且不含浅色端点；浅色现有渐变保持不变；强制高对比度保持 `Canvas`；静态测试、720/900px 浏览器 E2E、Lint、格式、构建和 PR Quality checks 通过。
+- 风险/回滚：深色渐变选值不当可能造成页面边缘亮度突变；浅色值保持原样，深色只使用现有深色语义色并由主题 E2E 控制；回退本切片 PR 即可恢复 `body` 原背景声明，不涉及数据迁移。
+- 分支：`codex/css-theme-token-2026-09-03`；PR [#438](https://github.com/MY-moss/moyang_Reader/pull/438)；远端提交 `ceb4eea2f48eb541ce5b3cad8dda70baa9d73b1d`；基线 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；启动前已核验 Issue #171 与开放 PR 无重复产品 PR。
+- 验证：RED 阶段静态测试先因缺少页面背景令牌失败；修复后静态测试 6/6、CSS 治理 E2E 4/4、前端 build 通过；本机浏览器桥接等待 Chrome 远程调试授权时使用 Playwright，desktop smoke 由远端 Quality checks 复核。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 
