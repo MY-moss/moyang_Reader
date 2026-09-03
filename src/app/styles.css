@@ -9,6 +9,16 @@
   --font-display: "Iowan Old Style", "Baskerville", Georgia, "Songti SC", serif;
   --font-reading: "Iowan Old Style", "Palatino Linotype", "Songti SC", "STSong", serif;
   --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Courier New", ui-monospace, monospace;
+  /* App chrome type scale: preserve existing sizes while centralizing hierarchy. */
+  --type-kicker: 9px;
+  --type-caption: 10px;
+  --type-control: 11px;
+  --type-body: 12px;
+  --type-emphasis: 13px;
+  --type-icon: 15px;
+  --type-brand: 16px;
+  --type-section: 17px;
+  --type-heading: 19px;
   --canvas: #eeebe3;
   --surface: #f8f6f0;
   --surface-strong: #fffdf8;
@@ -364,13 +374,13 @@ a:focus-visible {
 }
 .brand-name {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: var(--type-brand);
   letter-spacing: 0.025em;
 }
 .brand-subtitle {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
   letter-spacing: 0.18em;
 }
 .document-title {
@@ -380,7 +390,7 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--type-body);
   letter-spacing: 0.01em;
 }
 .modified-dot {
@@ -403,7 +413,7 @@ a:focus-visible {
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent-warm) 14%, transparent);
   color: var(--accent-warm);
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 800;
   line-height: 1;
   vertical-align: middle;
@@ -433,7 +443,7 @@ a:focus-visible {
   background: var(--surface-strong);
   color: var(--ink);
   padding: var(--space-6) var(--space-9);
-  font-size: 11px;
+  font-size: var(--type-control);
   white-space: nowrap;
   transition:
     border-color var(--motion-fast) var(--motion-ease-standard),
@@ -510,7 +520,7 @@ a:focus-visible {
 }
 .toolbar-overflow-label {
   color: var(--accent-deep);
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -536,7 +546,7 @@ a:focus-visible {
   margin-left: var(--space-10);
   color: var(--muted);
   content: "+";
-  font-size: 15px;
+  font-size: var(--type-icon);
   line-height: 1;
 }
 .toolbar-overflow-settings > .settings-menu[open] > summary::after,
@@ -611,7 +621,7 @@ a:focus-visible {
   color: var(--ink);
   padding: 8px 10px;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--type-control);
   white-space: nowrap;
 }
 .export-menu-panel button:hover {
@@ -647,7 +657,7 @@ a:focus-visible {
 }
 .settings-menu-title {
   color: var(--accent-deep);
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -659,7 +669,7 @@ a:focus-visible {
   align-items: start;
   color: var(--ink);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .settings-option input {
   accent-color: var(--accent);
@@ -671,7 +681,7 @@ a:focus-visible {
 }
 .settings-option small {
   color: #4f5b53;
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.45;
 }
 .settings-divider {
@@ -679,7 +689,7 @@ a:focus-visible {
   padding-top: 10px;
   border-top: 1px solid var(--line);
   color: #4f5b53;
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -689,7 +699,7 @@ a:focus-visible {
   justify-content: space-between;
   gap: 12px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .settings-select-option select {
   min-width: 92px;
@@ -698,13 +708,13 @@ a:focus-visible {
   background: var(--surface);
   color: var(--ink);
   padding: 5px 7px;
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .settings-range-option {
   display: grid;
   gap: 7px;
   color: var(--ink);
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .settings-range-heading,
 .settings-range-footer {
@@ -725,18 +735,18 @@ a:focus-visible {
 .settings-range-footer small {
   min-width: 0;
   color: var(--ink);
-  font-size: 9px;
+  font-size: var(--type-kicker);
   line-height: 1.35;
 }
 .settings-range-footer .quiet-button {
   flex: 0 0 auto;
   min-height: 24px;
   padding: 3px 6px;
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .settings-note {
   color: var(--muted-strong);
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.45;
 }
 .settings-persistence-status {
@@ -749,7 +759,7 @@ a:focus-visible {
   background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface));
   color: var(--ink);
   padding: 6px 8px;
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.3;
 }
 .settings-persistence-dot {
@@ -786,7 +796,7 @@ a:focus-visible {
   background: transparent;
   color: var(--accent-deep);
   padding: 7px 8px;
-  font-size: 11px;
+  font-size: var(--type-control);
   text-align: left;
 }
 .settings-guide-button:hover {
@@ -800,7 +810,7 @@ a:focus-visible {
 }
 .settings-actions .quiet-button {
   padding: 5px 8px;
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .toolbar-button.update-button.has-update {
   border-color: var(--accent-warm);
@@ -844,7 +854,7 @@ a:focus-visible {
   color: var(--ink);
   padding: 7px 9px;
   outline: none;
-  font-size: 12px;
+  font-size: var(--type-body);
 }
 .findbar input:focus-visible {
   border-color: var(--focus-border);
@@ -855,7 +865,7 @@ a:focus-visible {
 .find-count {
   min-width: 48px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--type-control);
   text-align: center;
 }
 .find-button {
@@ -1845,7 +1855,7 @@ a:focus-visible {
   padding: 9px 8px 8px 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .tab-item.active .tab-label {
   color: var(--ink);
@@ -1862,7 +1872,7 @@ a:focus-visible {
   border: 1px solid var(--accent-warm);
   border-radius: 50%;
   color: var(--accent-warm);
-  font-size: 9px;
+  font-size: var(--type-kicker);
   font-weight: 800;
   line-height: 1;
   vertical-align: -1px;
@@ -1873,7 +1883,7 @@ a:focus-visible {
   background: transparent;
   color: var(--muted);
   padding: 7px 9px 7px 4px;
-  font-size: 15px;
+  font-size: var(--type-icon);
   line-height: 1;
   transition:
     background var(--motion-fast) var(--motion-ease-standard),
@@ -2002,7 +2012,7 @@ html.pane-resizing * {
   margin-left: var(--space-6);
   color: var(--muted);
   content: "⌄";
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .workspace-actions .quiet-button:disabled {
   cursor: not-allowed;
@@ -2047,7 +2057,7 @@ html.pane-resizing * {
   padding: var(--space-6) var(--space-7);
   text-align: left;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .workspace-create-menu-panel button:hover,
 .workspace-create-menu-panel button:focus-visible {
@@ -2067,7 +2077,7 @@ html.pane-resizing * {
 .workspace-heading h2 {
   margin: var(--space-5) 0 0;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: var(--type-heading);
   font-weight: 500;
   letter-spacing: -0.01em;
 }
@@ -2078,7 +2088,7 @@ html.pane-resizing * {
   background: transparent;
   color: var(--accent-deep);
   padding: 6px 9px;
-  font-size: 11px;
+  font-size: var(--type-control);
   transition:
     border-color var(--motion-fast) var(--motion-ease-standard),
     background var(--motion-fast) var(--motion-ease-standard),
@@ -2110,7 +2120,7 @@ html.pane-resizing * {
   margin-top: 14px;
   overflow: visible;
   color: var(--ink);
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .workspace-location span:nth-child(2) {
   min-width: 0;
@@ -2125,7 +2135,7 @@ html.pane-resizing * {
 .workspace-location small {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .workspace-switcher {
   min-width: 0;
@@ -2140,7 +2150,7 @@ html.pane-resizing * {
   color: var(--accent-deep);
   padding: 2px 8px;
   cursor: pointer;
-  font-size: 9px;
+  font-size: var(--type-kicker);
   list-style: none;
   text-align: left;
   transition:
@@ -2171,7 +2181,7 @@ html.pane-resizing * {
 .workspace-switcher-label {
   padding: 4px 7px 5px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2200,13 +2210,13 @@ html.pane-resizing * {
   white-space: nowrap;
 }
 .workspace-switcher-menu button strong {
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 650;
 }
 .workspace-switcher-menu button span {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
 }
 .workspace-switcher-item {
   display: grid;
@@ -2223,7 +2233,7 @@ html.pane-resizing * {
   color: var(--muted) !important;
   padding: 4px !important;
   text-align: center !important;
-  font-size: 15px;
+  font-size: var(--type-icon);
   line-height: 1;
 }
 .workspace-switcher-remove:hover {
@@ -2238,7 +2248,7 @@ html.pane-resizing * {
   gap: 5px;
   margin-top: 11px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.4;
 }
 .workspace-filter-label {
@@ -2249,7 +2259,7 @@ html.pane-resizing * {
   background: transparent;
   color: var(--accent-deep);
   padding: 0;
-  font-size: 10px;
+  font-size: var(--type-caption);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -2259,7 +2269,7 @@ html.pane-resizing * {
 .workspace-export-note {
   margin-top: 9px;
   color: var(--accent-deep);
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -2362,7 +2372,7 @@ html.pane-resizing * {
 .workspace-help {
   margin: 14px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--type-control);
   line-height: 1.6;
 }
 .workspace-search {
@@ -2374,7 +2384,7 @@ html.pane-resizing * {
   color: var(--ink);
   padding: 9px 10px;
   outline: none;
-  font-size: 11px;
+  font-size: var(--type-control);
   box-shadow: inset 0 1px 2px rgba(47, 49, 41, 0.03);
 }
 .workspace-search:focus-visible {
@@ -2387,7 +2397,7 @@ html.pane-resizing * {
   gap: 7px;
   margin-top: 9px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .tag-filter span {
   flex: 0 0 auto;
@@ -2400,7 +2410,7 @@ html.pane-resizing * {
   background: var(--surface);
   color: var(--ink);
   padding: 6px 7px;
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .workspace-files,
 .workspace-results {
@@ -2428,7 +2438,7 @@ html.pane-resizing * {
 .workspace-subheading {
   padding: 0 7px 5px;
   color: #9a9285;
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2486,25 +2496,25 @@ html.pane-resizing * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--type-control);
   font-weight: 600;
 }
 .workspace-folder-icon {
   flex: 0 0 12px;
   color: var(--accent-warm);
-  font-size: 13px;
+  font-size: var(--type-emphasis);
   line-height: 1;
   opacity: 0.78;
 }
 .workspace-folder small {
   margin-left: auto;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
 }
 .workspace-folder-caret {
   flex: 0 0 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-emphasis);
   line-height: 1;
 }
 .workspace-file span,
@@ -2518,14 +2528,14 @@ html.pane-resizing * {
 }
 .workspace-file span,
 .workspace-result strong {
-  font-size: 11px;
+  font-size: var(--type-control);
   font-weight: 600;
 }
 .workspace-file small,
 .workspace-result span {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
 }
 .reading-history-panel {
   display: grid;
@@ -2544,13 +2554,13 @@ html.pane-resizing * {
   margin: 5px 0 0;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--type-section);
   font-weight: 500;
 }
 .reading-history-range {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
   white-space: nowrap;
 }
 .reading-history-metrics {
@@ -2570,7 +2580,7 @@ html.pane-resizing * {
 .reading-history-metric strong {
   overflow: hidden;
   color: var(--accent-deep);
-  font-size: 15px;
+  font-size: var(--type-icon);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2578,7 +2588,7 @@ html.pane-resizing * {
 .reading-history-metric span,
 .reading-history-day-value {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--type-kicker);
 }
 .reading-history-days {
   display: grid;
@@ -2616,7 +2626,7 @@ html.pane-resizing * {
 }
 .reading-history-day-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--type-caption);
   font-weight: 700;
 }
 .reading-history-day.is-today .reading-history-day-label {
@@ -2632,13 +2642,13 @@ html.pane-resizing * {
 .reading-history-empty {
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--type-caption);
   line-height: 1.5;
 }
 .reading-history-clear {
   justify-self: start;
   padding: 6px 9px;
-  font-size: 10px;
+  font-size: var(--type-caption);
 }
 .workspace-result span {
   white-space: normal;
@@ -4316,7 +4326,7 @@ html.pane-resizing * {
   border-top: 1px solid var(--line);
   background: var(--chrome-statusbar-surface);
   color: var(--statusbar-foreground);
-  font-size: 10px;
+  font-size: var(--type-caption);
   letter-spacing: 0.01em;
   line-height: 30px;
 }

@@ -75,3 +75,69 @@ test("keeps chrome spacing tokenized and usable at compact Windows widths", asyn
     if (width <= 720) expect(metrics.toolbar.rowGap).toBe("6px");
   }
 });
+
+test("keeps chrome and workspace typography on the semantic type scale", async ({ page }) => {
+  for (const width of [720, 900]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.goto("/");
+
+    await expect(page.locator(".brand-name")).toBeVisible();
+    await expect(page.locator(".workspace-heading h2")).toBeVisible();
+    await expect(page.locator(".workspace-help")).toBeVisible();
+    await expect(page.locator(".statusbar")).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const readFontSize = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (!element) throw new Error(`missing ${selector}`);
+        return getComputedStyle(element).fontSize;
+      };
+
+      return {
+        tokens: Object.fromEntries(
+          [
+            "--type-kicker",
+            "--type-caption",
+            "--type-control",
+            "--type-body",
+            "--type-emphasis",
+            "--type-icon",
+            "--type-brand",
+            "--type-section",
+            "--type-heading",
+          ].map((name) => [name, root.getPropertyValue(name).trim()]),
+        ),
+        fontSizes: {
+          brand: readFontSize(".brand-name"),
+          toolbar: readFontSize(".toolbar-button"),
+          workspaceHeading: readFontSize(".workspace-heading h2"),
+          workspaceHelp: readFontSize(".workspace-help"),
+          statusbar: readFontSize(".statusbar"),
+        },
+        viewport: {
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        },
+      };
+    });
+
+    expect(metrics.tokens["--type-kicker"]).toBe("9px");
+    expect(metrics.tokens["--type-caption"]).toBe("10px");
+    expect(metrics.tokens["--type-control"]).toBe("11px");
+    expect(metrics.tokens["--type-body"]).toBe("12px");
+    expect(metrics.tokens["--type-emphasis"]).toBe("13px");
+    expect(metrics.tokens["--type-icon"]).toBe("15px");
+    expect(metrics.tokens["--type-brand"]).toBe("16px");
+    expect(metrics.tokens["--type-section"]).toBe("17px");
+    expect(metrics.tokens["--type-heading"]).toBe("19px");
+    expect(metrics.fontSizes).toEqual({
+      brand: "16px",
+      toolbar: "11px",
+      workspaceHeading: "19px",
+      workspaceHelp: "11px",
+      statusbar: "10px",
+    });
+    expect(metrics.viewport.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewport.clientWidth);
+  }
+});

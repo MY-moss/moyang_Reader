@@ -55,7 +55,10 @@ G-01 工程治理与清理（本轮）
 - [x] **F-09c 用户反馈：默认首页与品牌视觉收口（已完成）**：默认空状态复用现有新 Logo，移除残留大写 M 并保持首次启动操作可用；只做该区域的视觉收口，不改阅读库数据语义、侧栏、更新器或 HTML 安全边界；T2；分支 `codex/default-home-brand-2026-09-03`，PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，Quality checks run `33687800718` 全部通过；代码提交 `b6ac4ba6ceb009ba4bd346765dd1650448dab8e6`。
 - [x] **F-09d #193 交互视觉令牌（已合并）**：补齐查找框焦点环、关系图主按钮、上下文页签状态，并抽取焦点/动效/等宽字体令牌；同步 reduced-motion 与 forced-colors；不改变布局、业务语义、HTML 安全路线或发布资产；T2。分支 `codex/visual-token-focus-2026-09-03`，PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 已 squash 合并为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`，Quality checks run `33706502133` 全部通过，Issue #193 已关闭。
 - [x] **F-09e #171 CSS 颜色令牌治理第一批（已合并）**：错误/警告、代码块/行内代码、文件卡片、状态栏和工作区列表使用语义颜色令牌；自动/显式深色主题移除逐组件重复覆盖；不改布局和业务逻辑；T2；分支 `codex/css-token-governance-2026-09-03`，PR [#434](https://github.com/MY-moss/moyang_Reader/pull/434) 已 squash 合并为 `main@f7b0b96087c56eb6d2aab4879a433d6fbd42d54a`，Quality checks run `33711636497` 和依赖审计 run `33711636526` 已通过；Issue #171 保持开放，后续令牌批次另行拆分。
-- [ ] **F-09f #171 CSS 紧凑间距令牌治理第二批（当前切片）**：顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏使用 `--space-*` 令牌；保持现有间距值和布局行为，补 720/900px 无横向溢出 E2E；不改交互和业务语义；T2；分支 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已创建。
+- [x] **F-09f #171 CSS 紧凑间距令牌治理第二批（已合并）**：顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏使用 `--space-*` 令牌；保持现有间距值和布局行为，补 720/900px 无横向溢出 E2E；不改交互和业务语义；T2；分支 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已 squash 合并为 `main@5dcf1962950d1e88615190a0948024136b054af6`，Quality checks run `33715368941` 全部通过；Issue #171 保持开放。
+- [ ] **F-09g #171 CSS 字体/动效/主题规则后续批次**：按独立垂直切片继续治理；本切片的字体字号边界见 F-09g1，动效或主题规则须重新核验 Issue/PR 后再单独授权；T2。
+- [x] **F-09g1 #171 CSS 字体字号令牌治理第三批（本切片）**：顶栏、更多/设置、查找栏、标签栏、左侧阅读库操作与文件条目、阅读历史摘要、状态栏使用 `--type-*` 令牌收敛 9–19px 字号；保持当前计算值和布局行为，不改业务语义；T2；分支 `codex/css-font-token-2026-09-03`，PR 待创建，合并后补主线 SHA 与 Quality checks。
+- [ ] **F-09g2 #171 CSS 动效/主题规则后续批次**：重新盘点剩余动效或主题覆盖，只选择一个边界，补对应静态和浏览器回归；不与 #194、#16 或 HTML 安全路线混做；T2。
 - [ ] **F-10 #16 App.tsx 渐进拆分**：一次只迁移一个 hook/服务边界，行为快照不变；不以行数为唯一目标；T1/T2。
 - [ ] **F-11 #194 TS↔Rust 契约收敛**：每次只处理一个 IPC/路径谓词族，补类型和测试；T1/T3。
 - [ ] **F-12 #227 安全披露文档**：新增 `SECURITY.md`、支持版本和私密报告入口；T0。
