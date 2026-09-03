@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
-- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 的主阅读区读屏播报收窄和 Escape 互斥已完成本轮实现，PR 合并后 #191 可关闭，下一独立切片为 #171/#193 视觉令牌治理；本次完成后不自动启动下一项。
-- 本轮最新基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #418–#431 已完成本轮代码与交接，当前分支只补 #191 Escape 互斥；Issue #233、#363、#366、#370、#416 已关闭，#191 待本切片合并后关闭。
+- 当前状态：默认首页与品牌视觉收口已在 PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430) 完成，Quality checks run `33687800718` 全部通过；#191 的主阅读区读屏播报收窄和 Escape 互斥已完成本轮实现，Escape 互斥已提交到 PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432)，待远端门禁通过后合并并关闭 #191；下一独立切片为 #171/#193 视觉令牌治理，本次完成后不自动启动下一项。
+- 本轮最新基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #418–#431 已完成本轮代码与交接，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 承载当前 #191 Escape 互斥切片；Issue #233、#363、#366、#370、#416 已关闭，#191 待 PR #432 合并后关闭。
 - 当前稳定版本：`v0.10.14`；#191 属于 `v0.11.x` 高频体验批次，不单独发布。
 - 全量审计、HTML 路线和未来任务卡见 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md)；执行计划见 [`../tasks/plan.md`](../tasks/plan.md)，待办排序见 [`../tasks/todo.md`](../tasks/todo.md)。这些文件不产生额外 Ready 事项。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；安装包、`.sig` 和 `latest.json` 已在线核验。Release run `33555344560` 的质量门禁和 Windows 构建发布成功。
@@ -49,7 +49,7 @@
 - 回滚：回退 PR #431 即可恢复原主区 `aria-live` 行为和加载提示标记，不需要数据迁移，不影响用户文档或阅读库。
 - 验证：RED 测试先复现 `main.content-area[aria-live]`；修复后 `npm run test:e2e:a11y -- --workers=1` 8/8、`npm test` 94 个文件/372 项、lint、格式、类型感知和 build 通过；`git diff --check` 通过。
 - 发布：普通 T2 无障碍切片，不生成 Windows x64 安装包、GitHub Release、签名文件、`latest.json` 或 Cloudflare 镜像；纳入后续稳定批次。
-- 交付：分支 `codex/reader-live-region-2026-09-03`，PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431)，代码提交 `a4448d7`；远端 Quality checks 待完成，Issue #191 保持开放。
+- 交付：分支 `codex/reader-live-region-2026-09-03`，PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431)，代码提交 `a4448d7`；已 squash 合并为 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605`，Quality checks run `33693407155` 全部通过，Issue #191 保持开放至 Escape 互斥切片完成。
 
 ## 最近完成：左侧栏阅读库操作区布局与菜单交互（用户反馈，2026-09-03）
 

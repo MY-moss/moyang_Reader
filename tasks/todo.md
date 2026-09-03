@@ -4,8 +4,8 @@
 
 ## 最近完成切片
 
-- [x] **#191 焦点模式 Escape 互斥（本切片）**：共享模态只消费当前焦点所属的最内层 Escape，并阻断后续全局监听；专注模式进入时聚焦可见退出入口，命令面板关闭后焦点安全归还；模态单测 7/7、浏览器 E2E 1/1、Windows 桌面 smoke 17/17 已通过。分支 `codex/escape-mutex-2026-09-03`，PR 创建后补充远端证据；合并后关闭 Issue #191。
-- [x] **#191 主阅读区读屏播报收窄**：移除 `main.content-area` 的宽范围 `aria-live`，打开文档加载状态改为显式 `status/polite`，补无障碍 E2E；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已创建，等待远端门禁后合并。Issue #191 保持开放，Escape 互斥另行拆分。
+- [x] **#191 焦点模式 Escape 互斥（本切片）**：共享模态只消费当前焦点所属的最内层 Escape，并阻断后续全局监听；专注模式进入时聚焦可见退出入口，命令面板关闭后焦点安全归还；模态单测 7/7、浏览器 E2E 1/1、Windows 桌面 smoke 17/17 已通过。分支 `codex/escape-mutex-2026-09-03`，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432)，待合并后关闭 Issue #191。
+- [x] **#191 主阅读区读屏播报收窄**：移除 `main.content-area` 的宽范围 `aria-live`，打开文档加载状态改为显式 `status/polite`，补无障碍 E2E；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已 squash 合并为 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605`，Quality checks run `33693407155` 全部通过。Issue #191 保持开放至 Escape 互斥合并。
 - [x] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 在独立工作树/分支 `codex/default-home-brand-2026-09-03` 完成默认空状态 Logo 替换，移除旧大写 M，保留首次启动操作；PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，Quality checks run `33687800718` 全部通过。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
 
 已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
