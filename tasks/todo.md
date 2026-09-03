@@ -10,17 +10,19 @@
 - [x] **#191 主阅读区读屏播报收窄**：移除 `main.content-area` 的宽范围 `aria-live`，打开文档加载状态改为显式 `status/polite`，补无障碍 E2E；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已 squash 合并为 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605`，Quality checks run `33693407155` 全部通过。Issue #191 保持开放至 Escape 互斥合并。
 - [x] **用户反馈：默认首页与品牌视觉收口**：启动前已重新核验开放 Issue/PR，未发现重复产品 PR；基于 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69` 在独立工作树/分支 `codex/default-home-brand-2026-09-03` 完成默认空状态 Logo 替换，移除旧大写 M，保留首次启动操作；PR [#430](https://github.com/MY-moss/moyang_Reader/pull/430)，Quality checks run `33687800718` 全部通过。只做这一垂直切片，#191 剩余读屏、视觉令牌和 HTML 路线另行拆分。
 - [x] **#171 CSS 紧凑间距令牌治理第二批（已合并）**：顶栏、More/查找面板、左侧工作区主控件、文件条目和底栏已改用 `--space-*` 令牌，保持原值并补 720/900px 无横向溢出 E2E；分支 `codex/css-token-followup-2026-09-03`，PR [#435](https://github.com/MY-moss/moyang_Reader/pull/435) 已 squash 合并为 `main@5dcf1962950d1e88615190a0948024136b054af6`，Quality checks run `33715368941` 全部通过，Issue #171 保持开放。
+- [x] **#171 CSS 字体字号令牌治理第三批（已合并）**：顶栏、更多/设置、查找栏、标签栏、左侧阅读库操作与文件条目、阅读历史摘要、状态栏已改用 `--type-*` 令牌，保持原值并补 720/900px 运行时字号与溢出 E2E；分支 `codex/css-font-token-2026-09-03`，PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436) 已 squash 合并为 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`，Quality checks run `33719109262` 全部通过，Issue #171 保持开放。
 
 已完成：更新入口“更多”工作流与不中断阅读 PR [#429](https://github.com/MY-moss/moyang_Reader/pull/429) 已 squash 合并为 `main@6843ff2b0a736d7c9247f4cd1205ee2398a09d69`，Quality checks run `33681521320` 全部通过；左侧栏阅读库操作区布局与菜单交互 PR [#428](https://github.com/MY-moss/moyang_Reader/pull/428) 已 squash 合并为 `main@8325982f12276e938084523966f02404ba2db041`，Quality checks run `33671029611` 全部通过。
 
-## 当前切片：#171 CSS 字体字号令牌治理第三批
+## 当前切片：#171 动效时长令牌治理
 
-- 目标：将顶栏、更多/设置、查找栏、标签栏、左侧阅读库操作与文件条目、阅读历史摘要、状态栏的 9–19px 字号收敛到语义 `--type-*` 令牌，保持当前计算值和布局行为不变。
-- 用户价值：默认首页、更多操作和侧栏的信息层级更稳定；后续 UI/无障碍调整只需修改统一字号来源，减少窄窗口漂移和逐处微调。
-- 非目标：不改阅读正文、编辑器或打印排版，不改变交互/数据/持久化，不处理 HTML 源码编辑、脚本、插件或跨平台范围，不生成发布资产。
-- 验收：受治理选择器不直接写入字号像素；9 个字号值由 `--type-*` 令牌表达；直接字号声明从 256 降至不高于 214；720/900px 运行时字号与无横向溢出检查通过；静态测试、Lint、类型感知、格式、构建、相关 E2E 和 PR Quality checks 通过。
-- 风险/回滚：同值令牌替换若误配可能改变信息层级或造成窄窗口换行；静态选择器治理与浏览器计算样式检查控制风险；回退本切片 PR 即可恢复原声明，不涉及数据迁移。
-- 分支：`codex/css-font-token-2026-09-03`；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436) 已创建；当前远端提交 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`；基线 `main@5dcf1962950d1e88615190a0948024136b054af6`。
+- 目标：把 `.file-drop-card` 的 140ms 与 `.quick-open-item` 的 130ms transition 时长收敛到语义 `--motion-file-drop` 与 `--motion-quick-open-item`，保持原有时长、标准缓动和 reduced-motion 覆盖行为不变。
+- 用户价值：后续维护动效时从统一来源调整两个残余路径，减少样式漂移，不打断当前阅读流程。
+- 非目标：不重做动效、不改交互/数据/持久化/主题规则，不处理更新器、阅读库或默认首页，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
+- 验收：两个规则只引用语义动效令牌；样式表不含直接 transition 时长；静态测试 5/5；720/900px 浏览器 E2E 3/3 覆盖正常/减少动效 computed style 与无横向溢出；Lint、格式、构建和 PR Quality checks 通过。
+- 风险/回滚：令牌误配可能改变微交互时序；同值替换、静态规则和运行时 computed style 检查控制风险；回退 PR #437 即可恢复原声明，不涉及数据迁移。
+- 分支：`codex/css-motion-token-2026-09-03`；PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)；远端提交 `a1bf9fda50d228f2ba38e647e8dd21adca861236`；基线 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；启动前已核验无重复产品 PR。
+- 验证：RED 阶段已复现缺少动效令牌；修复后静态测试 5/5、CSS 治理 E2E 3/3（720/900px、正常/减少动效）、build、Lint、Prettier 和 `git diff --check` 通过；本机 desktop smoke 待远端 Quality checks 确认。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 
@@ -28,7 +30,7 @@
 
 按“用户可见收益 / 无外部阻塞 / 可独立验收”排序：
 
-1. **#171 CSS 令牌治理后续批次**：颜色第一批和紧凑间距第二批已合并，本切片处理字体字号；后续重新盘点并只选择一个剩余动效/主题边界；T2；不与大范围布局重构混做。
+1. **#171 CSS 令牌治理后续批次**：颜色、紧凑间距和字体字号批次已合并，本切片处理动效时长；合并后重新盘点并只选择一个剩余主题边界；T2；不与大范围布局重构混做。
 2. **#241/#51/#112 发布条件旁路**：仅在真实旧版本、签名环境和 Cloudflare Secret 可用时重新评估；不把受限环境记为通过。
 3. **G-02/G-03 工程治理收口**：发布/交接状态结构化检查和构建缓存预算提示仍未开发；按 `NEXT.md` 重新授权后再做。
 
