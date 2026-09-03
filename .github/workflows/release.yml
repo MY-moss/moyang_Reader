@@ -70,6 +70,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "发布版本未通过版本一致性检查。"
           }
+          npm run release:status -- --version=$tag
+          if ($LASTEXITCODE -ne 0) {
+            throw "发布/交接状态未通过结构化检查。"
+          }
           "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Quality gate

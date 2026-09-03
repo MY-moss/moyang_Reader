@@ -4,28 +4,28 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@fbd5079f8346ba53df20ae53693b8608461ba083`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436、#437、#438、#439 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
+- 发布代码主线基线：`main@c8884859068642705761d6b398dbef869fddfc9e`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436、#437、#438、#439、#440 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批、间距第二批、字体字号第三批、动效时长、页面背景和批注/高亮主题治理已完成；当前推进 #171 PDF/图片预览画布主题令牌化。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-theme-next-2026-09-03`，PR [#440](https://github.com/MY-moss/moyang_Reader/pull/440)；主线基线为 `main@fbd5079f8346ba53df20ae53693b8608461ba083`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色/间距/字体/动效/页面背景/批注高亮/预览画布主题治理已完成；当前推进 G-02 发布/交接状态结构化检查。
+- 当前开放 Issue/PR 快照（2026-09-03）：G-02 启动前重新核验开放 Issue/PR，没有同类产品 Issue 或 PR；本切片分支为 `codex/g02-release-state-2026-09-03`，PR 待创建；主线基线为 `main@c8884859068642705761d6b398dbef869fddfc9e`；其余开放 PR 仅为 Dependabot 更新。结构化状态见 [`release-status.json`](release-status.json)，#241/#51 的外部阻塞保持显式记录。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#171 PDF/图片预览画布主题令牌化（2026-09-03）
+## 当前切片：G-02 发布/交接状态结构化检查（2026-09-03）
 
-- 目标：新增 `--preview-surface`、`--preview-checker-light`、`--preview-checker-dark` 语义令牌，让 PDF/图片预览外框和图片棋盘背景从语义令牌取色；为深色和强制高对比度提供主题回退。
-- 用户价值：深色阅读时 PDF/图片预览不再出现刺眼的浅色画布；Windows forced-colors 使用系统 `Canvas`，预览边界仍可辨识。
-- 非目标：不改变 PDF 页面白底、图片内容、缩放/滚动、尺寸布局、阅读库、更新器、业务逻辑、HTML 导出/编辑、安全门禁、脚本、插件或重型默认模块，不生成发布资产。
-- 验收标准：浅色计算样式保持现有值；显式/系统深色预览表面一致且变暗；forced-colors 三个令牌为 `Canvas` 且棋盘背景为 `none`；静态令牌测试 8/8；720px CSS 治理 E2E 6/6，覆盖主题模式和无横向溢出；Lint、类型感知、构建产物、格式、构建和 `git diff --check` 通过。
-- 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
-- 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright；无新增运行时依赖、凭据、数据迁移或发布资产。
-- 风险与回滚：深色预览表面或高对比度回退配置不当可能影响预览边界辨识；保持浅色原值并使用显式/系统深色、forced-colors 计算样式 E2E 控制；回退 PR #440 即可恢复预览选择器原有颜色和棋盘背景，不涉及数据迁移。
-- 基线与分支：远端 `main@fbd5079f8346ba53df20ae53693b8608461ba083`；分支 `codex/css-theme-next-2026-09-03`，提交 `c37c91f`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#440](https://github.com/MY-moss/moyang_Reader/pull/440)。
-- 当前验证：RED 阶段先复现缺少预览令牌；修复后工作流/令牌静态测试 21/21、CSS 治理 E2E 6/6、前端 build、Lint、类型感知、构建产物、格式和 `git diff --check` 通过；本机浏览器桥接等待 Chrome 远程调试授权时使用 Playwright，desktop smoke 待 PR Quality checks 复核。
-- 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
+- 目标：新增只读 `release:status` 校验，结构化核对项目版本、`CHANGELOG.md`、`NEXT.md` 唯一状态、Windows x64 Release 资产、镜像/旧版本更新/Authenticode 结论和交接链接。
+- 用户价值：发布和 AI 交接不再依赖容易漂移的散文状态；真实外部阻塞可以被审计并明确显示，不会被误报成全绿。
+- 非目标：不触发发布、不调用 GitHub/Cloudflare、不生成安装包或 `latest.json`，不读取或提交凭据，不改变更新器、业务功能、用户文件和 Windows x64 范围。
+- 验收标准：合法 v0.10.14 状态通过；重复/缺失 READY、版本漂移、CHANGELOG 缺段、资产缺失/路径不安全、缺少阻塞原因/证据和失效交接链接均阻断；`release:status` 接入 CI 与 Release 预检且保持只读。
+- 涉及文件：`scripts/release-status-check.mjs`、对应测试、`docs/release-status.json`、`package.json`、CI/Release workflow、`docs/RELEASE-POLICY.md`、本文件、`docs/NEXT.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：Node 文件系统、现有发布脚本和 Markdown/JSON 文档；无新增运行时依赖、凭据、数据迁移或外部服务调用。
+- 风险与回滚：状态格式过严可能阻断未来发布准备；支持 `planned/published` 生命周期并用 fixture 覆盖合法与非法状态，回退本 PR 即可移除状态门禁，不影响发布资产。
+- 基线与分支：远端 `main@c8884859068642705761d6b398dbef869fddfc9e`；分支 `codex/g02-release-state-2026-09-03`；无重复产品 Issue/PR；PR 待创建。
+- 当前验证：RED 阶段先确认缺少状态检查实现；完成后记录定向状态测试、`test:release`、lint/format、构建和远端 Quality run。
+- 发布/缓存：内部 T0/T1 工程治理，不生成 Windows x64 安装包、Tag、Release、签名或镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，只清理可再生生成物。
 
 ## 已合并切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）
 
