@@ -20,7 +20,7 @@
 - 非目标：不改阅读正文、编辑器或打印排版，不改变交互/数据/持久化，不处理 HTML 源码编辑、脚本、插件或跨平台范围，不生成发布资产。
 - 验收：受治理选择器不直接写入字号像素；9 个字号值由 `--type-*` 令牌表达；直接字号声明从 256 降至不高于 214；720/900px 运行时字号与无横向溢出检查通过；静态测试、Lint、类型感知、格式、构建、相关 E2E 和 PR Quality checks 通过。
 - 风险/回滚：同值令牌替换若误配可能改变信息层级或造成窄窗口换行；静态选择器治理与浏览器计算样式检查控制风险；回退本切片 PR 即可恢复原声明，不涉及数据迁移。
-- 分支：`codex/css-font-token-2026-09-03`；PR 待创建；基线 `main@5dcf1962950d1e88615190a0948024136b054af6`。
+- 分支：`codex/css-font-token-2026-09-03`；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436) 已创建；当前远端提交 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`；基线 `main@5dcf1962950d1e88615190a0948024136b054af6`。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。
 

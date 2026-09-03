@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
 - 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) CSS 字体令牌治理第三批，范围锁定为应用壳层、标签栏和左侧工作区的字号来源。
-- 基线与分支：远端 `main@5dcf1962950d1e88615190a0948024136b054af6`；独立分支 `codex/css-font-token-2026-09-03`；启动前已核验 #171、开放 Issue/PR，无重复产品 PR。
+- 基线与分支：远端 `main@5dcf1962950d1e88615190a0948024136b054af6`；独立分支 `codex/css-font-token-2026-09-03`；PR [#436](https://github.com/MY-moss/moyang_Reader/pull/436)；当前远端提交 `2f7c6f5e61e4624328e2aea78f332f2df6b3f7b5`；启动前已核验 #171、开放 Issue/PR，无重复产品 PR。
 - 稳定版本与发布：当前稳定版 `v0.10.14`；本切片是 v0.11 高频体验批次的 T2 样式治理，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
 - 构建缓存：统一使用 `D:\AI-moyang\本地阅读工具-build-cache`；C 盘旧 `build-cache` 已清理，切片结束后只回收可再生生成物，不触碰脏工作树或 junction。
 
