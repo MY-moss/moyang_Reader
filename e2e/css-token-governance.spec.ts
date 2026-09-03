@@ -198,3 +198,57 @@ test("keeps residual chrome motion tokenized and reduced-motion safe", async ({ 
     });
   }
 });
+
+test("keeps the page backdrop aligned with explicit and system dark themes", async ({ page }) => {
+  const readBackdrop = () =>
+    page.evaluate(() => {
+      const rootStyles = getComputedStyle(document.documentElement);
+      const bodyStyles = getComputedStyle(document.body);
+      return {
+        pageBackgroundToken: rootStyles.getPropertyValue("--page-background").trim(),
+        backgroundImage: bodyStyles.backgroundImage,
+        backgroundColor: bodyStyles.backgroundColor,
+        viewport: {
+          clientWidth: document.documentElement.clientWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+        },
+      };
+    });
+
+  for (const width of [720, 900]) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
+    await page.goto("/");
+
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = "light";
+    });
+    const light = await readBackdrop();
+
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = "dark";
+    });
+    const explicitDark = await readBackdrop();
+
+    await page.emulateMedia({ colorScheme: "dark", forcedColors: "none" });
+    await page.evaluate(() => {
+      document.documentElement.removeAttribute("data-theme");
+    });
+    const systemDark = await readBackdrop();
+
+    expect(explicitDark).toEqual(systemDark);
+    expect(light.backgroundImage).toContain("rgb(242, 239, 231)");
+    expect(light.backgroundImage).toContain("rgb(232, 229, 220)");
+    expect(explicitDark.backgroundImage).not.toContain("rgb(242, 239, 231)");
+    expect(explicitDark.backgroundImage).not.toContain("rgb(232, 229, 220)");
+    expect(explicitDark.backgroundImage).not.toEqual(light.backgroundImage);
+    expect(explicitDark.viewport.bodyScrollWidth).toBeLessThanOrEqual(explicitDark.viewport.clientWidth);
+    expect(light.viewport.bodyScrollWidth).toBeLessThanOrEqual(light.viewport.clientWidth);
+
+    await page.emulateMedia({ colorScheme: "light", forcedColors: "active" });
+    await page.goto("/");
+    const forcedColors = await readBackdrop();
+    expect(forcedColors.pageBackgroundToken).toBe("Canvas");
+    expect(forcedColors.backgroundImage).toBe("none");
+  }
+});

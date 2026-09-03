@@ -21,6 +21,7 @@ const semanticTokens = [
   "status-negative",
   "status-negative-accent",
   "warning-surface",
+  "page-background",
   "workspace-foreground",
   "workspace-hover-surface",
 ];
@@ -181,6 +182,24 @@ test("keeps dark theme component overrides token-only", () => {
     countRawColorLiterals(styles) <= 219,
     `硬编码颜色数量超过本切片预算：${countRawColorLiterals(styles)} > 219`,
   );
+});
+
+test("keeps the page backdrop synchronized with dark theme rules", () => {
+  assert.match(styles, /body\s*\{[^}]*background:\s*var\(--page-background\)/s);
+
+  const systemDarkTheme = styles.match(
+    /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root:not\(\[data-theme\]\)\s*\{([^}]*)\}/s,
+  );
+  const explicitDarkTheme = styles.match(/:root\[data-theme="dark"\]\s*\{([^}]*)\}/s);
+
+  assert.ok(systemDarkTheme, "找不到系统深色主题规则");
+  assert.ok(explicitDarkTheme, "找不到显式深色主题规则");
+  assert.match(systemDarkTheme[1], /--page-background\s*:/);
+  assert.match(explicitDarkTheme[1], /--page-background\s*:/);
+
+  const forcedColorsTheme = styles.match(/@media\s*\(forced-colors:\s*active\)\s*\{\s*:root\s*\{([^}]*)\}/s);
+  assert.ok(forcedColorsTheme, "找不到强制高对比度主题规则");
+  assert.match(forcedColorsTheme[1], /--page-background\s*:\s*Canvas\s*;/);
 });
 
 test("keeps app chrome and workspace density behind spacing tokens", () => {

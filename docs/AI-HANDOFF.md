@@ -4,27 +4,27 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@9dfe5d8dc806023ab2881c04300d24790e35c167`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
+- 发布代码主线基线：`main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433、#434、#435、#436、#437 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭，#171 保持开放以承载后续治理批次。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批、间距第二批和字体字号第三批已完成；当前正在推进 #171 动效时长令牌治理。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-motion-token-2026-09-03`，PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)，远端功能提交为 `a1bf9fda50d228f2ba38e647e8dd21adca861236`；主线基线为 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉、#193 交互视觉令牌、#171 CSS 颜色第一批、间距第二批、字体字号第三批和动效时长治理已完成；当前正在推进 #171 页面背景主题令牌治理。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；功能分支为 `codex/css-theme-token-2026-09-03`，PR 待创建；主线基线为 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；其余开放 PR 仅为 Dependabot 更新；#171 保持开放，等待本批合并及后续主题令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#171 动效时长令牌治理（2026-09-03）
+## 当前切片：#171 页面背景主题令牌治理（2026-09-03）
 
-- 目标：把 `.file-drop-card` 的 140ms 与 `.quick-open-item` 的 130ms transition 时长收敛到语义 `--motion-file-drop` 与 `--motion-quick-open-item`，保持原有时长、标准缓动和 reduced-motion 覆盖行为不变。
-- 用户价值：后续维护动效时从统一来源调整两个残余路径，减少样式漂移，不打断当前阅读流程。
-- 非目标：不重做动效、不改交互/数据/持久化/主题规则，不处理更新器、阅读库或默认首页，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
-- 验收标准：两个规则只引用语义动效令牌；样式表不含直接 transition 时长；静态令牌测试通过；720/900px 浏览器 E2E 验证正常与 reduced-motion 计算值且无横向溢出；Lint、格式、构建和 PR Quality checks 通过。
+- 目标：把 `body` 的页面背景收敛到语义 `--page-background`，保留现有浅色渐变，并为系统/显式深色提供一致的深色渐变；Windows 高对比度继续使用 `Canvas`。
+- 用户价值：深色主题下窗口边缘、滚动露底和空白区域不再残留浅色页面底，应用壳层与页面背景保持同一主题，不打断阅读流程。
+- 非目标：不改组件配色、布局尺寸、交互、阅读库/更新器/文档数据语义，不处理 #194、#16、发布条件项、HTML 源码编辑、脚本、插件或重型默认模块，不生成发布资产。
+- 验收标准：`body` 通过 `--page-background` 渲染；系统深色和显式深色均使用深色页面背景且计算样式一致；浅色现有渐变保持不变；强制高对比度保持 `Canvas`；静态令牌测试、720/900px 浏览器 E2E、Lint、格式、构建和 PR Quality checks 通过。
 - 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`e2e/css-token-governance.spec.ts`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖：现有 CSS Custom Properties、React/Vite、Node test、Playwright；无新增运行时依赖、凭据、数据迁移或发布资产。
-- 风险与回滚：令牌误配可能改变微交互时序；本批保留 140/130ms 原值，并以静态规则和运行时 computed style 检查控制风险；回退 PR #437 即可恢复原声明，不涉及数据迁移。
-- 基线与分支：远端 `main@9dfe5d8dc806023ab2881c04300d24790e35c167`；分支 `codex/css-motion-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR [#437](https://github.com/MY-moss/moyang_Reader/pull/437)，远端功能提交 `a1bf9fda50d228f2ba38e647e8dd21adca861236`。
-- 当前验证：RED 阶段已复现缺少动效令牌；修复后静态测试 5/5、CSS 治理 E2E 3/3（720/900px、正常/减少动效）、前端 build、Lint、Prettier 和 `git diff --check` 已通过；本机浏览器自动化桥接因 Chrome 远程调试授权未完成，使用 Playwright 完成定向验证；本机 Windows desktop smoke 仍受缺少 `tauri-driver` 影响，远端 PR Quality checks 待确认。
+- 风险与回滚：深色渐变选值不当可能造成页面边缘亮度突变或与内容区脱节；浅色值保持原样，深色只使用现有深色语义色，并以主题计算样式和窄窗口溢出检查控制；回退本切片 PR 即可恢复 `body` 原背景声明，不涉及数据迁移。
+- 基线与分支：远端 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；分支 `codex/css-theme-token-2026-09-03`；Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 启动前已核验无重复产品 PR；PR 待创建。
+- 当前验证：RED 阶段静态测试先因缺少页面背景令牌失败；修复后静态测试 6/6、CSS 治理 E2E 4/4、前端 build 通过；本机浏览器桥接等待 Chrome 远程调试授权时使用 Playwright，desktop smoke 由远端 Quality checks 复核。
 - 发布/缓存：普通 T2 UI 样式切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
 
 ## 已合并切片：#171 CSS 字体字号令牌治理第三批（2026-09-03）

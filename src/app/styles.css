@@ -93,6 +93,9 @@
   --workspace-active-surface: var(--accent-soft);
   --related-hover-surface: var(--surface-strong);
   --unresolved-link-surface: var(--surface);
+  --page-background:
+    radial-gradient(circle at 12% -10%, rgba(208, 225, 215, 0.72), transparent 32rem),
+    linear-gradient(135deg, #f2efe7 0%, var(--canvas) 54%, #e8e5dc 100%);
   --motion-micro: 120ms;
   --motion-fast: 150ms;
   --motion-quick: 160ms;
@@ -144,9 +147,7 @@ body {
   min-width: 0;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 12% -10%, rgba(208, 225, 215, 0.72), transparent 32rem),
-    linear-gradient(135deg, #f2efe7 0%, var(--canvas) 54%, #e8e5dc 100%);
+  background: var(--page-background);
 }
 
 button,
@@ -4399,6 +4400,14 @@ html.pane-resizing * {
     --workspace-active-surface: #2a3531;
     --related-hover-surface: #2a3531;
     --unresolved-link-surface: #252c2a;
+    --page-background:
+      radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--accent-soft) 60%, transparent), transparent 32rem),
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--canvas) 84%, var(--surface)) 0%,
+        var(--canvas) 54%,
+        color-mix(in srgb, var(--surface) 84%, var(--canvas)) 100%
+      );
   }
 }
 
@@ -4455,6 +4464,14 @@ html.pane-resizing * {
   --workspace-active-surface: #2a3531;
   --related-hover-surface: #2a3531;
   --unresolved-link-surface: #252c2a;
+  --page-background:
+    radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--accent-soft) 60%, transparent), transparent 32rem),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--canvas) 84%, var(--surface)) 0%,
+      var(--canvas) 54%,
+      color-mix(in srgb, var(--surface) 84%, var(--canvas)) 100%
+    );
 }
 
 @media (forced-colors: active) {
@@ -4482,6 +4499,7 @@ html.pane-resizing * {
     --focus-border: Highlight;
     --primary-foreground: ButtonText;
     --shadow-primary: none;
+    --page-background: Canvas;
   }
 
   body,
