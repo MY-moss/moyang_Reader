@@ -22,6 +22,8 @@ const semanticTokens = [
   "status-negative-accent",
   "warning-surface",
   "page-background",
+  "annotation-border",
+  "annotation-surface",
   "workspace-foreground",
   "workspace-hover-surface",
 ];
@@ -200,6 +202,30 @@ test("keeps the page backdrop synchronized with dark theme rules", () => {
   const forcedColorsTheme = styles.match(/@media\s*\(forced-colors:\s*active\)\s*\{\s*:root\s*\{([^}]*)\}/s);
   assert.ok(forcedColorsTheme, "找不到强制高对比度主题规则");
   assert.match(forcedColorsTheme[1], /--page-background\s*:\s*Canvas\s*;/);
+});
+
+test("keeps annotation highlights behind semantic theme tokens", () => {
+  for (const token of ["annotation-border", "annotation-surface"]) {
+    assert.match(styles, new RegExp(`--${token}\\s*:`), `缺少批注主题令牌 --${token}`);
+  }
+
+  assert.match(
+    styles,
+    /\.annotation-quote\s*\{[^}]*border-left:\s*3px solid var\(--annotation-border\)[^}]*background:\s*color-mix\(in srgb, var\(--annotation-surface\) 14%, var\(--surface\)\)/s,
+  );
+  assert.match(
+    styles,
+    /\.annotation-item:hover,\s*\.annotation-item\.current\s*\{[^}]*border-color:\s*color-mix\(in srgb, var\(--annotation-border\) 50%, var\(--line\)\)[^}]*background:\s*color-mix\(in srgb, var\(--annotation-surface\) 15%, var\(--surface-strong\)\)/s,
+  );
+  assert.match(styles, /\.annotation-mark\s*\{[^}]*color:\s*var\(--annotation-border\)/s);
+  assert.match(
+    styles,
+    /\.moyang-annotation-hit\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--annotation-surface\) 42%, transparent\)[^}]*box-shadow:\s*inset 0 -2px 0 color-mix\(in srgb, var\(--annotation-border\) 54%, transparent\)/s,
+  );
+  assert.match(
+    styles,
+    /::highlight\(moyang-annotation\)\s*\{[^}]*background-color:\s*color-mix\(in srgb, var\(--annotation-surface\) 42%, transparent\)[^}]*text-decoration-color:\s*color-mix\(in srgb, var\(--annotation-border\) 60%, transparent\)/s,
+  );
 });
 
 test("keeps app chrome and workspace density behind spacing tokens", () => {
