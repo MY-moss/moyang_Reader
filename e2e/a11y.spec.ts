@@ -306,6 +306,119 @@ test("keeps search focus and context tabs visibly distinct across themes", async
   expect(darkState.active).not.toBe(darkState.inactive);
 });
 
+test("keeps governed palette values symmetric across explicit and system dark themes", async ({ page }) => {
+  await page.goto("/");
+
+  const semanticTokens = [
+    "--error-border",
+    "--error-surface",
+    "--file-type-surface",
+    "--file-type-foreground",
+    "--inline-code-surface",
+    "--inline-code-foreground",
+    "--statusbar-foreground",
+    "--warning-surface",
+    "--workspace-foreground",
+  ] as const;
+
+  type PaletteSnapshot = {
+    rawTokens: Record<(typeof semanticTokens)[number], string>;
+    resolved: {
+      errorBorder: string;
+      errorSurface: string;
+      fileTypeSurface: string;
+      fileTypeForeground: string;
+      inlineCodeSurface: string;
+      inlineCodeForeground: string;
+      statusbarForeground: string;
+      warningSurface: string;
+      workspaceForeground: string;
+    };
+  };
+
+  const readPalette = async (): Promise<PaletteSnapshot> =>
+    page.evaluate((tokenNames) => {
+      const rootStyles = getComputedStyle(document.documentElement);
+      const holder = document.createElement("div");
+      const error = document.createElement("div");
+      const fileCard = document.createElement("div");
+      const fileType = document.createElement("span");
+      const inlineCode = document.createElement("code");
+      const markdownBody = document.createElement("div");
+      const notice = document.createElement("div");
+      const workspaceFile = document.createElement("button");
+      const statusbar = document.createElement("div");
+
+      holder.style.position = "absolute";
+      holder.style.inset = "-9999px auto auto -9999px";
+      error.className = "error-state";
+      fileCard.className = "file-card";
+      fileType.className = "file-type";
+      inlineCode.textContent = "code";
+      markdownBody.className = "markdown-body";
+      notice.className = "external-change-notice";
+      workspaceFile.className = "workspace-file";
+      statusbar.className = "statusbar";
+      fileCard.append(fileType);
+      markdownBody.append(inlineCode);
+      holder.append(error, fileCard, markdownBody, notice, workspaceFile, statusbar);
+      document.body.append(holder);
+
+      const readColor = (element: Element, property: "color" | "backgroundColor" | "borderTopColor") => {
+        const styles = getComputedStyle(element);
+        if (property === "color") return styles.color;
+        if (property === "backgroundColor") return styles.backgroundColor;
+        return styles.borderTopColor;
+      };
+      const resolved = {
+        errorBorder: readColor(error, "borderTopColor"),
+        errorSurface: readColor(error, "backgroundColor"),
+        fileTypeSurface: readColor(fileType, "backgroundColor"),
+        fileTypeForeground: readColor(fileType, "color"),
+        inlineCodeSurface: readColor(inlineCode, "backgroundColor"),
+        inlineCodeForeground: readColor(inlineCode, "color"),
+        statusbarForeground: readColor(statusbar, "color"),
+        warningSurface: readColor(notice, "backgroundColor"),
+        workspaceForeground: readColor(workspaceFile, "color"),
+      };
+      const rawTokens = Object.fromEntries(
+        tokenNames.map((token) => [token, rootStyles.getPropertyValue(token).trim()]),
+      ) as PaletteSnapshot["rawTokens"];
+      holder.remove();
+      return { rawTokens, resolved };
+    }, semanticTokens);
+
+  const setExplicitTheme = async (theme: "light" | "dark") => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.evaluate((themeName) => {
+      document.documentElement.dataset.theme = themeName;
+    }, theme);
+  };
+
+  await setExplicitTheme("light");
+  const light = await readPalette();
+  await setExplicitTheme("dark");
+  const explicitDark = await readPalette();
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+  const systemDark = await readPalette();
+
+  expect(explicitDark).toEqual(systemDark);
+  for (const [token, value] of Object.entries(light.rawTokens)) {
+    expect(value, `${token} 浅色令牌为空`).not.toBe("");
+  }
+  for (const [token, value] of Object.entries(explicitDark.rawTokens)) {
+    expect(value, `${token} 深色令牌为空`).not.toBe("");
+  }
+  expect(light.resolved.errorSurface).not.toBe(explicitDark.resolved.errorSurface);
+  expect(light.resolved.fileTypeSurface).not.toBe(explicitDark.resolved.fileTypeSurface);
+  expect(light.resolved.inlineCodeForeground).not.toBe(explicitDark.resolved.inlineCodeForeground);
+  expect(light.resolved.statusbarForeground).not.toBe(explicitDark.resolved.statusbarForeground);
+  expect(light.resolved.warningSurface).not.toBe(explicitDark.resolved.warningSurface);
+  expect(light.resolved.workspaceForeground).not.toBe(explicitDark.resolved.workspaceForeground);
+});
+
 test("keeps the empty state usable in Windows high-contrast mode", async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active" });
   await page.goto("/");

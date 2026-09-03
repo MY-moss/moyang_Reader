@@ -4,17 +4,30 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@38ed9a03a11654986afa8656b2347d5784f35c34`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432 已 squash 合并；Issue #233、#363、#366、#370、#416、#191 已以 `completed` 关闭，#193 由当前唯一 PR #433 承载。
+- 发布代码主线基线：`main@9a7017747c1121d977489a42aba2f7809e6e0892`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431、#432、#433 已 squash 合并；Issue #233、#363、#366、#370、#416、#191、#193 已以 `completed` 关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉和当前 #193 视觉令牌切片已完成实现。下一独立切片为 #171 CSS 令牌治理，当前批次完成后停止。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #193 与开放 PR，未发现重复产品 PR；唯一功能分支为 `codex/visual-token-focus-2026-09-03`，PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 已创建，远端提交 `8fbad61841db1684ac41f22409a9568c606a35e9`；其余开放 PR 为该快照中的 Dependabot 更新；#171 仍开放并排在下一项。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的六个键盘/读屏子切片已完成并关闭；#428 左侧栏阅读库操作区、#429 更新入口“更多”工作流、#430 默认首页品牌视觉和 #193 交互视觉令牌已完成；当前正在推进 #171 CSS 颜色令牌治理第一批。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #171 与开放 PR，未发现重复产品 PR；唯一功能分支为 `codex/css-token-governance-2026-09-03`，PR 尚待创建；主线基线为 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；其余开放 PR 为 Dependabot 更新；#171 保持开放，等待后续令牌批次完成。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
 > 以下“已完成切片”段落是历史交接，只用于回溯实现、验证和回滚；不要从其中的旧“当前/下一项”文字选择任务。任务地图以 [`DEVELOPMENT-AUDIT.md`](DEVELOPMENT-AUDIT.md) 为参考，执行授权仍只有 [`NEXT.md`](NEXT.md)。
 
-## 当前切片：#193 交互视觉令牌（2026-09-03）
+## 当前切片：#171 CSS 颜色令牌治理第一批（2026-09-03）
+
+- 目标：将错误/警告、代码块/行内代码、文件卡片、状态栏和工作区列表的重复颜色收敛到语义令牌，并让自动深色与显式深色共享同一组令牌覆盖。
+- 用户价值：浅色、深色和系统主题的内容/状态反馈更一致；后续无障碍或品牌色修复只需改语义令牌，减少漏改和主题漂移。
+- 非目标：不重写整份 `styles.css`，不改布局、业务逻辑、阅读库/文档/更新器语义，不进入 HTML 源码编辑，不执行脚本，不引入插件或重型默认模块，不生成发布资产。
+- 验收标准：本批涉及的公共颜色均通过语义令牌；深色逐组件覆盖为 0；硬编码颜色计数有可复核下降；显式/系统深色计算样式一致；静态检查、浏览器 E2E、构建、Lint、类型感知、格式和 diff 检查通过。
+- 基线与分支：从已包含 #193 合并代码的干净工作树建立 `codex/css-token-governance-2026-09-03`；发布主线基线 `main@9a7017747c1121d977489a42aba2f7809e6e0892`；Issue #171 启动前未发现重复产品 PR。
+- 涉及文件：`src/app/styles.css`、`scripts/style-token-check.test.mjs`、`package.json`、`e2e/a11y.spec.ts` 及本次同步的任务/交接文档。
+- 依赖与风险：复用现有 CSS Custom Properties、Node test、Playwright/axe；颜色替换可能造成局部主题回归，因此只保持原值并用显式/系统深色对称 E2E 锁定。无新运行时依赖、凭据、数据迁移或发布资产。
+- 回滚：回退本批 PR 即可恢复原颜色声明和重复主题覆盖，不需要数据迁移。
+- 指标：`styles.css` 6073→5950 行；原始颜色字面量 245→219；自动/显式深色逐组件选择器 88→0。
+- 验证：工作流/令牌静态测试 15/15、主题对称浏览器 E2E 1/1、主题相关无障碍 E2E 4/4、前端 build 2 次（第 2 次由桌面 smoke 脚本强制触发）、Lint、类型感知 ESLint、Prettier、构建产物和 `git diff --check` 通过；本机桌面 smoke 因环境缺少 `tauri-driver` 未完成桌面会话，远端 Windows smoke 待 PR 门禁确认；本批不生成安装包、Tag、Release、签名、`latest.json` 或镜像。
+
+## 已完成切片：#193 交互视觉令牌（2026-09-03）
 
 - 目标：补齐查找框焦点环、关系图 primary 主按钮和上下文页签的普通/悬停/激活/聚焦状态，并抽取焦点、动效和等宽字体令牌。
 - 用户价值：键盘焦点可见、页签状态不混淆、关系图入口更易发现；深色、减少动画和 Windows 高对比度模式保持一致反馈。
@@ -23,7 +36,7 @@
 - 涉及文件：`src/app/styles.css`、`src/app/components/RelatedPanel.tsx`、`src/app/components/RelatedPanel.test.tsx`、`e2e/a11y.spec.ts`，以及本次同步的交互/无障碍/任务/交接文档。
 - 依赖：现有 CSS 语义色、`aria-selected` 页签语义、React/Vite、Vitest、Playwright；无新运行时依赖、凭据或迁移。
 - 风险与回滚：令牌时序或主题对比度变化可能影响局部反馈；回退 PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 即可恢复，不影响用户数据。
-- 验证：RelatedPanel 单测 1/1、相关无障碍浏览器 E2E 1/1、build、Lint、类型感知 ESLint、格式和 diff 检查通过；桌面 smoke 已完成原生编译，但本机缺少 `tauri-driver`，未记为通过。
+- 验证：RelatedPanel 单测 1/1、相关无障碍浏览器 E2E 1/1、build、Lint、类型感知 ESLint、格式和 diff 检查通过；PR [#433](https://github.com/MY-moss/moyang_Reader/pull/433) 的 Quality checks run `33706502133` 全部通过，包含 Windows desktop smoke；本机桌面运行器仍因缺少 `tauri-driver` 无法复现会话。
 - 发布/缓存：普通 T2 UI 切片，不生成安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建缓存继续使用 `D:\AI-moyang\本地阅读工具-build-cache`。
 
 ## 已完成切片：#191 主阅读区读屏播报收窄（2026-09-03）
