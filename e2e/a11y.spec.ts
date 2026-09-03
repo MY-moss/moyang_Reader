@@ -240,6 +240,72 @@ test("keeps solid accent controls readable in explicit and system dark themes", 
   }
 });
 
+test("keeps search focus and context tabs visibly distinct across themes", async ({ page }) => {
+  await loadReaderFixture(page);
+
+  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  const searchbox = page.getByRole("searchbox", { name: "搜索文档" });
+  await expect(searchbox).toBeFocused();
+  const searchFocus = await searchbox.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return { outlineStyle: styles.outlineStyle, outlineWidth: styles.outlineWidth, boxShadow: styles.boxShadow };
+  });
+  expect(searchFocus.outlineStyle).toBe("solid");
+  expect(searchFocus.outlineWidth).toBe("2px");
+  expect(searchFocus.boxShadow).not.toBe("none");
+
+  await page.keyboard.press("Escape");
+  const contextToggle = page.locator(".context-toggle");
+  if ((await contextToggle.getAttribute("aria-pressed")) !== "true") await contextToggle.click();
+  const tabs = page.locator('.context-tab[role="tab"]');
+  await expect(tabs).toHaveCount(5);
+
+  const tokenState = await page.evaluate(() => {
+    const rootStyles = getComputedStyle(document.documentElement);
+    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');
+    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');
+    if (!active || !inactive) throw new Error("context tab states are incomplete");
+    const read = (element: HTMLElement) => {
+      const styles = getComputedStyle(element);
+      return {
+        background: styles.backgroundColor,
+        boxShadow: styles.boxShadow,
+        transitionDuration: styles.transitionDuration,
+      };
+    };
+    return {
+      active: read(active),
+      inactive: read(inactive),
+      motionFast: rootStyles.getPropertyValue("--motion-fast").trim(),
+      fontMono: rootStyles.getPropertyValue("--font-mono").trim(),
+    };
+  });
+
+  expect(tokenState.active.background).not.toBe(tokenState.inactive.background);
+  expect(tokenState.active.boxShadow).not.toBe("none");
+  expect(tokenState.motionFast).toBe(".15s");
+  expect(tokenState.inactive.transitionDuration).toContain("0.15s");
+  expect(tokenState.fontMono).toContain("Cascadia");
+
+  await page.addStyleTag({ content: ".context-tab { transition: none !important; }" });
+  const inactiveTab = page.locator('.context-tab[aria-selected="false"]').first();
+  await inactiveTab.hover();
+  const hoverBackground = await inactiveTab.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(hoverBackground).not.toBe(tokenState.inactive.background);
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  const darkState = await page.evaluate(() => {
+    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');
+    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');
+    if (!active || !inactive) throw new Error("context tab states are incomplete in dark theme");
+    const read = (element: HTMLElement) => getComputedStyle(element).backgroundColor;
+    return { active: read(active), inactive: read(inactive) };
+  });
+  expect(darkState.active).not.toBe(darkState.inactive);
+});
+
 test("keeps the empty state usable in Windows high-contrast mode", async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active" });
   await page.goto("/");

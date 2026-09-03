@@ -8,6 +8,7 @@
   --font-ui: "Avenir Next", "Segoe UI Variable", "Microsoft YaHei UI", sans-serif;
   --font-display: "Iowan Old Style", "Baskerville", Georgia, "Songti SC", serif;
   --font-reading: "Iowan Old Style", "Palatino Linotype", "Songti SC", "STSong", serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Courier New", ui-monospace, monospace;
   --canvas: #eeebe3;
   --surface: #f8f6f0;
   --surface-strong: #fffdf8;
@@ -27,6 +28,21 @@
   --search-hit-active: #e89a4f;
   --shadow-soft: 0 12px 32px rgba(47, 49, 41, 0.08);
   --shadow-lifted: 0 18px 48px rgba(47, 49, 41, 0.14);
+  --shadow-primary: 0 5px 14px rgba(50, 114, 105, 0.2);
+  --focus-outline: 2px solid var(--accent);
+  --focus-outline-offset: 3px;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 84%, transparent);
+  --focus-border: var(--accent);
+  --primary-foreground: #fffdf8;
+  --motion-micro: 120ms;
+  --motion-fast: 150ms;
+  --motion-quick: 160ms;
+  --motion-panel: 180ms;
+  --motion-slow: 520ms;
+  --motion-reduced: 0.01ms;
+  --motion-ease-standard: ease;
+  --motion-ease-enter: ease-out;
+  --motion-ease-emphasized: cubic-bezier(0.2, 0.75, 0.25, 1);
   --radius: 5px;
 }
 
@@ -74,8 +90,8 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
 }
 ::selection {
   background: var(--accent-soft);
@@ -354,11 +370,11 @@ a:focus-visible {
   font-size: 11px;
   white-space: nowrap;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    transform 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    background var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-fast) var(--motion-ease-standard);
 }
 .toolbar-button:hover:not(:disabled) {
   border-color: var(--accent);
@@ -372,14 +388,14 @@ a:focus-visible {
 .toolbar-button.primary {
   border-color: var(--accent-solid);
   background: linear-gradient(145deg, var(--accent-solid-highlight), var(--accent-solid));
-  color: white;
-  box-shadow: 0 5px 14px rgba(50, 114, 105, 0.2);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-primary);
 }
 .toolbar-button.primary:hover:not(:disabled),
 .toolbar-button.primary:focus-visible {
   border-color: var(--accent-solid-hover);
   background: var(--accent-solid-hover);
-  color: #fffdf8;
+  color: var(--primary-foreground);
 }
 .focus-button {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
@@ -772,6 +788,12 @@ a:focus-visible {
   outline: none;
   font-size: 12px;
 }
+.findbar input:focus-visible {
+  border-color: var(--focus-border);
+  box-shadow: var(--focus-ring);
+  outline: var(--focus-outline);
+  outline-offset: 1px;
+}
 .find-count {
   min-width: 48px;
   color: var(--muted);
@@ -790,8 +812,8 @@ a:focus-visible {
   color: var(--ink);
   line-height: 1;
   transition:
-    border-color 150ms ease,
-    background 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    background var(--motion-fast) var(--motion-ease-standard);
 }
 .quick-open-backdrop {
   position: fixed;
@@ -803,7 +825,7 @@ a:focus-visible {
   padding: 12vh 24px 24px;
   background: rgba(31, 38, 35, 0.42);
   backdrop-filter: blur(10px) saturate(0.86);
-  animation: quick-open-fade 160ms ease-out;
+  animation: quick-open-fade var(--motion-quick) var(--motion-ease-enter);
 }
 .quick-open-dialog {
   width: min(680px, 100%);
@@ -812,7 +834,7 @@ a:focus-visible {
   border-radius: 9px;
   background: color-mix(in srgb, var(--surface-strong) 94%, var(--accent-soft));
   box-shadow: 0 24px 72px rgba(28, 37, 33, 0.28);
-  animation: quick-open-rise 180ms ease-out;
+  animation: quick-open-rise var(--motion-panel) var(--motion-ease-enter);
 }
 .quick-open-header {
   display: flex;
@@ -1340,7 +1362,7 @@ a:focus-visible {
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface) 80%, #1f2824 20%);
   color: var(--ink);
-  font-family: "Cascadia Mono", "Cascadia Code", "Consolas", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.55;
 }
@@ -1530,7 +1552,7 @@ a:focus-visible {
 }
 .workspace-entry-details-path {
   color: var(--muted) !important;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 10px !important;
 }
 .workspace-entry-details-footer {
@@ -1564,7 +1586,7 @@ a:focus-visible {
   padding: 24px;
   background: rgba(31, 38, 35, 0.52);
   backdrop-filter: blur(8px) saturate(0.88);
-  animation: quick-open-fade 160ms ease-out;
+  animation: quick-open-fade var(--motion-quick) var(--motion-ease-enter);
 }
 .print-preview-dialog {
   display: flex;
@@ -1576,7 +1598,7 @@ a:focus-visible {
   border-radius: 9px;
   background: var(--surface);
   box-shadow: 0 24px 72px rgba(28, 37, 33, 0.3);
-  animation: quick-open-rise 180ms ease-out;
+  animation: quick-open-rise var(--motion-panel) var(--motion-ease-enter);
 }
 .print-preview-header {
   display: flex;
@@ -1721,7 +1743,7 @@ a:focus-visible {
   display: block;
   height: 100%;
   background: var(--accent);
-  transition: width 160ms ease;
+  transition: width var(--motion-quick) var(--motion-ease-standard);
 }
 .update-notice-error .quiet-button {
   color: var(--danger);
@@ -1736,9 +1758,9 @@ a:focus-visible {
   border-bottom: 0;
   border-radius: 6px 6px 0 0;
   transition:
-    border-color 150ms ease,
-    opacity 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    opacity var(--motion-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-fast) var(--motion-ease-standard);
 }
 .tab-item:active {
   cursor: grabbing;
@@ -1796,8 +1818,8 @@ a:focus-visible {
   font-size: 15px;
   line-height: 1;
   transition:
-    background 150ms ease,
-    color 150ms ease;
+    background var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard);
 }
 .tab-close:hover {
   background: rgba(189, 105, 69, 0.1);
@@ -1860,8 +1882,8 @@ a:focus-visible {
   opacity: 0;
   transform: translate(-50%, -50%);
   transition:
-    opacity 150ms ease,
-    height 150ms ease;
+    opacity var(--motion-fast) var(--motion-ease-standard),
+    height var(--motion-fast) var(--motion-ease-standard);
 }
 .pane-resize-handle:hover::after,
 .pane-resize-handle:focus-visible::after,
@@ -2000,9 +2022,21 @@ html.pane-resizing * {
   padding: 6px 9px;
   font-size: 11px;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    background var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard);
+}
+.quiet-button.primary {
+  border-color: var(--accent-solid);
+  background: linear-gradient(145deg, var(--accent-solid-highlight), var(--accent-solid));
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-primary);
+}
+.quiet-button.primary:hover:not(:disabled),
+.quiet-button.primary:focus-visible {
+  border-color: var(--accent-solid-hover);
+  background: var(--accent-solid-hover);
+  color: var(--primary-foreground);
 }
 .quiet-button:hover:not(:disabled) {
   border-color: var(--line);
@@ -2052,8 +2086,8 @@ html.pane-resizing * {
   list-style: none;
   text-align: left;
   transition:
-    background 150ms ease,
-    border-color 150ms ease;
+    background var(--motion-fast) var(--motion-ease-standard),
+    border-color var(--motion-fast) var(--motion-ease-standard);
 }
 .workspace-switcher-trigger::-webkit-details-marker {
   display: none;
@@ -2205,7 +2239,7 @@ html.pane-resizing * {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
-  transition: width 160ms ease-out;
+  transition: width var(--motion-quick) var(--motion-ease-enter);
 }
 .workspace-export-failures {
   margin-top: 8px;
@@ -2353,10 +2387,10 @@ html.pane-resizing * {
   padding: 8px 9px;
   text-align: left;
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease,
-    transform 150ms ease;
+    background var(--motion-fast) var(--motion-ease-standard),
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard);
 }
 .workspace-folder {
   display: flex;
@@ -2371,9 +2405,9 @@ html.pane-resizing * {
   padding: 8px 9px;
   text-align: left;
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
+    background var(--motion-fast) var(--motion-ease-standard),
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard);
 }
 .workspace-folder:hover,
 .workspace-file:hover,
@@ -2517,7 +2551,7 @@ html.pane-resizing * {
   min-height: 0;
   border-radius: 3px 3px 0 0;
   background: var(--accent);
-  transition: height 180ms ease;
+  transition: height var(--motion-panel) var(--motion-ease-standard);
 }
 .reading-history-day.is-today .reading-history-bar {
   background: var(--accent-solid);
@@ -2616,9 +2650,9 @@ html.pane-resizing * {
   padding: 4px 8px;
   font-size: 10px;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    transform 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    background var(--motion-fast) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard);
 }
 .tag-chip:hover,
 .tag-chip.active {
@@ -2641,9 +2675,9 @@ html.pane-resizing * {
   padding: 8px 9px;
   text-align: left;
   transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
+    background var(--motion-fast) var(--motion-ease-standard),
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard);
 }
 .outgoing-list button:hover {
   border-color: var(--line);
@@ -3182,7 +3216,7 @@ html.pane-resizing * {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-warm));
-  transition: width 180ms ease-out;
+  transition: width var(--motion-panel) var(--motion-ease-enter);
 }
 .reading-current-heading {
   display: -webkit-box;
@@ -3212,9 +3246,9 @@ html.pane-resizing * {
   padding: 7px 3px;
   font-size: 10px;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    background var(--motion-fast) var(--motion-ease-standard),
+    color var(--motion-fast) var(--motion-ease-standard);
 }
 .reading-rail-actions button:hover {
   border-color: var(--accent);
@@ -3321,7 +3355,7 @@ html.pane-resizing * {
     font-weight: 700;
     letter-spacing: 0.03em;
     pointer-events: none;
-    animation: reading-zoom-hud-in 160ms ease-out;
+    animation: reading-zoom-hud-in var(--motion-quick) var(--motion-ease-enter);
     backdrop-filter: blur(10px);
   }
 }
@@ -3433,7 +3467,7 @@ html.pane-resizing * {
   border-radius: var(--radius);
   background: #252a29;
   color: #e9eee9;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.65;
   box-shadow: 0 12px 28px rgba(37, 42, 41, 0.14);
@@ -3443,7 +3477,7 @@ html.pane-resizing * {
   padding: 72px 0 110px;
   background: transparent;
   color: inherit;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.75;
   white-space: pre-wrap;
@@ -3455,7 +3489,7 @@ html.pane-resizing * {
   border-radius: 3px;
   background: #ebe7dc;
   color: #6b3f32;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.82em;
 }
 .markdown-body pre code {
@@ -3858,7 +3892,7 @@ html.pane-resizing * {
   resize: none;
   background: transparent;
   color: var(--ink);
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.75;
 }
@@ -3871,7 +3905,7 @@ html.pane-resizing * {
   min-height: calc(100vh - 150px);
   background: transparent;
   color: var(--ink);
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.75;
   outline: none;
@@ -3921,7 +3955,7 @@ html.pane-resizing * {
   display: block;
   padding: 62px 0 86px;
   color: var(--muted);
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 .loading-state,
@@ -4005,7 +4039,7 @@ html.pane-resizing * {
   margin-top: 8px;
   overflow: auto;
   color: var(--danger);
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -4078,9 +4112,9 @@ html.pane-resizing * {
   text-align: left;
   box-shadow: var(--shadow-soft);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--motion-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-fast) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard);
 }
 .graph-node:hover,
 .graph-node:focus-visible {
@@ -4189,8 +4223,8 @@ html.pane-resizing * {
   font-size: 13px;
   box-shadow: 0 8px 20px rgba(50, 114, 105, 0.2);
   transition:
-    transform 150ms ease,
-    box-shadow 150ms ease;
+    transform var(--motion-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-fast) var(--motion-ease-standard);
 }
 .empty-actions {
   display: flex;
@@ -4538,6 +4572,11 @@ html.pane-resizing * {
     --danger: CanvasText;
     --search-hit: Highlight;
     --search-hit-active: Highlight;
+    --focus-outline: 2px solid Highlight;
+    --focus-ring: 0 0 0 3px Highlight;
+    --focus-border: Highlight;
+    --primary-foreground: ButtonText;
+    --shadow-primary: none;
   }
 
   body,
@@ -4560,6 +4599,7 @@ html.pane-resizing * {
   }
 
   .toolbar-button.primary,
+  .quiet-button.primary,
   .editor-toolbar-insert-button,
   .editor-insert-submit {
     border-color: ButtonText;
@@ -4568,6 +4608,8 @@ html.pane-resizing * {
   }
 
   .toolbar-button.primary:hover:not(:disabled),
+  .quiet-button.primary:hover:not(:disabled),
+  .quiet-button.primary:focus-visible,
   .editor-toolbar-insert-button:hover:not(:disabled),
   .editor-toolbar-insert-button:focus-visible,
   .editor-insert-submit:hover,
@@ -4575,6 +4617,18 @@ html.pane-resizing * {
     border-color: Highlight;
     background: Highlight;
     color: HighlightText;
+  }
+
+  .context-tab:hover:not([aria-selected="true"]) {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .context-tab[aria-selected="true"] {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: inset 0 -2px 0 Highlight;
   }
 }
 
@@ -4590,7 +4644,7 @@ html.pane-resizing * {
 }
 
 .empty-state {
-  animation: empty-rise 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: empty-rise var(--motion-slow) var(--motion-ease-emphasized) both;
 }
 .empty-action:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -4866,10 +4920,10 @@ html.pane-resizing * {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: var(--motion-reduced) !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: var(--motion-reduced) !important;
   }
 }
 
@@ -5129,15 +5183,27 @@ html.pane-resizing * {
     padding: 7px 3px;
     font-size: 10px;
     white-space: nowrap;
+    transition:
+      background var(--motion-fast) var(--motion-ease-standard),
+      color var(--motion-fast) var(--motion-ease-standard),
+      box-shadow var(--motion-fast) var(--motion-ease-standard);
   }
-  .context-tab:hover {
+  .context-tab:hover:not([aria-selected="true"]) {
     background: var(--surface-strong);
     color: var(--accent-deep);
+    box-shadow: inset 0 0 0 1px var(--line);
   }
-  .context-tab.active {
+  .context-tab.active,
+  .context-tab[aria-selected="true"] {
     background: var(--accent-soft);
     color: var(--accent-deep);
     box-shadow: inset 0 -2px 0 var(--accent);
+    font-weight: 650;
+  }
+  .context-tab:focus-visible {
+    box-shadow: var(--focus-ring);
+    outline: var(--focus-outline);
+    outline-offset: 1px;
   }
   .context-panel-body {
     min-width: 0;
@@ -5240,8 +5306,8 @@ html.pane-resizing * {
     border-radius: 9px;
     background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
     transition:
-      border-color 120ms ease,
-      background 120ms ease;
+      border-color var(--motion-micro) var(--motion-ease-standard),
+      background var(--motion-micro) var(--motion-ease-standard);
   }
   .bookmark-item:hover,
   .bookmark-item.current {
@@ -5664,7 +5730,7 @@ html.pane-resizing * {
     background: color-mix(in srgb, var(--surface-strong) 97%, var(--canvas));
     box-shadow: 0 18px 46px color-mix(in srgb, var(--ink) 22%, transparent);
     padding: 5px;
-    animation: context-menu-in 120ms ease-out;
+    animation: context-menu-in var(--motion-micro) var(--motion-ease-enter);
   }
   .moyang-context-menu-title {
     overflow: hidden;
@@ -5727,7 +5793,7 @@ html.pane-resizing * {
   .moyang-context-menu button small {
     flex: 0 0 auto;
     color: var(--muted);
-    font-family: "Cascadia Code", Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
   }
   @keyframes context-menu-in {
@@ -5842,7 +5908,7 @@ html.pane-resizing * {
     border-radius: 3px;
     background: var(--accent-soft);
     padding: 2px 5px;
-    font-family: "Cascadia Code", Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 0.86em;
   }
   .wysiwyg-editor .editor pre {
@@ -5851,7 +5917,7 @@ html.pane-resizing * {
     border-radius: 5px;
     background: color-mix(in srgb, var(--canvas) 68%, var(--surface));
     padding: 15px 17px;
-    font-family: "Cascadia Code", Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.6;
   }

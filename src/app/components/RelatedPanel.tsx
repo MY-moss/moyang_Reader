@@ -32,7 +32,7 @@ export function RelatedPanel({
           <div className="panel-kicker">CONTEXT</div>
           <h2 id="related-title">关联内容</h2>
         </div>
-        <button type="button" className="quiet-button" onClick={onOpenGraph}>
+        <button type="button" className="quiet-button primary" onClick={onOpenGraph}>
           关系图
         </button>
       </div>
