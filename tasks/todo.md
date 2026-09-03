@@ -23,7 +23,7 @@
 - 非目标：不改组件配色、布局尺寸、交互、阅读库/更新器/文档数据语义，不处理 #194、#16、发布条件项、HTML 源码编辑、脚本、插件或重型默认模块，不生成发布资产。
 - 验收：`body` 通过 `--page-background` 渲染；系统深色和显式深色计算样式一致且不含浅色端点；浅色现有渐变保持不变；强制高对比度保持 `Canvas`；静态测试、720/900px 浏览器 E2E、Lint、格式、构建和 PR Quality checks 通过。
 - 风险/回滚：深色渐变选值不当可能造成页面边缘亮度突变；浅色值保持原样，深色只使用现有深色语义色并由主题 E2E 控制；回退本切片 PR 即可恢复 `body` 原背景声明，不涉及数据迁移。
-- 分支：`codex/css-theme-token-2026-09-03`；PR 待创建；基线 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；启动前已核验 Issue #171 与开放 PR 无重复产品 PR。
+- 分支：`codex/css-theme-token-2026-09-03`；PR [#438](https://github.com/MY-moss/moyang_Reader/pull/438)；远端提交 `ceb4eea2f48eb541ce5b3cad8dda70baa9d73b1d`；基线 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；启动前已核验 Issue #171 与开放 PR 无重复产品 PR。
 - 验证：RED 阶段静态测试先因缺少页面背景令牌失败；修复后静态测试 6/6、CSS 治理 E2E 4/4、前端 build 通过；本机浏览器桥接等待 Chrome 远程调试授权时使用 Playwright，desktop smoke 由远端 Quality checks 复核。
 
 已完成的 #191 子切片：快速打开 PR [#424](https://github.com/MY-moss/moyang_Reader/pull/424) 已 squash 合并为 `main@a650f934429f8f19511dd6c72ef5b17541c694ff`，Quality checks run `33634427700` 全绿；标签栏 PR [#425](https://github.com/MY-moss/moyang_Reader/pull/425) 已 squash 合并为 `main@0783b27c314749a3e1e1b0371b92674a0a77a247`，Quality checks run `33642980506` 全绿；文件树 PR [#426](https://github.com/MY-moss/moyang_Reader/pull/426) 已 squash 合并为 `main@e9cde556e48957f270828159890522b52ef51f89`，Quality checks run `33653154436` 全绿；目录 PR [#427](https://github.com/MY-moss/moyang_Reader/pull/427) 已 squash 合并为 `main@61ab3b35e9f50e0704846e5dac768f03f98458a2`，Quality checks run `33664518604` 全部通过。

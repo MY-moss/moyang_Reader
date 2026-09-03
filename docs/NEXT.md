@@ -1,7 +1,7 @@
 # Moyang Reader 唯一下一步
 
-- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 页面背景主题令牌治理，范围锁定为 `body` 现有固定浅色渐变的主题适配；此前动效令牌 PR #437 已合并到 `main@5b9f4e8`。
-- 基线与分支：远端 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；独立分支 `codex/css-theme-token-2026-09-03`；启动前已核验 #171、开放 Issue/PR，无重复产品 PR；其余开放 PR 仅为 Dependabot。
+- 当前切片：Issue [#171](https://github.com/MY-moss/moyang_Reader/issues/171) 页面背景主题令牌治理，范围锁定为 `body` 现有固定浅色渐变的主题适配；此前动效令牌 PR #437 已合并到 `main@5b9f4e8`，本切片 PR [#438](https://github.com/MY-moss/moyang_Reader/pull/438) 已创建。
+- 基线与分支：远端 `main@5b9f4e8cb804ff6366d229a04a5e42c13840e8a1`；独立分支 `codex/css-theme-token-2026-09-03`，远端提交 `ceb4eea2f48eb541ce5b3cad8dda70baa9d73b1d`，PR [#438](https://github.com/MY-moss/moyang_Reader/pull/438)；启动前已核验 #171、开放 Issue/PR，无重复产品 PR；其余开放 PR 仅为 Dependabot。
 - 稳定版本与发布：当前稳定版 `v0.10.14`；本切片是 v0.11 高频体验批次的 T2 样式治理，不生成安装包、Release、签名、`latest.json` 或 Cloudflare 镜像。
 - 构建缓存：统一使用 `D:\AI-moyang\本地阅读工具-build-cache`；C 盘旧 `build-cache` 已清理，切片结束时只回收可再生生成物，不触碰脏工作树或 junction。
 
@@ -19,7 +19,7 @@
 
 ## 完成后唯一下一步
 
-- 本切片合并后，重新核验 Issue/PR，从 #171 剩余主题规则中只选择一个边界；不顺手处理 #194、#16、发布条件项或 HTML 路线。
+- PR #438 合并后，重新核验 Issue/PR，从 #171 剩余主题规则中只选择一个边界；不顺手处理 #194、#16、发布条件项或 HTML 路线。
 
 ## 仍未开发的路线
 
