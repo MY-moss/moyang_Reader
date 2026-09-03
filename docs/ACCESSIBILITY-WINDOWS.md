@@ -67,6 +67,7 @@
 - 开启 Windows 高对比度，确认边界、焦点环、按钮和正文仍可辨识，axe 检查不出现新的 critical/serious 违规。
 - 开启“减少动画”或系统减少动画设置，确认面板、菜单和加载状态不会快速闪烁或阻断操作。
 - 运行 `npm run test:e2e:a11y -- --grep "keeps search focus and context tabs visibly distinct across themes" --workers=1`，记录查找框焦点、页签状态和动效/字体令牌回归结果。
+- 运行 `npm run test:e2e:a11y -- --grep "keeps governed palette values symmetric" --workers=1`，确认显式深色与系统深色的诊断、内容和工作区颜色令牌解析一致。
 
 ## 记录模板
 
