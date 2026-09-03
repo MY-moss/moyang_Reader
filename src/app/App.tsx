@@ -731,6 +731,7 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
+  const focusExitRef = useRef<HTMLButtonElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const progressiveReaderRef = useRef<ProgressiveReaderContentHandle>(null);
   const searchHighlightRef = useRef<{
@@ -791,6 +792,10 @@ export function App() {
   const renderedHtml = documentState?.rendered.html ?? "";
   const progressiveReaderReady =
     !shouldUseProgressiveReader(renderedHtml) || progressiveReaderReadyHtml === renderedHtml;
+
+  useEffect(() => {
+    if (focusMode) focusExitRef.current?.focus();
+  }, [focusMode]);
 
   const notify = useCallback((message: string, level: NotificationLevel = "success") => {
     const trimmedMessage = message.trim();
@@ -6072,7 +6077,7 @@ export function App() {
             </button>
           )}
           {focusMode && (
-            <button type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
+            <button ref={focusExitRef} type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
               退出专注 <span>Esc</span>
             </button>
           )}

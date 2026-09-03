@@ -27,7 +27,8 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
 
 /**
  * Keeps every application modal consistent: initial focus, Escape close,
- * keyboard focus containment, and focus restoration after unmount.
+ * keyboard focus containment, and focus restoration after unmount. Escape is
+ * consumed immediately so a page-level shortcut cannot close an outer mode too.
  */
 export function useModalBehavior({ containerRef, initialFocusRef, onClose }: ModalBehaviorOptions): void {
   const onCloseRef = useRef(onClose);
@@ -43,13 +44,15 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
     initialFocus?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!modalContainer?.isConnected) return;
+
       const activeElement = document.activeElement;
       const activeModal = activeElement instanceof HTMLElement ? activeElement.closest('[aria-modal="true"]') : null;
       if (activeModal && activeModal !== modalContainer) return;
 
       if (event.key === "Escape") {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         onCloseRef.current();
         return;
       }

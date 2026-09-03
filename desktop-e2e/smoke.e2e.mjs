@@ -599,6 +599,33 @@ async function pressDesktopEscape() {
   }
 }
 
+async function dispatchDesktopKey(key, options = {}) {
+  await browser.execute(
+    (eventKey, eventOptions) => {
+      const target =
+        eventOptions.target === "document"
+          ? document
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : document;
+      target.dispatchEvent(
+        new window.KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: eventKey,
+          code: eventOptions.code ?? eventKey,
+          ctrlKey: Boolean(eventOptions.ctrlKey),
+          shiftKey: Boolean(eventOptions.shiftKey),
+          altKey: Boolean(eventOptions.altKey),
+          metaKey: Boolean(eventOptions.metaKey),
+        }),
+      );
+    },
+    key,
+    options,
+  );
+}
+
 async function discardDraftNotice() {
   const recoveryNotice = await browser.$(".draft-recovery-notice");
   await recoveryNotice.waitForDisplayed();
@@ -630,6 +657,68 @@ async function waitForCloseConfirmation() {
 }
 
 describe("Moyang Reader desktop runtime", () => {
+  it("closes only the innermost command panel before focus mode", async () => {
+    await browser.execute(() => window.localStorage.clear());
+    await browser.refresh();
+
+    await browser.$(".document-title").waitForDisplayed();
+    await browser.$("h1=Desktop E2E").waitForDisplayed();
+
+    await browser.$(".focus-button.toolbar-optional").click();
+    const shell = await browser.$(".app-shell");
+    await browser.waitUntil(() => shell.getAttribute("class").then((value) => value?.includes("focus-mode")), {
+      timeout: 5_000,
+      timeoutMsg: "focus mode did not open in the desktop runtime",
+    });
+    const focusExit = await browser.$(".focus-exit");
+    await focusExit.waitForDisplayed();
+
+    await dispatchDesktopKey("p", { code: "KeyP", ctrlKey: true, shiftKey: true });
+    const commandPalette = await browser.$('[role="dialog"][aria-labelledby="command-palette-title"]');
+    await commandPalette.waitForDisplayed();
+    const commandInput = await browser.$('input[aria-label="搜索命令"]');
+    await commandInput.waitForDisplayed();
+    await commandInput.click();
+    await dispatchDesktopKey("Escape", { code: "Escape" });
+    await browser.waitUntil(() => commandPalette.isDisplayed().then((visible) => !visible), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop command panel did not close on the first Escape",
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => !document.querySelector('[aria-labelledby="command-palette-title"]')),
+      {
+        timeout: 5_000,
+        timeoutMsg: "the desktop command panel remained mounted after the first Escape",
+      },
+    );
+    assert.match(await shell.getAttribute("class"), /focus-mode/);
+    assert.equal(
+      await browser.execute((element) => document.activeElement === element, focusExit),
+      true,
+      "desktop command panel should restore focus to the visible focus-mode exit",
+    );
+
+    await browser.pause(100);
+    // Exercise the native desktop path first. The embedded driver can accept
+    // a WebDriver key action without forwarding it into the WebView, so keep
+    // the focused DOM dispatch as a deterministic fallback for that runner.
+    await browser.keys("Escape");
+    const closedByNativeEscape = await browser
+      .waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
+        timeout: 1_000,
+        timeoutMsg: "the desktop focus mode did not close on the native Escape path",
+      })
+      .then(() => true)
+      .catch(() => false);
+    if (!closedByNativeEscape) {
+      await dispatchDesktopKey("Escape", { code: "Escape" });
+    }
+    await browser.waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
+      timeout: 5_000,
+      timeoutMsg: "the desktop focus mode did not close on the second Escape",
+    });
+  });
+
   it("opens an initial Markdown path, edits it, and writes it back to disk", async () => {
     await browser.execute(() => window.localStorage.clear());
     await browser.refresh();

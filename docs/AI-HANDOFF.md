@@ -4,11 +4,11 @@
 
 ## 当前基线（2026-09-03）
 
-- 发布代码主线基线：`main@1e00683658e023405dcaee5be9c389adcbbd25c9`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430 已 squash 合并，PR #431 正在等待远端门禁；Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 保持开放以承载剩余子切片。
+- 发布代码主线基线：`main@34b3fc6b1b0656f207b9b46240c7de17279f6605`；PR #415、#418、#419、#420、#421、#422、#423、#424、#425、#426、#427、#428、#429、#430、#431 已 squash 合并；Issue #233、#363、#366、#370、#416 已以 `completed` 关闭，#191 待本切片合并后关闭。
 - 最新稳定版本：`v0.10.14`；当前后续 milestone：`v0.11.0`。
 - GitHub Release [v0.10.14](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14) 已公开；Release run `33555344560` 的 Quality checks、Windows 构建、签名和发布成功。
-- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树、目录 roving/当前章节高亮和主阅读区读屏播报收窄子切片已完成，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；下一独立切片只剩 #191 的 Esc 互斥。
-- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #191 与开放 PR，未发现读屏播报或 Escape 互斥重复产品 PR；本切片唯一功能 PR 为 #431，远端 Quality checks 待完成；其余开放 PR 为 6 个 Dependabot 更新；#191 不因已完成子切片合并而关闭。
+- 当前状态：v0.10.14 已发布；[#416](https://github.com/MY-moss/moyang_Reader/issues/416)、[#233](https://github.com/MY-moss/moyang_Reader/issues/233)、[#366](https://github.com/MY-moss/moyang_Reader/issues/366) 和 [#370](https://github.com/MY-moss/moyang_Reader/issues/370) 已完成；[#191](https://github.com/MY-moss/moyang_Reader/issues/191) 的快速打开、标签栏、文件树、目录 roving/当前章节高亮、主阅读区读屏播报收窄和 Escape 互斥子切片已完成，#428 左侧栏阅读库操作区 UI 修复、#429 更新入口“更多”工作流和 #430 默认首页品牌视觉收口已完成；Escape 互斥由 PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 承载，待合并后关闭 #191，下一独立切片为 #171/#193 视觉令牌治理。
+- 当前开放 Issue/PR 快照（2026-09-03）：本切片启动前重新核验 Issue #191 与开放 PR，未发现读屏播报或 Escape 互斥重复产品 PR；本切片唯一功能分支为 `codex/escape-mutex-2026-09-03`，PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 已创建并待远端门禁；其余开放 PR 为该快照中的 Dependabot 更新；#191 待 PR #432 合并后关闭。
 - Cloudflare：公开 Pages 的 v0.10.14 manifest、安装包和签名已 HTTP 200，安装包 SHA-256 与 GitHub Release 一致；本次 Release 的镜像子任务因仓库 Cloudflare Secrets 未生效而失败，不能把自动镜像工作流记为全绿。
 - 产品范围继续是 Windows x64、本地优先和 Markdown 真源；不增加云同步、任意脚本插件、移动端或 DOCX/PDF 原格式回写。
 
@@ -18,12 +18,25 @@
 
 - 目标与用户价值：移除 `main.content-area` 的宽范围 `aria-live`，避免长文正文因无关状态变化被读屏器整段重新播报；打开文档加载状态改为独立的 `role=status`/`aria-live=polite`，阅读缩放和渐进渲染状态、错误提示继续保持显式语义。
 - 非目标：不处理 #191 的 Escape 互斥、标签/文件树/目录导航，不改正文、搜索、鼠标行为、HTML 安全路线、视觉令牌、脚本、插件或发布资产；不关闭 Issue #191。
-- 基线与分支：基于 `main@1e00683658e023405dcaee5be9c389adcbbd25c9` 创建项目内独立工作树；分支 `codex/reader-live-region-2026-09-03`；启动前重新核验 Issue #191 与开放 PR，未发现重复产品 PR；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已创建，代码提交 `a4448d7`，远端 Quality checks 待完成。
+- 基线与分支：基于 `main@1e00683658e023405dcaee5be9c389adcbbd25c9` 创建项目内独立工作树；分支 `codex/reader-live-region-2026-09-03`；启动前重新核验 Issue #191 与开放 PR，未发现重复产品 PR；PR [#431](https://github.com/MY-moss/moyang_Reader/pull/431) 已 squash 合并为 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605`，代码提交 `a4448d7`，Quality checks run `33693407155` 全部通过。
 - 验收标准：主阅读区不再作为 live region 祖先包裹文章；动态加载/缩放/渐进渲染状态和错误可独立获取；无障碍 E2E 验证正文不在宽 live region 内且保留缩放状态语义，axe 不出现 serious/critical 违规。
 - 涉及文件：`src/app/App.tsx`、`e2e/a11y.spec.ts`、`docs/ACCESSIBILITY-WINDOWS.md`、`docs/UI-INTERACTION.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
 - 依赖、风险与回滚：复用现有状态提示、`ProgressiveReaderContent` status 和通知/错误语义，不新增依赖、凭据或迁移；移除祖先播报后通过显式状态保留必要反馈；回退 PR #431 即可恢复原行为。
 - 验证：RED 测试先复现 `main.content-area[aria-live]`；修复后 `npm run test:e2e:a11y -- --workers=1` 8/8、`npm test` 94 个文件/372 项、lint、格式、类型感知、build 和 `git diff --check` 通过。
 - 发布/缓存：普通 T2 无障碍切片，不生成安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；构建生成物使用工作树既有清理流程，不恢复 C 盘旧缓存。
+
+## 本轮切片：#191 焦点模式 Escape 互斥（2026-09-03）
+
+- 目标与用户价值：嵌套命令面板/快速打开打开时，`Escape` 只关闭拥有当前焦点的最内层弹层；专注模式进入后焦点落在可见退出入口，关闭弹层后不丢失键盘工作位置，也不会误退出外层阅读模式。
+- 非目标：不改命令内容、更新器、侧栏布局、主阅读区 live region、正文、搜索、HTML 安全预览/源码编辑、视觉令牌、脚本、插件、数据模型、发布资产或跨平台范围。
+- 基线与分支：基于已核验的 `main@34b3fc6b1b0656f207b9b46240c7de17279f6605` 建立独立工作树；分支 `codex/escape-mutex-2026-09-03`；启动前重新检查 Issue #191 和开放 PR，未发现重复产品 PR。
+- 实现边界：共享模态 Escape 使用立即消费，阻断同一窗口上后续全局监听；进入专注模式后将焦点交给可见的 `focus-exit`；命令面板第一次 Escape 只关闭面板，第二次才退出专注。
+- 验收标准：重叠模态只由当前焦点所属层处理 Escape；专注模式 → 命令面板 → 两次 Escape 的状态顺序正确，第一次关闭后焦点回到可见“退出专注”；既有模态 Tab/Escape/焦点归还回归不变；浏览器与 Windows UI smoke 通过。
+- 涉及文件：`src/app/components/useModalBehavior.ts`、`src/app/components/useModalBehavior.test.tsx`、`src/app/App.tsx`、`e2e/smoke.spec.ts`、`desktop-e2e/smoke.e2e.mjs`、`docs/UI-INTERACTION.md`、`docs/ACCESSIBILITY-WINDOWS.md`、`CHANGELOG.md`、`docs/NEXT.md`、`docs/AI-HANDOFF.md`、`docs/handoff/v0.11.md`、`tasks/plan.md`、`tasks/todo.md`。
+- 依赖：复用既有 `aria-modal="true"` 模态契约、命令面板、专注模式按钮、Tauri/Playwright/Webdriver 测试基础设施；不新增依赖、凭据或数据迁移。
+- 风险与回滚：立即消费 Escape 会阻断模态后的同窗口快捷键，属于互斥契约所需行为；进入专注模式新增一次焦点移动，需保留可见退出入口。回退本切片 PR 即可恢复原 Escape 冒泡和焦点行为，不影响阅读库或更新资产。
+- 当前验证：RED 单测先确认后注册的全局 Escape 监听仍被调用，分离后的模态节点仍会误消费 Escape；修复后共享模态定向单测 7/7、浏览器定向 E2E 1/1、全量单测 94 文件/374 项、lint、格式、类型感知、build、构建产物和差异检查通过；Windows 桌面 smoke 17/17 通过。全量浏览器套件本地 74/75，唯一失败为既有 Markdown 序列化基线用例，与本切片无关；PR [#432](https://github.com/MY-moss/moyang_Reader/pull/432) 的远端 Quality checks 待核验。
+- 发布/缓存：普通 T2 可访问性/UI 切片，不生成 Windows x64 安装包、Tag、Release、签名、`latest.json` 或 Cloudflare 镜像；继续使用 `D:\AI-moyang\本地阅读工具-build-cache`，生成物按清理器回收，不恢复 C 盘旧缓存。
 
 ## 本轮工程治理与 HTML 路线
 

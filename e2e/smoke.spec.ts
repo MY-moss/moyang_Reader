@@ -1674,6 +1674,36 @@ test("enters and exits focus reading mode", async ({ page }) => {
   await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
 });
 
+test("closes only the innermost command panel before focus mode", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "nested-escape-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Nested Escape\n\n专注模式与命令面板的 Escape 互斥测试"),
+  });
+  await switchToRenderedMode(page);
+  await expect(page.getByRole("heading", { name: "Nested Escape" })).toBeVisible();
+
+  await page.getByRole("button", { name: "专注", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+  const focusExitButton = page.getByRole("button", { name: /退出专注/ });
+  await expect(focusExitButton).toBeVisible();
+
+  await page.keyboard.press("Control+Shift+P");
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByRole("searchbox", { name: "搜索命令" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
+  await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+  await expect(focusExitButton).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".app-shell")).not.toHaveClass(/focus-mode/);
+});
+
 test("collapses and restores the reading sidebar", async ({ page }) => {
   await page.goto("/");
 
