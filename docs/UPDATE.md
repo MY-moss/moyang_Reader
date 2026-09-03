@@ -25,7 +25,31 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 没有有效签名的更新包不会安装。
 
-## #416 Windows 图标一致性验证（未发布）
+更新提示中的“签名”是 Tauri updater 对 manifest/安装包的公钥校验，不等同于 Windows NSIS Authenticode 证书。当前 Authenticode 证书条件仍按 [`release-status.json`](release-status.json) 记录为 `blocked`，不能把 updater 签名当成 Windows 代码签名结论。
+
+## 用户侧更新与打开器排查
+
+### 更新状态
+
+- 从顶部 `更多 → 更新` 可以随时手动检查；“启动时检查更新”只在下一次启动读取，运行中修改设置不会打断当前阅读或立即下载。
+- “发现新版本”时选择“下载并安装”。下载前不替换当前应用文件，下载后会校验 Tauri updater 签名。
+- “下载中…”可以隐藏，下载会继续；稍后从 `更多 → 下载中…` 恢复进度。隐藏不是取消，也不会重新开始下载。
+- “已更新”只表示安装文件已准备好，不会强制退出或自动重启。确认文档和设置已经保存后，选择“重启应用”；如果暂时不方便，可继续当前工作。
+
+### 更新失败时
+
+- **镜像不可用或网络超时**：更新器先尝试公开 Cloudflare Pages 地址，再使用 GitHub Release 回退地址。检查网络后重试；仍失败时可从 [GitHub Release](https://github.com/MY-moss/moyang_Reader/releases/latest) 手动下载当前 Windows x64 安装包。
+- **签名校验失败**：安装会停止。只从仓库的 GitHub Release 页面重新下载可信安装包，不使用聊天、文档或第三方页面提供的 `.exe`、`.sig` 或私钥。
+- **权限或文件被占用**：保留当前版本，先关闭正在运行的旧实例或占用安装目录的程序，再重试；也可以从 GitHub Release 手动安装。不要删除用户文档、修改注册表来绕过文件关联，也不要关闭 Windows 安全策略或运行未知脚本。
+- **上次更新没有完成**：当前版本会保留。不要降级覆盖；等待更高的补丁版本发布后再重试，应用启动时可能显示恢复提示。
+
+### 外部链接、工作区路径和文件关联
+
+- `moyang-wiki:`、相对 Markdown 链接和章节锚点留在应用内处理；外部链接只允许 `http:`、`https:`、`mailto:` 和 `tel:`，交给 Windows 默认程序打开。`javascript:`、`file:` 和未知协议会被拦截，主窗口不会直接导航到外部页面。
+- 本地文档链接使用当前已授权的阅读库或用户选择的文件路径。工作区外的本地路径不会通过外部 opener 打开；如果目标未经过用户选择或授权，桌面端会拒绝读取并要求重新选择文件或添加阅读库。
+- Windows 安装包会注册 Markdown、文本、Word、PDF 和常见图片扩展名，但 Windows 可能保留用户当前选择的默认程序。双击没有交给 Moyang Reader 时，请在 Windows“默认应用”或“打开方式”中重新选择，不要删除文档或绕过系统权限。
+
+## #416 Windows 图标一致性记录（已合并，未单独发布）
 
 - 代码基线：从 `main@b11539ea85bc816dbb9f002021084755d7c826b2` 的干净工作树完成；范围仅为 Windows x64 图标资源、Tauri bundle 配置和发布前门禁。
 - 修复内容：显式声明全部 Windows `bundle.icon` 资源；校验 PNG 尺寸/哈希、ICO 目录和同源图像，并阻止旧字母 M 图标或不安全路径进入发布流程。
@@ -145,9 +169,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。因此本次 `v0.10.2` 发布后，根路径已在线反映新版本；版本目录 manifest 当前仍回退到 GitHub 资产地址，静态资产同步仍保留版本目录策略作为可选发布路径。
+当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 动态代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。截至 `v0.10.14`，公开动态镜像的 manifest、安装包和签名可访问；这表示公开回退入口可用，不表示静态镜像工作流已经完成。
 
-镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.2` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会回退到第二个 GitHub 更新端点。
+镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.14` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会在镜像无法取得可用 manifest 时回退到第二个更新端点。结构化事实以 [`release-status.json`](release-status.json) 为准，静态镜像为 `blocked` 时不能写成发布成功。
 
 `scripts/mirror-worker.js` 保留为手动应急回滚方案，不是当前默认发布路径。静态镜像部署完成后，工作流会重试检查根 manifest、版本目录 manifest、安装包和 `.sig`，并校验版本、HTTP 状态和安装包大小。
 
