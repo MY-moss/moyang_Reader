@@ -1,1 +1,27 @@
-/**\n * Normalize a filesystem path for comparisons and map keys.\n *\n * Path identity must not depend on the user's locale. JavaScript's\n * `toLowerCase()` is intentionally locale-independent, unlike\n * `toLocaleLowerCase()`.\n */\nexport function normalizePathKey(path: string): string {\n  const windowsPath = path.replace(/\//g, "\\");\n  const withoutNamespacePrefix = windowsPath.startsWith("\\\\?\\UNC\\")\n    ? `\\\\${windowsPath.slice("\\\\?\\UNC\\".length)}`\n    : windowsPath.startsWith("\\\\?\\")\n      ? windowsPath.slice("\\\\?\\".length)\n      : windowsPath;\n\n  return withoutNamespacePrefix\n    .replace(/[\\/]+/g, "\\")\n    .replace(/\\$/, "")\n    .toLowerCase();\n}\n\n/** Return whether a path is the root itself or a descendant of that root. */\nexport function isPathWithin(path: string, root: string): boolean {\n  const candidate = normalizePathKey(path);\n  const normalizedRoot = normalizePathKey(root);\n  return Boolean(normalizedRoot) && (candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}\\`));\n}\n
+/**
+ * Normalize a filesystem path for comparisons and map keys.
+ *
+ * Path identity must not depend on the user's locale. JavaScript's
+ * `toLowerCase()` is intentionally locale-independent, unlike
+ * `toLocaleLowerCase()`.
+ */
+export function normalizePathKey(path: string): string {
+  const windowsPath = path.replace(/\//g, "\\");
+  const withoutNamespacePrefix = windowsPath.startsWith("\\\\?\\UNC\\")
+    ? `\\\\${windowsPath.slice("\\\\?\\UNC\\".length)}`
+    : windowsPath.startsWith("\\\\?\\")
+      ? windowsPath.slice("\\\\?\\".length)
+      : windowsPath;
+
+  return withoutNamespacePrefix
+    .replace(/[\\/]+/g, "\\")
+    .replace(/\\$/, "")
+    .toLowerCase();
+}
+
+/** Return whether a path is the root itself or a descendant of that root. */
+export function isPathWithin(path: string, root: string): boolean {
+  const candidate = normalizePathKey(path);
+  const normalizedRoot = normalizePathKey(root);
+  return Boolean(normalizedRoot) && (candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}\\`));
+}
