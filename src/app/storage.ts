@@ -1,5 +1,5 @@
 import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";
-import { normalizePathKey } from "./path-key";
+import { isPathWithin, normalizePathKey } from "./path-key";
 import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
 
 const workspaceKey = "moyang-reader-workspace";
@@ -205,12 +205,6 @@ export function loadOpenTabs(): RecentFile[] {
   }
 }
 
-function workspacePathContains(root: string, candidate: string): boolean {
-  const normalizedRoot = comparablePath(root);
-  const normalizedCandidate = comparablePath(candidate);
-  return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}\\`);
-}
-
 function parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {
   if (!raw) return [];
   const parsed = JSON.parse(raw) as unknown;
@@ -226,9 +220,9 @@ function parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {
         (item as { path: string }).path.trim().length > 0,
     )
     .map((item) => {
-      const tabs = parseOpenTabs(item.tabs).filter((tab) => workspacePathContains(item.path, tab.path));
+      const tabs = parseOpenTabs(item.tabs).filter((tab) => isPathWithin(tab.path, item.path));
       const activeDocumentPath =
-        typeof item.activeDocumentPath === "string" && workspacePathContains(item.path, item.activeDocumentPath)
+        typeof item.activeDocumentPath === "string" && isPathWithin(item.activeDocumentPath, item.path)
           ? item.activeDocumentPath
           : null;
       return { path: item.path, tabs, activeDocumentPath };
