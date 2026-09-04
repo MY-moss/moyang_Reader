@@ -21,6 +21,7 @@
 - 审计时共有 8 个开放 Issue：4 个可执行/候选项、3 个外部条件项、1 个历史跟踪项。
 - 开放 PR 均为 Dependabot 依赖更新，没有产品功能 PR。
 - 执行权限、批准队列和运行状态分别由 `ai/policy.json`、`ai/plan-v1.json` 与 `ai/state.json` 管理；[`NEXT.md`](NEXT.md) 仅为生成摘要。
+- G03 外部 GitHub App、Code Owner 探针和强制身份隔离已取消；G01/G02 控制面保留，M1101 不再依赖 G03。取消原因与状态迁移以结构化计划和 ADR 0013 为准。
 
 ## 本地工作区提示
 

@@ -4,10 +4,14 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  advanceDeliveryState,
   finishState,
+  isCancelledTask,
   isAllowedPath,
   isProtectedPath,
   loadGovernance,
+  migrateCancelledTask,
+  nextActiveQueueIndex,
   renderNext,
   taskDigest,
   validateApprovalReceipt,
@@ -25,6 +29,24 @@ test("accepts the checked-in policy, plan, and state", () => {
   assert.deepEqual(validatePolicy(policy), []);
   assert.deepEqual(validatePlan(plan, policy), []);
   assert.deepEqual(validateState(state, plan, policy), []);
+});
+
+test("records G03 as cancelled without treating it as completed", () => {
+  const { plan, state } = loadGovernance(sourceRoot);
+  assert.equal(isCancelledTask(plan, "G03"), true);
+  assert.deepEqual(state.completedTaskIds, ["G01", "G02"]);
+  assert.equal(plan.tasks[state.queueIndex].id, "M1101");
+  assert.deepEqual(plan.tasks[state.queueIndex].dependsOn, ["G02"]);
+});
+
+test("rejects dependencies on cancelled tasks", () => {
+  const { policy, plan } = loadGovernance(sourceRoot);
+  const changed = JSON.parse(JSON.stringify(plan));
+  changed.tasks.find((task) => task.id === "M1102").dependsOn = ["G03"];
+  assert.equal(
+    validatePlan(changed, policy).some((error) => error.includes("不能依赖已取消任务")),
+    true,
+  );
 });
 
 test("rejects an automatically deliverable T3 task", () => {
@@ -67,7 +89,7 @@ test("keeps the canonical state machine from being relaxed", () => {
     currentTaskId: "M1101",
     queueIndex: 3,
     status: "PENDING_INTAKE",
-    completedTaskIds: ["G01", "G02", "G03"],
+    completedTaskIds: ["G01", "G02"],
     blocker: null,
   };
   const errors = validateStateTransition(pending, { ...pending, status: "IN_PROGRESS" }, plan, policy);
@@ -80,39 +102,52 @@ test("keeps the canonical state machine from being relaxed", () => {
 test("renders a compact summary for exactly the current task", () => {
   const { plan, state } = loadGovernance(sourceRoot);
   const rendered = renderNext(plan, state);
-  assert.match(rendered, /任务：G03/);
+  assert.match(rendered, /任务：M1101/);
   assert.match(rendered, /状态：AWAITING_APPROVAL/);
-  assert.doesNotMatch(rendered, /M1101/);
+  assert.match(rendered, /已取消计划项：G03/);
 });
 
 test("rejects queue skips and completed-prefix drift", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
   const next = {
     ...state,
-    currentTaskId: "M1102",
-    queueIndex: 4,
+    currentTaskId: "M1103",
+    queueIndex: 5,
     status: "PENDING_INTAKE",
-    completedTaskIds: ["G01", "G02", "G03", "M1101"],
-    lastCompleted: { taskId: "G03", summary: "skipped" },
+    completedTaskIds: ["G01", "G02", "M1101", "M1102"],
+    lastCompleted: { taskId: "M1102", summary: "skipped" },
   };
   const errors = validateStateTransition(state, next, plan, policy);
   assert.equal(
-    errors.some((error) => error.includes("跳跃")),
+    errors.some((error) => error.includes("未取消任务")),
     true,
   );
 });
 
 test("rejects a one-step queue advance without verification and delivery evidence", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
-  const next = {
+  const previous = {
     ...state,
+    currentTaskId: "G02",
+    queueIndex: 1,
+    status: "DELIVERY_READY",
+    completedTaskIds: ["G01"],
+    blocker: null,
+  };
+  const next = {
+    ...previous,
     currentTaskId: "M1101",
     queueIndex: 3,
     status: "PENDING_INTAKE",
-    completedTaskIds: ["G01", "G02", "G03"],
-    lastCompleted: { taskId: "G03", summary: "manually advanced" },
+    completedTaskIds: ["G01", "G02"],
+    lastCancelled: {
+      taskId: "G03",
+      reason: plan.cancelledTasks[0].reason,
+      recordedAt: "2026-09-04T03:00:07.337Z",
+    },
+    lastCompleted: { taskId: "G02", summary: "manually advanced" },
   };
-  const errors = validateStateTransition(state, next, plan, policy);
+  const errors = validateStateTransition(previous, next, plan, policy);
   assert.equal(
     errors.some((error) => error.includes("验证证据")),
     true,
@@ -120,6 +155,92 @@ test("rejects a one-step queue advance without verification and delivery evidenc
   assert.equal(
     errors.some((error) => error.includes("交付摘要")),
     true,
+  );
+});
+
+test("allows a controlled migration away from a cancelled current task", () => {
+  const { policy, plan, state } = loadGovernance(sourceRoot);
+  const previous = {
+    ...state,
+    currentTaskId: "G03",
+    queueIndex: 2,
+    status: "AWAITING_APPROVAL",
+    completedTaskIds: ["G01", "G02"],
+    blocker: { reason: "旧状态", nextAction: "迁移" },
+  };
+  const next = {
+    ...state,
+    currentTaskId: "M1101",
+    queueIndex: 3,
+    status: "AWAITING_APPROVAL",
+    completedTaskIds: ["G01", "G02"],
+    blocker: { reason: "G03 已取消", nextAction: "运行 ai:start" },
+    lastCancelled: {
+      taskId: "G03",
+      reason: plan.cancelledTasks[0].reason,
+      recordedAt: "2026-09-04T03:00:07.337Z",
+    },
+  };
+  assert.deepEqual(validateStateTransition(previous, next, plan, policy), []);
+});
+
+test("migrates a cancelled current task to the next active task", () => {
+  const { plan, state } = loadGovernance(sourceRoot);
+  const previous = {
+    ...state,
+    currentTaskId: "G03",
+    queueIndex: 2,
+    status: "AWAITING_APPROVAL",
+    completedTaskIds: ["G01", "G02"],
+    blocker: { reason: "旧状态", nextAction: "迁移" },
+  };
+  const migrated = migrateCancelledTask(plan, previous);
+  assert.equal(migrated.currentTaskId, "M1101");
+  assert.equal(migrated.queueIndex, 3);
+  assert.equal(migrated.status, "PENDING_INTAKE");
+  assert.deepEqual(migrated.completedTaskIds, ["G01", "G02"]);
+  assert.equal(migrated.lastCancelled.taskId, "G03");
+  assert.equal(Number.isNaN(Date.parse(migrated.lastCancelled.recordedAt)), false);
+});
+
+test("rejects crossing a cancelled task without a cancellation record", () => {
+  const { policy, plan, state } = loadGovernance(sourceRoot);
+  const previous = {
+    ...state,
+    currentTaskId: "G03",
+    queueIndex: 2,
+    status: "AWAITING_APPROVAL",
+    completedTaskIds: ["G01", "G02"],
+    blocker: { reason: "旧状态", nextAction: "迁移" },
+  };
+  const next = {
+    ...state,
+    currentTaskId: "M1101",
+    queueIndex: 3,
+    status: "PENDING_INTAKE",
+    completedTaskIds: ["G01", "G02"],
+    lastCancelled: null,
+    blocker: null,
+  };
+  assert.equal(
+    validateStateTransition(previous, next, plan, policy).some((error) => error.includes("lastCancelled")),
+    true,
+  );
+});
+
+test("does not execute a cancelled task", () => {
+  const { plan, state } = loadGovernance(sourceRoot);
+  const cancelledState = {
+    ...state,
+    currentTaskId: "G03",
+    queueIndex: 2,
+    status: "IN_PROGRESS",
+    completedTaskIds: ["G01", "G02"],
+    blocker: null,
+  };
+  assert.throws(
+    () => finishState(plan, cancelledState, { result: "passed", summary: "invalid", checks: [], policy: {} }),
+    /已取消.*finish/,
   );
 });
 
@@ -131,7 +252,10 @@ test("requires approval before a T3 task can run", () => {
     currentTaskId: "M1105",
     queueIndex: t3Index,
     status: "IN_PROGRESS",
-    completedTaskIds: plan.tasks.slice(0, t3Index).map((task) => task.id),
+    completedTaskIds: plan.tasks
+      .slice(0, t3Index)
+      .filter((task) => !isCancelledTask(plan, task.id))
+      .map((task) => task.id),
     blocker: null,
   };
   const errors = validateState(t3State, plan, policy);
@@ -171,50 +295,56 @@ test("recognizes protected and task-allowed paths", () => {
   assert.equal(isAllowedPath("docs-private/escape.md", [plan.tasks[0]]), false);
 });
 
-test("finishes one approved task and advances exactly once", () => {
+test("finishes one auto-deliverable task and advances exactly once", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
   const checks = plan.tasks[state.queueIndex].validation.map((command) => ({ command, result: "pass" }));
-  const approval = {
-    schemaVersion: 1,
-    planId: plan.planId,
-    taskId: plan.tasks[state.queueIndex].id,
-    taskDigest: taskDigest(plan.tasks[state.queueIndex]),
-    status: "approved",
-    approvedBy: "@MY-moss",
-    approvedAt: "2026-09-04T00:00:00.000Z",
-    scope: plan.tasks[state.queueIndex].goal,
+  const currentState = {
+    ...state,
+    status: "IN_PROGRESS",
+    blocker: null,
   };
-  const next = finishState(
-    plan,
-    { ...state, approval },
-    {
-      result: "passed",
-      summary: "repository protection verified",
-      checks,
-      policy,
-    },
-  );
-  assert.equal(next.currentTaskId, "M1101");
+  const next = finishState(plan, currentState, {
+    result: "passed",
+    summary: "repository protection verified",
+    checks,
+    policy,
+  });
+  assert.equal(next.currentTaskId, "M1102");
   assert.equal(next.status, "PENDING_INTAKE");
-  assert.deepEqual(next.completedTaskIds, ["G01", "G02", "G03"]);
+  assert.deepEqual(next.completedTaskIds, ["G01", "G02", "M1101"]);
   assert.deepEqual(next.lastCompleted.verification, checks);
+  assert.equal(next.lastCancelled, null);
+});
+
+test("advances across an explicitly cancelled queue item", () => {
+  const { plan, state } = loadGovernance(sourceRoot);
+  const previous = {
+    ...state,
+    currentTaskId: "G02",
+    queueIndex: 1,
+    status: "DELIVERY_READY",
+    completedTaskIds: ["G01"],
+    blocker: null,
+    deliveryEvidence: { summary: "G02 verified" },
+    verification: [
+      { command: "npm run test:workflow", result: "pass" },
+      { command: "npm run ai:check", result: "pass" },
+      { command: "git diff --check", result: "pass" },
+    ],
+  };
+  const next = advanceDeliveryState(plan, previous);
+  assert.equal(next.currentTaskId, "M1101");
+  assert.equal(next.queueIndex, 3);
+  assert.deepEqual(next.completedTaskIds, ["G01", "G02"]);
+  assert.equal(next.lastCancelled.taskId, "G03");
+  assert.equal(next.lastCancelled.reason, plan.cancelledTasks[0].reason);
 });
 
 test("does not accept missing required verification", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
-  const task = plan.tasks[state.queueIndex];
-  const approval = {
-    schemaVersion: 1,
-    planId: plan.planId,
-    taskId: task.id,
-    taskDigest: taskDigest(task),
-    status: "approved",
-    approvedBy: "@MY-moss",
-    approvedAt: "2026-09-04T00:00:00.000Z",
-    scope: task.goal,
-  };
+  const currentState = { ...state, status: "IN_PROGRESS", blocker: null };
   assert.throws(
-    () => finishState(plan, { ...state, approval }, { result: "passed", summary: "incomplete", checks: [], policy }),
+    () => finishState(plan, currentState, { result: "passed", summary: "incomplete", checks: [], policy }),
     /缺少通过的必需验证/,
   );
 });

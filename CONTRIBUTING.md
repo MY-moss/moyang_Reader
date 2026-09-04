@@ -78,4 +78,4 @@ Pop-Location
 
 ## AI 交接
 
-批准队列内的 T0–T2 在 G03 保护探针通过、无治理文件变化且 Quality checks 全绿时可以自动交付。T3、治理策略、权限、安全、更新器、发布工作流、凭据和数据迁移必须人工确认。代码、测试、必要文档和结构化状态应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前任务使用 `npm run ai:context`，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
+批准队列内的 T0–T2 在依赖已完成或按计划取消、无治理文件变化且 Quality checks 全绿时可以自动交付。T3、治理策略、权限、安全、更新器、发布工作流、凭据和数据迁移必须人工确认；计划中的已取消任务不计入完成，也不能由 AI 自行新增。代码、测试、必要文档和结构化状态应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前任务使用 `npm run ai:context`，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。

@@ -145,6 +145,24 @@ test("checks a finishing pull request against the completed task, not the next t
   );
 });
 
+test("includes cancelled queue items when validating a plan amendment", () => {
+  const { plan, state } = loadGovernance(sourceRoot);
+  const previous = {
+    ...state,
+    currentTaskId: "G02",
+    queueIndex: 1,
+  };
+  const next = {
+    ...state,
+    currentTaskId: "M1101",
+    queueIndex: 3,
+  };
+  assert.deepEqual(
+    activeTaskRange(plan, previous, next).map((task) => task.id),
+    ["G02", "G03", "M1101"],
+  );
+});
+
 test("does not trust an approval stored only in mutable state", () => {
   const { plan, state } = loadGovernance(sourceRoot);
   const forged = { ...state, approval: { taskId: state.currentTaskId } };

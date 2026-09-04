@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "planId": "moyang-v1",
-  "currentTaskId": "G03",
-  "queueIndex": 2,
+  "currentTaskId": "M1101",
+  "queueIndex": 3,
   "status": "AWAITING_APPROVAL",
   "branch": "codex/ai-context-reset-2026-09-03",
   "baseSha": "2a90448a065c2f5e98792106c93df2a3752bd79d",
@@ -10,9 +10,14 @@
   "remoteCheck": null,
   "approval": null,
   "verification": [],
+  "lastCancelled": {
+    "taskId": "G03",
+    "reason": "按用户决定取消外部 GitHub App、Code Owner 和探针门禁；保留 G01/G02 的仓库内控制面。",
+    "recordedAt": "2026-09-04T03:00:07.337Z"
+  },
   "blocker": {
-    "reason": "需要仓库所有者配置独立 AI bot、治理文件 Code Owner 审批，并完成两个探针 PR。",
-    "nextAction": "人工审查并合并治理切片；完成 G03 设置和探针后，合入与 G03 任务摘要绑定的审批凭证。"
+    "reason": "G03 已按用户决定取消；需要合并本次计划和状态机修订后重新运行 ai:start。",
+    "nextAction": "合并本次治理修订后运行 npm run ai:start，开始 M1101。"
   },
   "deliveryEvidence": null,
   "lastCompleted": {
@@ -28,5 +33,5 @@
       "recordedAt": "2026-09-03T19:12:20.021Z"
     }
   },
-  "updatedAt": "2026-09-03T19:12:20.021Z"
+  "updatedAt": "2026-09-04T03:00:07.337Z"
 }

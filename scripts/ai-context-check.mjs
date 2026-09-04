@@ -98,6 +98,7 @@ function changedPaths(projectRoot) {
 export function activeTaskRange(plan, previous, state) {
   if (!previous) return plan.tasks.slice(0, state.queueIndex + 1);
   if (state.queueIndex === previous.queueIndex + 1) return [plan.tasks[previous.queueIndex]];
+  if (state.queueIndex > previous.queueIndex) return plan.tasks.slice(previous.queueIndex, state.queueIndex + 1);
   return [plan.tasks[state.queueIndex]];
 }
 

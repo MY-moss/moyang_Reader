@@ -2,6 +2,13 @@
   "schemaVersion": 1,
   "planId": "moyang-v1",
   "productGoal": "在 v1.0 形成可靠、离线、本地优先的 Windows 阅读工作台，并只为知识库与 AI 保留内部能力接口。",
+  "cancelledTasks": [
+    {
+      "id": "G03",
+      "cancelledAt": "2026-09-04T03:00:07.337Z",
+      "reason": "按用户决定取消外部 GitHub App、Code Owner 和探针门禁；保留 G01/G02 的仓库内控制面。"
+    }
+  ],
   "tasks": [
     {
       "id": "G01",
@@ -82,7 +89,7 @@
       "risk": "T1",
       "governance": false,
       "autoDeliver": true,
-      "dependsOn": ["G03"],
+      "dependsOn": ["G02"],
       "value": "避免工作区切换、缓存失效、树操作和差量刷新使用不同路径规则。",
       "goal": "统一前端 Windows 同路径或子路径谓词并迁移五个调用方。",
       "nonGoals": ["不修改 Rust 路径授权", "不重构 App.tsx", "不改变 external-change 双向事件语义"],

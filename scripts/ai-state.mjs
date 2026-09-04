@@ -51,6 +51,18 @@ function hasTextArray(value) {
   return Array.isArray(value) && value.length > 0 && value.every(hasText);
 }
 
+function cancellationEntries(plan) {
+  return Array.isArray(plan?.cancelledTasks) ? plan.cancelledTasks : [];
+}
+
+export function isCancelledTask(plan, taskId) {
+  return cancellationEntries(plan).some((entry) => entry?.id === taskId);
+}
+
+function cancellationForTask(plan, taskId) {
+  return cancellationEntries(plan).find((entry) => entry?.id === taskId) ?? null;
+}
+
 function readJson(projectRoot, relativePath) {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, relativePath), "utf8"));
 }
@@ -151,6 +163,9 @@ export function validatePlan(plan, policy) {
   if (plan.planId !== policy?.planId) errors.push("plan.planId 必须与 policy.planId 一致。");
   if (!hasText(plan.productGoal)) errors.push("plan.productGoal 不能为空。");
   if (!Array.isArray(plan.tasks) || plan.tasks.length === 0) return [...errors, "plan.tasks 不能为空。"];
+  if (!Array.isArray(plan.cancelledTasks)) {
+    errors.push("plan.cancelledTasks 必须是数组。");
+  }
 
   const ids = new Set();
   for (const [index, task] of plan.tasks.entries()) {
@@ -190,11 +205,27 @@ export function validatePlan(plan, policy) {
     }
   }
 
+  const cancelledIds = new Set();
+  for (const [index, cancellation] of cancellationEntries(plan).entries()) {
+    const label = `plan.cancelledTasks[${index}]`;
+    if (!isObject(cancellation) || !hasText(cancellation.id) || cancelledIds.has(cancellation.id)) {
+      errors.push(`${label}.id 缺失或重复。`);
+      continue;
+    }
+    cancelledIds.add(cancellation.id);
+    if (!ids.has(cancellation.id)) errors.push(`${label}.id 必须引用已有任务。`);
+    if (!hasText(cancellation.reason)) errors.push(`${label}.reason 不能为空。`);
+    if (!hasText(cancellation.cancelledAt) || Number.isNaN(Date.parse(cancellation.cancelledAt))) {
+      errors.push(`${label}.cancelledAt 必须是有效 ISO 日期时间。`);
+    }
+  }
+
   for (const [index, task] of plan.tasks.entries()) {
     for (const dependency of task.dependsOn ?? []) {
       const dependencyIndex = plan.tasks.findIndex((candidate) => candidate.id === dependency);
       if (dependencyIndex < 0) errors.push(`任务 ${task.id} 依赖未知任务 ${dependency}。`);
       if (dependencyIndex >= index) errors.push(`任务 ${task.id} 只能依赖排在它之前的任务。`);
+      if (cancelledIds.has(dependency)) errors.push(`任务 ${task.id} 不能依赖已取消任务 ${dependency}。`);
     }
   }
   return errors;
@@ -213,15 +244,34 @@ export function validateState(state, plan, policy) {
   }
   const current = plan.tasks[state.queueIndex];
   if (current?.id !== state.currentTaskId) errors.push("state.currentTaskId 与 queueIndex 不一致。");
+  if (current && isCancelledTask(plan, current.id) && state.status !== "AWAITING_APPROVAL") {
+    errors.push(`已取消任务 ${current.id} 不能进入 ${state.status} 状态。`);
+  }
   if (
     !Array.isArray(state.completedTaskIds) ||
     new Set(state.completedTaskIds).size !== state.completedTaskIds?.length
   ) {
     errors.push("state.completedTaskIds 必须是无重复数组。");
   } else {
-    const expectedPrefix = plan.tasks.slice(0, state.queueIndex).map((task) => task.id);
+    const expectedPrefix = plan.tasks
+      .slice(0, state.queueIndex)
+      .filter((task) => !isCancelledTask(plan, task.id))
+      .map((task) => task.id);
     if (JSON.stringify(state.completedTaskIds) !== JSON.stringify(expectedPrefix)) {
-      errors.push("state.completedTaskIds 必须等于当前任务之前的完整有序前缀，不能跳过或倒退。");
+      errors.push("state.completedTaskIds 必须等于当前任务之前的活动任务前缀；已取消任务不得伪装为完成。");
+    }
+  }
+  if (state.lastCancelled !== null && state.lastCancelled !== undefined) {
+    const cancellation = cancellationForTask(plan, state.lastCancelled.taskId);
+    if (!cancellation) {
+      errors.push("state.lastCancelled.taskId 必须引用计划中已取消的任务。");
+    } else {
+      if (state.lastCancelled.reason !== cancellation.reason) {
+        errors.push("state.lastCancelled.reason 必须与计划取消记录一致。");
+      }
+      if (!hasText(state.lastCancelled.recordedAt) || Number.isNaN(Date.parse(state.lastCancelled.recordedAt))) {
+        errors.push("state.lastCancelled.recordedAt 必须是有效 ISO 日期时间。");
+      }
     }
   }
   if (current && (current.risk === "T3" || current.governance) && !current.autoDeliver) {
@@ -243,8 +293,8 @@ export function validateState(state, plan, policy) {
 export function validateStateTransition(previous, next, plan, policy) {
   const errors = [...validateState(next, plan, policy)];
   if (!previous) return errors;
-  if (next.queueIndex < previous.queueIndex || next.queueIndex > previous.queueIndex + 1) {
-    errors.push("状态只能留在当前任务或前进一个任务，不能倒退或跳跃。");
+  if (next.queueIndex < previous.queueIndex) {
+    errors.push("状态只能留在当前任务或前进到后续任务，不能倒退。");
     return errors;
   }
   if (next.queueIndex === previous.queueIndex) {
@@ -256,18 +306,56 @@ export function validateStateTransition(previous, next, plan, policy) {
     return errors;
   }
 
-  if (next.status !== "PENDING_INTAKE") errors.push("前进到下一任务时状态必须是 PENDING_INTAKE。");
-  const expectedCompleted = [...previous.completedTaskIds, previous.currentTaskId];
-  if (JSON.stringify(next.completedTaskIds) !== JSON.stringify(expectedCompleted)) {
-    errors.push("前进队列时必须把上一任务追加到 completedTaskIds。");
+  const previousTask = plan.tasks[previous.queueIndex];
+  if (!previousTask) {
+    errors.push("前一任务不在当前计划中，不能迁移状态。");
+    return errors;
   }
+  const skippedTasks = plan.tasks.slice(previous.queueIndex + 1, next.queueIndex);
+  const activeSkipped = skippedTasks.filter((task) => !isCancelledTask(plan, task.id));
+  if (activeSkipped.length > 0) {
+    errors.push(`状态不能跳过未取消任务：${activeSkipped.map((task) => task.id).join("、")}。`);
+    return errors;
+  }
+
+  const previousCancelled = isCancelledTask(plan, previousTask.id);
+  const cancellation = cancellationForTask(plan, previousTask.id);
+  const cancellationMigration = previousCancelled && next.status === "AWAITING_APPROVAL";
+  if (next.status !== "PENDING_INTAKE" && !cancellationMigration) {
+    errors.push("前进到下一任务时状态必须是 PENDING_INTAKE；取消迁移可暂留 AWAITING_APPROVAL。");
+  }
+  const expectedCompleted = previousCancelled
+    ? [...previous.completedTaskIds]
+    : [...previous.completedTaskIds, previous.currentTaskId];
+  if (JSON.stringify(next.completedTaskIds) !== JSON.stringify(expectedCompleted)) {
+    errors.push("前进队列时只能追加已完成的活动任务；已取消任务不得加入 completedTaskIds。");
+  }
+
+  if (previousCancelled) {
+    if (next.lastCancelled?.taskId !== previousTask.id) {
+      errors.push(`跨过已取消任务 ${previousTask.id} 时必须记录 lastCancelled。`);
+    } else if (cancellation && next.lastCancelled.reason !== cancellation.reason) {
+      errors.push(`lastCancelled.reason 必须与 ${previousTask.id} 的计划取消记录一致。`);
+    }
+    return errors;
+  }
+
+  if (skippedTasks.length > 0) {
+    const lastSkipped = skippedTasks[skippedTasks.length - 1];
+    const skippedCancellation = cancellationForTask(plan, lastSkipped.id);
+    if (next.lastCancelled?.taskId !== lastSkipped.id) {
+      errors.push(`跨过已取消任务时必须记录最后一个取消项 ${lastSkipped.id}。`);
+    } else if (skippedCancellation && next.lastCancelled.reason !== skippedCancellation.reason) {
+      errors.push(`lastCancelled.reason 必须与 ${lastSkipped.id} 的计划取消记录一致。`);
+    }
+  }
+
   if (next.lastCompleted?.taskId !== previous.currentTaskId) {
     errors.push("前进队列时 lastCompleted 必须记录上一任务。");
   }
   const completedChecks = new Map(
     (next.lastCompleted?.verification ?? []).map((check) => [check.command, check.result]),
   );
-  const previousTask = plan.tasks[previous.queueIndex];
   const missingChecks = previousTask.validation.filter((command) => completedChecks.get(command) !== "pass");
   if (missingChecks.length > 0) errors.push(`前进队列缺少上一任务验证证据：${missingChecks.join("；")}。`);
   if (!hasText(next.lastCompleted?.deliveryEvidence?.summary)) {
@@ -361,6 +449,13 @@ export function renderNext(plan, state) {
 - 风险：${task.risk}${task.governance ? " / 治理" : ""}
 - Issue：${issueUrl(task.issue)}
 - 自动交付：${task.autoDeliver ? "允许" : "禁止，必须人工确认"}
+${
+  cancellationEntries(plan).length > 0
+    ? `- 已取消计划项：${cancellationEntries(plan)
+        .map((entry) => `${entry.id}（${entry.reason}）`)
+        .join("；")}`
+    : ""
+}
 
 ## 目标
 
@@ -432,6 +527,7 @@ function compactContext(plan, state) {
       acceptance: task.acceptance,
       validation: task.validation,
       allowedPaths: task.allowedPaths,
+      cancelledTasks: cancellationEntries(plan).map(({ id, reason }) => ({ id, reason })),
       blocker: state.blocker,
     },
     null,
@@ -490,6 +586,9 @@ function parseChecks(args) {
 
 export function deliveryReadyState(plan, state, { summary, checks, policy }) {
   const task = plan.tasks[state.queueIndex];
+  if (task && isCancelledTask(plan, task.id)) {
+    throw new Error(`任务 ${task.id} 已取消，不能记录交付结果。`);
+  }
   if (task.risk === "T3" || task.governance || !task.autoDeliver) {
     const approvalErrors = validateApprovalReceipt(task, state.approval, policy, plan);
     if (approvalErrors.length > 0) throw new Error(approvalErrors.join("\n"));
@@ -507,10 +606,48 @@ export function deliveryReadyState(plan, state, { summary, checks, policy }) {
   };
 }
 
+export function nextActiveQueueIndex(plan, startIndex) {
+  let index = startIndex;
+  while (index < plan.tasks.length && isCancelledTask(plan, plan.tasks[index].id)) index += 1;
+  return index;
+}
+
+export function migrateCancelledTask(plan, state) {
+  const current = plan.tasks[state.queueIndex];
+  if (!current || !isCancelledTask(plan, current.id)) return state;
+  const nextIndex = nextActiveQueueIndex(plan, state.queueIndex + 1);
+  if (nextIndex >= plan.tasks.length) throw new Error(`已取消任务 ${current.id} 后没有可执行的后续任务。`);
+  const cancellation = cancellationForTask(plan, current.id);
+  return {
+    ...state,
+    currentTaskId: plan.tasks[nextIndex].id,
+    queueIndex: nextIndex,
+    status: "PENDING_INTAKE",
+    remoteCheck: null,
+    approval: null,
+    verification: [],
+    blocker: null,
+    lastCancelled: {
+      taskId: current.id,
+      reason: cancellation.reason,
+      recordedAt: new Date().toISOString(),
+    },
+  };
+}
+
 export function advanceDeliveryState(plan, delivered) {
   const task = plan.tasks[delivered.queueIndex];
-  const nextIndex = delivered.queueIndex + 1;
+  const nextIndex = nextActiveQueueIndex(plan, delivered.queueIndex + 1);
   if (nextIndex >= plan.tasks.length) return delivered;
+  const skippedTasks = plan.tasks.slice(delivered.queueIndex + 1, nextIndex);
+  const lastCancelled =
+    skippedTasks.length > 0
+      ? {
+          taskId: skippedTasks[skippedTasks.length - 1].id,
+          reason: cancellationForTask(plan, skippedTasks[skippedTasks.length - 1].id).reason,
+          recordedAt: new Date().toISOString(),
+        }
+      : null;
   return {
     ...delivered,
     currentTaskId: plan.tasks[nextIndex].id,
@@ -521,6 +658,7 @@ export function advanceDeliveryState(plan, delivered) {
     approval: null,
     verification: [],
     blocker: null,
+    lastCancelled,
     lastCompleted: {
       taskId: task.id,
       summary: delivered.deliveryEvidence.summary,
@@ -531,6 +669,10 @@ export function advanceDeliveryState(plan, delivered) {
 }
 
 export function finishState(plan, state, { result, summary, checks, policy }) {
+  const task = plan.tasks[state.queueIndex];
+  if (task && isCancelledTask(plan, task.id)) {
+    throw new Error(`任务 ${task.id} 已取消，不能执行 finish。`);
+  }
   if (result === "blocked") {
     return {
       ...state,
@@ -552,7 +694,7 @@ function persistTransition(projectRoot, plan, policy, previous, next) {
 
 function main(projectRoot = defaultRoot) {
   const [command = "context", ...args] = process.argv.slice(2);
-  const { policy, plan, state } = loadGovernance(projectRoot);
+  let { policy, plan, state } = loadGovernance(projectRoot);
   const errors = [...validatePolicy(policy), ...validatePlan(plan, policy), ...validateState(state, plan, policy)];
   if (errors.length > 0) throw new Error(errors.join("\n"));
 
@@ -564,6 +706,7 @@ function main(projectRoot = defaultRoot) {
     const requestedTaskId = readFlag(args, "task") ?? state.currentTaskId;
     const task = plan.tasks.find((candidate) => candidate.id === requestedTaskId);
     if (!task) throw new Error(`未知任务 ${requestedTaskId}。`);
+    if (isCancelledTask(plan, task.id)) throw new Error(`任务 ${task.id} 已取消，不能生成审批凭证。`);
     console.log(
       JSON.stringify(
         {
@@ -589,6 +732,9 @@ function main(projectRoot = defaultRoot) {
     return;
   }
   if (command === "start") {
+    if (isCancelledTask(plan, state.currentTaskId)) {
+      state = persistTransition(projectRoot, plan, policy, state, migrateCancelledTask(plan, state));
+    }
     const task = plan.tasks[state.queueIndex];
     if (!["PENDING_INTAKE", "READY", "BLOCKED", "AWAITING_APPROVAL"].includes(state.status)) {
       throw new Error(`当前状态 ${state.status} 不能开始任务。`);

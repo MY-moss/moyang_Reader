@@ -5,6 +5,7 @@
 ### Improved
 
 - AI 开发采用受保护 policy/plan 与可变 state 双层控制面；`NEXT.md` 改为生成摘要，并增加队列、风险、文件范围、上下文预算、自我授权和退役入口回归门禁。
+- G03 外部 GitHub App、Code Owner 探针和强制身份隔离按计划修订取消；G01/G02 保留，M1101 改为直接依赖 G02，已取消项保留原因但不计入完成。
 - AI 状态机固定为逐阶段转换；工作树清理新增 `codex/` 分支、已合入 `origin/main`、目录干净和无链接四重证据，删除型工具纳入 Code Owner 保护。
 - #112：统一更新器、镜像、外部链接和 Windows 文件关联的用户/维护者说明；明确镜像回退、手动重启、权限失败、工作区授权、协议白名单、Tauri updater 签名与 NSIS Authenticode 的边界，并补充文档/链接一致性检查。
 - G-02：新增只读 `release:status` 结构化检查，核对版本、CHANGELOG、唯一下一步、Windows x64 发布资产、镜像/外部阻塞和交接链接，不会触发发布或读取凭据。
