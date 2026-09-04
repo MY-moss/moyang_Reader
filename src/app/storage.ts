@@ -1,1 +1,472 @@
-import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";\nimport { isPathWithin, normalizePathKey } from "./path-key";\nimport { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";\n\nconst workspaceKey = "moyang-reader-workspace";\nconst recentFilesKey = "moyang-reader-recent-files";\nconst recentWorkspacesKey = "moyang-reader-recent-workspaces";\nconst mountedWorkspacesKey = "moyang-reader-mounted-workspaces";\nconst workspaceSessionsKey = "moyang-reader-workspace-sessions";\nconst lastDocumentKey = "moyang-reader-last-document";\nconst openTabsKey = "moyang-reader-open-tabs";\nconst readingPositionsKey = "moyang-reader-reading-positions";\nconst sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";\nconst contextPanelOpenKey = "moyang-reader-context-panel-open";\nconst contextPanelTabKey = "moyang-reader-context-panel-tab";\nconst paneWidthsKey = "moyang-reader-pane-widths";\nexport const MAX_RECENT_FILES = 50;\nconst maxRecentWorkspaces = 8;\nexport const MAX_MOUNTED_WORKSPACES = 5;\nconst maxOpenTabs = 16;\nexport const MAX_READING_POSITIONS = 32;\n\nexport type WorkspaceSession = {\n  path: string;\n  tabs: RecentFile[];\n  activeDocumentPath: string | null;\n};\n\nexport function loadSidebarCollapsed(): boolean {\n  try {\n    return localStorage.getItem(sidebarCollapsedKey) === "true";\n  } catch {\n    return false;\n  }\n}\n\nexport function saveSidebarCollapsed(collapsed: boolean): void {\n  try {\n    localStorage.setItem(sidebarCollapsedKey, String(collapsed));\n  } catch {\n    // The layout preference remains available for the current session.\n  }\n}\n\nexport function loadContextPanelOpen(): boolean {\n  try {\n    const saved = localStorage.getItem(contextPanelOpenKey);\n    return saved === null ? true : saved === "true";\n  } catch {\n    return true;\n  }\n}\n\nexport function saveContextPanelOpen(open: boolean): void {\n  try {\n    localStorage.setItem(contextPanelOpenKey, String(open));\n  } catch {\n    // The context panel remains available for the current session.\n  }\n}\n\nexport function loadContextPanelTab(): ContextPanelTab {\n  try {\n    const saved = localStorage.getItem(contextPanelTabKey);\n    return saved === "backlinks" || saved === "properties" || saved === "bookmarks" || saved === "annotations"\n      ? saved\n      : "outline";\n  } catch {\n    return "outline";\n  }\n}\n\nexport function saveContextPanelTab(tab: ContextPanelTab): void {\n  try {\n    localStorage.setItem(contextPanelTabKey, tab);\n  } catch {\n    // The context panel tab remains available for the current session.\n  }\n}\n\nexport function loadPaneWidths(): PaneWidths {\n  try {\n    const raw = localStorage.getItem(paneWidthsKey);\n    return raw ? normalizePaneWidths(JSON.parse(raw) as unknown) : { ...DEFAULT_PANE_WIDTHS };\n  } catch {\n    return { ...DEFAULT_PANE_WIDTHS };\n  }\n}\n\nexport function savePaneWidths(widths: PaneWidths): void {\n  try {\n    localStorage.setItem(paneWidthsKey, JSON.stringify(normalizePaneWidths(widths)));\n  } catch {\n    // Pane widths remain available for the current session.\n  }\n}\n\nfunction comparablePath(path: string): string {\n  return normalizePathKey(path);\n}\n\nfunction validRecentFileTimestamp(value: unknown): value is number {\n  return typeof value === "number" && Number.isFinite(value) && value >= 0;\n}\n\nfunction parseRecentFile(value: unknown): RecentFile | null {\n  if (\n    typeof value !== "object" ||\n    value === null ||\n    typeof (value as RecentFile).path !== "string" ||\n    typeof (value as RecentFile).name !== "string"\n  ) {\n    return null;\n  }\n\n  const file = value as RecentFile;\n  if (!file.path.trim() || !file.name.trim() || file.path.startsWith("browser://")) return null;\n  return validRecentFileTimestamp(file.lastOpenedAt)\n    ? { path: file.path, name: file.name, lastOpenedAt: file.lastOpenedAt }\n    : { path: file.path, name: file.name };\n}\n\nfunction sortRecentFiles(files: RecentFile[]): RecentFile[] {\n  return files\n    .map((file, index) => ({ file, index, timestamp: file.lastOpenedAt }))\n    .sort((left, right) => {\n      const leftTimestamp = validRecentFileTimestamp(left.timestamp) ? left.timestamp : undefined;\n      const rightTimestamp = validRecentFileTimestamp(right.timestamp) ? right.timestamp : undefined;\n      if (leftTimestamp !== undefined && rightTimestamp !== undefined) {\n        return rightTimestamp - leftTimestamp || left.index - right.index;\n      }\n      if (leftTimestamp !== undefined || rightTimestamp !== undefined) return leftTimestamp !== undefined ? -1 : 1;\n      return left.index - right.index;\n    })\n    .map(({ file }) => file);\n}\n\nfunction normalizeRecentFiles(value: unknown): RecentFile[] {\n  if (!Array.isArray(value)) return [];\n\n  return sortRecentFiles(value.map(parseRecentFile).filter((file): file is RecentFile => file !== null)).slice(\n    0,\n    MAX_RECENT_FILES,\n  );\n}\n\nexport function loadWorkspacePath(): string | null {\n  try {\n    return localStorage.getItem(workspaceKey);\n  } catch {\n    return null;\n  }\n}\n\nexport function saveWorkspacePath(path: string | null): void {\n  try {\n    if (path) localStorage.setItem(workspaceKey, path);\n    else localStorage.removeItem(workspaceKey);\n  } catch {\n    // Local storage may be unavailable in a restricted browser preview.\n  }\n}\n\nexport function loadLastDocumentPath(): string | null {\n  try {\n    return localStorage.getItem(lastDocumentKey);\n  } catch {\n    return null;\n  }\n}\n\nexport function saveLastDocumentPath(path: string | null): void {\n  try {\n    if (path) localStorage.setItem(lastDocumentKey, path);\n    else localStorage.removeItem(lastDocumentKey);\n  } catch {\n    // Local storage may be unavailable in a restricted browser preview.\n  }\n}\n\nfunction parseOpenTabs(parsed: unknown): RecentFile[] {\n  if (!Array.isArray(parsed)) return [];\n\n  const seen = new Set<string>();\n  return parsed\n    .map(parseRecentFile)\n    .filter((item): item is RecentFile => item !== null)\n    .filter((item) => !item.path.startsWith("browser://"))\n    .filter((item) => {\n      const key = comparablePath(item.path);\n      if (seen.has(key)) return false;\n      seen.add(key);\n      return true;\n    })\n    .slice(0, maxOpenTabs);\n}\n\nexport function loadOpenTabs(): RecentFile[] {\n  try {\n    const raw = localStorage.getItem(openTabsKey);\n    if (!raw) return [];\n    return parseOpenTabs(JSON.parse(raw) as unknown);\n  } catch {\n    return [];\n  }\n}\n\nfunction parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {\n  if (!raw) return [];\n  const parsed = JSON.parse(raw) as unknown;\n  if (!Array.isArray(parsed)) return [];\n\n  const seen = new Set<string>();\n  return parsed\n    .filter(\n      (item): item is { path: string; tabs?: unknown; activeDocumentPath?: unknown } =>\n        typeof item === "object" &&\n        item !== null &&\n        typeof (item as { path?: unknown }).path === "string" &&\n        (item as { path: string }).path.trim().length > 0,\n    )\n    .map((item) => {\n      const tabs = parseOpenTabs(item.tabs).filter((tab) => isPathWithin(tab.path, item.path));\n      const activeDocumentPath =\n        typeof item.activeDocumentPath === "string" && isPathWithin(item.activeDocumentPath, item.path)\n          ? item.activeDocumentPath\n          : null;\n      return { path: item.path, tabs, activeDocumentPath };\n    })\n    .filter((session) => {\n      const key = comparablePath(session.path);\n      if (seen.has(key)) return false;\n      seen.add(key);\n      return true;\n    })\n    .slice(0, MAX_MOUNTED_WORKSPACES);\n}\n\nexport function loadWorkspaceSessions(): WorkspaceSession[] {\n  try {\n    return parseWorkspaceSessions(localStorage.getItem(workspaceSessionsKey));\n  } catch {\n    return [];\n  }\n}\n\nexport function saveWorkspaceSessions(sessions: WorkspaceSession[]): void {\n  try {\n    const normalized = parseWorkspaceSessions(JSON.stringify(sessions));\n    localStorage.setItem(workspaceSessionsKey, JSON.stringify(normalized));\n  } catch {\n    // Workspace session restoration is best-effort when local storage is unavailable.\n  }\n}\n\nexport function saveWorkspaceSession(session: WorkspaceSession): void {\n  const key = comparablePath(session.path);\n  const next = [session, ...loadWorkspaceSessions().filter((item) => comparablePath(item.path) !== key)].slice(\n    0,\n    MAX_MOUNTED_WORKSPACES,\n  );\n  saveWorkspaceSessions(next);\n}\n\nexport function forgetWorkspaceSession(path: string): void {\n  const key = comparablePath(path);\n  saveWorkspaceSessions(loadWorkspaceSessions().filter((session) => comparablePath(session.path) !== key));\n}\n\nexport function saveOpenTabs(tabs: RecentFile[]): void {\n  try {\n    const seen = new Set<string>();\n    const next = tabs\n      .filter((tab) => tab.path.trim().length > 0 && tab.name.trim().length > 0 && !tab.path.startsWith("browser://"))\n      .filter((tab) => {\n        const key = comparablePath(tab.path);\n        if (seen.has(key)) return false;\n        seen.add(key);\n        return true;\n      })\n      .slice(0, maxOpenTabs);\n    localStorage.setItem(openTabsKey, JSON.stringify(next));\n  } catch {\n    // Session restoration is best-effort when local storage is unavailable.\n  }\n}\n\nexport type ReadingPosition = {\n  path: string;\n  top: number;\n};\n\nfunction isReadingPosition(value: unknown): value is ReadingPosition {\n  return (\n    typeof value === "object" &&\n    value !== null &&\n    typeof (value as ReadingPosition).path === "string" &&\n    typeof (value as ReadingPosition).top === "number" &&\n    Number.isFinite((value as ReadingPosition).top) &&\n    (value as ReadingPosition).top >= 0\n  );\n}\n\nexport function normalizeReadingPositions(value: unknown): ReadingPosition[] {\n  if (!Array.isArray(value)) return [];\n\n  const seen = new Set<string>();\n  return value\n    .filter(isReadingPosition)\n    .map((item) => ({ path: item.path.trim(), top: Math.max(0, Math.round(item.top)) }))\n    .filter((item) => item.path.length > 0)\n    .filter((item) => {\n      const key = comparablePath(item.path);\n      if (!key || seen.has(key)) return false;\n      seen.add(key);\n      return true;\n    })\n    .slice(0, MAX_READING_POSITIONS);\n}\n\nexport function loadReadingPositions(): ReadingPosition[] {\n  try {\n    const raw = localStorage.getItem(readingPositionsKey);\n    if (!raw) return [];\n    return normalizeReadingPositions(JSON.parse(raw) as unknown);\n  } catch {\n    return [];\n  }\n}\n\nexport function saveReadingPositions(positions: readonly ReadingPosition[]): void {\n  try {\n    localStorage.setItem(readingPositionsKey, JSON.stringify(normalizeReadingPositions(positions)));\n  } catch {\n    // Local storage may be unavailable in a restricted browser preview.\n  }\n}\n\nexport function loadReadingPosition(path: string): number {\n  const key = comparablePath(path);\n  return loadReadingPositions().find((item) => comparablePath(item.path) === key)?.top ?? 0;\n}\n\nexport function saveReadingPosition(path: string, top: number): void {\n  const key = comparablePath(path);\n  if (!key || !Number.isFinite(top)) return;\n\n  saveReadingPositions([{ path, top }, ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key)]);\n}\n\nfunction parseWorkspaceList(raw: string | null, limit: number): RecentWorkspace[] {\n  if (!raw) return [];\n  const parsed = JSON.parse(raw) as unknown;\n  if (!Array.isArray(parsed)) return [];\n\n  const seen = new Set<string>();\n  return parsed\n    .filter(\n      (item): item is RecentWorkspace =>\n        typeof item === "object" &&\n        item !== null &&\n        typeof (item as RecentWorkspace).path === "string" &&\n        typeof (item as RecentWorkspace).name === "string" &&\n        (item as RecentWorkspace).path.trim().length > 0 &&\n        (item as RecentWorkspace).name.trim().length > 0,\n    )\n    .filter((workspace) => {\n      const key = comparablePath(workspace.path);\n      if (seen.has(key)) return false;\n      seen.add(key);\n      return true;\n    })\n    .slice(0, limit);\n}\n\nfunction loadWorkspaceList(key: string, limit: number): RecentWorkspace[] {\n  try {\n    return parseWorkspaceList(localStorage.getItem(key), limit);\n  } catch {\n    return [];\n  }\n}\n\nfunction saveWorkspaceList(key: string, workspaces: RecentWorkspace[], limit: number): void {\n  try {\n    const normalized = parseWorkspaceList(JSON.stringify(workspaces), limit);\n    localStorage.setItem(key, JSON.stringify(normalized));\n  } catch {\n    // Workspace lists remain available for the current session.\n  }\n}\n\nexport function loadRecentWorkspaces(): RecentWorkspace[] {\n  return loadWorkspaceList(recentWorkspacesKey, maxRecentWorkspaces);\n}\n\nexport function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {\n  saveWorkspaceList(recentWorkspacesKey, workspaces, maxRecentWorkspaces);\n}\n\nexport function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {\n  const key = comparablePath(workspace.path);\n  const next = [workspace, ...loadRecentWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(\n    0,\n    maxRecentWorkspaces,\n  );\n  saveRecentWorkspaces(next);\n  return next;\n}\n\nexport function loadMountedWorkspaces(): RecentWorkspace[] {\n  return loadWorkspaceList(mountedWorkspacesKey, MAX_MOUNTED_WORKSPACES);\n}\n\nexport function saveMountedWorkspaces(workspaces: RecentWorkspace[]): void {\n  saveWorkspaceList(mountedWorkspacesKey, workspaces, MAX_MOUNTED_WORKSPACES);\n}\n\nexport function rememberMountedWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {\n  const key = comparablePath(workspace.path);\n  const next = [workspace, ...loadMountedWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(\n    0,\n    MAX_MOUNTED_WORKSPACES,\n  );\n  saveMountedWorkspaces(next);\n  return next;\n}\n\nexport function forgetMountedWorkspace(path: string): RecentWorkspace[] {\n  const key = comparablePath(path);\n  const next = loadMountedWorkspaces().filter((workspace) => comparablePath(workspace.path) !== key);\n  saveMountedWorkspaces(next);\n  return next;\n}\n\nexport function loadRecentFiles(): RecentFile[] {\n  try {\n    const raw = localStorage.getItem(recentFilesKey);\n    if (!raw) return [];\n    return normalizeRecentFiles(JSON.parse(raw) as unknown);\n  } catch {\n    return [];\n  }\n}\n\nexport function rememberRecentFile(file: RecentFile, openedAt = Date.now()): RecentFile[] {\n  const stampedFile = validRecentFileTimestamp(openedAt)\n    ? { path: file.path, name: file.name, lastOpenedAt: openedAt }\n    : { path: file.path, name: file.name };\n  const next = normalizeRecentFiles([stampedFile, ...loadRecentFiles().filter((item) => item.path !== file.path)]);\n  saveRecentFiles(next);\n  return next;\n}\n\nexport function saveRecentFiles(files: RecentFile[]): void {\n  try {\n    localStorage.setItem(recentFilesKey, JSON.stringify(normalizeRecentFiles(files)));\n  } catch {\n    // Recent files remain available for the current session.\n  }\n}\n\nexport function formatRecentFileTime(lastOpenedAt?: number, now = Date.now()): string {\n  if (!validRecentFileTimestamp(lastOpenedAt)) return "打开时间未知";\n\n  const elapsedMinutes = Math.max(0, Math.floor((now - lastOpenedAt) / 60_000));\n  if (elapsedMinutes < 1) return "刚刚";\n  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;\n  const elapsedHours = Math.floor(elapsedMinutes / 60);\n  if (elapsedHours < 24) return `${elapsedHours} 小时前`;\n  return `${Math.floor(elapsedHours / 24)} 天前`;\n}\n
+import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";
+import { isPathWithin, normalizePathKey } from "./path-key";
+import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
+
+const workspaceKey = "moyang-reader-workspace";
+const recentFilesKey = "moyang-reader-recent-files";
+const recentWorkspacesKey = "moyang-reader-recent-workspaces";
+const mountedWorkspacesKey = "moyang-reader-mounted-workspaces";
+const workspaceSessionsKey = "moyang-reader-workspace-sessions";
+const lastDocumentKey = "moyang-reader-last-document";
+const openTabsKey = "moyang-reader-open-tabs";
+const readingPositionsKey = "moyang-reader-reading-positions";
+const sidebarCollapsedKey = "moyang-reader-sidebar-collapsed";
+const contextPanelOpenKey = "moyang-reader-context-panel-open";
+const contextPanelTabKey = "moyang-reader-context-panel-tab";
+const paneWidthsKey = "moyang-reader-pane-widths";
+export const MAX_RECENT_FILES = 50;
+const maxRecentWorkspaces = 8;
+export const MAX_MOUNTED_WORKSPACES = 5;
+const maxOpenTabs = 16;
+export const MAX_READING_POSITIONS = 32;
+
+export type WorkspaceSession = {
+  path: string;
+  tabs: RecentFile[];
+  activeDocumentPath: string | null;
+};
+
+export function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(sidebarCollapsedKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(sidebarCollapsedKey, String(collapsed));
+  } catch {
+    // The layout preference remains available for the current session.
+  }
+}
+
+export function loadContextPanelOpen(): boolean {
+  try {
+    const saved = localStorage.getItem(contextPanelOpenKey);
+    return saved === null ? true : saved === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function saveContextPanelOpen(open: boolean): void {
+  try {
+    localStorage.setItem(contextPanelOpenKey, String(open));
+  } catch {
+    // The context panel remains available for the current session.
+  }
+}
+
+export function loadContextPanelTab(): ContextPanelTab {
+  try {
+    const saved = localStorage.getItem(contextPanelTabKey);
+    return saved === "backlinks" || saved === "properties" || saved === "bookmarks" || saved === "annotations"
+      ? saved
+      : "outline";
+  } catch {
+    return "outline";
+  }
+}
+
+export function saveContextPanelTab(tab: ContextPanelTab): void {
+  try {
+    localStorage.setItem(contextPanelTabKey, tab);
+  } catch {
+    // The context panel tab remains available for the current session.
+  }
+}
+
+export function loadPaneWidths(): PaneWidths {
+  try {
+    const raw = localStorage.getItem(paneWidthsKey);
+    return raw ? normalizePaneWidths(JSON.parse(raw) as unknown) : { ...DEFAULT_PANE_WIDTHS };
+  } catch {
+    return { ...DEFAULT_PANE_WIDTHS };
+  }
+}
+
+export function savePaneWidths(widths: PaneWidths): void {
+  try {
+    localStorage.setItem(paneWidthsKey, JSON.stringify(normalizePaneWidths(widths)));
+  } catch {
+    // Pane widths remain available for the current session.
+  }
+}
+
+function comparablePath(path: string): string {
+  return normalizePathKey(path);
+}
+
+function validRecentFileTimestamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function parseRecentFile(value: unknown): RecentFile | null {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as RecentFile).path !== "string" ||
+    typeof (value as RecentFile).name !== "string"
+  ) {
+    return null;
+  }
+
+  const file = value as RecentFile;
+  if (!file.path.trim() || !file.name.trim() || file.path.startsWith("browser://")) return null;
+  return validRecentFileTimestamp(file.lastOpenedAt)
+    ? { path: file.path, name: file.name, lastOpenedAt: file.lastOpenedAt }
+    : { path: file.path, name: file.name };
+}
+
+function sortRecentFiles(files: RecentFile[]): RecentFile[] {
+  return files
+    .map((file, index) => ({ file, index, timestamp: file.lastOpenedAt }))
+    .sort((left, right) => {
+      const leftTimestamp = validRecentFileTimestamp(left.timestamp) ? left.timestamp : undefined;
+      const rightTimestamp = validRecentFileTimestamp(right.timestamp) ? right.timestamp : undefined;
+      if (leftTimestamp !== undefined && rightTimestamp !== undefined) {
+        return rightTimestamp - leftTimestamp || left.index - right.index;
+      }
+      if (leftTimestamp !== undefined || rightTimestamp !== undefined) return leftTimestamp !== undefined ? -1 : 1;
+      return left.index - right.index;
+    })
+    .map(({ file }) => file);
+}
+
+function normalizeRecentFiles(value: unknown): RecentFile[] {
+  if (!Array.isArray(value)) return [];
+
+  return sortRecentFiles(value.map(parseRecentFile).filter((file): file is RecentFile => file !== null)).slice(
+    0,
+    MAX_RECENT_FILES,
+  );
+}
+
+export function loadWorkspacePath(): string | null {
+  try {
+    return localStorage.getItem(workspaceKey);
+  } catch {
+    return null;
+  }
+}
+
+export function saveWorkspacePath(path: string | null): void {
+  try {
+    if (path) localStorage.setItem(workspaceKey, path);
+    else localStorage.removeItem(workspaceKey);
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+export function loadLastDocumentPath(): string | null {
+  try {
+    return localStorage.getItem(lastDocumentKey);
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastDocumentPath(path: string | null): void {
+  try {
+    if (path) localStorage.setItem(lastDocumentKey, path);
+    else localStorage.removeItem(lastDocumentKey);
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+function parseOpenTabs(parsed: unknown): RecentFile[] {
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  return parsed
+    .map(parseRecentFile)
+    .filter((item): item is RecentFile => item !== null)
+    .filter((item) => !item.path.startsWith("browser://"))
+    .filter((item) => {
+      const key = comparablePath(item.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, maxOpenTabs);
+}
+
+export function loadOpenTabs(): RecentFile[] {
+  try {
+    const raw = localStorage.getItem(openTabsKey);
+    if (!raw) return [];
+    return parseOpenTabs(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+function parseWorkspaceSessions(raw: string | null): WorkspaceSession[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  return parsed
+    .filter(
+      (item): item is { path: string; tabs?: unknown; activeDocumentPath?: unknown } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { path?: unknown }).path === "string" &&
+        (item as { path: string }).path.trim().length > 0,
+    )
+    .map((item) => {
+      const tabs = parseOpenTabs(item.tabs).filter((tab) => isPathWithin(tab.path, item.path));
+      const activeDocumentPath =
+        typeof item.activeDocumentPath === "string" && isPathWithin(item.activeDocumentPath, item.path)
+          ? item.activeDocumentPath
+          : null;
+      return { path: item.path, tabs, activeDocumentPath };
+    })
+    .filter((session) => {
+      const key = comparablePath(session.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_MOUNTED_WORKSPACES);
+}
+
+export function loadWorkspaceSessions(): WorkspaceSession[] {
+  try {
+    return parseWorkspaceSessions(localStorage.getItem(workspaceSessionsKey));
+  } catch {
+    return [];
+  }
+}
+
+export function saveWorkspaceSessions(sessions: WorkspaceSession[]): void {
+  try {
+    const normalized = parseWorkspaceSessions(JSON.stringify(sessions));
+    localStorage.setItem(workspaceSessionsKey, JSON.stringify(normalized));
+  } catch {
+    // Workspace session restoration is best-effort when local storage is unavailable.
+  }
+}
+
+export function saveWorkspaceSession(session: WorkspaceSession): void {
+  const key = comparablePath(session.path);
+  const next = [session, ...loadWorkspaceSessions().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    MAX_MOUNTED_WORKSPACES,
+  );
+  saveWorkspaceSessions(next);
+}
+
+export function forgetWorkspaceSession(path: string): void {
+  const key = comparablePath(path);
+  saveWorkspaceSessions(loadWorkspaceSessions().filter((session) => comparablePath(session.path) !== key));
+}
+
+export function saveOpenTabs(tabs: RecentFile[]): void {
+  try {
+    const seen = new Set<string>();
+    const next = tabs
+      .filter((tab) => tab.path.trim().length > 0 && tab.name.trim().length > 0 && !tab.path.startsWith("browser://"))
+      .filter((tab) => {
+        const key = comparablePath(tab.path);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, maxOpenTabs);
+    localStorage.setItem(openTabsKey, JSON.stringify(next));
+  } catch {
+    // Session restoration is best-effort when local storage is unavailable.
+  }
+}
+
+export type ReadingPosition = {
+  path: string;
+  top: number;
+};
+
+function isReadingPosition(value: unknown): value is ReadingPosition {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ReadingPosition).path === "string" &&
+    typeof (value as ReadingPosition).top === "number" &&
+    Number.isFinite((value as ReadingPosition).top) &&
+    (value as ReadingPosition).top >= 0
+  );
+}
+
+export function normalizeReadingPositions(value: unknown): ReadingPosition[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  return value
+    .filter(isReadingPosition)
+    .map((item) => ({ path: item.path.trim(), top: Math.max(0, Math.round(item.top)) }))
+    .filter((item) => item.path.length > 0)
+    .filter((item) => {
+      const key = comparablePath(item.path);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_READING_POSITIONS);
+}
+
+export function loadReadingPositions(): ReadingPosition[] {
+  try {
+    const raw = localStorage.getItem(readingPositionsKey);
+    if (!raw) return [];
+    return normalizeReadingPositions(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+export function saveReadingPositions(positions: readonly ReadingPosition[]): void {
+  try {
+    localStorage.setItem(readingPositionsKey, JSON.stringify(normalizeReadingPositions(positions)));
+  } catch {
+    // Local storage may be unavailable in a restricted browser preview.
+  }
+}
+
+export function loadReadingPosition(path: string): number {
+  const key = comparablePath(path);
+  return loadReadingPositions().find((item) => comparablePath(item.path) === key)?.top ?? 0;
+}
+
+export function saveReadingPosition(path: string, top: number): void {
+  const key = comparablePath(path);
+  if (!key || !Number.isFinite(top)) return;
+
+  saveReadingPositions([{ path, top }, ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key)]);
+}
+
+function parseWorkspaceList(raw: string | null, limit: number): RecentWorkspace[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  const seen = new Set<string>();
+  return parsed
+    .filter(
+      (item): item is RecentWorkspace =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as RecentWorkspace).path === "string" &&
+        typeof (item as RecentWorkspace).name === "string" &&
+        (item as RecentWorkspace).path.trim().length > 0 &&
+        (item as RecentWorkspace).name.trim().length > 0,
+    )
+    .filter((workspace) => {
+      const key = comparablePath(workspace.path);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function loadWorkspaceList(key: string, limit: number): RecentWorkspace[] {
+  try {
+    return parseWorkspaceList(localStorage.getItem(key), limit);
+  } catch {
+    return [];
+  }
+}
+
+function saveWorkspaceList(key: string, workspaces: RecentWorkspace[], limit: number): void {
+  try {
+    const normalized = parseWorkspaceList(JSON.stringify(workspaces), limit);
+    localStorage.setItem(key, JSON.stringify(normalized));
+  } catch {
+    // Workspace lists remain available for the current session.
+  }
+}
+
+export function loadRecentWorkspaces(): RecentWorkspace[] {
+  return loadWorkspaceList(recentWorkspacesKey, maxRecentWorkspaces);
+}
+
+export function saveRecentWorkspaces(workspaces: RecentWorkspace[]): void {
+  saveWorkspaceList(recentWorkspacesKey, workspaces, maxRecentWorkspaces);
+}
+
+export function rememberRecentWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
+  const key = comparablePath(workspace.path);
+  const next = [workspace, ...loadRecentWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    maxRecentWorkspaces,
+  );
+  saveRecentWorkspaces(next);
+  return next;
+}
+
+export function loadMountedWorkspaces(): RecentWorkspace[] {
+  return loadWorkspaceList(mountedWorkspacesKey, MAX_MOUNTED_WORKSPACES);
+}
+
+export function saveMountedWorkspaces(workspaces: RecentWorkspace[]): void {
+  saveWorkspaceList(mountedWorkspacesKey, workspaces, MAX_MOUNTED_WORKSPACES);
+}
+
+export function rememberMountedWorkspace(workspace: RecentWorkspace): RecentWorkspace[] {
+  const key = comparablePath(workspace.path);
+  const next = [workspace, ...loadMountedWorkspaces().filter((item) => comparablePath(item.path) !== key)].slice(
+    0,
+    MAX_MOUNTED_WORKSPACES,
+  );
+  saveMountedWorkspaces(next);
+  return next;
+}
+
+export function forgetMountedWorkspace(path: string): RecentWorkspace[] {
+  const key = comparablePath(path);
+  const next = loadMountedWorkspaces().filter((workspace) => comparablePath(workspace.path) !== key);
+  saveMountedWorkspaces(next);
+  return next;
+}
+
+export function loadRecentFiles(): RecentFile[] {
+  try {
+    const raw = localStorage.getItem(recentFilesKey);
+    if (!raw) return [];
+    return normalizeRecentFiles(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+export function rememberRecentFile(file: RecentFile, openedAt = Date.now()): RecentFile[] {
+  const stampedFile = validRecentFileTimestamp(openedAt)
+    ? { path: file.path, name: file.name, lastOpenedAt: openedAt }
+    : { path: file.path, name: file.name };
+  const next = normalizeRecentFiles([stampedFile, ...loadRecentFiles().filter((item) => item.path !== file.path)]);
+  saveRecentFiles(next);
+  return next;
+}
+
+export function saveRecentFiles(files: RecentFile[]): void {
+  try {
+    localStorage.setItem(recentFilesKey, JSON.stringify(normalizeRecentFiles(files)));
+  } catch {
+    // Recent files remain available for the current session.
+  }
+}
+
+export function formatRecentFileTime(lastOpenedAt?: number, now = Date.now()): string {
+  if (!validRecentFileTimestamp(lastOpenedAt)) return "打开时间未知";
+
+  const elapsedMinutes = Math.max(0, Math.floor((now - lastOpenedAt) / 60_000));
+  if (elapsedMinutes < 1) return "刚刚";
+  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours} 小时前`;
+  return `${Math.floor(elapsedHours / 24)} 天前`;
+}
