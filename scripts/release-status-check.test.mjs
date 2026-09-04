@@ -16,7 +16,6 @@ function copyStatusFixture() {
   for (const relativePath of [
     "package.json",
     "CHANGELOG.md",
-    "docs/NEXT.md",
     "docs/AI-HANDOFF.md",
     "docs/AI-TAKEOVER-PROMPT.md",
     "docs/RELEASE-POLICY.md",
@@ -43,29 +42,6 @@ function writeStatus(root, status) {
 
 test("accepts the checked-in release and handoff status", () => {
   assert.deepEqual(validateReleaseStatus(sourceRoot), []);
-});
-
-test("rejects a NEXT file with duplicate or missing readiness status", () => {
-  const root = copyStatusFixture();
-  try {
-    const nextPath = path.join(root, "docs", "NEXT.md");
-    const next = fs.readFileSync(nextPath, "utf8");
-    fs.writeFileSync(nextPath, next.replace("- 状态：READY", "- 状态：READY\n- 状态：BLOCKED"), "utf8");
-    let errors = validateReleaseStatus(root);
-    assert.equal(
-      errors.some((error) => error.includes("唯一状态")),
-      true,
-    );
-
-    fs.writeFileSync(nextPath, next.replace("- 状态：READY", ""), "utf8");
-    errors = validateReleaseStatus(root);
-    assert.equal(
-      errors.some((error) => error.includes("唯一状态")),
-      true,
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
 });
 
 test("rejects release status when versions, assets, or changelog drift", () => {

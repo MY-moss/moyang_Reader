@@ -1,0 +1,16 @@
+# Governance files require repository-owner review. This file must protect itself.
+/AGENTS.md @MY-moss
+/.github/CODEOWNERS @MY-moss
+/.github/workflows/** @MY-moss
+/docs/ai/policy.json @MY-moss
+/docs/ai/plan-v1.json @MY-moss
+/docs/ai/approvals/** @MY-moss
+/docs/RELEASE-POLICY.md @MY-moss
+/SECURITY.md @MY-moss
+/scripts/ai-context-check.mjs @MY-moss
+/scripts/ai-context-check.test.mjs @MY-moss
+/scripts/ai-state.mjs @MY-moss
+/scripts/ai-state.test.mjs @MY-moss
+/scripts/cleanup-workspace.mjs @MY-moss
+/scripts/cleanup-workspace.test.mjs @MY-moss
+/docs/WORKSPACE-CLEANUP.md @MY-moss

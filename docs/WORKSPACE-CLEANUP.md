@@ -18,7 +18,7 @@
 - 根目录当前未提交改动、未推送分支和未完成 PR；
 - 含未提交改动、未合并分支、junction/符号链接或无法确认归属的工作树；
 - `docs/handoff/`、Release 记录、Issue/PR 模板、用户笔记和工作区文件；
-- `node_modules/` 的唯一真实目录及其被 junction 指向的内容；
+- 各工作树独立的 `node_modules/`；旧版 junction 只报告并保留，不自动解除或覆盖；
 - 私钥、API Token、Windows 凭据和用户配置；清理器不会触碰这些内容。
 
 ## 2. 唯一清理流程
@@ -41,7 +41,7 @@ npm run cleanup:workspace -- --apply
 npm run cleanup:workspace -- --apply --prune-targets
 ```
 
-需要回收已合并且干净的项目内工作树时，再额外加入 `--prune-worktrees`。清理器会自动跳过脏工作树和含 junction/符号链接的工作树；禁止使用强制删除绕过保护。
+需要回收已合并且干净的项目内工作树时，再额外加入 `--prune-worktrees`。清理器只接受目录干净、不含 junction/符号链接、使用 `codex/` 分支且该分支已合并到本地 `origin/main` 的候选；当前、detached、普通分支、未合并分支和证据读取失败的工作树都会保留。禁止使用强制删除绕过保护。
 
 ### 构建缓存预算提示
 
@@ -57,7 +57,7 @@ npm run cleanup:workspace -- --dry-run
 
 ## 3. 防止再次膨胀
 
-1. 新工作树只放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <path>` 复用唯一的 `node_modules`。
+1. 新工作树只放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <path>` 执行独立的 `npm ci --prefer-offline`；共享 npm 下载缓存，不共享 `node_modules`。
 2. Tauri/Cargo 只通过仓库包装脚本运行，默认目标统一到 `%LOCALAPPDATA%\Moyang Reader\build-cache\cargo-target`；如需迁移磁盘，在用户级环境变量设置 `MOYANG_BUILD_CACHE_DIR`，不要把目标放进源码仓库或工作树。
 3. 开发阶段不重复生成安装包；一个切片最多一次完整构建。
 4. 每个新切片开始前先预览清理器；日常只清理非保护生成物，Cargo target 按空闲状态和磁盘阈值清理。

@@ -243,6 +243,31 @@ function hasChanges(worktreePath) {
   return runGit(["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all"], worktreePath).trim();
 }
 
+export function assessWorktreeRemovalEvidence(
+  entry,
+  { hasChanges: dirty = false, reparsePointCount = 0, mergedIntoMain = false } = {},
+) {
+  if (entry.detached || !entry.branch) {
+    return { removable: false, reason: "缺少可核验分支（detached）" };
+  }
+  if (!entry.branch.startsWith("refs/heads/codex/")) {
+    return { removable: false, reason: "不是受管 codex/ 分支" };
+  }
+  if (dirty) return { removable: false, reason: "有未提交改动" };
+  if (reparsePointCount > 0) return { removable: false, reason: "含 junction/符号链接，已跳过" };
+  if (!mergedIntoMain) return { removable: false, reason: "分支尚未合并到 origin/main" };
+  return { removable: true, reason: "目录干净且 codex/ 分支已合并到 origin/main" };
+}
+
+function isMergedIntoMain(branch, repositoryRoot) {
+  try {
+    runGit(["merge-base", "--is-ancestor", branch, "origin/main"], repositoryRoot);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function formatBytes(bytes) {
   const kib = 1024;
   const mib = kib * 1024;
@@ -322,14 +347,14 @@ function main() {
       continue;
     }
 
-    if (changes) {
-      skipped.push(`${path.basename(worktreePath)}: 有未提交改动`);
-      continue;
-    }
-
     const links = findReparsePoints(worktreePath);
-    if (links.length > 0) {
-      skipped.push(`${path.basename(worktreePath)}: 含 junction/符号链接，已跳过`);
+    const evidence = assessWorktreeRemovalEvidence(entry, {
+      hasChanges: Boolean(changes),
+      reparsePointCount: links.length,
+      mergedIntoMain: isMergedIntoMain(entry.branch, repositoryRoot),
+    });
+    if (!evidence.removable) {
+      skipped.push(`${path.basename(worktreePath)}: ${evidence.reason}`);
       continue;
     }
     removable.push(worktreePath);
@@ -360,6 +385,9 @@ function main() {
     for (const artifact of cleanableArtifacts.slice(0, 40)) {
       console.log(`- ${formatBytes(artifact.bytes)} ${artifact.label}: ${artifact.path}`);
     }
+  }
+  if (removable.length > 0) {
+    console.log(`可回收工作树：${removable.map((candidate) => path.basename(candidate)).join("、")}。`);
   }
   if (protectedArtifacts.length > 0) {
     console.log("受保护构建目标：使用 --prune-targets 后才会清理。");

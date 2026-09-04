@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "planId": "moyang-v1",
+  "currentTaskId": "M1101",
+  "queueIndex": 3,
+  "status": "AWAITING_APPROVAL",
+  "branch": "codex/ai-context-reset-2026-09-03",
+  "baseSha": "2a90448a065c2f5e98792106c93df2a3752bd79d",
+  "completedTaskIds": ["G01", "G02"],
+  "remoteCheck": null,
+  "approval": null,
+  "verification": [],
+  "lastCancelled": {
+    "taskId": "G03",
+    "reason": "按用户决定取消外部 GitHub App、Code Owner 和探针门禁；保留 G01/G02 的仓库内控制面。",
+    "recordedAt": "2026-09-04T03:00:07.337Z"
+  },
+  "blocker": {
+    "reason": "G03 已按用户决定取消；需要合并本次计划和状态机修订后重新运行 ai:start。",
+    "nextAction": "合并本次治理修订后运行 npm run ai:start，开始 M1101。"
+  },
+  "deliveryEvidence": null,
+  "lastCompleted": {
+    "taskId": "G02",
+    "summary": "已建立结构化 AI 控制面、状态机、生成摘要和本地治理门禁。",
+    "verification": [
+      { "command": "npm run test:workflow", "result": "pass" },
+      { "command": "npm run ai:check", "result": "pass" },
+      { "command": "git diff --check", "result": "pass" }
+    ],
+    "deliveryEvidence": {
+      "summary": "G01/G02 治理切片已在独立工作树验证，等待首次人工审查。",
+      "recordedAt": "2026-09-03T19:12:20.021Z"
+    }
+  },
+  "updatedAt": "2026-09-04T03:00:07.337Z"
+}

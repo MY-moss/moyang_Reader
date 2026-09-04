@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  assessWorktreeRemovalEvidence,
   assessBuildCacheBudget,
   collectGeneratedArtifacts,
   formatBuildCacheBudgetReport,
@@ -13,6 +14,27 @@ import {
   measurePath,
   parseWorktreeList,
 } from "./cleanup-workspace.mjs";
+
+test("only removes clean merged worktrees with managed branch evidence", () => {
+  const managed = { path: "D:/repo/.codex-worktrees/feature", branch: "refs/heads/codex/feature" };
+
+  assert.deepEqual(assessWorktreeRemovalEvidence(managed, { mergedIntoMain: true }), {
+    removable: true,
+    reason: "目录干净且 codex/ 分支已合并到 origin/main",
+  });
+  assert.equal(assessWorktreeRemovalEvidence(managed).removable, false);
+  assert.equal(assessWorktreeRemovalEvidence(managed, { hasChanges: true, mergedIntoMain: true }).removable, false);
+  assert.equal(assessWorktreeRemovalEvidence(managed, { reparsePointCount: 1, mergedIntoMain: true }).removable, false);
+  assert.equal(
+    assessWorktreeRemovalEvidence({ path: managed.path, detached: true }, { mergedIntoMain: true }).removable,
+    false,
+  );
+  assert.equal(
+    assessWorktreeRemovalEvidence({ path: managed.path, branch: "refs/heads/main" }, { mergedIntoMain: true })
+      .removable,
+    false,
+  );
+});
 
 test("parses registered worktrees without losing branch metadata", () => {
   const entries = parseWorktreeList(

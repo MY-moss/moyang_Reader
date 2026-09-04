@@ -74,6 +74,9 @@ jobs:
       - name: Workspace hygiene helper tests
         run: npm run test:workflow
 
+      - name: AI governance state check
+        run: npm run ai:check
+
       - name: Frontend coverage gate
         run: npm run test:coverage
 

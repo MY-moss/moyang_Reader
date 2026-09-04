@@ -1,6 +1,6 @@
 # v0.9.0 功能需求与验收
 
-> 本文保留多个版本的验收记录。历史段落中的“当前”“开放”只代表当时快照；现在的 Issue 状态以 [`ISSUE-INDEX.md`](ISSUE-INDEX.md) 和 GitHub 为准，当前唯一 Ready 以 [`NEXT.md`](NEXT.md) 为准。
+> 本文保留多个版本的验收记录。历史段落中的“当前”“开放”只代表当时快照；实时 Issue/PR 状态以 GitHub 为准，批准队列与运行状态分别以 [`ai/plan-v1.json`](ai/plan-v1.json) 和 [`ai/state.json`](ai/state.json) 为准，[`NEXT.md`](NEXT.md) 只是生成摘要。
 
 ## 产品边界
 
