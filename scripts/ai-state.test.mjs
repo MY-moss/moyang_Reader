@@ -186,6 +186,7 @@ test("allows a controlled migration away from a cancelled current task", () => {
 
 test("migrates a cancelled current task to the next active task", () => {
   const { plan, state } = loadGovernance(sourceRoot);
+  assert.equal(nextActiveQueueIndex(plan, 2), 3);
   const previous = {
     ...state,
     currentTaskId: "G03",
