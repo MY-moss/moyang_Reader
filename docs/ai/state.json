@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
   "planId": "moyang-v1",
-  "currentTaskId": "M1102",
-  "queueIndex": 4,
+  "currentTaskId": "M1103",
+  "queueIndex": 5,
   "status": "PENDING_INTAKE",
-  "branch": "codex/m1101-path-key-2026-09-04",
-  "baseSha": "93f67d876ec7a88505abb74edaba8e636857a0f3",
-  "completedTaskIds": ["G01", "G02", "M1101"],
+  "branch": "codex/m1102-coverage-gate-2026-09-04-main",
+  "baseSha": "7b58ae1ca84ff478b542a5a9b7aaee01e54f14ec",
+  "completedTaskIds": ["G01", "G02", "M1101", "M1102"],
   "remoteCheck": null,
   "approval": null,
   "verification": [],
   "lastCancelled": null,
   "blocker": null,
   "deliveryEvidence": {
-    "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
-    "recordedAt": "2026-09-04T04:27:11.304Z"
+    "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
+    "recordedAt": "2026-09-04T06:12:34.050Z"
   },
   "lastCompleted": {
-    "taskId": "M1101",
-    "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
+    "taskId": "M1102",
+    "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
     "verification": [
       {
-        "command": "npm test -- --run path-key",
+        "command": "npm run test:coverage",
         "result": "pass"
       },
       {
@@ -35,16 +35,12 @@
       {
         "command": "npm run ai:check",
         "result": "pass"
-      },
-      {
-        "command": "git diff --check",
-        "result": "pass"
       }
     ],
     "deliveryEvidence": {
-      "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
-      "recordedAt": "2026-09-04T04:27:11.304Z"
+      "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
+      "recordedAt": "2026-09-04T06:12:34.050Z"
     }
   },
-  "updatedAt": "2026-09-04T04:27:11.308Z"
+  "updatedAt": "2026-09-04T06:12:34.054Z"
 }
