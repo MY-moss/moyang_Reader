@@ -1,4 +1,4 @@
-import { normalizePathKey } from "./path-key";
+import { isPathWithin } from "./path-key";
 
 function displayPath(path: string): string {
   return path.replace(/[\\/]+/g, "\\").replace(/\\$/, "");
@@ -12,9 +12,7 @@ export function workspaceEntryAbsolutePath(workspacePath: string, entryPath: str
 }
 
 export function isPathWithinEntry(path: string, entryPath: string): boolean {
-  const candidate = normalizePathKey(path);
-  const entry = normalizePathKey(entryPath);
-  return candidate === entry || candidate.startsWith(`${entry}\\`);
+  return isPathWithin(path, entryPath);
 }
 
 /** Rebase an open-tab or recent-file path after renaming a file or directory. */
