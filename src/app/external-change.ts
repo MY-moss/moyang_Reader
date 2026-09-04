@@ -1,1 +1,30 @@
-import { isPathWithin } from "./path-key";\n\nexport type ExternalChangeAction = "ignore" | "reload" | "notify";\n\nexport type ExternalChangeInput = {\n  changedPaths: readonly string[];\n  currentPath: string;\n  modified: boolean;\n  selfWriting?: boolean;\n  selfWrittenUntil?: number;\n  now: number;\n};\n\nfunction pathWasChanged(changedPath: string, currentPath: string): boolean {\n  return isPathWithin(currentPath, changedPath) || isPathWithin(changedPath, currentPath);\n}\n\nexport function resolveExternalChangeAction({\n  changedPaths,\n  currentPath,\n  modified,\n  selfWriting,\n  selfWrittenUntil,\n  now,\n}: ExternalChangeInput): ExternalChangeAction {\n  if (!changedPaths.some((path) => pathWasChanged(path, currentPath))) return "ignore";\n  if (selfWriting) return "ignore";\n  if (typeof selfWrittenUntil === "number" && selfWrittenUntil > now) return "ignore";\n  return modified ? "notify" : "reload";\n}\n
+import { isPathWithin } from "./path-key";
+
+export type ExternalChangeAction = "ignore" | "reload" | "notify";
+
+export type ExternalChangeInput = {
+  changedPaths: readonly string[];
+  currentPath: string;
+  modified: boolean;
+  selfWriting?: boolean;
+  selfWrittenUntil?: number;
+  now: number;
+};
+
+function pathWasChanged(changedPath: string, currentPath: string): boolean {
+  return isPathWithin(currentPath, changedPath) || isPathWithin(changedPath, currentPath);
+}
+
+export function resolveExternalChangeAction({
+  changedPaths,
+  currentPath,
+  modified,
+  selfWriting,
+  selfWrittenUntil,
+  now,
+}: ExternalChangeInput): ExternalChangeAction {
+  if (!changedPaths.some((path) => pathWasChanged(path, currentPath))) return "ignore";
+  if (selfWriting) return "ignore";
+  if (typeof selfWrittenUntil === "number" && selfWrittenUntil > now) return "ignore";
+  return modified ? "notify" : "reload";
+}
