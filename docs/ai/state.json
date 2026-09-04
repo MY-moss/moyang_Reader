@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
   "planId": "moyang-v1",
-  "currentTaskId": "M1103",
-  "queueIndex": 5,
+  "currentTaskId": "M1104",
+  "queueIndex": 6,
   "status": "PENDING_INTAKE",
-  "branch": "codex/m1102-coverage-gate-2026-09-04-main",
-  "baseSha": "7b58ae1ca84ff478b542a5a9b7aaee01e54f14ec",
-  "completedTaskIds": ["G01", "G02", "M1101", "M1102"],
+  "branch": "codex/m1103-browser-journeys-2026-09-04",
+  "baseSha": "65a84f6944974fd5adbdf48f3fa7512861398a7f",
+  "completedTaskIds": ["G01", "G02", "M1101", "M1102", "M1103"],
   "remoteCheck": null,
   "approval": null,
   "verification": [],
   "lastCancelled": null,
   "blocker": null,
   "deliveryEvidence": {
-    "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
-    "recordedAt": "2026-09-04T06:12:34.050Z"
+    "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
+    "recordedAt": "2026-09-04T06:55:22.040Z"
   },
   "lastCompleted": {
-    "taskId": "M1102",
-    "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
+    "taskId": "M1103",
+    "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
     "verification": [
       {
-        "command": "npm run test:coverage",
+        "command": "npm run test:e2e",
         "result": "pass"
       },
       {
@@ -38,9 +38,9 @@
       }
     ],
     "deliveryEvidence": {
-      "summary": "固定全源码覆盖率范围与真实基线，并为关键纯逻辑模块设置 90% 行和 80% 分支门槛。",
-      "recordedAt": "2026-09-04T06:12:34.050Z"
+      "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
+      "recordedAt": "2026-09-04T06:55:22.040Z"
     }
   },
-  "updatedAt": "2026-09-04T06:12:34.054Z"
+  "updatedAt": "2026-09-04T06:55:22.042Z"
 }
