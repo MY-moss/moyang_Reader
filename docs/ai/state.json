@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
   "planId": "moyang-v1",
-  "currentTaskId": "M1104",
-  "queueIndex": 6,
+  "currentTaskId": "M1105",
+  "queueIndex": 7,
   "status": "PENDING_INTAKE",
-  "branch": "codex/m1103-browser-journeys-2026-09-04",
-  "baseSha": "65a84f6944974fd5adbdf48f3fa7512861398a7f",
-  "completedTaskIds": ["G01", "G02", "M1101", "M1102", "M1103"],
+  "branch": "codex/m1104-command-contract-2026-09-04",
+  "baseSha": "c1513d9f56c8dcb279cb916d0915bbe15a32312f",
+  "completedTaskIds": ["G01", "G02", "M1101", "M1102", "M1103", "M1104"],
   "remoteCheck": null,
   "approval": null,
   "verification": [],
   "lastCancelled": null,
   "blocker": null,
   "deliveryEvidence": {
-    "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
-    "recordedAt": "2026-09-04T06:55:22.040Z"
+    "summary": "集中 TS↔Rust Tauri 命令名称、参数和返回类型，保持运行时 IPC 不变",
+    "recordedAt": "2026-09-04T07:54:05.350Z"
   },
   "lastCompleted": {
-    "taskId": "M1103",
-    "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
+    "taskId": "M1104",
+    "summary": "集中 TS↔Rust Tauri 命令名称、参数和返回类型，保持运行时 IPC 不变",
     "verification": [
       {
-        "command": "npm run test:e2e",
+        "command": "npm test -- --run bridge",
         "result": "pass"
       },
       {
@@ -29,7 +29,7 @@
         "result": "pass"
       },
       {
-        "command": "npm run format:check",
+        "command": "npm run build",
         "result": "pass"
       },
       {
@@ -38,9 +38,9 @@
       }
     ],
     "deliveryEvidence": {
-      "summary": "按用户旅程拆分浏览器测试，保留全部 64 个原有场景并新增独立可运行文件",
-      "recordedAt": "2026-09-04T06:55:22.040Z"
+      "summary": "集中 TS↔Rust Tauri 命令名称、参数和返回类型，保持运行时 IPC 不变",
+      "recordedAt": "2026-09-04T07:54:05.350Z"
     }
   },
-  "updatedAt": "2026-09-04T06:55:22.042Z"
+  "updatedAt": "2026-09-04T07:54:05.356Z"
 }
