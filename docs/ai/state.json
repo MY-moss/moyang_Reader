@@ -1,37 +1,54 @@
 {
   "schemaVersion": 1,
   "planId": "moyang-v1",
-  "currentTaskId": "M1101",
-  "queueIndex": 3,
-  "status": "AWAITING_APPROVAL",
-  "branch": "codex/ai-context-reset-2026-09-03",
-  "baseSha": "2a90448a065c2f5e98792106c93df2a3752bd79d",
-  "completedTaskIds": ["G01", "G02"],
+  "currentTaskId": "M1102",
+  "queueIndex": 4,
+  "status": "PENDING_INTAKE",
+  "branch": "codex/m1101-path-key-2026-09-04",
+  "baseSha": "93f67d876ec7a88505abb74edaba8e636857a0f3",
+  "completedTaskIds": [
+    "G01",
+    "G02",
+    "M1101"
+  ],
   "remoteCheck": null,
   "approval": null,
   "verification": [],
-  "lastCancelled": {
-    "taskId": "G03",
-    "reason": "按用户决定取消外部 GitHub App、Code Owner 和探针门禁；保留 G01/G02 的仓库内控制面。",
-    "recordedAt": "2026-09-04T03:00:07.337Z"
+  "lastCancelled": null,
+  "blocker": null,
+  "deliveryEvidence": {
+    "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
+    "recordedAt": "2026-09-04T04:27:11.304Z"
   },
-  "blocker": {
-    "reason": "G03 已按用户决定取消；需要合并本次计划和状态机修订后重新运行 ai:start。",
-    "nextAction": "合并本次治理修订后运行 npm run ai:start，开始 M1101。"
-  },
-  "deliveryEvidence": null,
   "lastCompleted": {
-    "taskId": "G02",
-    "summary": "已建立结构化 AI 控制面、状态机、生成摘要和本地治理门禁。",
+    "taskId": "M1101",
+    "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
     "verification": [
-      { "command": "npm run test:workflow", "result": "pass" },
-      { "command": "npm run ai:check", "result": "pass" },
-      { "command": "git diff --check", "result": "pass" }
+      {
+        "command": "npm test -- --run path-key",
+        "result": "pass"
+      },
+      {
+        "command": "npm run lint",
+        "result": "pass"
+      },
+      {
+        "command": "npm run format:check",
+        "result": "pass"
+      },
+      {
+        "command": "npm run ai:check",
+        "result": "pass"
+      },
+      {
+        "command": "git diff --check",
+        "result": "pass"
+      }
     ],
     "deliveryEvidence": {
-      "summary": "G01/G02 治理切片已在独立工作树验证，等待首次人工审查。",
-      "recordedAt": "2026-09-03T19:12:20.021Z"
+      "summary": "统一 Windows 路径包含判断并迁移五个前端调用方，保留外部变更双向语义。",
+      "recordedAt": "2026-09-04T04:27:11.304Z"
     }
   },
-  "updatedAt": "2026-09-04T03:00:07.337Z"
+  "updatedAt": "2026-09-04T04:27:11.308Z"
 }
