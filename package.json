@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "desktop": "node scripts/run-tauri.mjs dev",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --config vite.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:a11y": "playwright test e2e/a11y.spec.ts",
     "test:e2e:desktop": "node scripts/test-desktop-e2e.mjs",
