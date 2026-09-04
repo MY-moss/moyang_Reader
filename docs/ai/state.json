@@ -6,11 +6,7 @@
   "status": "PENDING_INTAKE",
   "branch": "codex/m1101-path-key-2026-09-04",
   "baseSha": "93f67d876ec7a88505abb74edaba8e636857a0f3",
-  "completedTaskIds": [
-    "G01",
-    "G02",
-    "M1101"
-  ],
+  "completedTaskIds": ["G01", "G02", "M1101"],
   "remoteCheck": null,
   "approval": null,
   "verification": [],
