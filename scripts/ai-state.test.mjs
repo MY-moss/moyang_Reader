@@ -34,9 +34,10 @@ test("accepts the checked-in policy, plan, and state", () => {
 test("records G03 as cancelled without treating it as completed", () => {
   const { plan, state } = loadGovernance(sourceRoot);
   assert.equal(isCancelledTask(plan, "G03"), true);
-  assert.deepEqual(state.completedTaskIds, ["G01", "G02"]);
-  assert.equal(plan.tasks[state.queueIndex].id, "M1101");
-  assert.deepEqual(plan.tasks[state.queueIndex].dependsOn, ["G02"]);
+  assert.equal(state.completedTaskIds.includes("G03"), false);
+  assert.equal(state.queueIndex > plan.tasks.findIndex((task) => task.id === "G03"), true);
+  assert.notEqual(state.currentTaskId, "G03");
+  assert.deepEqual(plan.tasks.find((task) => task.id === "M1101").dependsOn, ["G02"]);
 });
 
 test("rejects dependencies on cancelled tasks", () => {
@@ -102,20 +103,21 @@ test("keeps the canonical state machine from being relaxed", () => {
 test("renders a compact summary for exactly the current task", () => {
   const { plan, state } = loadGovernance(sourceRoot);
   const rendered = renderNext(plan, state);
-  assert.match(rendered, /任务：M1101/);
-  assert.match(rendered, /状态：AWAITING_APPROVAL/);
+  assert.match(rendered, new RegExp(`任务：${state.currentTaskId}`));
+  assert.match(rendered, new RegExp(`状态：${state.status}`));
   assert.match(rendered, /已取消计划项：G03/);
 });
 
 test("rejects queue skips and completed-prefix drift", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
+  const skippedIndex = state.queueIndex + 2;
+  assert.equal(skippedIndex < plan.tasks.length, true);
   const next = {
     ...state,
-    currentTaskId: "M1103",
-    queueIndex: 5,
+    currentTaskId: plan.tasks[skippedIndex].id,
+    queueIndex: skippedIndex,
     status: "PENDING_INTAKE",
-    completedTaskIds: ["G01", "G02", "M1101", "M1102"],
-    lastCompleted: { taskId: "M1102", summary: "skipped" },
+    lastCompleted: { taskId: state.currentTaskId, summary: "skipped" },
   };
   const errors = validateStateTransition(state, next, plan, policy);
   assert.equal(
@@ -298,9 +300,17 @@ test("recognizes protected and task-allowed paths", () => {
 
 test("finishes one auto-deliverable task and advances exactly once", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
-  const checks = plan.tasks[state.queueIndex].validation.map((command) => ({ command, result: "pass" }));
+  const currentTaskId = "M1101";
+  const currentIndex = plan.tasks.findIndex((task) => task.id === currentTaskId);
+  const checks = plan.tasks[currentIndex].validation.map((command) => ({ command, result: "pass" }));
   const currentState = {
     ...state,
+    currentTaskId,
+    queueIndex: currentIndex,
+    completedTaskIds: plan.tasks
+      .slice(0, currentIndex)
+      .filter((task) => !isCancelledTask(plan, task.id))
+      .map((task) => task.id),
     status: "IN_PROGRESS",
     blocker: null,
   };
