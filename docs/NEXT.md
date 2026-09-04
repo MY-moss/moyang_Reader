@@ -3,54 +3,48 @@
 > 此文件由 `npm run ai:render` 从 `docs/ai/plan-v1.json` 与 `docs/ai/state.json` 生成，禁止手工修改。
 
 - 计划：moyang-v1
-- 任务：M1101
-- 状态：AWAITING_APPROVAL
+- 任务：M1102
+- 状态：PENDING_INTAKE
 - 风险：T1
-- Issue：https://github.com/MY-moss/moyang_Reader/issues/194
+- Issue：无
 - 自动交付：允许
 - 已取消计划项：G03（按用户决定取消外部 GitHub App、Code Owner 和探针门禁；保留 G01/G02 的仓库内控制面。）
 
 ## 目标
 
-统一前端 Windows 同路径或子路径谓词并迁移五个调用方。
+配置显式覆盖范围、冻结真实基线并为关键纯逻辑模块设置 90% 行与 80% 分支阈值。
 
 ## 用户价值
 
-避免工作区切换、缓存失效、树操作和差量刷新使用不同路径规则。
+让覆盖率门禁真实反映 App 与组件风险。
 
 ## 非目标
 
-- 不修改 Rust 路径授权
-- 不重构 App.tsx
-- 不改变 external-change 双向事件语义
+- 不为追求数字编写无行为价值测试
+- 不修改产品行为
 
 ## 验收标准
 
-- 共享谓词复用 normalizePathKey
-- 覆盖大小写、分隔符、UNC、扩展路径和前缀碰撞
-- 五个调用方删除重复实现
+- App 与组件不再被隐式排除
+- 全局阈值不低于首次真实测量值且只能提高
 
 ## 验证
 
-- `npm test -- --run path-key`
+- `npm run test:coverage`
 - `npm run lint`
 - `npm run format:check`
 - `npm run ai:check`
-- `git diff --check`
 
 ## 允许修改范围
 
-- `src/app/`
+- `src/`
+- `vite.config.ts`
+- `package.json`
 - `docs/ai/state.json`
 - `docs/NEXT.md`
 
 ## 风险与回滚
 
-回退共享谓词切片；不涉及文件格式或数据迁移。
-
-## 阻塞/确认点
-
-- 原因：G03 已按用户决定取消；需要合并本次计划和状态机修订后重新运行 ai:start。
-- 下一动作：合并本次治理修订后运行 npm run ai:start，开始 M1101。
+回退覆盖配置与新增测试。
 
 完成当前任务后只能推进到计划中的下一项；不得增加、跳过或重排任务。

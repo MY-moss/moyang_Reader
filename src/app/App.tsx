@@ -271,7 +271,7 @@ import {
   workspaceFoldersMatch,
 } from "./workspace-refresh";
 import { resolveExternalChangeAction } from "./external-change";
-import { normalizePathKey } from "./path-key";
+import { isPathWithin, normalizePathKey } from "./path-key";
 import {
   addBookmark,
   createBookmark,
@@ -396,12 +396,6 @@ function startsWithHeading(html: string): boolean {
 
 function comparablePath(path: string): string {
   return normalizePathKey(path);
-}
-
-function pathBelongsToWorkspace(path: string, workspacePath: string): boolean {
-  const candidate = comparablePath(path);
-  const root = comparablePath(workspacePath);
-  return candidate === root || candidate.startsWith(`${root}\\`);
 }
 
 function resolveRelativePath(basePath: string, target: string): string | null {
@@ -1706,13 +1700,13 @@ export function App() {
     if (!workspacePath) return;
     updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
       tabs: openTabsRef.current.filter(
-        (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, workspacePath),
+        (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, workspacePath),
       ),
     });
   }, [openTabs, workspacePath]);
 
   useEffect(() => {
-    if (!workspacePath || !documentState?.path || !pathBelongsToWorkspace(documentState.path, workspacePath)) return;
+    if (!workspacePath || !documentState?.path || !isPathWithin(documentState.path, workspacePath)) return;
     updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
       activeDocumentPath: documentState.path,
     });
@@ -1991,12 +1985,10 @@ export function App() {
       const currentDocument = documentStateRef.current;
       updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {
         tabs: openTabsRef.current.filter(
-          (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, previousWorkspacePath),
+          (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, previousWorkspacePath),
         ),
         activeDocumentPath:
-          currentDocument && pathBelongsToWorkspace(currentDocument.path, previousWorkspacePath)
-            ? currentDocument.path
-            : null,
+          currentDocument && isPathWithin(currentDocument.path, previousWorkspacePath) ? currentDocument.path : null,
       });
       persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, previousWorkspacePath);
     }
@@ -2498,8 +2490,8 @@ export function App() {
     const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));
     const targetPath = cached?.activeDocumentPath ?? null;
     const currentPath = documentStateRef.current?.path ?? null;
-    const currentBelongs = currentPath ? pathBelongsToWorkspace(currentPath, workspacePath) : false;
-    const targetBelongs = targetPath ? pathBelongsToWorkspace(targetPath, workspacePath) : false;
+    const currentBelongs = currentPath ? isPathWithin(currentPath, workspacePath) : false;
+    const targetBelongs = targetPath ? isPathWithin(targetPath, workspacePath) : false;
 
     if (currentPath && !currentBelongs) {
       releaseDocumentResources(currentPath);
@@ -2822,7 +2814,7 @@ export function App() {
         const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
         if (cached) {
           const cachedTabs = nextTabs.filter(
-            (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
+            (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root),
           );
           updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
             tabs: cachedTabs,
@@ -2906,9 +2898,7 @@ export function App() {
         const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
         if (cached) {
           updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
-            tabs: nextTabs.filter(
-              (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
-            ),
+            tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
             activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,
           });
           persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
@@ -2988,9 +2978,7 @@ export function App() {
           const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
           if (cached) {
             updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
-              tabs: nextTabs.filter(
-                (tab) => !tab.path.startsWith("browser://") && pathBelongsToWorkspace(tab.path, root),
-              ),
+              tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
               activeDocumentPath: cached.activeDocumentPath
                 ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, transferredPath)
                 : null,

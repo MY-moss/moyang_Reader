@@ -18,3 +18,10 @@ export function normalizePathKey(path: string): string {
     .replace(/\\$/, "")
     .toLowerCase();
 }
+
+/** Return whether a path is the root itself or a descendant of that root. */
+export function isPathWithin(path: string, root: string): boolean {
+  const candidate = normalizePathKey(path);
+  const normalizedRoot = normalizePathKey(root);
+  return Boolean(normalizedRoot) && (candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}\\`));
+}

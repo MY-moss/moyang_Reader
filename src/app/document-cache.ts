@@ -1,5 +1,5 @@
 import type { DocumentKind, FileStamp, RenderedMarkdown } from "./types";
-import { normalizePathKey } from "./path-key";
+import { isPathWithin, normalizePathKey } from "./path-key";
 
 export const MAX_DOCUMENT_CACHE_ENTRIES = 32;
 export const MAX_DOCUMENT_CACHE_BYTES = 64 * 1024 * 1024;
@@ -92,7 +92,7 @@ export class DocumentCache {
     if (scopes.length === 0) return;
 
     for (const key of this.entries.keys()) {
-      if (scopes.some((scope) => key === scope || key.startsWith(`${scope}\\`))) {
+      if (scopes.some((scope) => isPathWithin(key, scope))) {
         this.removeByKey(key);
       }
     }
