@@ -1,4 +1,4 @@
-import { normalizePathKey } from "./path-key";
+import { isPathWithin } from "./path-key";
 
 export type ExternalChangeAction = "ignore" | "reload" | "notify";
 
@@ -11,14 +11,8 @@ export type ExternalChangeInput = {
   now: number;
 };
 
-function comparablePath(path: string): string {
-  return normalizePathKey(path);
-}
-
 function pathWasChanged(changedPath: string, currentPath: string): boolean {
-  const changed = comparablePath(changedPath);
-  const current = comparablePath(currentPath);
-  return changed === current || current.startsWith(`${changed}\\`) || changed.startsWith(`${current}\\`);
+  return isPathWithin(currentPath, changedPath) || isPathWithin(changedPath, currentPath);
 }
 
 export function resolveExternalChangeAction({
