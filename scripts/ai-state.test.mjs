@@ -53,6 +53,30 @@ test("requires every blocked action and rejects contradictory permission", () =>
   );
 });
 
+test("keeps the canonical state machine from being relaxed", () => {
+  const { policy, plan, state } = loadGovernance(sourceRoot);
+  const changed = JSON.parse(JSON.stringify(policy));
+  changed.stateTransitions.PENDING_INTAKE.push("IN_PROGRESS");
+  assert.equal(
+    validatePolicy(changed).some((error) => error.includes("固定状态机")),
+    true,
+  );
+
+  const pending = {
+    ...state,
+    currentTaskId: "M1101",
+    queueIndex: 3,
+    status: "PENDING_INTAKE",
+    completedTaskIds: ["G01", "G02", "G03"],
+    blocker: null,
+  };
+  const errors = validateStateTransition(pending, { ...pending, status: "IN_PROGRESS" }, plan, policy);
+  assert.equal(
+    errors.some((error) => error.includes("不允许从 PENDING_INTAKE")),
+    true,
+  );
+});
+
 test("renders a compact summary for exactly the current task", () => {
   const { plan, state } = loadGovernance(sourceRoot);
   const rendered = renderNext(plan, state);

@@ -11,3 +11,6 @@
 /scripts/ai-context-check.test.mjs @MY-moss
 /scripts/ai-state.mjs @MY-moss
 /scripts/ai-state.test.mjs @MY-moss
+/scripts/cleanup-workspace.mjs @MY-moss
+/scripts/cleanup-workspace.test.mjs @MY-moss
+/docs/WORKSPACE-CLEANUP.md @MY-moss

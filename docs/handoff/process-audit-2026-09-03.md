@@ -1,4 +1,4 @@
-# Moyang Reader 开发流程审计
+# Moyang Reader 开发流程审计（归档）
 
 > 审计日期：2026-09-03
 >
@@ -35,7 +35,7 @@
         ↓
 按需读取：相关 Issue + 源码 + 测试 + 一个相似实现
         ↓
-特殊任务：release-status / ROADMAP / tasks/plan
+特殊任务：release-status / ROADMAP / REQUIREMENTS
         ↓
 仅追溯：docs/handoff / CHANGELOG / Git / Release
 ```
@@ -48,15 +48,16 @@
 | ---------------------------- | -------------------------------- | -------------------------------- |
 | `AGENTS.md`                  | 平台、安全、启动、验证和交接规则 | 当前 Issue、固定 SHA、版本流水账 |
 | `docs/ai/state.json`         | 唯一动态任务状态                 | 计划、权限、完整历史             |
+| `docs/ai/plan-v1.json`       | 受保护的批准队列、依赖和验收     | 运行状态、临时候选               |
 | `docs/NEXT.md`               | 从结构化状态生成的人类摘要       | 手工修改、独立动态事实           |
 | `docs/AI-HANDOFF.md`         | 稳定版本、外部阻塞、最近结果     | 逐 PR 流水账、当前任务验收       |
 | `docs/AI-TAKEOVER-PROMPT.md` | 可复制的稳定短提示               | 当前 Issue、版本、SHA            |
 | `docs/ROADMAP.md`            | 产品阶段和依赖                   | 当前分支/PR/CI 状态              |
-| `tasks/plan.md`              | 开放任务排序和依赖               | 已完成清单、当前实现状态         |
-| `tasks/todo.md`              | 兼容索引                         | 任何动态待办副本                 |
-| `docs/ISSUE-INDEX.md`        | 定期刷新的开放 Issue 快照        | 完整 Issue 正文、历史 PR         |
+| GitHub Issue/PR              | 实时外部状态与讨论               | 本地权限替代、离线任务授权       |
 
 `docs/REQUIREMENTS.md` 仍保留详细验收历史，但普通任务只读取相关标题区间。后续可按版本归档，它不再进入默认接手上下文。
+
+旧 `tasks/plan.md`、`tasks/todo.md`、`docs/ISSUE-INDEX.md` 和一次性会话指标脚本已退役；历史由 Git 保存，`ai:check` 会阻止这些路径被重新引入为并行事实源。
 
 ## 后续开发路径
 

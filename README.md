@@ -127,7 +127,7 @@ npm run desktop
 3. v0.12–v0.13：通过安全门禁后再推进 HTML 只读预览、知识流、本地分享和受控自动化。
 4. v1.0：Windows x64 核心能力冻结并进入长期维护；跨平台、云同步和任意脚本插件不在当前范围。
 
-详细需求、交互契约、版本映射和全量任务地图见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)、[`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/DEVELOPMENT-AUDIT.md`](docs/DEVELOPMENT-AUDIT.md)。
+详细需求、交互契约和产品阶段见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md)；2026-09-03 的流程整改证据已归档至 [`docs/handoff/process-audit-2026-09-03.md`](docs/handoff/process-audit-2026-09-03.md)。
 
 ## AI 快速接手
 

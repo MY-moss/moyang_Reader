@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   activeTaskRange,
   contextLimits,
+  retiredPaths,
   validateAiContext,
   validateApprovalSource,
   validateChangedPathSet,
@@ -85,6 +86,22 @@ test("rejects oversized startup context", () => {
     );
     assert.equal(
       errors.some((error) => error.includes("默认接手上下文")),
+      true,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rejects reintroduced retired context entry points", () => {
+  const root = copyFixture();
+  try {
+    const retiredPath = path.join(root, retiredPaths[0]);
+    fs.mkdirSync(path.dirname(retiredPath), { recursive: true });
+    fs.writeFileSync(retiredPath, "stale task snapshot\n", "utf8");
+    const errors = validateAiContext(root, { inspectGit: false });
+    assert.equal(
+      errors.some((error) => error.includes(retiredPaths[0]) && error.includes("已退役")),
       true,
     );
   } finally {

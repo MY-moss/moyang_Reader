@@ -27,6 +27,16 @@ export const statuses = new Set([
   "AWAITING_APPROVAL",
 ]);
 
+export const canonicalStateTransitions = {
+  PENDING_INTAKE: ["READY", "BLOCKED", "AWAITING_APPROVAL"],
+  READY: ["IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL"],
+  IN_PROGRESS: ["VERIFYING", "BLOCKED", "AWAITING_APPROVAL"],
+  VERIFYING: ["DELIVERY_READY", "BLOCKED", "AWAITING_APPROVAL"],
+  DELIVERY_READY: ["PENDING_INTAKE", "BLOCKED"],
+  BLOCKED: ["PENDING_INTAKE", "READY", "AWAITING_APPROVAL"],
+  AWAITING_APPROVAL: ["READY", "BLOCKED"],
+};
+
 const risks = ["T0", "T1", "T2", "T3"];
 
 function isObject(value) {
@@ -111,6 +121,9 @@ export function validatePolicy(policy) {
     `prefix:${String(policy.approvalDirectory ?? "").replaceAll("\\", "/")}/`,
     "exact:scripts/ai-state.mjs",
     "exact:scripts/ai-context-check.mjs",
+    "exact:scripts/cleanup-workspace.mjs",
+    "exact:scripts/cleanup-workspace.test.mjs",
+    "exact:docs/WORKSPACE-CLEANUP.md",
   ]) {
     if (!protectedValues.has(required)) errors.push(`policy.protectedPaths 缺少必需保护：${required}。`);
   }
@@ -121,6 +134,10 @@ export function validatePolicy(policy) {
       const targets = policy.stateTransitions[status];
       if (!Array.isArray(targets) || targets.some((target) => !statuses.has(target))) {
         errors.push(`policy.stateTransitions.${status} 缺失或包含未知状态。`);
+      } else if (
+        JSON.stringify([...targets].sort()) !== JSON.stringify([...canonicalStateTransitions[status]].sort())
+      ) {
+        errors.push(`policy.stateTransitions.${status} 必须保持固定状态机，不得增加或删除转换。`);
       }
     }
   }
@@ -471,8 +488,49 @@ function parseChecks(args) {
   });
 }
 
-export function finishState(plan, state, { result, summary, checks, policy }) {
+export function deliveryReadyState(plan, state, { summary, checks, policy }) {
   const task = plan.tasks[state.queueIndex];
+  if (task.risk === "T3" || task.governance || !task.autoDeliver) {
+    const approvalErrors = validateApprovalReceipt(task, state.approval, policy, plan);
+    if (approvalErrors.length > 0) throw new Error(approvalErrors.join("\n"));
+  }
+  const checkMap = new Map(checks.map((check) => [check.command, check.result]));
+  const missing = task.validation.filter((command) => checkMap.get(command) !== "pass");
+  if (missing.length > 0) throw new Error(`缺少通过的必需验证：${missing.join("；")}`);
+
+  return {
+    ...state,
+    status: "DELIVERY_READY",
+    blocker: null,
+    verification: checks,
+    deliveryEvidence: { summary, recordedAt: new Date().toISOString() },
+  };
+}
+
+export function advanceDeliveryState(plan, delivered) {
+  const task = plan.tasks[delivered.queueIndex];
+  const nextIndex = delivered.queueIndex + 1;
+  if (nextIndex >= plan.tasks.length) return delivered;
+  return {
+    ...delivered,
+    currentTaskId: plan.tasks[nextIndex].id,
+    queueIndex: nextIndex,
+    status: "PENDING_INTAKE",
+    completedTaskIds: [...delivered.completedTaskIds, task.id],
+    remoteCheck: null,
+    approval: null,
+    verification: [],
+    blocker: null,
+    lastCompleted: {
+      taskId: task.id,
+      summary: delivered.deliveryEvidence.summary,
+      verification: delivered.verification,
+      deliveryEvidence: delivered.deliveryEvidence,
+    },
+  };
+}
+
+export function finishState(plan, state, { result, summary, checks, policy }) {
   if (result === "blocked") {
     return {
       ...state,
@@ -482,40 +540,14 @@ export function finishState(plan, state, { result, summary, checks, policy }) {
     };
   }
   if (result !== "passed") throw new Error("--result 必须是 passed 或 blocked。");
-  if (task.risk === "T3" || task.governance || !task.autoDeliver) {
-    const approvalErrors = validateApprovalReceipt(task, state.approval, policy, plan);
-    if (approvalErrors.length > 0) throw new Error(approvalErrors.join("\n"));
-  }
-  const checkMap = new Map(checks.map((check) => [check.command, check.result]));
-  const missing = task.validation.filter((command) => checkMap.get(command) !== "pass");
-  if (missing.length > 0) throw new Error(`缺少通过的必需验证：${missing.join("；")}`);
+  return advanceDeliveryState(plan, deliveryReadyState(plan, state, { summary, checks, policy }));
+}
 
-  const delivered = {
-    ...state,
-    status: "DELIVERY_READY",
-    blocker: null,
-    verification: checks,
-    deliveryEvidence: { summary, recordedAt: new Date().toISOString() },
-  };
-  const nextIndex = state.queueIndex + 1;
-  if (nextIndex >= plan.tasks.length) return delivered;
-  return {
-    ...delivered,
-    currentTaskId: plan.tasks[nextIndex].id,
-    queueIndex: nextIndex,
-    status: "PENDING_INTAKE",
-    completedTaskIds: [...state.completedTaskIds, task.id],
-    remoteCheck: null,
-    approval: null,
-    verification: [],
-    blocker: null,
-    lastCompleted: {
-      taskId: task.id,
-      summary,
-      verification: checks,
-      deliveryEvidence: delivered.deliveryEvidence,
-    },
-  };
+function persistTransition(projectRoot, plan, policy, previous, next) {
+  const errors = validateStateTransition(previous, next, plan, policy);
+  if (errors.length > 0) throw new Error(errors.join("\n"));
+  updateState(projectRoot, plan, next);
+  return next;
 }
 
 function main(projectRoot = defaultRoot) {
@@ -564,13 +596,16 @@ function main(projectRoot = defaultRoot) {
     try {
       state.remoteCheck = verifyRemote(projectRoot, task);
     } catch (cause) {
-      state.status = "BLOCKED";
-      state.blocker = {
-        reason: cause instanceof Error ? cause.message : String(cause),
-        nextAction: "恢复网络或解决实时 Issue/PR 冲突后重新运行 ai:start。",
+      const blocked = {
+        ...state,
+        status: "BLOCKED",
+        blocker: {
+          reason: cause instanceof Error ? cause.message : String(cause),
+          nextAction: "恢复网络或解决实时 Issue/PR 冲突后重新运行 ai:start。",
+        },
       };
-      updateState(projectRoot, plan, state);
-      console.error(state.blocker.reason);
+      persistTransition(projectRoot, plan, policy, state, blocked);
+      console.error(blocked.blocker.reason);
       process.exitCode = 2;
       return;
     }
@@ -578,32 +613,45 @@ function main(projectRoot = defaultRoot) {
       try {
         state.approval = loadApprovalFromMain(projectRoot, policy, plan, task);
       } catch (cause) {
-        state.status = "AWAITING_APPROVAL";
-        state.blocker = {
-          reason: cause instanceof Error ? cause.message : String(cause),
-          nextAction: `生成并由 Code Owner 合并 ${policy.approvalDirectory}/${task.id}.json 后重新运行 ai:start。`,
+        const awaiting = {
+          ...state,
+          status: "AWAITING_APPROVAL",
+          blocker: {
+            reason: cause instanceof Error ? cause.message : String(cause),
+            nextAction: `生成并由 Code Owner 合并 ${policy.approvalDirectory}/${task.id}.json 后重新运行 ai:start。`,
+          },
         };
-        updateState(projectRoot, plan, state);
-        console.error(state.blocker.reason);
+        persistTransition(projectRoot, plan, policy, state, awaiting);
+        console.error(awaiting.blocker.reason);
         process.exitCode = 2;
         return;
       }
     }
     try {
-      state.baseSha = state.remoteCheck.baseSha;
-      state.branch = state.remoteCheck.branch;
-      state.status = "IN_PROGRESS";
-      state.blocker = null;
-      updateState(projectRoot, plan, state);
-      console.log(`任务 ${task.id} 已开始，基线 ${state.baseSha}。`);
-    } catch (cause) {
-      state.status = "BLOCKED";
-      state.blocker = {
-        reason: cause instanceof Error ? cause.message : String(cause),
-        nextAction: "恢复网络或解决实时 Issue/PR 冲突后重新运行 ai:start。",
+      const ready = {
+        ...state,
+        baseSha: state.remoteCheck.baseSha,
+        branch: state.remoteCheck.branch,
+        status: "READY",
+        blocker: null,
       };
-      updateState(projectRoot, plan, state);
-      console.error(state.blocker.reason);
+      const readyState = state.status === "READY" ? ready : persistTransition(projectRoot, plan, policy, state, ready);
+      const inProgress = persistTransition(projectRoot, plan, policy, readyState, {
+        ...readyState,
+        status: "IN_PROGRESS",
+      });
+      console.log(`任务 ${task.id} 已开始，基线 ${inProgress.baseSha}。`);
+    } catch (cause) {
+      const blocked = {
+        ...state,
+        status: "BLOCKED",
+        blocker: {
+          reason: cause instanceof Error ? cause.message : String(cause),
+          nextAction: "修复状态或主线冲突后重新运行 ai:start。",
+        },
+      };
+      persistTransition(projectRoot, plan, policy, state, blocked);
+      console.error(blocked.blocker.reason);
       process.exitCode = 2;
     }
     return;
@@ -612,14 +660,26 @@ function main(projectRoot = defaultRoot) {
     const result = readFlag(args, "result");
     const summary = readFlag(args, "summary");
     if (!hasText(summary)) throw new Error("ai:finish 需要 --summary=<简短结果>。");
-    const nextState = finishState(plan, state, {
-      result,
-      summary,
-      checks: parseChecks(args),
-      policy,
-    });
-    updateState(projectRoot, plan, nextState);
-    console.log(result === "passed" ? `任务已完成，当前任务为 ${nextState.currentTaskId}。` : "任务已记录为 BLOCKED。");
+    const checks = parseChecks(args);
+    if (result === "blocked") {
+      const nextState = finishState(plan, state, { result, summary, checks, policy });
+      persistTransition(projectRoot, plan, policy, state, nextState);
+      console.log("任务已记录为 BLOCKED。");
+      return;
+    }
+    if (result !== "passed") throw new Error("--result 必须是 passed 或 blocked。");
+    if (!["IN_PROGRESS", "VERIFYING"].includes(state.status)) {
+      throw new Error(`当前状态 ${state.status} 不能完成任务；必须先运行 ai:start。`);
+    }
+    const verifying =
+      state.status === "VERIFYING"
+        ? state
+        : persistTransition(projectRoot, plan, policy, state, { ...state, status: "VERIFYING" });
+    const delivered = deliveryReadyState(plan, verifying, { summary, checks, policy });
+    persistTransition(projectRoot, plan, policy, verifying, delivered);
+    const nextState = advanceDeliveryState(plan, delivered);
+    if (nextState !== delivered) persistTransition(projectRoot, plan, policy, delivered, nextState);
+    console.log(`任务已完成，当前任务为 ${nextState.currentTaskId}。`);
     return;
   }
   throw new Error(`未知命令 ${command}。支持 context、start、render、finish、approval-template。`);

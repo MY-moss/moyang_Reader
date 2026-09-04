@@ -32,9 +32,16 @@ export const contextLimits = new Map([
   ["docs/AI-WORKFLOW.md", { maxBytes: 16_000, maxLines: 180 }],
   ["docs/AI-TAKEOVER-PROMPT.md", { maxBytes: 4_000, maxLines: 50 }],
   ["docs/ROADMAP.md", { maxBytes: 14_000, maxLines: 180 }],
-  ["tasks/plan.md", { maxBytes: 12_000, maxLines: 160 }],
-  ["tasks/todo.md", { maxBytes: 3_000, maxLines: 40 }],
 ]);
+
+export const retiredPaths = [
+  "docs/DEVELOPMENT-AUDIT.md",
+  "docs/ISSUE-INDEX.md",
+  "docs/PLATFORMS.md",
+  "tasks/plan.md",
+  "tasks/todo.md",
+  "scripts/ai-workflow-metrics.mjs",
+];
 
 function readText(projectRoot, relativePath, errors) {
   try {
@@ -135,6 +142,12 @@ export function validateAiContext(projectRoot = defaultRoot, { inspectGit = true
     }
   }
 
+  for (const relativePath of retiredPaths) {
+    if (fs.existsSync(path.join(projectRoot, relativePath))) {
+      errors.push(`${relativePath} 已退役；实时事实必须来自结构化计划/状态或 GitHub，不得恢复旧入口。`);
+    }
+  }
+
   let policy;
   let plan;
   let state;
@@ -170,10 +183,6 @@ export function validateAiContext(projectRoot = defaultRoot, { inspectGit = true
   if (!documents.get("docs/AI-TAKEOVER-PROMPT.md")?.includes("npm run ai:context")) {
     errors.push("AI 接手提示词必须使用 npm run ai:context 获取当前任务。");
   }
-  if (/^- \[[ xX]\]/m.test(documents.get("tasks/todo.md") ?? "")) {
-    errors.push("tasks/todo.md 只能作为索引，不得复制动态复选清单。");
-  }
-
   const releaseStatus = readText(projectRoot, "docs/release-status.json", errors);
   if (/"nextStatus"\s*:/.test(releaseStatus)) {
     errors.push("release-status.json 不得复制开发任务状态 nextStatus。");

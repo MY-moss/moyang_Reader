@@ -31,16 +31,19 @@
     { "match": "exact", "path": "scripts/ai-context-check.test.mjs" },
     { "match": "exact", "path": "scripts/ai-state.mjs" },
     { "match": "exact", "path": "scripts/ai-state.test.mjs" },
+    { "match": "exact", "path": "scripts/cleanup-workspace.mjs" },
+    { "match": "exact", "path": "scripts/cleanup-workspace.test.mjs" },
+    { "match": "exact", "path": "docs/WORKSPACE-CLEANUP.md" },
     { "match": "exact", "path": "docs/RELEASE-POLICY.md" },
     { "match": "exact", "path": "SECURITY.md" }
   ],
   "stateTransitions": {
-    "PENDING_INTAKE": ["READY", "IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL"],
+    "PENDING_INTAKE": ["READY", "BLOCKED", "AWAITING_APPROVAL"],
     "READY": ["IN_PROGRESS", "BLOCKED", "AWAITING_APPROVAL"],
     "IN_PROGRESS": ["VERIFYING", "BLOCKED", "AWAITING_APPROVAL"],
     "VERIFYING": ["DELIVERY_READY", "BLOCKED", "AWAITING_APPROVAL"],
     "DELIVERY_READY": ["PENDING_INTAKE", "BLOCKED"],
     "BLOCKED": ["PENDING_INTAKE", "READY", "AWAITING_APPROVAL"],
-    "AWAITING_APPROVAL": ["PENDING_INTAKE", "READY", "IN_PROGRESS", "BLOCKED"]
+    "AWAITING_APPROVAL": ["READY", "BLOCKED"]
   }
 }

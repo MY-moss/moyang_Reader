@@ -41,7 +41,7 @@ npm run cleanup:workspace -- --apply
 npm run cleanup:workspace -- --apply --prune-targets
 ```
 
-需要回收已合并且干净的项目内工作树时，再额外加入 `--prune-worktrees`。清理器会自动跳过脏工作树和含 junction/符号链接的工作树；禁止使用强制删除绕过保护。
+需要回收已合并且干净的项目内工作树时，再额外加入 `--prune-worktrees`。清理器只接受目录干净、不含 junction/符号链接、使用 `codex/` 分支且该分支已合并到本地 `origin/main` 的候选；当前、detached、普通分支、未合并分支和证据读取失败的工作树都会保留。禁止使用强制删除绕过保护。
 
 ### 构建缓存预算提示
 
