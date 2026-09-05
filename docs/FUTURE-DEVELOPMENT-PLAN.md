@@ -80,11 +80,14 @@ Moyang Reader 的目标不是复制 Obsidian、Notion、VS Code 或某个 AI 客
 
 - `canOpen`
 - `readMetadata`
+- `extractText`
 - `render`
 - `export`
 - `supportsEdit`
 
-但不能一次把所有格式重写进一个万能接口。先让内置 Markdown / TXT 通过新接口跑通，再迁移 DOCX/PDF/图片。
+`extractText` 很重要：未来搜索、AI、RAG 和引用不能假定所有格式都像 Markdown 一样天然有正文字符串。当前 PDF 主要是预览能力，图片也没有正文文本，因此 AI 接入前必须先定义“哪些格式可以提供安全文本、哪些只能预览、哪些需要额外解析/OCR”。
+
+不能一次把所有格式重写进一个万能接口。先让内置 Markdown / TXT 通过新接口跑通，再迁移 DOCX；PDF 文本提取和图片 OCR 作为独立后续能力评估。
 
 #### C. IndexProvider 尚未成为稳定端口
 
@@ -384,6 +387,18 @@ Manifest 建议包含：
 
 ## 6. AI 功能路线
 
+### AI 前置：统一可提取文本能力
+
+AI 不应只对 Markdown 好用。每个 DocumentAdapter 要明确 `extractText` 能力和来源质量：
+
+- Markdown/TXT：原始文本；
+- DOCX：从安全解析结果提取正文和标题；
+- PDF：当前预览不等于可供 AI/搜索使用的正文，未来需要独立文本提取能力；
+- 图片：默认无正文，OCR 必须作为可选能力而不是偷偷联网；
+- EPUB：若未来支持，按章节提供结构化文本。
+
+AI UI 必须告诉用户当前格式是“完整正文”“部分提取”“OCR/视觉理解”还是“不支持正文上下文”。
+
 ## AI-1：手动辅助阅读
 
 建议最先落地，因为风险低、价值直接：
@@ -405,7 +420,8 @@ Manifest 建议包含：
 
 建议：
 
-- 按 Markdown 标题 / 段落切块；
+- 按 Markdown/EPUB 标题、DOCX 标题或可提取段落切块；
+- PDF 只有在文本提取质量合格后才进入语义索引；
 - 保存 `path + content fingerprint + heading + offsets`；
 - 文件修改时只重算变化块；
 - embeddings 是派生数据，可随时重建；
@@ -485,7 +501,7 @@ MCP 可以成为 v1.0 之后的互操作层，但**不能成为 Moyang Reader �
 | 工作区元数据 | 批注、未来工作区设置 | `.moyang/` | 部分否 |
 | 应用偏好 | 主题、布局、provider 配置 | App data / settings | 是或可迁移 |
 | 密钥 | API Key、token | Windows 安全凭据存储 | 否，且不导出 |
-| 派生缓存 | 搜索索引、embedding、缩略图 | cache | 是 |
+| 派生缓存 | 搜索索引、embedding、缩略图/OCR cache | cache | 是 |
 
 要求：
 
@@ -499,9 +515,23 @@ MCP 可以成为 v1.0 之后的互操作层，但**不能成为 Moyang Reader �
 
 ## 9. 格式能力路线
 
-现有 adapter registry 是正确方向。新增格式按用户价值与维护成本评估，而不是为了数量。
+现有 adapter registry 是正确方向。新增格式或增强既有格式按用户价值与维护成本评估，而不是为了数量。
 
-候选优先级：
+### 既有格式增强：PDF 深度阅读
+
+当前 PDF 的优势是快速预览。后续如果真实需求明确，优先顺序应是：
+
+1. 安全文本提取；
+2. 文内搜索和复制一致性；
+3. 目录/页码定位；
+4. 将提取文本提供给 AI/RAG，并明确页码来源；
+5. 最后才评估 PDF 批注映射。
+
+不以“自己实现完整 PDF 引擎”为目标，也不做 PDF 原格式编辑器。
+
+### 既有格式增强：图片 OCR / 视觉理解
+
+只作为可选功能。优先本地或用户明确配置的 provider；OCR 结果是派生数据，可清除重建。不能因为打开图片就默认把图片发送到远程 AI。
 
 ### 高价值候选：EPUB 只读
 
@@ -576,6 +606,7 @@ AI 特别需要测试：
 - 超大上下文；
 - 部分流输出后失败；
 - 模型返回空内容；
+- 文档文本提取不完整或失败；
 - diff 应用时原文件已经改变；
 - 远程请求不能偷偷扩大文件范围。
 
@@ -601,7 +632,15 @@ AI 特别需要测试：
 - secure secret storage 可用；
 - ConsentScope UI 可用；
 - 请求取消 / timeout / error 可控；
+- 至少 Markdown/TXT/DOCX 有稳定 `extractText` 路径；
 - 不需要修改正文即可完成第一个阅读辅助功能。
+
+### PDF / 图片进入 AI 上下文的条件
+
+- PDF 有可验证文本提取，并能保留页码或可定位来源；
+- 图片必须由用户明确启用 OCR/vision；
+- UI 能说明“原文 / 提取文本 / OCR / 视觉模型”的来源类型；
+- 失败时不伪装成完整文档理解。
 
 ### 语义索引开始条件
 
@@ -633,6 +672,7 @@ AI 特别需要测试：
 
 - Inbox / Daily / Properties
 - 内部 capability ports
+- 文档统一 `extractText` 边界
 - AI provider mock
 - 权限代理
 - 安全密钥存储
@@ -643,6 +683,7 @@ AI 特别需要测试：
 - AI 选区/当前文档辅助
 - OpenAI-compatible / 本地 provider
 - 声明式扩展包
+- PDF 安全文本提取与 AI 上下文
 - EPUB 只读
 - saved search / collection
 - 可选语义搜索
