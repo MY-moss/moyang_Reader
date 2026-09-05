@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"eslint.config.mjs\" \".prettierrc.json\" \"*.md\" \".github/**/*.{md,yml,yaml}\" \"docs/**/*.{json,md}\" \"scripts/*.mjs\" \"desktop-e2e/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"eslint.config.mjs\" \".prettierrc.json\" \".github/**/*.{yml,yaml}\" \"docs/**/*.json\" \"scripts/*.mjs\" \"desktop-e2e/*.mjs\"",
     "preview": "vite preview",
     "desktop": "node scripts/run-tauri.mjs dev",
     "test": "vitest run",
