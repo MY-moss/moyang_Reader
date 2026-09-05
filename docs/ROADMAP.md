@@ -1,6 +1,6 @@
 # Moyang Reader 产品路线
 
-路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
+路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，AI 阅读伴侣的专项目标与垂直切片见 [`AI-READING-COMPANION.md`](AI-READING-COMPANION.md)，稳定发布事实见 `release-status.json`。
 
 ## 产品完成态
 
@@ -61,6 +61,8 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 - 核心默认不联网；发送内容时展示范围、用途、provider/model；写回提供 diff。
 - v1.0 前仍不加载任意脚本、iframe/WebView 插件，不承诺第三方 ABI。
 
+这一阶段只建设基础接缝，不提前实现完整 AI 产品体验。后续“选区快捷解释 → 当前文档问答 → 最近阅读回顾 → 防剧透阅读记忆 → 可选 RAG”的具体路线统一见 [`AI-READING-COMPANION.md`](AI-READING-COMPANION.md)。
+
 ## v0.15：冻结与兼容
 
 - 冻结设置 key/schema、IPC 命令、核心快捷键、command ids 和主要保存行为。
@@ -80,7 +82,9 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 
 优先候选：
 
-- AI 选区/当前文档解释、总结、翻译和问答；
+- AI 阅读伴侣 MVP：选区解释/为什么/举例/总结/翻译 + 当前文档问答；
+- 最近阅读回顾：“我刚刚读了什么？”；
+- 防剧透的人物/术语记忆卡与阅读记忆地图；
 - 一个远程 provider + 一个本地/OpenAI-compatible provider；
 - 声明式扩展包（模板、snippet、主题、prompt preset），先不运行任意第三方 JS；
 - PDF 安全文本提取、页码来源与 AI/RAG 上下文；
@@ -88,6 +92,8 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 - saved search / collection；
 - 词法搜索之上的可选语义检索/RAG；
 - 受控的 read-only MCP bridge。
+
+AI 阅读伴侣候选只能在前置条件满足后按 [`AI-READING-COMPANION.md`](AI-READING-COMPANION.md) 中 RC01–RC10 拆成 0.5–3 天的单切片，不一次性全部进入当前队列。
 
 更晚再评估：图片 OCR/vision、受控 sidecar 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
 
