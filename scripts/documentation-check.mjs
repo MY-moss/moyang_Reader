@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { validateAiProcess } from "./ai-process-check.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -129,6 +130,7 @@ export function validateDocumentation(projectRoot = defaultRoot) {
     errors.push(`docs/release-status.json 不是有效 JSON：${cause instanceof Error ? cause.message : String(cause)}`);
   }
 
+  errors.push(...validateAiProcess(projectRoot));
   return errors;
 }
 
@@ -139,7 +141,7 @@ export function runDocumentationCheck(projectRoot = defaultRoot) {
     errors.forEach((error) => console.error("- " + error));
     return 1;
   }
-  console.log("Documentation check passed: links and update/opener guidance are consistent.");
+  console.log("Documentation check passed: links, update/opener guidance and AI handoff rules are consistent.");
   return 0;
 }
 

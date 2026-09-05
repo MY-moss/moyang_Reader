@@ -1,43 +1,69 @@
-## 范围
+## Slice
 
-- Issue/反馈：
-- 用户问题与可观察结果：
-- 非目标：
-- 开始时主线：
-- 工作树/分支：
-- 同主题开放 PR：无 / 有（说明处理方式）
+- Issue / Task：
+- Track（Modernization 时）：A / B / C / D / E / 不适用
+- Risk lane：Green / Yellow / Red / 不适用
+- 开始时 base SHA：
+- 分支 / worktree：
+- Write-set（并行开发时）：
+- 同主题开放 PR：无 / 有（说明依赖或冲突处理）
 
-## 实现
+## 目标 / 用户价值
+
+- 解决什么问题：
+- 用户或维护者得到什么：
+
+## 变更
 
 - 主要改动：
-- 关键边界与失败路径：
-- 修改的用户/工程文档：不适用 / 已说明
+- 关键接口 / 数据流：
+- 用户可见变化：无 / 有（说明）
+
+## 非目标
+
+- 本 PR 明确不做：
+
+## Compatibility
+
+- 用户普通文件：unchanged / backward-compatible migration / 说明
+- settings / `.moyang` / 批注 / 书签 / 草稿：unchanged / backward-compatible migration / 说明
+- 默认离线 / 权限边界：unchanged / 说明
 
 ## 验证
 
-- 风险级别：T0 / T1 / T2 / T3
-- AI 任务 ID / 状态：
+只填写实际适用项，不为了模板跑无关完整门禁。
 
-| 检查                       | 结果                          |
-| -------------------------- | ----------------------------- |
-| `<command or manual path>` | `<pass/fail；失败写首个根因>` |
+| 检查 | 结果 |
+| --- | --- |
+| unit / targeted tests | 未运行 / pass / fail（说明） |
+| lint / type / build | 未运行 / pass / fail（说明） |
+| browser E2E / a11y | 未运行 / pass / fail（说明） |
+| Rust fmt / clippy / test | 未运行 / pass / fail（说明） |
+| desktop smoke | 未运行 / pass / fail（说明） |
+| release / updater / signing | 不适用 / 说明真实验证结果 |
 
-- Windows 手动/桌面路径（如适用）：
-- CI：`sha=<...> run_id=<...> conclusion=<...>`
+CI：未运行 / `sha=<...> run_id=<...> conclusion=<...>`
 
-## 风险与交付
+## 风险 / 回滚
 
-- 已知限制：
+- 已知风险：
 - 回滚方式：
-- 发布：无 / patch / minor（理由）
-- 外部动作或人工确认点：
 
-## 交接检查
+如果是 **Red** 动作，只在这里写清真正需要维护者确认的事项，例如：真实用户数据不可逆操作、高风险权限扩大、密钥/签名、正式 Release/Tag。
 
-- [ ] 一个垂直切片，无无关重构、依赖升级或秘密/生成物
-- [ ] 相关测试、用户文案和文档已同步
-- [ ] 已通过 `ai:finish` 更新结构化状态，`docs/NEXT.md` 由 `ai:render` 生成
-- [ ] 未新增、跳过或重排批准队列；修改文件位于任务允许范围
-- [ ] T3 或治理保护文件变更已进入 `AWAITING_APPROVAL`
-- [ ] 稳定版本或外部阻塞变化时已更新结构化发布状态与摘要
-- [ ] 合并后停止，不自动开始下一项
+## Integration / Handoff
+
+- target：main / next
+- 依赖 PR：无 / #...
+- 与其他 active Track 的 shared-file 冲突：无 / 有（说明）
+- `docs/AI-TASKS.md`：不适用 / 已同步
+- 后续：无 / 说明下一独立 slice（本 PR 不顺手实现）
+
+## Checklist
+
+- [ ] 一个 coherent slice，没有顺手扩张到下一个任务
+- [ ] 没有提交密钥、用户文件、构建产物或伪造的验证结果
+- [ ] 相关测试 / 文案 / 文档已按实际改动同步
+- [ ] 持久化或用户文件契约变化时有向后兼容或明确回滚
+- [ ] UI 改动包含相关 E2E；Rust/IPC/文件边界包含对应定向验证（适用时）
+- [ ] Modernization 并行开发时，Write-set 没有未经协调覆盖其他活动 Track
