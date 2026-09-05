@@ -1,34 +1,41 @@
 # Moyang Reader 当前交接摘要
 
-本文件只记录稳定事实和外部阻塞。执行任务运行 `npm run ai:context`；发布资产只看 [`release-status.json`](release-status.json)；历史从 [`handoff/`](handoff/) 或 Git/Release 查询。
+本文件只保留稳定事实和外部阻塞。当前开发任务统一看 [`AI-TASKS.md`](AI-TASKS.md)，产品阶段看 [`ROADMAP.md`](ROADMAP.md)，插件、AI、MCP、数据与 v1.0 后扩展方向看 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)。
 
-## 稳定基线（核验于 2026-09-03）
+## 稳定基线
 
-- 审计时主线：`2a90448a065c2f5e98792106c93df2a3752bd79d`。
-- 最新稳定版本：`v0.10.14`，Windows x64 Release、安装包、Tauri updater 签名和 `latest.json` 已发布。
-- 产品边界：Windows x64、本地优先、Markdown 真源；浏览器版仅用于开发与 UI 测试。
-- 最近完成：PR [#442](https://github.com/MY-moss/moyang_Reader/pull/442) 已合并构建缓存预算提示；PR [#443](https://github.com/MY-moss/moyang_Reader/pull/443) 已完成更新与 opener 文档收口并关闭 Issue [#112](https://github.com/MY-moss/moyang_Reader/issues/112)。
+- 当前稳定版本：`v0.10.14`。
+- 产品边界：Windows x64、本地优先；浏览器版仅用于开发预览和 UI 测试。
+- 技术栈：Tauri 2 + Rust + React + TypeScript。
+- `main` 受 GitHub `Quality checks` 保护。
+- 当前工程主线正在收敛 TS↔Tauri 契约、App.tsx 职责、Rust commands、搜索入口、桌面交互与视觉系统。
+
+## AI 接手方式
+
+1. 阅读根目录 `AGENTS.md`。
+2. 阅读 `docs/AI-TASKS.md`。
+3. 检查目标任务是否已有开放 PR。
+4. 选择第一个可执行 TODO，从最新 main 建一个 `codex/` 分支，只完成一个垂直切片。
+5. PR 中写清测试、风险和回滚；完成后更新任务清单。
+6. 只有需要决定未来产品/架构方向时才读 `FUTURE-DEVELOPMENT-PLAN.md`；其中长期候选不能跳过依赖直接开工。
+
+不再使用 `docs/ai/policy.json`、`plan-v1.json`、`state.json`、审批凭证或 `docs/NEXT.md` 状态机。
 
 ## 外部阻塞
 
-- [#227](https://github.com/MY-moss/moyang_Reader/issues/227)：GitHub Private Vulnerability Reporting 经 API 核验为未启用。启用前不能声称仓库已有可用私密报告入口，也不要用公开 Issue 代替。
-- [#241](https://github.com/MY-moss/moyang_Reader/issues/241)：公开镜像可用，但 Cloudflare 静态上传仍依赖仓库 Secrets；旧版本更新只在具备真实旧安装环境时复验。不得把代理可用写成静态工作流全绿。
-- [#51](https://github.com/MY-moss/moyang_Reader/issues/51)：Tauri updater 的 `.sig` 不等于 NSIS Authenticode。当前缺少代码签名证书，只能记录限制和哈希核验方式。
-- 精确状态、证据、资产名与哈希见 `release-status.json`；不要从历史交接复制旧版本数据。
+- #227：GitHub Private Vulnerability Reporting 需要维护者在仓库设置中开启。未开启前不要声称已有可用私密报告入口，也不要让安全研究者用公开 Issue 发送敏感细节。
+- #241：完整旧版本自动更新回归需要真实 Windows x64 旧安装环境和发布条件；CI 不能替代这项实机证据。
+- #51：Tauri updater `.sig` 不等于 Windows Authenticode。当前没有代码签名证书时，只能明确披露限制并提供 updater 签名 / SHA-256 核验。
 
-## 开放工作概况
+精确发布资产、版本和哈希仍以 `docs/release-status.json` 为准。
 
-- 审计时共有 8 个开放 Issue：4 个可执行/候选项、3 个外部条件项、1 个历史跟踪项。
-- 开放 PR 均为 Dependabot 依赖更新，没有产品功能 PR。
-- 执行权限、批准队列和运行状态分别由 `ai/policy.json`、`ai/plan-v1.json` 与 `ai/state.json` 管理；[`NEXT.md`](NEXT.md) 仅为生成摘要。
-- G03 外部 GitHub App、Code Owner 探针和强制身份隔离已取消；G01/G02 控制面保留，M1101 不再依赖 G03。取消原因与状态迁移以结构化计划和 ADR 0013 为准。
+## 架构历史说明
 
-## 本地工作区提示
-
-仓库根目录可能停留在旧分支并含用户未提交改动。任何新切片都先运行 `git status`；不要覆盖根目录，优先从最新 `origin/main` 建立 `.codex-worktrees/` 独立工作树。
+- ADR 0011 / 0013 只保留为历史记录，不能用于重新启用 T0–T3、G01–G03 或 policy/state 审批状态机。
+- ADR 0012 仍然有效：v1.0 前先让内置功能使用稳定的 DocumentAdapter / IndexProvider / CommandContribution / AiProvider 等内部能力接口，不提前承诺第三方插件 ABI。
 
 ## 维护规则
 
-- 本文件控制在 100 行内；只保留一个稳定基线、外部阻塞和最近一次结果。
-- 完成记录进入当前版本 `docs/handoff/`、CHANGELOG、Issue 或 PR，不在这里累计流水账。
-- 不在此处复制当前任务、候选任务验收、固定“下一步”或完整 CI 日志。
+- 本文件保持短小，不复制当前 PR、实时 SHA、完整任务验收或 CI 日志。
+- 历史结果留在 Git、PR、Issue、Release 或 `docs/handoff/`。
+- 根目录有未提交改动时不要覆盖；AI 优先使用独立 worktree/分支。

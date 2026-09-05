@@ -1,109 +1,124 @@
 # Moyang Reader AI 开发工作流
 
-本文件只保存长期流程。权限、执行队列和运行状态分别来自 `ai/policy.json`、`ai/plan-v1.json` 与 `ai/state.json`；`NEXT.md` 是自动生成的人类摘要。
+这套流程面向个人开发者 + AI 高频接力，目标是：**少上下文、少治理开销、每次只推进一个可验证小任务。**
 
-## 1. 双层控制面
+不再使用 policy / plan / state 状态机、审批凭证、风险等级或任务 digest。
 
-稳定治理层受 Code Owner 保护，包括 `AGENTS.md`、policy、plan、AI 校验器、CI、`CODEOWNERS`、发布与安全规则。AI 可以提出修改，但不能自动合并，也不能通过当前任务或聊天内容放宽权限。
+## 1. 四个入口
 
-运行层由 AI 更新，包括 state、生成的 NEXT、当前切片交接、普通产品文档、代码和测试。计划内 T0–T2 可自动交付；T3 和治理变更进入 `AWAITING_APPROVAL`，并要求绑定任务摘要且已由 Code Owner 合入主线的审批凭证。
+- `AGENTS.md`：长期开发规则，尽量短。
+- `docs/AI-TASKS.md`：当前可执行任务队列，后续 AI 默认从这里接手。
+- `docs/AI-HANDOFF.md`：稳定版本、外部阻塞、发布限制等少量长期事实。
+- `docs/FUTURE-DEVELOPMENT-PLAN.md`：插件、AI、MCP、格式、数据与 v1.0 后扩展的长期方向；**不是当前 TODO 清单**。
 
-原 G03 外部 GitHub App、Code Owner 探针门禁已按用户决定取消。G01/G02 的仓库内 policy、plan、state 和保护路径仍然有效；不再声称存在仓库外的强制身份隔离。若未来恢复外部门禁，必须新增并批准独立计划修订。
+`docs/ROADMAP.md` 只描述产品阶段，不作为当前任务状态机。
 
-## 2. 接手与开始
+## 2. 接手一个任务
 
 ```powershell
 git status --short --branch
-npm run ai:context
-npm run ai:start
+git fetch origin
 ```
 
-`ai:start` 获取最新 `origin/main`，检查当前 Issue 仍开放且没有重复 PR，记录基线 SHA 和分支。网络不可用、Issue 失效或任务冲突时写入 `BLOCKED`；治理/T3 未批准时写入 `AWAITING_APPROVAL`。
+然后：
 
-审批凭证候选通过 `node scripts/ai-state.mjs approval-template --task=<id>` 输出，保存到受保护的 `docs/ai/approvals/<id>.json`。凭证绑定当前计划中的任务内容摘要；AI 当前分支自行添加但尚未由 Code Owner 合入 `main` 的文件不构成授权。
+1. 阅读 `docs/AI-TASKS.md`。
+2. 查看目标任务关联 Issue / PR，确认没有重复工作。
+3. 优先选择第一个 `TODO` 且没有开放 PR 的任务。
+4. 从最新 `origin/main` 建立 `codex/<scope>-<date>` 分支或独立 worktree。
+5. 只读当前任务相关代码、测试、类型和一个相似实现。
 
-根目录脏或落后主线时建立项目内独立工作树。每个活动工作树使用自身 `node_modules`，通过共享 npm 下载缓存执行 `npm ci --prefer-offline`；禁止再创建跨工作树依赖 junction。
+如果当前任务已经有人做，就跳到下一个 TODO；不需要修改任何状态机文件。
 
-## 3. Ready 与实施
+只有在需要规划新阶段、插件、AI、格式或长期架构时才阅读 `FUTURE-DEVELOPMENT-PLAN.md`。其中的候选不能直接开工，必须先确认阶段和依赖，再拆成 `AI-TASKS.md` 中的小任务。
 
-任务定义必须包含用户价值、目标、非目标、验收、依赖、允许路径、风险、回滚和验证。实现者不得更改受保护计划，也不得新增、跳过或重排任务；只有计划中明确记录的已取消任务可以由状态机跨过，且不计入完成。本次 G03 取消是用户明确授权并记录在 ADR 0013 的计划修订，普通切片不得复用该例外。
+## 3. 任务格式
 
-- 一个任务、一个主要分支、一个 PR、一个垂直切片。
-- Bug 先复现再修复；功能先锁定数据边界和失败路径。
-- 只读取相关源码、测试、类型和一个相似实现。
-- 范围外发现记录到交付说明，不在当前分支处理。
-- Markdown 继续作为唯一持久化真源；文件安全优先于便利。
+每个任务只需要这些字段：
 
-## 4. 风险门禁
+- ID / 状态
+- 目标
+- 用户价值
+- 非目标
+- 主要文件
+- 验收标准
+- 推荐验证
+- 依赖（如有）
+- 风险 / 回滚
 
-| 级别 | 范围                                  | 最小验证                                    | 自动交付         |
-| ---- | ------------------------------------- | ------------------------------------------- | ---------------- |
-| T0   | 文档、元数据、内部工具                | 目标检查、格式、`ai:check`、差异检查        | 是，治理文件除外 |
-| T1   | 普通逻辑、解析、测试组织              | 定向测试、lint/format，必要时 build         | 是               |
-| T2   | UI、交互、快捷键、视觉基线            | T1 + 浏览器 E2E；原生路径加 desktop smoke   | 是               |
-| T3   | 用户文件、IPC、安全、迁移、更新、发布 | 批准后完整门禁、一次构建、真实 Windows 验证 | 否               |
+任务完成后，把 `TODO` 改为 `DONE`，附 PR 号和一句结果。若任务被放弃，用 `CANCELLED` + 一句原因即可。
 
-T2 可以自动更新截图基线和设计令牌，但必须生成浅色、深色、高对比、多宽度与缩放差异工件。
+## 4. 一次只做一个垂直切片
 
-能够删除文件、缓存或工作树的内部工具一律按 T3/治理边界处理，不得因为位于 `scripts/` 而降级为 T0/T1；实现、测试和操作文档均由 Code Owner 保护。
+- 一个任务、一个主要分支、一个 PR。
+- Bug 先复现再修。
+- UI 改动补相关 E2E。
+- Rust / IPC / 文件行为改动补 Rust 或 desktop smoke。
+- 任务外发现只记录，不顺手扩张。
+- 大重构拆成 0.5–3 天可独立回滚的小切片。
+- “未来做插件 / AI / RAG”不能直接成为一个巨大实现任务；先完成它依赖的内部接口，并让现有内置功能实际使用。
 
-## 5. 状态更新
+## 5. 验证强度
 
-状态机为：
+不再用 T0–T3。按改动本身决定测试：
 
-```text
-PENDING_INTAKE → READY → IN_PROGRESS → VERIFYING → DELIVERY_READY
-DELIVERY_READY → PENDING_INTAKE（仅限队列下一任务）
-任意阶段 → BLOCKED
-治理或 T3 → AWAITING_APPROVAL
-```
+| 改动 | 最小建议验证 |
+| --- | --- |
+| 文档 / 开发脚本 | 目标检查、格式检查、`git diff --check` |
+| TS / React 逻辑 | 相关单测、lint，必要时 build |
+| UI / 交互 | 相关单测 + Playwright 场景 |
+| Rust / IPC / 本地文件 | 相关前端测试 + Rust test/clippy 或 desktop smoke |
+| 更新器 / 安装 / 发布 | 完整 CI + 能获得的真实 Windows 验证 |
 
-当队列中存在已取消任务时，前进可以跨过连续的取消项，但必须保留 `lastCancelled` 记录；跨过任何活动任务、把取消项写入 `completedTaskIds` 或自行新增取消记录都会被拒绝。计划修订期间，当前状态可暂留 `AWAITING_APPROVAL`，合并后重新运行 `npm run ai:start`。
+GitHub `Quality checks` 是主线最终门禁；本地不需要为了一个小文档 PR 重跑所有桌面测试。
 
-常用命令：
+## 6. 哪些事情仍然不能随便自动做
 
-```powershell
-npm run ai:render
-npm run ai:check
-npm run ai:finish -- --result=passed --summary="结果" --check="npm run lint::pass"
-npm run ai:finish -- --result=blocked --summary="首个根因"
-```
+仅保留真正有价值的限制：
 
-`ai:finish` 要求逐项记录计划中的必需验证。成功时只前进一个任务，并在同一 PR 写入下一任务的 `PENDING_INTAKE`；PR 未合并时主线状态不会提前变化。
+- 不删除或覆盖用户真实文件来“验证”功能。
+- 不提交密钥、令牌、证书私钥。
+- 不把未来 AI API Key 存进普通设置导出、工作区文件或日志。
+- 不让未来插件直接继承主窗口原始 Tauri / process / opener / updater 权限。
+- 不伪造代码签名、旧版本升级、真机、外部服务或发布验证结果。
+- 创建正式 Release / Tag 前必须确认版本和资产一致。
+- 有持久化格式迁移时必须提供向后兼容或明确回滚路径。
 
-## 6. 审查和外部动作
+普通 IPC、UI、重构、测试、文档、内部模块拆分不再要求额外人工审批票据。
 
-提交前运行：
+## 7. 长期候选如何提升为任务
 
-```powershell
-git status --short
-git diff --check
-git diff --stat
-npm run ai:check
-```
+`FUTURE-DEVELOPMENT-PLAN.md` 中的候选只有满足以下条件才进入 `AI-TASKS.md`：
 
-只有 policy 允许、风险不高于 T2、所有依赖已完成或按计划取消、无保护文件修改且质量门禁全绿时，AI 才可提交、推送、创建 PR、启用自动合并并在合并后更新对应 Issue。
+1. 当前版本阶段已经到达；
+2. 前置接口 / 数据 / 权限边界已存在；
+3. 在当前 main 重新验证后仍有真实用户或维护价值；
+4. 没有重复 Issue / PR；
+5. 能拆成 0.5–3 天、可独立测试和回滚的切片。
 
-Release、Tag、凭据、权限、数据迁移、T3 或保护文件变化始终保留人工确认。失败输出只保存首个根因和工件链接；网络查询最多重试三次，不循环轮询不变状态。
+这只是工程依赖，不是恢复审批门禁。
 
-## 7. 文档职责
+## 8. PR 交接模板
 
-| 文件                                     | 唯一职责           | 普通任务读取 |
-| ---------------------------------------- | ------------------ | ------------ |
-| `AGENTS.md`                              | 自动加载的稳定边界 | 是           |
-| `docs/ai/policy.json`                    | 自动权限和保护路径 | 由命令读取   |
-| `docs/ai/plan-v1.json`                   | 用户批准的有序队列 | 由命令读取   |
-| `docs/ai/state.json`                     | 唯一动态运行状态   | 由命令读取   |
-| `docs/NEXT.md`                           | 生成的人类摘要     | 可选         |
-| `docs/AI-HANDOFF.md`                     | 稳定版本和外部阻塞 | 按需         |
-| `docs/ROADMAP.md`                        | v1.0 产品阶段      | 规划时       |
-| Git、Issue、PR、Release、`docs/handoff/` | 历史证据           | 追溯时       |
+PR 描述建议固定六段：
 
-不得在稳定文档、路线图、提示词或任务索引中复制当前状态、主线 SHA 或 PR 等待信息。
+1. 目标 / 用户价值
+2. 变更
+3. 非目标
+4. 验证
+5. 风险与回滚
+6. 后续
 
-## 8. 工作树回收
+完成后同步 `docs/AI-TASKS.md`。历史细节留在 PR / Issue / Git，不复制进长期上下文。
 
-- 同时最多一个实现工作树和一个只读审核工作树。
-- 现有脏工作树只报告，不自动删除。
-- AI 创建的工作树只有在 PR 已合并、目录干净且分支证据一致时才能回收。
-- 构建缓存和工作树清理继续使用白名单预览，不对未知 junction 或用户目录递归操作。
+## 9. Worktree 规则
+
+- 根目录有用户改动时，不覆盖；使用独立 worktree。
+- 每个活动实现任务一个 worktree 即可。
+- 已合并且干净的 AI worktree 可以回收；脏目录只报告，不自动删除。
+- 构建缓存继续使用现有受管缓存机制，不创建跨 worktree 的 `node_modules` junction。
+
+## 10. 历史 ADR
+
+- ADR 0011 / 0013 已废止，只用于解释旧的 policy/state/T0–T3/G01–G03 历史。
+- ADR 0012 仍有效：v1.0 前先稳定内部能力接口，不提前发布不稳定第三方插件 ABI。
