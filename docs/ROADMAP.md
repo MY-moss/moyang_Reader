@@ -1,6 +1,6 @@
 # Moyang Reader 产品路线
 
-路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
+路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，每日文章精读 / Reading Inbox 的完整产品、接口、数据、安全与分阶段规范见 [`READING-INBOX-PLAN.md`](READING-INBOX-PLAN.md)，稳定发布事实见 `release-status.json`。
 
 ## 产品完成态
 
@@ -44,7 +44,7 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 
 ## v0.13：轻量知识库
 
-- Inbox 快速记录，继续创建普通 Markdown。
+- **Quick Capture Inbox**：快速记录用户自己的内容，继续创建普通 Markdown；它与 v1.0 后的外部文章 `Reading Inbox` 是两个不同领域，不共享队列状态语义。
 - Daily Note 按用户指定目录生成普通 Markdown。
 - YAML frontmatter Properties 面板从只读升级为安全编辑。
 - 属性 / 标签表格视图，Markdown 仍是真源。
@@ -59,6 +59,7 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 - 建立 `AiProvider` 与 `ConsentScope`；先使用 mock 验证接口、取消、错误、流式输出和可见上下文范围。
 - provider 普通配置与 secret 分离；API Key/token 不进入 portable settings 或工作区文件。
 - 核心默认不联网；发送内容时展示范围、用途、provider/model；写回提供 diff。
+- 为 v1.0 后 Reading Inbox 只稳定必要接缝：**网络内容来源 / Article Import 不并入 `DocumentAdapter`**；本阶段不实现 URL 抓取、每日文章队列、浏览器扩展或后台推送。
 - v1.0 前仍不加载任意脚本、iframe/WebView 插件，不承诺第三方 ABI。
 
 ## v0.15：冻结与兼容
@@ -80,6 +81,7 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 
 优先候选：
 
+- **可选 Reading Inbox / 每日文章精读**：严格按 [`READING-INBOX-PLAN.md`](READING-INBOX-PLAN.md) 分阶段推进，从 feature toggle、稳健阅读锚点和手动 URL 导入开始，再到队列、Digest、离线资源、AI 精读和 RSS/浏览器/MCP 来源；默认关闭、默认不联网，导入后的普通 Markdown 始终是真源。
 - AI 选区/当前文档解释、总结、翻译和问答；
 - 一个远程 provider + 一个本地/OpenAI-compatible provider；
 - 声明式扩展包（模板、snippet、主题、prompt preset），先不运行任意第三方 JS；
