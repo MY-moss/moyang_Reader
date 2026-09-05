@@ -16,7 +16,8 @@ export type AnnotationSelection = {
 export type TextAnnotation = AnnotationSelection & {
   id: string;
   path: string;
-  note?: string;
+  /** Rust's optional note is serialized as null when no note is stored. */
+  note?: string | null;
   createdAt: number;
   updatedAt: number;
 };
