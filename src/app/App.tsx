@@ -236,6 +236,13 @@ import {
   type SettingsController,
   type SettingsPersistenceStatus,
 } from "./settings-controller";
+import {
+  createDocumentSessionController,
+  type DocumentOpenNavigation,
+  type DocumentSaveCommit,
+  type DocumentSessionController,
+  type DraftFlushOutcome,
+} from "./document-session-controller";
 import { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";
 import {
   documentKindFromPath,
@@ -277,12 +284,7 @@ import type { PaneWidths } from "./pane-layout";
 import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
-import {
-  formatTransitionConfirmation,
-  isSameDocumentPath,
-  shouldConfirmDocumentReplacement,
-  shouldConfirmWorkspaceSwitch,
-} from "./document-transition";
+import { formatTransitionConfirmation, isSameDocumentPath, shouldConfirmWorkspaceSwitch } from "./document-transition";
 import {
   clipboardAssetFileName,
   clipboardAssetPath,
@@ -297,7 +299,6 @@ import {
   clearDraftSnapshot,
   getDraftSnapshotState,
   loadDraftSnapshots,
-  saveDraftSnapshot,
   type DraftSnapshot,
   type DraftSaveResult,
 } from "./draft-recovery";
@@ -534,8 +535,6 @@ type CachedWorkspace = {
   activeDocumentPath: string | null;
 };
 
-type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
-
 type DraftComparisonRequest = {
   snapshot: RecoverySnapshot;
   comparisonSource: string | null;
@@ -555,8 +554,6 @@ type OpenPathsOutcome = {
   duplicateCount: number;
   cancelled: boolean;
 };
-
-type DocumentOpenNavigation = "sync" | "push" | "back" | "forward";
 
 function updateCachedWorkspace(
   cache: Map<string, CachedWorkspace>,
@@ -725,9 +722,9 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const documentSessionControllerRef = useRef<DocumentSessionController | null>(null);
   const navigationHistoryRef = useRef<NavigationHistoryState>(navigationHistory);
   const closeConfirmationOpenRef = useRef(false);
-  const closeOperationRef = useRef(0);
   const sourceDraftRef = useRef(sourceDraft);
   const editorHistoryRef = useRef(editorHistory);
   const preferencesRef = useRef<ReaderPreferences>(preferences);
@@ -1056,43 +1053,16 @@ export function App() {
   );
 
   const flushCurrentDraft = useCallback((): DraftFlushOutcome => {
-    const current = documentStateRef.current;
-    if (!current?.modified || !isEditableDocument(current.kind)) return "not-needed";
-    if (current.path.startsWith("browser://")) return "unavailable";
+    return documentSessionControllerRef.current?.flushDraft() ?? "not-needed";
+  }, []);
 
-    const result = saveDraftSnapshot({
-      path: current.path,
-      draft: sourceDraftRef.current,
-      baseSource: current.source,
-      savedAt: Date.now(),
-    });
-    return handleDraftSaveResult(result) ? "saved" : "failed";
-  }, [handleDraftSaveResult]);
+  const confirmDocumentReplacement = useCallback((nextPaths: readonly string[], action: string) => {
+    return documentSessionControllerRef.current?.confirmDocumentReplacement(nextPaths, action) ?? true;
+  }, []);
 
-  const confirmDocumentReplacement = useCallback(
-    (nextPaths: readonly string[], action: string) => {
-      if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;
-      const outcome = flushCurrentDraft();
-      if (outcome === "failed") return false;
-      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));
-    },
-    [flushCurrentDraft],
-  );
-
-  const confirmWorkspaceSwitch = useCallback(
-    (nextWorkspacePath: string, action: string) => {
-      const currentDocument = documentStateRef.current;
-      if (
-        !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)
-      ) {
-        return true;
-      }
-      const outcome = flushCurrentDraft();
-      if (outcome === "failed") return false;
-      return window.confirm(formatTransitionConfirmation(action, outcome === "saved"));
-    },
-    [flushCurrentDraft],
-  );
+  const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, action: string) => {
+    return documentSessionControllerRef.current?.confirmWorkspaceSwitch(nextWorkspacePath, action) ?? true;
+  }, []);
 
   const exportPortableSettings = useCallback(async () => {
     try {
@@ -1509,13 +1479,7 @@ export function App() {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
-        const result = saveDraftSnapshot({
-          path: current.path,
-          draft: sourceDraftRef.current,
-          baseSource: current.source,
-          savedAt: Date.now(),
-        });
-        handleDraftSaveResult(result);
+        flushCurrentDraft();
       }
       if (isTauriRuntime() || !documentStateRef.current?.modified) return;
       event.preventDefault();
@@ -1523,7 +1487,7 @@ export function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [handleDraftSaveResult]);
+  }, [flushCurrentDraft]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -1534,13 +1498,7 @@ export function App() {
       if (closeConfirmationOpenRef.current || settingsCloseInFlightRef.current) return;
       const current = documentStateRef.current;
       if (current?.modified && isEditableDocument(current.kind) && !current.path.startsWith("browser://")) {
-        const result = saveDraftSnapshot({
-          path: current.path,
-          draft: sourceDraftRef.current,
-          baseSource: current.source,
-          savedAt: Date.now(),
-        });
-        if (!handleDraftSaveResult(result)) return;
+        if (flushCurrentDraft() === "failed") return;
       }
       if (current?.modified) {
         closeConfirmationOpenRef.current = true;
@@ -1575,7 +1533,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [flushAppSettings, handleDraftSaveResult, notify]);
+  }, [flushAppSettings, flushCurrentDraft, notify]);
 
   useEffect(() => {
     workspacePathRef.current = workspacePath;
@@ -2315,70 +2273,129 @@ export function App() {
     [commitNavigationHistory],
   );
 
-  const openPath = useCallback(
-    async (path: string, preserveMode = false, navigation: DocumentOpenNavigation = "sync"): Promise<boolean> => {
-      const previousPath = documentStateRef.current?.path ?? null;
-      try {
-        let opened = false;
-        if (path.startsWith("browser://")) {
-          const cached = browserDocumentsRef.current.get(path);
-          if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
-          if (cached.bytes) {
-            opened = await openBinary(path, cached.bytes, preserveMode);
-          } else if (cached.source !== undefined) {
-            opened = await openSource(path, cached.source, preserveMode);
-          }
-        } else {
-          const kind = documentKindFromPath(path);
-          if (!kind) {
-            throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
-          }
-          const stamp = await fileMetadata(path);
-          const cached = documentCacheRef.current.get(path, stamp);
-          if (kind === "docx" || kind === "pdf" || kind === "image") {
-            if (cached?.kind === kind && cached.bytes) {
-              opened = await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
-            } else {
-              opened = await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
-            }
-          } else if (cached?.kind === kind) {
-            opened = await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
-          } else {
-            opened = await openSource(path, await readTextFile(path), preserveMode, stamp);
-          }
+  const getCurrentDocument = useCallback(() => documentStateRef.current, []);
+  const getSourceDraft = useCallback(() => sourceDraftRef.current, []);
+  const getWorkspacePath = useCallback(() => workspacePathRef.current, []);
+  const renderDocumentSource = useCallback(
+    (path: string, source: string) =>
+      renderSource(path, source, {
+        allowRemoteResources: preferencesRef.current.allowRemoteResources,
+      }),
+    [],
+  );
+  const loadDocument = useCallback(
+    async (path: string, preserveMode: boolean): Promise<boolean> => {
+      let opened = false;
+      if (path.startsWith("browser://")) {
+        const cached = browserDocumentsRef.current.get(path);
+        if (!cached) throw new Error("浏览器预览文件已失效，请重新选择。");
+        if (cached.bytes) {
+          opened = await openBinary(path, cached.bytes, preserveMode);
+        } else if (cached.source !== undefined) {
+          opened = await openSource(path, cached.source, preserveMode);
         }
-
-        if (opened) commitDocumentOpenNavigation(path, navigation, previousPath);
-        return opened;
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "文件打开失败。");
-        return false;
+      } else {
+        const kind = documentKindFromPath(path);
+        if (!kind) {
+          throw new Error("不支持的文档类型，请选择 Markdown、文本、Word、PDF 或图片文件。");
+        }
+        const stamp = await fileMetadata(path);
+        const cached = documentCacheRef.current.get(path, stamp);
+        if (kind === "docx" || kind === "pdf" || kind === "image") {
+          if (cached?.kind === kind && cached.bytes) {
+            opened = await openBinary(path, cached.bytes, preserveMode, stamp, cached.rendered);
+          } else {
+            opened = await openBinary(path, await readBinaryFile(path), preserveMode, stamp);
+          }
+        } else if (cached?.kind === kind) {
+          opened = await openSource(path, cached.source, preserveMode, stamp, cached.rendered);
+        } else {
+          opened = await openSource(path, await readTextFile(path), preserveMode, stamp);
+        }
       }
+      return opened;
     },
-    [commitDocumentOpenNavigation, openBinary, openSource],
+    [openBinary, openSource],
+  );
+  const invalidateDocumentCache = useCallback((path: string) => {
+    documentCacheRef.current.remove(path);
+  }, []);
+  const getSelfWritingPaths = useCallback(() => selfWritingPathsRef.current, []);
+  const getSelfWrittenPaths = useCallback(() => selfWrittenPathsRef.current, []);
+
+  const handleDocumentSaveCommit = useCallback(({ path, draft, rendered, snapshots }: DocumentSaveCommit) => {
+    setDocumentState((latest) =>
+      latest && isSameDocumentPath(latest.path, path)
+        ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
+        : latest,
+    );
+    setDraftSnapshots(snapshots);
+    setDraftRecovery(null);
+    setError(null);
+  }, []);
+  const handleDocumentSaveConflict = useCallback((path: string) => {
+    setDocumentState((latest) =>
+      latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
+    );
+  }, []);
+  const handleDocumentSessionError = useCallback((message: string) => setError(message), []);
+  const downloadDocumentText = useCallback((name: string, contents: string) => downloadText(name, contents), []);
+
+  useEffect(() => {
+    const documentSessionController = createDocumentSessionController({
+      getCurrentDocument,
+      getSourceDraft,
+      getWorkspacePath,
+      isNative: isTauriRuntime(),
+      readTextFile,
+      writeTextFile,
+      renderSource: renderDocumentSource,
+      downloadText: downloadDocumentText,
+      loadDocument,
+      commitNavigation: commitDocumentOpenNavigation,
+      onDraftSaved: handleDraftSaveResult,
+      onSaveCommitted: handleDocumentSaveCommit,
+      onSaveConflict: handleDocumentSaveConflict,
+      onExternalChangePath: setExternalChangePath,
+      onError: handleDocumentSessionError,
+      invalidateCache: invalidateDocumentCache,
+      getSelfWritingPaths,
+      getSelfWrittenPaths,
+    });
+    documentSessionControllerRef.current = documentSessionController;
+    return () => {
+      if (documentSessionControllerRef.current === documentSessionController) {
+        documentSessionControllerRef.current = null;
+      }
+      documentSessionController.dispose();
+    };
+  }, [
+    commitDocumentOpenNavigation,
+    downloadDocumentText,
+    getCurrentDocument,
+    getSelfWrittenPaths,
+    getSelfWritingPaths,
+    getSourceDraft,
+    getWorkspacePath,
+    handleDocumentSaveCommit,
+    handleDocumentSaveConflict,
+    handleDocumentSessionError,
+    handleDraftSaveResult,
+    invalidateDocumentCache,
+    loadDocument,
+    renderDocumentSource,
+  ]);
+
+  const openPath = useCallback(
+    (path: string, preserveMode = false, navigation: DocumentOpenNavigation = "sync"): Promise<boolean> => {
+      return documentSessionControllerRef.current?.openPath(path, preserveMode, navigation) ?? Promise.resolve(false);
+    },
+    [],
   );
 
-  const reloadExternalChange = useCallback(async () => {
-    const current = documentStateRef.current;
-    if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;
-
-    if (current.modified) {
-      const draftResult = saveDraftSnapshot({
-        path: current.path,
-        draft: sourceDraftRef.current,
-        baseSource: current.source,
-        savedAt: Date.now(),
-      });
-      if (!handleDraftSaveResult(draftResult)) return;
-      if (!window.confirm("重新载入会覆盖当前未保存修改，已先保留一份草稿恢复副本。继续吗？")) return;
-    }
-
-    setExternalChangePath(null);
-    const opened = await openPath(current.path, true);
-    if (!opened && documentStateRef.current?.path === current.path) {
-      setExternalChangePath(current.path);
-    }
-  }, [externalChangePath, handleDraftSaveResult, openPath]);
+  const reloadExternalChange = useCallback(() => {
+    return documentSessionControllerRef.current?.reloadExternalChange(externalChangePath) ?? Promise.resolve();
+  }, [externalChangePath]);
 
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
@@ -2483,76 +2500,19 @@ export function App() {
     await openPath(targetPath, false, "back");
   }, [confirmDocumentReplacement, openPath]);
 
-  const saveDocument = useCallback(async (allowExternalOverwrite = false): Promise<boolean> => {
-    const current = documentStateRef.current;
-    const draft = sourceDraftRef.current;
-    if (!current || !current.modified || !isEditableDocument(current.kind)) return false;
-
-    if (current.externallyModified && !allowExternalOverwrite) {
-      setExternalChangePath(current.path);
-      setError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
-      return false;
-    }
-
-    const path = current.path;
-    const pathKey = comparablePath(path);
-    let writeCompleted = false;
-    try {
-      if (isTauriRuntime()) {
-        if (!allowExternalOverwrite) {
-          const diskSource = await readTextFile(path);
-          if (diskSource !== current.source) {
-            setDocumentState((latest) =>
-              latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
-            );
-            setExternalChangePath(path);
-            setError("文件在保存前已被其他程序修改，请先选择处理方式。");
-            return false;
-          }
-        }
-        selfWritingPathsRef.current.add(pathKey);
-        try {
-          await writeTextFile(path, draft);
-        } finally {
-          selfWritingPathsRef.current.delete(pathKey);
-        }
-        writeCompleted = true;
-        selfWrittenPathsRef.current.set(pathKey, Date.now() + 1_500);
-        documentCacheRef.current.remove(path);
-      } else {
-        downloadText(current.name, draft);
-      }
-
-      const rendered = await renderSource(path, draft, {
-        allowRemoteResources: preferencesRef.current.allowRemoteResources,
-      });
-      setDocumentState((latest) =>
-        latest && isSameDocumentPath(latest.path, path)
-          ? { ...latest, source: draft, rendered, modified: false, externallyModified: false }
-          : latest,
-      );
-      setDraftSnapshots(clearDraftSnapshot(path));
-      setDraftRecovery(null);
-      setExternalChangePath(null);
-      setError(null);
-      return true;
-    } catch (cause) {
-      selfWritingPathsRef.current.delete(pathKey);
-      if (!writeCompleted) selfWrittenPathsRef.current.delete(pathKey);
-      setError(cause instanceof Error ? cause.message : "保存失败。");
-      return false;
-    }
+  const saveDocument = useCallback((allowExternalOverwrite = false): Promise<boolean> => {
+    return documentSessionControllerRef.current?.saveDocument(allowExternalOverwrite) ?? Promise.resolve(false);
   }, []);
 
   const cancelCloseConfirmation = useCallback(() => {
-    closeOperationRef.current += 1;
+    documentSessionControllerRef.current?.cancelCloseOperation();
     closeConfirmationOpenRef.current = false;
     settingsCloseInFlightRef.current = false;
     setCloseConfirmationOpen(false);
   }, []);
 
   const confirmClose = useCallback(() => {
-    closeOperationRef.current += 1;
+    documentSessionControllerRef.current?.beginCloseOperation();
     closeConfirmationOpenRef.current = false;
     setCloseConfirmationOpen(false);
     settingsCloseInFlightRef.current = true;
@@ -2573,13 +2533,14 @@ export function App() {
 
   const saveAndClose = useCallback(() => {
     if (settingsCloseInFlightRef.current) return;
-    const operation = closeOperationRef.current + 1;
-    closeOperationRef.current = operation;
+    const controller = documentSessionControllerRef.current;
+    if (!controller) return;
+    const operation = controller.beginCloseOperation();
     settingsCloseInFlightRef.current = true;
     void (async () => {
       try {
         if (!(await saveDocument())) return;
-        if (closeOperationRef.current !== operation) return;
+        if (!controller.isCurrentCloseOperation(operation)) return;
         closeConfirmationOpenRef.current = false;
         setCloseConfirmationOpen(false);
         if (!(await flushAppSettings())) {
@@ -3648,13 +3609,7 @@ export function App() {
     }
 
     const timer = window.setTimeout(() => {
-      const result = saveDraftSnapshot({
-        path: current.path,
-        draft: sourceDraft,
-        baseSource: current.source,
-        savedAt: Date.now(),
-      });
-      handleDraftSaveResult(result);
+      flushCurrentDraft();
     }, 1_500);
     return () => window.clearTimeout(timer);
   }, [
@@ -3664,7 +3619,7 @@ export function App() {
     documentState?.path,
     documentState?.source,
     sourceDraft,
-    handleDraftSaveResult,
+    flushCurrentDraft,
   ]);
 
   useEffect(() => {
@@ -3695,8 +3650,10 @@ export function App() {
   }, [documentState?.kind, documentState?.path, documentState?.source]);
 
   const recoverDraft = useCallback(() => {
-    if (!draftRecovery || !isSameDocumentPath(documentStateRef.current?.path ?? "", draftRecovery.path)) return;
-    updateSource(draftRecovery.draft);
+    if (!draftRecovery) return;
+    const recoveredDraft = documentSessionControllerRef.current?.resolveDraftRecovery(draftRecovery);
+    if (recoveredDraft === null || recoveredDraft === undefined) return;
+    updateSource(recoveredDraft);
     setDraftRecovery(null);
     setMode("source");
   }, [draftRecovery, updateSource]);
