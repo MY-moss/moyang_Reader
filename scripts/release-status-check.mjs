@@ -180,7 +180,7 @@ function validateHandoff(projectRoot, handoff, errors) {
     return;
   }
   const links = [
-    ["NEXT", handoff.next],
+    ["AI-TASKS", handoff.next],
     ["AI-HANDOFF", handoff.summary],
     ["AI 接手提示词", handoff.takeover],
     ["版本交接归档", handoff.versionArchive],
@@ -258,5 +258,5 @@ export function runReleaseStatusCheck(args = [], projectRoot = defaultRoot) {
 
 const invokedFile = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : "";
 if (invokedFile === import.meta.url) {
-  process.exitCode = runReleaseStatusCheck(process.argv.slice(2));
+  process.exitCode = runReleaseStatusCheck(process.argv.slice(2), defaultRoot);
 }
