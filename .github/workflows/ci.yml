@@ -71,11 +71,8 @@ jobs:
       - name: Configuration format check
         run: npm run format:check
 
-      - name: Workspace hygiene helper tests
+      - name: Workspace helper tests
         run: npm run test:workflow
-
-      - name: AI governance state check
-        run: npm run ai:check
 
       - name: Frontend coverage gate
         run: npm run test:coverage

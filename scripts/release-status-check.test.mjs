@@ -16,6 +16,7 @@ function copyStatusFixture() {
   for (const relativePath of [
     "package.json",
     "CHANGELOG.md",
+    "docs/AI-TASKS.md",
     "docs/AI-HANDOFF.md",
     "docs/AI-TAKEOVER-PROMPT.md",
     "docs/RELEASE-POLICY.md",

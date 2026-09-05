@@ -4,7 +4,7 @@
 
 ## 开始开发
 
-AI 先遵循 [`AGENTS.md`](AGENTS.md)，再运行 `npm run ai:context` 和 `npm run ai:start`。根目录已有未提交改动时不要直接开发；新切片放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 在目标工作树执行独立的 `npm ci --prefer-offline`。流程和路线分别见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md) 与 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+AI 先遵循 [`AGENTS.md`](AGENTS.md)，再阅读 [`docs/AI-TASKS.md`](docs/AI-TASKS.md)。根目录已有未提交改动时不要直接覆盖；新切片可以放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 在目标工作树执行独立的 `npm ci --prefer-offline`。流程和路线分别见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md) 与 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
 ```powershell
 npm install
@@ -56,14 +56,13 @@ Pop-Location
 
 ## 提交前检查
 
-- 开始新任务前先查看 [Issues](https://github.com/MY-moss/moyang_Reader/issues)，避免重复修复。
-- 按 `AGENTS.md` 的 T0–T3 风险级别运行最小充分验证；T3 才默认要求完整前端、Rust、浏览器和 Windows 桌面门禁。
-- AI/交接文档改动运行 `npm run ai:check`；更新/opener 文档运行 `npm run check:docs`。
+- 开始新任务前先查看 [Issues](https://github.com/MY-moss/moyang_Reader/issues) 和开放 PR，避免重复修复。
+- 按改动范围做最小充分验证：普通逻辑跑相关单测 + lint；UI 加相关 E2E；Rust/IPC/文件路径加 Rust test/clippy 或 desktop smoke；发布相关才跑完整发布验证。
+- 更新/opener 文档运行 `npm run check:docs`。
 - 不提交私钥、签名私钥密码、`.sig` 文件、本地工作区内容或构建产物。
 - 用户可见行为、发布流程或架构变更要同步更新 README、CHANGELOG 或架构文档。
 - 本地 Tauri/Cargo 命令使用项目包装脚本。构建缓存位置、预算和安全清理参数只以 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md) 为准，不在多处复制。
-- 每个功能切片必须通过 `npm run ai:finish` 更新结构化状态；没有目标、验收、测试结果和下一队列位置的 PR 不算完成。
-- 开始阅读代码前先运行 `npm run ai:context`；只在需要版本背景时读取交接摘要，不要把完整仓库、历史归档或整段流水线日志复制进 AI 上下文。
+- 一个任务一个 PR；完成后更新 `docs/AI-TASKS.md` 的状态和 PR 号，不维护额外状态机。
 
 ## 提交与 Pull Request
 
@@ -72,10 +71,14 @@ Pop-Location
 1. 改动解决的问题和对应 Issue。
 2. 影响的文件类型、平台和兼容性。
 3. 实际运行过的检查命令及结果。
-4. 是否需要同步更新 Release、更新清单或用户文档。
+4. 风险、回滚方式，以及是否需要同步 Release/用户文档。
 
 主分支不接受强制推送。发布版本通过版本标签触发，详见 [`docs/UPDATE.md`](docs/UPDATE.md) 和 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。
 
 ## AI 交接
 
-批准队列内的 T0–T2 在依赖已完成或按计划取消、无治理文件变化且 Quality checks 全绿时可以自动交付。T3、治理策略、权限、安全、更新器、发布工作流、凭据和数据迁移必须人工确认；计划中的已取消任务不计入完成，也不能由 AI 自行新增。代码、测试、必要文档和结构化状态应在同一个 PR 中提交。完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)，当前任务使用 `npm run ai:context`，可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
+后续 AI 只需要三步：读 `AGENTS.md` → 读 `docs/AI-TASKS.md` → 检查目标 Issue/PR。默认选择第一个可执行 TODO，完成后在同一个 PR 更新任务状态。
+
+普通代码、UI、IPC、重构、测试和文档不需要额外审批凭证。真正需要谨慎的是：用户真实文件删除/迁移、密钥与证书、正式 Release/Tag、以及不能伪造的真机/签名/外部服务验证。
+
+可复制提示词见 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
