@@ -54,7 +54,7 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 
 ## v0.14：内部扩展内核与 AI 接缝
 
-- 将现有文档 adapter registry 逐步升级成真实可执行的 `DocumentAdapter` 内部接口。
+- 将现有文档 adapter registry 逐步升级成真实可执行的 `DocumentAdapter` 内部接口，并明确 `render / extractText / edit / export` 能力。
 - 建立 `IndexProvider`、`CommandService / CommandContribution`、`SettingsNamespace` 与 `PermissionBroker`。
 - 建立 `AiProvider` 与 `ConsentScope`；先使用 mock 验证接口、取消、错误、流式输出和可见上下文范围。
 - provider 普通配置与 secret 分离；API Key/token 不进入 portable settings 或工作区文件。
@@ -83,12 +83,13 @@ v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件�
 - AI 选区/当前文档解释、总结、翻译和问答；
 - 一个远程 provider + 一个本地/OpenAI-compatible provider；
 - 声明式扩展包（模板、snippet、主题、prompt preset），先不运行任意第三方 JS；
+- PDF 安全文本提取、页码来源与 AI/RAG 上下文；
 - EPUB 只读 adapter；
 - saved search / collection；
 - 词法搜索之上的可选语义检索/RAG；
 - 受控的 read-only MCP bridge。
 
-更晚再评估：受控 sidecar 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
+更晚再评估：图片 OCR/vision、受控 sidecar 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
 
 ## 长期边界
 
