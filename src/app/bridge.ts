@@ -21,6 +21,7 @@ import type {
   WorkspaceSearchResult,
 } from "./types";
 import type { TextAnnotation } from "./annotations";
+import { normalizeExternalUrl } from "./external-url";
 
 export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
@@ -49,7 +50,7 @@ export async function writeAnnotations(root: string, annotations: readonly TextA
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
-  const normalized = url.startsWith("//") ? `${window.location.protocol}${url}` : url;
+  const normalized = normalizeExternalUrl(url);
   if (isTauriRuntime()) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(normalized);
