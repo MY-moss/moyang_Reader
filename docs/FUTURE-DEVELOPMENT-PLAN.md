@@ -487,7 +487,7 @@ MCP 可以成为 v1.0 之后的互操作层，但**不能成为 Moyang Reader �
 
 让 AI provider 通过 MCP 使用外部工具，但工具权限、结果大小、超时和联网状态仍由应用管理。
 
-由于 MCP 规范仍在演进，必须放在 `McpAdapter` 后面，不让内部 command / AI provider 直接依赖某个协议版本。
+由于外部协议会持续演进，MCP 必须放在 `McpAdapter` 后面，不让内部 command / AI provider 直接绑定某个传输、SDK 或协议版本；升级 MCP 不应迫使核心文档/索引接口一起重写。
 
 ---
 
