@@ -12,12 +12,19 @@
 
 1. `git status --short --branch`，不要覆盖已有未提交改动。
 2. 阅读 `docs/AI-TASKS.md`，优先处理第一个未完成且没有开放 PR 的普通任务。
-3. 检查 GitHub Issues / PR，避免重复开发。
+3. 检查 GitHub Issues / PR，避免重复开发。**GitHub 当前状态优先于任务板；发现冲突先同步任务板。**
 4. 从目标 base 创建 `codex/<scope>-<date>` 分支或独立 worktree；一个 PR 一个 coherent slice。
 5. 只读取当前任务相关源码、测试和一个相似实现，不全仓无目的通读。
 6. 完成后运行与改动匹配的测试，把实际结果写进 PR；普通任务同步 `docs/AI-TASKS.md` 状态。
 
-如果目标明确标记为 #464 / `MOD-XX` Modernization，再额外阅读 `docs/MODERNIZATION-CAMPAIGN.md`；涉及 UI 时再读 `docs/UI-NEXT-SPEC.md`。
+状态与“什么才算真的完成”统一遵循 `docs/AI-EXECUTION-CONTRACT.md`：
+
+- `TODO`：没有同主题开放实现 PR；
+- `IN_PROGRESS — PR #N`：PR 已创建但尚未合入目标 base；
+- `DONE — PR #N`：PR 已合入目标 base 且验收/测试可验证；
+- AI 自称完成、旧聊天或单纯 Issue 勾选都不能替代 merged PR / target branch 事实。
+
+如果目标明确标记为 #464 / `MOD-XX` Modernization，再额外阅读 `docs/MODERNIZATION-TASKS.md` 与 `docs/MODERNIZATION-CAMPAIGN.md`；涉及 UI 时再读 `docs/UI-NEXT-SPEC.md`。
 
 ## 开发原则
 
@@ -64,4 +71,4 @@ PR 描述保持短而完整：
 - 风险与回滚
 - 下一步（如有）
 
-长期路线看 `docs/ROADMAP.md`；当前普通可执行任务看 `docs/AI-TASKS.md`；Modernization 看 `docs/MODERNIZATION-CAMPAIGN.md`；稳定版本和外部阻塞看 `docs/AI-HANDOFF.md`。
+长期路线看 `docs/ROADMAP.md`；当前普通可执行任务看 `docs/AI-TASKS.md`；完成确认契约看 `docs/AI-EXECUTION-CONTRACT.md`；Modernization 看 `docs/MODERNIZATION-TASKS.md` / `docs/MODERNIZATION-CAMPAIGN.md`；稳定版本和外部阻塞看 `docs/AI-HANDOFF.md`。
