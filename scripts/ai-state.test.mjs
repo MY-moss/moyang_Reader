@@ -353,7 +353,19 @@ test("advances across an explicitly cancelled queue item", () => {
 
 test("does not accept missing required verification", () => {
   const { policy, plan, state } = loadGovernance(sourceRoot);
-  const currentState = { ...state, status: "IN_PROGRESS", blocker: null };
+  const currentTaskId = "M1101";
+  const currentIndex = plan.tasks.findIndex((task) => task.id === currentTaskId);
+  const currentState = {
+    ...state,
+    currentTaskId,
+    queueIndex: currentIndex,
+    completedTaskIds: plan.tasks
+      .slice(0, currentIndex)
+      .filter((task) => !isCancelledTask(plan, task.id))
+      .map((task) => task.id),
+    status: "IN_PROGRESS",
+    blocker: null,
+  };
   assert.throws(
     () => finishState(plan, currentState, { result: "passed", summary: "incomplete", checks: [], policy }),
     /缺少通过的必需验证/,
