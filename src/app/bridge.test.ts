@@ -15,8 +15,12 @@ import {
   commitBinaryFile,
   discardBinaryFile,
   fileMetadata,
+  listWorkspaceEntries,
   readAnnotations,
+  readAppSettings,
   readPreviousVersion,
+  readTextFile,
+  searchWorkspace,
   subscribeToFileDrop,
   writeBinaryFile,
   writeBinaryFileChunk,
@@ -75,6 +79,85 @@ describe("binary bridge", () => {
 
     await expect(readPreviousVersion("C:\\Notes\\Today.md")).resolves.toBe("# Previous");
     expect(invoke).toHaveBeenCalledWith("read_previous_version", { path: "C:\\Notes\\Today.md" });
+  });
+
+  it.each([
+    {
+      command: "read_app_settings",
+      invalid: 42,
+      call: () => readAppSettings(),
+    },
+    {
+      command: "read_annotations",
+      invalid: { annotations: [] },
+      call: () => readAnnotations("C:\\Vault"),
+    },
+    {
+      command: "read_text_file",
+      invalid: { contents: "# Note" },
+      call: () => readTextFile("C:\\Notes\\Today.md"),
+    },
+    {
+      command: "list_workspace_entries",
+      invalid: { files: [], folders: [], truncated: false },
+      call: () => listWorkspaceEntries("C:\\Vault"),
+    },
+    {
+      command: "search_workspace",
+      invalid: [{ file: {}, preview: "匹配" }],
+      call: () => searchWorkspace("C:\\Vault", "匹配"),
+    },
+  ])("rejects an invalid $command response with one stable error", async ({ command, invalid, call }) => {
+    invoke.mockResolvedValue(invalid);
+
+    await expect(call()).rejects.toMatchObject({
+      name: "IpcResponseValidationError",
+      code: "IPC_INVALID_RESPONSE",
+      command,
+      message: `IPC 命令 ${command} 返回了无效响应。`,
+    });
+  });
+
+  it("passes valid read-only responses through unchanged", async () => {
+    const response = {
+      files: [
+        {
+          path: "C:\\Vault\\Today.md",
+          name: "Today.md",
+          relativePath: "Today.md",
+          pinyinKey: "Today.md",
+          size: 42,
+          modifiedMs: null,
+          kind: "markdown",
+        },
+      ],
+      folders: [{ path: "C:\\Vault\\Notes", name: "Notes", relativePath: "Notes" }],
+      truncated: false,
+      scannedTotal: 2,
+    };
+    invoke.mockResolvedValue(response);
+
+    await expect(listWorkspaceEntries("C:\\Vault")).resolves.toBe(response);
+  });
+
+  it("accepts the existing nullable annotation note wire shape", async () => {
+    const response = [
+      {
+        id: "a-1",
+        path: "Notes/Today.md",
+        quote: "important",
+        prefix: "Read",
+        suffix: "now",
+        start: 5,
+        end: 14,
+        note: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    invoke.mockResolvedValue(response);
+
+    await expect(readAnnotations("C:\\Vault")).resolves.toBe(response);
   });
 
   it("round-trips workspace annotation sidecar calls through native IPC", async () => {
