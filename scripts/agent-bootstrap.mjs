@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepositoryRoot } from "./repository-root.mjs";
+import { resolveWorkingTreeRoot } from "./working-tree-root.mjs";
 
 const gitCommand = process.platform === "win32" ? "git.exe" : "git";
 
@@ -100,7 +100,7 @@ function formatList(items, emptyText) {
 }
 
 export async function buildAgentContext(projectRoot = process.cwd()) {
-  const root = resolveRepositoryRoot(path.resolve(projectRoot));
+  const root = resolveWorkingTreeRoot(path.resolve(projectRoot));
   const status = runGit(root, ["status", "--short", "--branch"]);
   const branch = runGit(root, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const head = runGit(root, ["rev-parse", "HEAD"]);
