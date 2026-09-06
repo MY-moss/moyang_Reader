@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { findFirstActiveTask, parseGitHubRepositoryUrl } from "./agent-bootstrap.mjs";
+import { resolveWorkingTreeRoot } from "./working-tree-root.mjs";
 
 test("parseGitHubRepositoryUrl accepts HTTPS and SSH origins", () => {
   assert.equal(parseGitHubRepositoryUrl("https://github.com/MY-moss/moyang_Reader.git"), "MY-moss/moyang_Reader");
@@ -25,4 +28,10 @@ test("findFirstActiveTask returns first TODO when previous tasks are complete", 
     title: "next",
     status: "TODO",
   });
+});
+
+test("resolveWorkingTreeRoot keeps checks inside the active checkout", () => {
+  const root = resolveWorkingTreeRoot(process.cwd());
+  assert.equal(fs.existsSync(path.join(root, "package.json")), true);
+  assert.equal(fs.existsSync(path.join(root, ".git")), true);
 });
