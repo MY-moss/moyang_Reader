@@ -1,6 +1,7 @@
 import { invoke as tauriInvoke, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import type { TextAnnotation } from "./annotations";
 import type {
+  DocumentKind,
   FileStamp,
   OpenPath,
   WorkspaceDirectory,
@@ -156,6 +157,19 @@ export type IpcRawCommand = typeof IPC_COMMANDS.writeBinaryFileRaw | typeof IPC_
 type IpcArgs<C extends IpcCommand> = IpcCommandMap[C]["args"];
 type IpcResult<C extends IpcCommand> = IpcCommandMap[C]["result"];
 
+export const IPC_INVALID_RESPONSE_CODE = "IPC_INVALID_RESPONSE" as const;
+
+export class IpcResponseValidationError extends Error {
+  readonly code = IPC_INVALID_RESPONSE_CODE;
+
+  constructor(readonly command: IpcCommand) {
+    super(`IPC 命令 ${command} 返回了无效响应。`);
+    this.name = "IpcResponseValidationError";
+  }
+}
+
+export type IpcResponseValidator<T> = (value: unknown) => value is T;
+
 /** Invoke a normal registered Rust command with its statically declared payload/result. */
 export function invokeCommand<C extends IpcCommand>(
   command: C,
@@ -164,6 +178,109 @@ export function invokeCommand<C extends IpcCommand>(
   if (args.length === 0) return tauriInvoke<IpcResult<C>>(command);
   return tauriInvoke<IpcResult<C>>(command, args[0] as InvokeArgs);
 }
+
+export function assertIpcResponse<T>(command: IpcCommand, value: unknown, validator: IpcResponseValidator<T>): T {
+  if (!validator(value)) throw new IpcResponseValidationError(command);
+  return value;
+}
+
+export async function invokeValidatedCommand<C extends IpcCommand>(
+  command: C,
+  validator: IpcResponseValidator<IpcResult<C>>,
+  ...args: IpcArgs<C> extends undefined ? [] : [args: IpcArgs<C>]
+): Promise<IpcResult<C>> {
+  const invoke = invokeCommand as (
+    command: C,
+    ...args: IpcArgs<C> extends undefined ? [] : [args: IpcArgs<C>]
+  ) => Promise<IpcResult<C>>;
+  const response = await invoke(command, ...args);
+  return assertIpcResponse(command, response, validator);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isDocumentKind(value: unknown): value is DocumentKind {
+  return value === "markdown" || value === "text" || value === "docx" || value === "pdf" || value === "image";
+}
+
+function isTextAnnotation(value: unknown): value is TextAnnotation {
+  if (!isRecord(value)) return false;
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.path) &&
+    isNonEmptyString(value.quote) &&
+    typeof value.prefix === "string" &&
+    typeof value.suffix === "string" &&
+    isNonNegativeSafeInteger(value.start) &&
+    isNonNegativeSafeInteger(value.end) &&
+    value.end > value.start &&
+    isNonNegativeFiniteNumber(value.createdAt) &&
+    isNonNegativeFiniteNumber(value.updatedAt) &&
+    // Rust serializes an absent Option<String> as JSON null in the existing
+    // annotation response; accept that wire representation without rewriting it.
+    (value.note === undefined || value.note === null || typeof value.note === "string")
+  );
+}
+
+function isWorkspaceFile(value: unknown): value is WorkspaceFile {
+  if (!isRecord(value)) return false;
+  return (
+    isNonEmptyString(value.path) &&
+    isNonEmptyString(value.name) &&
+    isNonEmptyString(value.relativePath) &&
+    isNonNegativeSafeInteger(value.size) &&
+    isDocumentKind(value.kind) &&
+    (value.pinyinKey === undefined || typeof value.pinyinKey === "string") &&
+    (value.modifiedMs === undefined || value.modifiedMs === null || isNonNegativeSafeInteger(value.modifiedMs))
+  );
+}
+
+function isWorkspaceDirectory(value: unknown): value is WorkspaceDirectory {
+  if (!isRecord(value)) return false;
+  return isNonEmptyString(value.path) && isNonEmptyString(value.name) && isNonEmptyString(value.relativePath);
+}
+
+export const isStringResponse: IpcResponseValidator<string> = (value): value is string => typeof value === "string";
+
+export const isStringOrNullResponse: IpcResponseValidator<string | null> = (value): value is string | null =>
+  typeof value === "string" || value === null;
+
+export const isTextAnnotationsResponse: IpcResponseValidator<TextAnnotation[]> = (value): value is TextAnnotation[] =>
+  Array.isArray(value) && value.every(isTextAnnotation);
+
+export const isWorkspaceListingResponse: IpcResponseValidator<WorkspaceListing> = (
+  value,
+): value is WorkspaceListing => {
+  if (!isRecord(value)) return false;
+  return (
+    Array.isArray(value.files) &&
+    value.files.every(isWorkspaceFile) &&
+    Array.isArray(value.folders) &&
+    value.folders.every(isWorkspaceDirectory) &&
+    typeof value.truncated === "boolean" &&
+    isNonNegativeSafeInteger(value.scannedTotal)
+  );
+};
+
+export const isWorkspaceSearchResponse: IpcResponseValidator<WorkspaceSearchResult[]> = (
+  value,
+): value is WorkspaceSearchResult[] =>
+  Array.isArray(value) &&
+  value.every((item) => isRecord(item) && isWorkspaceFile(item.file) && typeof item.preview === "string");
 
 /** Invoke the two raw-body commands while retaining Tauri's request options. */
 export function invokeRawCommand(command: IpcRawCommand, body: ArrayBuffer, options: InvokeOptions): Promise<void> {

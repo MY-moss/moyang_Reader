@@ -1,4 +1,14 @@
-import { IPC_COMMANDS, invokeCommand, invokeRawCommand } from "./ipc-contract";
+import {
+  IPC_COMMANDS,
+  invokeCommand,
+  invokeRawCommand,
+  invokeValidatedCommand,
+  isStringOrNullResponse,
+  isStringResponse,
+  isTextAnnotationsResponse,
+  isWorkspaceListingResponse,
+  isWorkspaceSearchResponse,
+} from "./ipc-contract";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   FileStamp,
@@ -18,7 +28,7 @@ export function isTauriRuntime(): boolean {
 
 export async function readAppSettings(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
-  return invokeCommand(IPC_COMMANDS.readAppSettings);
+  return invokeValidatedCommand(IPC_COMMANDS.readAppSettings, isStringOrNullResponse);
 }
 
 export async function writeAppSettings(contents: string): Promise<void> {
@@ -28,7 +38,7 @@ export async function writeAppSettings(contents: string): Promise<void> {
 
 export async function readAnnotations(root: string): Promise<TextAnnotation[]> {
   if (!isTauriRuntime()) return [];
-  return invokeCommand(IPC_COMMANDS.readAnnotations, { root });
+  return invokeValidatedCommand(IPC_COMMANDS.readAnnotations, isTextAnnotationsResponse, { root });
 }
 
 export async function writeAnnotations(root: string, annotations: readonly TextAnnotation[]): Promise<void> {
@@ -93,7 +103,7 @@ export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]>
 
 export async function listWorkspaceEntries(root: string): Promise<WorkspaceListing> {
   if (!isTauriRuntime()) return { files: [], folders: [], truncated: false, scannedTotal: 0 };
-  return invokeCommand(IPC_COMMANDS.listWorkspaceEntries, { root });
+  return invokeValidatedCommand(IPC_COMMANDS.listWorkspaceEntries, isWorkspaceListingResponse, { root });
 }
 
 export async function listWorkspaceDirectories(root: string): Promise<WorkspaceDirectory[]> {
@@ -103,7 +113,7 @@ export async function listWorkspaceDirectories(root: string): Promise<WorkspaceD
 
 export async function searchWorkspace(root: string, query: string): Promise<WorkspaceSearchResult[]> {
   if (!isTauriRuntime()) return [];
-  return invokeCommand(IPC_COMMANDS.searchWorkspace, { root, query });
+  return invokeValidatedCommand(IPC_COMMANDS.searchWorkspace, isWorkspaceSearchResponse, { root, query });
 }
 
 export async function indexWorkspace(root: string): Promise<WorkspaceIndexEntry[]> {
@@ -246,7 +256,7 @@ export async function readTextFile(path: string): Promise<string> {
     throw new Error("浏览器预览模式不能直接读取本地路径，请使用文件选择器。");
   }
 
-  return invokeCommand(IPC_COMMANDS.readTextFile, { path });
+  return invokeValidatedCommand(IPC_COMMANDS.readTextFile, isStringResponse, { path });
 }
 
 export async function readPreviousVersion(path: string): Promise<string | null> {
