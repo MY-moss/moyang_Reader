@@ -68,6 +68,34 @@ describe("document session controller", () => {
     expect(confirm).not.toHaveBeenCalled();
   });
 
+  it("flushes the current draft before switching workspaces", () => {
+    const saveDraft = vi.fn().mockReturnValue({ ok: true, prunedCount: 0, snapshots: [] });
+    const confirm = vi.fn().mockReturnValue(true);
+    const controller = createDocumentSessionController(
+      createOptions(createDocument(), {
+        saveDraft,
+        confirm,
+        getWorkspacePath: () => "C:\\Notes",
+      }),
+    );
+
+    expect(controller.confirmWorkspaceSwitch("C:\\Archive", "切换阅读库")).toBe(true);
+    expect(saveDraft).toHaveBeenCalledOnce();
+    expect(confirm).toHaveBeenCalledWith("当前文档的最新修改已自动保留为草稿，可在“草稿”中心恢复。仍要切换阅读库吗？");
+  });
+
+  it("blocks document replacement when the draft cannot be preserved", () => {
+    const saveDraft = vi.fn().mockReturnValue({ ok: false, prunedCount: 0, snapshots: [] });
+    const confirm = vi.fn().mockReturnValue(true);
+    const onDraftSaved = vi.fn().mockReturnValue(false);
+    const controller = createDocumentSessionController(
+      createOptions(createDocument(), { saveDraft, confirm, onDraftSaved }),
+    );
+
+    expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "切换文档")).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("blocks a native save when the disk version changed", async () => {
     const onSaveConflict = vi.fn();
     const writeTextFile = vi.fn();
