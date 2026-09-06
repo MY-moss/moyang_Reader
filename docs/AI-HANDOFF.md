@@ -1,6 +1,6 @@
 # Moyang Reader 当前交接摘要
 
-本文件只保留稳定事实和外部阻塞。当前开发任务统一看 [`AI-TASKS.md`](AI-TASKS.md)，产品阶段看 [`ROADMAP.md`](ROADMAP.md)，插件、AI、MCP、数据与 v1.0 后扩展方向看 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)。
+本文件只保留稳定事实和外部阻塞。当前开发任务统一看 [`AI-TASKS.md`](AI-TASKS.md)，工程硬边界看 [`DEVELOPMENT-ARCHITECTURE-CONTRACT.md`](DEVELOPMENT-ARCHITECTURE-CONTRACT.md)，产品阶段看 [`ROADMAP.md`](ROADMAP.md)，插件、AI、MCP、数据与 v1.0 后扩展方向看 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)。
 
 ## 稳定基线
 
@@ -12,12 +12,12 @@
 
 ## AI 接手方式
 
-1. 阅读根目录 `AGENTS.md`。
-2. 阅读 `docs/AI-TASKS.md`。
-3. 检查目标任务是否已有开放 PR。
-4. 选择第一个可执行 TODO，从最新 main 建一个 `codex/` 分支，只完成一个垂直切片。
-5. PR 中写清测试、风险和回滚；完成后更新任务清单。
-6. 只有需要决定未来产品/架构方向时才读 `FUTURE-DEVELOPMENT-PLAN.md`；其中长期候选不能跳过依赖直接开工。
+1. 本地 Agent 先运行 `npm run agent:bootstrap`；远程 Agent 至少检查最新 main、Open PR/Issue 和 CI。
+2. 阅读根目录 `AGENTS.md`、`docs/AI-TASKS.md` 和 `docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`。
+3. 最早未完成任务已有 Open PR / `IN_PROGRESS` / `WAITING` 时，只能继续/修复/等待该任务，不得跳到后续 TODO。
+4. 只有远程状态已确认且前序无阻塞时，才从最新 main 建一个 `codex/` 分支，只完成一个垂直切片。
+5. PR 中写清测试、风险和回滚；任务来自 AI-TASKS 时完成后更新任务清单。
+6. 只有需要决定未来产品/架构方向时才读 `FUTURE-DEVELOPMENT-PLAN.md`；长期候选不能跳过依赖直接开工。
 
 不再使用 `docs/ai/policy.json`、`plan-v1.json`、`state.json`、审批凭证或 `docs/NEXT.md` 状态机。
 
@@ -33,9 +33,11 @@
 
 - ADR 0011 / 0013 只保留为历史记录，不能用于重新启用 T0–T3、G01–G03 或 policy/state 审批状态机。
 - ADR 0012 仍然有效：v1.0 前先让内置功能使用稳定的 DocumentAdapter / IndexProvider / CommandContribution / AiProvider 等内部能力接口，不提前承诺第三方插件 ABI。
+- 当前 `DocumentAdapter` registry 仍主要是内部 metadata/capability 注册，不是第三方插件 SDK；行为接口演进按 D01 小步推进。
 
 ## 维护规则
 
 - 本文件保持短小，不复制当前 PR、实时 SHA、完整任务验收或 CI 日志。
 - 历史结果留在 Git、PR、Issue、Release 或 `docs/handoff/`。
+- `.codex-cache` 只保存本机 Agent 上下文/未 push 便签，不提交、不覆盖 GitHub 事实。
 - 根目录有未提交改动时不要覆盖；AI 优先使用独立 worktree/分支。
