@@ -144,7 +144,11 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
   const taskMarkdown = fs.existsSync(taskPath) ? fs.readFileSync(taskPath, "utf8") : "";
   const activeTask = findFirstActiveTask(taskMarkdown);
   const workingTreeDirty =
-    status.ok && status.value.split(/\r?\n/).slice(1).some((line) => line.trim().length > 0);
+    status.ok &&
+    status.value
+      .split(/\r?\n/)
+      .slice(1)
+      .some((line) => line.trim().length > 0);
   const onLatestMain =
     branch.ok &&
     branch.value === "main" &&
@@ -184,11 +188,9 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
     `- REMOTE_STATUS: ${remoteStatus}\n` +
     `- NEW_TASK_ALLOWED: ${canStartNewTask ? "YES" : "NO"}\n\n` +
     `## Working tree\n\n` +
-    `\`\`\`text\n${status.ok ? status.value : status.error ?? "UNKNOWN"}\n\`\`\`\n\n` +
+    `\`\`\`text\n${status.ok ? status.value : (status.error ?? "UNKNOWN")}\n\`\`\`\n\n` +
     `## First unfinished AI task\n\n` +
-    (activeTask
-      ? `- ${activeTask.id} — ${activeTask.title}\n- status: ${activeTask.status}\n`
-      : `- none detected\n`) +
+    (activeTask ? `- ${activeTask.id} — ${activeTask.title}\n- status: ${activeTask.status}\n` : `- none detected\n`) +
     `\n## Open PRs\n\n${remoteStatus === "OK" ? formatList(openPrs, "none") : "- UNKNOWN — do not assume none"}\n` +
     `\n## Open Issues (first 20)\n\n${remoteStatus === "OK" ? formatList(openIssues, "none") : "- UNKNOWN"}\n` +
     `\n## Local worktrees\n\n${formatList(

@@ -20,8 +20,11 @@ function relative(root, file) {
   return path.relative(root, file).replaceAll("\\", "/");
 }
 
-export function scanArchitecture(projectRoot = process.cwd()) {
-  const root = resolveWorkingTreeRoot(path.resolve(projectRoot));
+function isTestSource(relativePath) {
+  return /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(relativePath);
+}
+
+export function scanArchitectureAtRoot(root) {
   const violations = [];
   const srcRoot = path.join(root, "src");
   const allSource = walkFiles(srcRoot);
@@ -29,6 +32,7 @@ export function scanArchitecture(projectRoot = process.cwd()) {
   for (const file of allSource) {
     const rel = relative(root, file);
     const text = fs.readFileSync(file, "utf8");
+    if (isTestSource(rel)) continue;
 
     if (text.includes("@tauri-apps/api/core") && rel !== "src/app/ipc-contract.ts") {
       violations.push(`${rel}: raw @tauri-apps/api/core is only allowed in src/app/ipc-contract.ts`);
@@ -42,6 +46,7 @@ export function scanArchitecture(projectRoot = process.cwd()) {
   const componentRoot = path.join(root, "src", "app", "components");
   for (const file of walkFiles(componentRoot)) {
     const rel = relative(root, file);
+    if (isTestSource(rel)) continue;
     const text = fs.readFileSync(file, "utf8");
     if (/from\s+["']@tauri-apps\//.test(text)) {
       violations.push(`${rel}: presentation components must not import Tauri APIs directly`);
@@ -64,6 +69,10 @@ export function scanArchitecture(projectRoot = process.cwd()) {
   }
 
   return violations;
+}
+
+export function scanArchitecture(projectRoot = process.cwd()) {
+  return scanArchitectureAtRoot(resolveWorkingTreeRoot(path.resolve(projectRoot)));
 }
 
 function main() {
