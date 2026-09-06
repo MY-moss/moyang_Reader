@@ -91,7 +91,6 @@ import {
   discardBinaryFile,
   revealWorkspaceEntry,
   readBinaryFile,
-  readAppSettings,
   readAnnotations,
   readPreviousVersion,
   readTextFile,
@@ -104,7 +103,6 @@ import {
   subscribeToOpenPaths,
   writeBinaryFile,
   writeBinaryFileChunk,
-  writeAppSettings,
   writeAnnotations,
   writeTextFile,
   type FileDropEvent,
@@ -198,10 +196,6 @@ import {
   loadOpenTabs,
   loadReadingPosition,
   loadReadingPositions,
-  loadSidebarCollapsed,
-  loadContextPanelOpen,
-  loadContextPanelTab,
-  loadPaneWidths,
   loadWorkspacePath,
   rememberRecentFile,
   rememberMountedWorkspace,
@@ -223,9 +217,9 @@ import {
 } from "./storage";
 import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
 import { relativeMarkdownAssetPath } from "./markdown-path";
-import { loadReaderPreferences, saveReaderPreferences, type ReaderPreferences } from "./preferences";
+import { saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
-import { loadLocale, saveLocale, type Locale } from "./i18n";
+import { saveLocale } from "./i18n";
 import {
   addAnnotation,
   createAnnotation,
@@ -237,14 +231,11 @@ import {
   type TextAnnotation,
 } from "./annotations";
 import {
-  createAppSettingsSnapshot,
-  loadAppSettingsSnapshot,
-  parseAppSettings,
-  saveAppSettingsSnapshot,
-  serializeAppSettings,
-  type AppSettingsSnapshot,
+  createSettingsController,
+  loadInitialAppSettings,
+  type SettingsController,
   type SettingsPersistenceStatus,
-} from "./app-settings";
+} from "./settings-controller";
 import { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";
 import {
   documentKindFromPath,
@@ -468,15 +459,6 @@ function currentHeadingFromElements(headings: HTMLElement[], contentArea: HTMLEl
   return readingHeadingFromElement(currentHeading ?? headings[0]);
 }
 
-function readSavedTheme(): ThemeMode {
-  try {
-    const saved = localStorage.getItem("moyang-reader-theme");
-    return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
-  } catch {
-    return "system";
-  }
-}
-
 function downloadText(name: string, contents: string, mimeType = "text/markdown"): void {
   const blob = new Blob([contents], { type: mimeType + ";charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -576,11 +558,6 @@ type OpenPathsOutcome = {
 
 type DocumentOpenNavigation = "sync" | "push" | "back" | "forward";
 
-type PendingAppSettingsWrite = {
-  snapshot: AppSettingsSnapshot;
-  localSaved: boolean;
-};
-
 function updateCachedWorkspace(
   cache: Map<string, CachedWorkspace>,
   root: string,
@@ -619,7 +596,8 @@ function headingIdFromTarget(target: EventTarget | null): string | null {
 }
 
 export function App() {
-  const [storedAppSettings] = useState<AppSettingsSnapshot | null>(() => loadAppSettingsSnapshot());
+  const [initialAppSettings] = useState(loadInitialAppSettings);
+  const storedAppSettings = initialAppSettings.storedSnapshot;
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [progressiveReaderReadyHtml, setProgressiveReaderReadyHtml] = useState<string | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -632,22 +610,14 @@ export function App() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [searchResultCount, setSearchResultCount] = useState(0);
   const [searchResultIndex, setSearchResultIndex] = useState(0);
-  const [theme, setTheme] = useState<ThemeMode>(() => storedAppSettings?.theme ?? readSavedTheme());
-  const [locale, setLocale] = useState<Locale>(() => storedAppSettings?.locale ?? loadLocale());
+  const [theme, setTheme] = useState<ThemeMode>(() => initialAppSettings.theme);
+  const [locale, setLocale] = useState(() => initialAppSettings.locale);
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => storedAppSettings?.sidebarCollapsed ?? loadSidebarCollapsed(),
-  );
-  const [rightPanelOpen, setRightPanelOpen] = useState(
-    () => storedAppSettings?.rightPanelOpen ?? loadContextPanelOpen(),
-  );
-  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(
-    () => storedAppSettings?.activeContextTab ?? loadContextPanelTab(),
-  );
-  const [paneWidths, setPaneWidths] = useState(() => storedAppSettings?.paneWidths ?? loadPaneWidths());
-  const [preferences, setPreferences] = useState<ReaderPreferences>(
-    () => storedAppSettings?.preferences ?? loadReaderPreferences(),
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => initialAppSettings.sidebarCollapsed);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => initialAppSettings.rightPanelOpen);
+  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(() => initialAppSettings.activeContextTab);
+  const [paneWidths, setPaneWidths] = useState(() => initialAppSettings.paneWidths);
+  const [preferences, setPreferences] = useState<ReaderPreferences>(() => initialAppSettings.preferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);
@@ -671,6 +641,13 @@ export function App() {
   const [fileDropState, setFileDropState] = useState<FileDropState>(idleFileDropState);
   const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
   const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
+  const [settingsController] = useState<SettingsController>(() =>
+    createSettingsController({
+      isNative: isTauriRuntime(),
+      onStatus: setSettingsPersistenceStatus,
+    }),
+  );
+  const flushAppSettings = useCallback(() => settingsController.flush(), [settingsController]);
   const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
   const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -774,11 +751,6 @@ export function App() {
   const selfWrittenPathsRef = useRef(new Map<string, number>());
   const sourceRenderRequestRef = useRef(0);
   const pendingHeadingRef = useRef<string | null>(null);
-  const nativeSettingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingAppSettingsWriteRef = useRef<PendingAppSettingsWrite | null>(null);
-  const appSettingsFlushTimerRef = useRef<number | null>(null);
-  const lastNativeSettingsWriteRef = useRef<Promise<boolean>>(Promise.resolve(true));
-  const settingsWriteRevisionRef = useRef(0);
   const settingsCloseInFlightRef = useRef(false);
   const draftComparisonRequestIdRef = useRef(0);
   const previousVersionRequestIdRef = useRef(0);
@@ -924,47 +896,6 @@ export function App() {
     },
     [setPaneWidthCss],
   );
-
-  const enqueueNativeSettingsWrite = useCallback((pending: PendingAppSettingsWrite): Promise<boolean> => {
-    const revision = ++settingsWriteRevisionRef.current;
-    const nativeWrite = nativeSettingsWriteQueueRef.current
-      .catch(() => undefined)
-      .then(() => writeAppSettings(serializeAppSettings(pending.snapshot)));
-    const result = nativeWrite.then(
-      () => {
-        if (revision === settingsWriteRevisionRef.current) {
-          setSettingsPersistenceStatus(pending.localSaved ? "saved" : "fallback");
-        }
-        return true;
-      },
-      () => {
-        if (revision === settingsWriteRevisionRef.current) {
-          setSettingsPersistenceStatus(pending.localSaved ? "fallback" : "error");
-        }
-        return false;
-      },
-    );
-    nativeSettingsWriteQueueRef.current = result.then(() => undefined);
-    lastNativeSettingsWriteRef.current = result;
-    return result;
-  }, []);
-
-  const flushAppSettings = useCallback(async (): Promise<boolean> => {
-    if (!isTauriRuntime()) return true;
-
-    const timer = appSettingsFlushTimerRef.current;
-    if (timer !== null) {
-      window.clearTimeout(timer);
-      appSettingsFlushTimerRef.current = null;
-    }
-
-    const pending = pendingAppSettingsWriteRef.current;
-    if (pending) {
-      pendingAppSettingsWriteRef.current = null;
-      return enqueueNativeSettingsWrite(pending);
-    }
-    return lastNativeSettingsWriteRef.current;
-  }, [enqueueNativeSettingsWrite]);
 
   const navigateToHeading = useCallback(
     (item: TocItem) => {
@@ -1304,11 +1235,11 @@ export function App() {
     if (!isTauriRuntime()) return;
 
     let active = true;
-    void readAppSettings()
-      .then((serialized) => {
+    void settingsController
+      .readNativeSettings(storedAppSettings)
+      .then(({ snapshot: nativeSnapshot }) => {
         if (!active) return;
-        const nativeSnapshot = serialized ? parseAppSettings(serialized) : null;
-        if (nativeSnapshot && (!storedAppSettings || nativeSnapshot.savedAt > storedAppSettings.savedAt)) {
+        if (nativeSnapshot) {
           preferencesRef.current = nativeSnapshot.preferences;
           setPreferences(nativeSnapshot.preferences);
           setTheme(nativeSnapshot.theme);
@@ -1329,12 +1260,12 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [storedAppSettings]);
+  }, [settingsController, storedAppSettings]);
 
   useEffect(() => {
     if (!nativeSettingsReady) return;
 
-    const snapshot = createAppSettingsSnapshot({
+    settingsController.persist({
       preferences,
       theme,
       locale,
@@ -1343,52 +1274,19 @@ export function App() {
       activeContextTab,
       paneWidths,
     });
-    const localResult = saveAppSettingsSnapshot(
-      {
-        preferences,
-        theme,
-        locale,
-        sidebarCollapsed,
-        rightPanelOpen,
-        activeContextTab,
-        paneWidths,
-      },
-      snapshot.savedAt,
-    );
-
-    if (!isTauriRuntime()) {
-      setSettingsPersistenceStatus(localResult.ok ? "saved" : "error");
-      return;
-    }
-
-    pendingAppSettingsWriteRef.current = { snapshot, localSaved: localResult.ok };
-    const timer = window.setTimeout(
-      () => {
-        appSettingsFlushTimerRef.current = null;
-        const pending = pendingAppSettingsWriteRef.current;
-        pendingAppSettingsWriteRef.current = null;
-        if (pending) void enqueueNativeSettingsWrite(pending);
-      },
-      localResult.ok ? 220 : 0,
-    );
-    appSettingsFlushTimerRef.current = timer;
-    setSettingsPersistenceStatus("saving");
-
-    return () => {
-      window.clearTimeout(timer);
-      if (appSettingsFlushTimerRef.current === timer) appSettingsFlushTimerRef.current = null;
-    };
   }, [
     activeContextTab,
-    enqueueNativeSettingsWrite,
     locale,
     nativeSettingsReady,
     paneWidths,
     preferences,
     rightPanelOpen,
+    settingsController,
     sidebarCollapsed,
     theme,
   ]);
+
+  useEffect(() => () => settingsController.dispose(), [settingsController]);
 
   useEffect(() => {
     documentCacheRef.current.clear();
