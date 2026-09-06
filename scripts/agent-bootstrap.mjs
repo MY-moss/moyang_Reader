@@ -18,7 +18,11 @@ function runGit(root, args) {
     };
   } catch (error) {
     const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
-    return { ok: false, value: "", error: stderr || error?.message || "git command failed" };
+    return {
+      ok: false,
+      value: "",
+      error: stderr || error?.message || "git command failed",
+    };
   }
 }
 
@@ -121,7 +125,10 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
         fetchJson(`https://api.github.com/repos/${repoFullName}/pulls?state=open&per_page=30`, token),
         fetchJson(`https://api.github.com/repos/${repoFullName}/issues?state=open&per_page=30`, token),
       ]);
-      openPrs = prs.map((pr) => `#${pr.number} ${pr.title} [${pr.head?.ref ?? "?"} → ${pr.base?.ref ?? "?"}]${pr.draft ? " DRAFT" : ""}`);
+      openPrs = prs.map(
+        (pr) =>
+          `#${pr.number} ${pr.title} [${pr.head?.ref ?? "?"} → ${pr.base?.ref ?? "?"}]${pr.draft ? " DRAFT" : ""}`,
+      );
       openIssues = issues
         .filter((issue) => !issue.pull_request)
         .slice(0, 20)
@@ -136,25 +143,35 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
   const taskPath = path.join(root, "docs", "AI-TASKS.md");
   const taskMarkdown = fs.existsSync(taskPath) ? fs.readFileSync(taskPath, "utf8") : "";
   const activeTask = findFirstActiveTask(taskMarkdown);
-  const workingTreeDirty = status.ok && status.value.split(/\r?\n/).slice(1).some((line) => line.trim().length > 0);
+  const workingTreeDirty =
+    status.ok && status.value.split(/\r?\n/).slice(1).some((line) => line.trim().length > 0);
+  const onLatestMain =
+    branch.ok &&
+    branch.value === "main" &&
+    head.ok &&
+    originMain.ok &&
+    head.value === originMain.value &&
+    divergence.ahead === 0 &&
+    divergence.behind === 0;
 
   const canStartNewTask =
     remoteStatus === "OK" &&
     fetchResult.ok &&
-    originMain.ok &&
+    onLatestMain &&
     openPrs.length === 0 &&
     !workingTreeDirty &&
     activeTask?.status === "TODO";
 
   const reasons = [];
   if (remoteStatus !== "OK") reasons.push("remote/GitHub 状态无法确认");
+  if (!onLatestMain) reasons.push("当前不在与 origin/main 完全一致的 clean main 起点");
   if (openPrs.length > 0) reasons.push("存在 Open PR，必须先处理它");
   if (workingTreeDirty) reasons.push("当前 worktree 有未提交改动");
   if (activeTask && activeTask.status !== "TODO") reasons.push(`最早任务状态为 ${activeTask.status}`);
-  if (branch.value === "main" && divergence.behind > 0) reasons.push(`本地 main 落后 origin/main ${divergence.behind} 个提交`);
 
   const generatedAt = new Date().toISOString();
-  const context = `# Moyang Reader Local Agent Context\n\n` +
+  const context =
+    `# Moyang Reader Local Agent Context\n\n` +
     `Generated: ${generatedAt}\n\n` +
     `> 这是本机缓存，不是项目状态机。GitHub / origin/main 和受版本控制文档优先。不要提交 .codex-cache。\n\n` +
     `## Repository\n\n` +
@@ -169,10 +186,15 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
     `## Working tree\n\n` +
     `\`\`\`text\n${status.ok ? status.value : status.error ?? "UNKNOWN"}\n\`\`\`\n\n` +
     `## First unfinished AI task\n\n` +
-    (activeTask ? `- ${activeTask.id} — ${activeTask.title}\n- status: ${activeTask.status}\n` : `- none detected\n`) +
+    (activeTask
+      ? `- ${activeTask.id} — ${activeTask.title}\n- status: ${activeTask.status}\n`
+      : `- none detected\n`) +
     `\n## Open PRs\n\n${remoteStatus === "OK" ? formatList(openPrs, "none") : "- UNKNOWN — do not assume none"}\n` +
     `\n## Open Issues (first 20)\n\n${remoteStatus === "OK" ? formatList(openIssues, "none") : "- UNKNOWN"}\n` +
-    `\n## Local worktrees\n\n${formatList(worktrees.map((item) => `${item.branch}: ${item.path}`), "none") }\n` +
+    `\n## Local worktrees\n\n${formatList(
+      worktrees.map((item) => `${item.branch}: ${item.path}`),
+      "none",
+    )}\n` +
     `\n## Start decision\n\n` +
     (canStartNewTask
       ? `可以从最新 origin/main 开始“最早 TODO”这一项；仍需先阅读 AGENTS.md 和架构契约。\n`
