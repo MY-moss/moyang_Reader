@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepositoryRoot } from "./repository-root.mjs";
+import { resolveWorkingTreeRoot } from "./working-tree-root.mjs";
 
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]);
 
@@ -21,7 +21,7 @@ function relative(root, file) {
 }
 
 export function scanArchitecture(projectRoot = process.cwd()) {
-  const root = resolveRepositoryRoot(path.resolve(projectRoot));
+  const root = resolveWorkingTreeRoot(path.resolve(projectRoot));
   const violations = [];
   const srcRoot = path.join(root, "src");
   const allSource = walkFiles(srcRoot);
