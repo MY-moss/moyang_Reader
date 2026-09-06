@@ -62,8 +62,8 @@ function parseAheadBehind(value) {
 }
 
 async function fetchJson(url, token) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  const controller = new globalThis.AbortController();
+  const timer = globalThis.setTimeout(() => controller.abort(), 7000);
   try {
     const headers = {
       Accept: "application/vnd.github+json",
@@ -71,11 +71,11 @@ async function fetchJson(url, token) {
       "User-Agent": "moyang-reader-agent-bootstrap",
     };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetch(url, { headers, signal: controller.signal });
+    const response = await globalThis.fetch(url, { headers, signal: controller.signal });
     if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
     return await response.json();
   } finally {
-    clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
 }
 
