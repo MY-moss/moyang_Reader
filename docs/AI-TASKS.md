@@ -63,13 +63,14 @@
 
 ### A05 — Rust commands.rs 第一阶段拆分
 
-**状态：TODO**
+**状态：DONE — PR #475**
 
 - 关联：#16 / #194
 - 目标：先迁移纯只读/文档解析领域，入口保留注册和路由；后续阶段在本任务完成后再追加，不预先堆满队列。
 - 用户价值：降低 Rust 单文件维护成本，让修改面更容易理解和回滚。
 - 非目标：不一次拆完整个 `commands.rs`；不改 IPC 名称或授权逻辑。
 - 验收：迁移命令行为完全一致；Rust tests/clippy + desktop smoke 通过。
+- 当前交接：PR #475 已从 `main@dc3ae91` 选择性提取文档读取/解析职责；本地 Rust 与前端契约验证通过，GitHub Quality checks（含 desktop smoke）已全绿，准备 squash 合入。
 
 ### A06 — 统一快速打开 / 文内查找 / 阅读库搜索的使用语义
 
