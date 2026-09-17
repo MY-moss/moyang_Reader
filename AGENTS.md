@@ -26,6 +26,8 @@ v0.11 收口
 - 新代码不得重新把职责堆回 `App.tsx`、`commands.rs` 或其他大型编排中心；提取必须按稳定业务职责进行，并保持行为等价与可回滚。
 - 不以文件行数作为重构目标。只在修改影响面、测试边界或真实调用关系得到改善时拆分。
 - 当前 `main` 与稳定 Release 有较大开发跨度时，真实 Windows 主流程、安装/升级、PDF 落盘、更新器、恢复和签名事实验证优先于新功能。
+- GitHub Release 是 updater metadata 的权威来源；Cloudflare Pages 是镜像/备用源。不得让可能返回陈旧 `200` 的镜像排在权威源前面，从而遮蔽新版本。
+- 功能正确性 smoke 与性能 benchmark 分开治理：PR 必须阻断真实功能回归，但共享 Runner 的单次毫秒抖动不得作为正确性失败。性能以独立 benchmark、多轮结果和趋势判断。
 - Authenticode 缺失可以作为明确披露的外部限制，但旧版 → 新版自动更新完整实机闭环必须在 v1.0 前至少成功验证一次。
 - 旧 AI governance policy/state machine、额外任务板、身份隔离与生成式审批流程均视为历史设计；不得恢复。
 
@@ -42,10 +44,11 @@ npm run agent:bootstrap
 1. `git status --short --branch`，不要覆盖已有未提交改动；读取 `.codex-cache/agent-context.md`，如存在再读 `.codex-cache/agent-handoff.md`。
 2. 阅读 `docs/AI-TASKS.md` 和 `docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`。
 3. 检查最新 `origin/main`、GitHub Open PR / Issue 和目标 PR 的 CI；旧聊天、旧审计、旧 SHA 不能替代当前状态。
-4. 严格从任务队列最早未完成项处理：只要更早任务是 `IN_PROGRESS` / `WAITING` 或存在对应开放 PR，就禁止跳到后续 TODO。不能用 stacked PR、多 Track、第二套任务板绕过。
-5. 只有远程状态已确认、没有前序阻塞时，才从最新 `origin/main` 创建一个 `codex/<scope>-<date>` 分支或独立 worktree；一个任务一个 PR。
+4. 严格从任务队列最早未完成项处理：只要更早任务是 `IN_PROGRESS` / `WAITING`，或存在**与该任务对应 / 修改同一范围**的开放 PR，就禁止跳到后续 TODO。Dependabot、机器人依赖更新、纯维护或明显不相干 PR 不得被误判为整个产品队列阻塞；仍需检查是否存在冲突或影响当前任务。
+5. 只有远程状态已确认、没有前序真实阻塞时，才从最新 `origin/main` 创建一个 `codex/<scope>-<date>` 分支或独立 worktree；一个任务一个 PR。
 6. 只读取当前任务相关源码、测试、架构边界和一个相似实现，不全仓无目的重写。
 7. 完成后运行与改动匹配的测试，把结果写进 PR；若任务来自 `AI-TASKS.md`，同一 PR 更新状态和一句交接。
+8. `BLOCKED_EXTERNAL` 只能标记真正依赖外部设置、证书、凭据或真机的子项；仓库内仍可完成的代码、文档、测试和检查必须拆开继续做。
 
 如果 GitHub/远程状态为 UNKNOWN：可以继续当前已经存在的本地任务分支，但不得自行开启新任务或后续 PR。
 
@@ -86,6 +89,13 @@ npm run agent:bootstrap
 当前阅读位置主要依赖 `{ path, scrollTop }`，并有有限历史容量。v0.12 应兼容式增强为 heading/progress/scroll fallback 等稳健 anchor。
 
 第一版不为了定位保存正文 quote/context；如果未来需要正文片段定位，先明确隐私、持久化和迁移策略。
+
+## CI 与性能门禁
+
+- PR 阻断门禁优先验证确定性的正确性、安全性、数据保护、契约与构建结果。
+- 性能测试应保存可解释的 fixture、轮次、环境和原始指标；共享 GitHub-hosted runner 上不得仅凭一次 `renderer gap` / wall-clock 超阈值判定产品回归。
+- 性能 benchmark 可以失败并报警，但应通过 scheduled/manual 工作流或稳定专用环境跟踪；若要升级为 required gate，必须先证明低波动、可重复并明确回归判定方式。
+- 浏览器/桌面 E2E 出现重试后通过的 flaky case 时要记录并修复，不把 retry 当作永久正常状态。
 
 ## 开发原则
 
