@@ -1,124 +1,179 @@
 # Moyang Reader 产品路线
 
-路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
+路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，长期候选和架构方向见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
 
 ## 产品完成态
 
-v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件安全、打开、阅读、编辑、搜索、关联、导出、恢复和更新构成稳定闭环。
+v1.0 的目标不是“功能最多”，而是成为一个可靠、离线、本地优先的 Windows x64 文档阅读工作台：文件安全、打开、阅读、编辑、搜索、关联、批注、导出、恢复和更新形成稳定闭环。
 
-核心方向不是堆功能，而是形成四个优势：
+核心优势固定为：
 
-1. **轻量**：启动、打开、搜索、切换尽量快，大工作区也有明确降级策略。
-2. **本地真源**：Markdown/frontmatter/普通文件仍能被其他工具直接读取，不把内容锁进私有数据库。
-3. **交互顺手**：高频入口清楚、键鼠逻辑一致、Windows DPI 与主题下可读。
-4. **可持续扩展**：代码按职责拆分、测试边界清楚，未来 AI / 插件通过受控接口进入，不侵入核心文件安全层。
+1. **轻量**：启动、打开、搜索、切换尽量快，大工作区和大文件有明确降级策略。
+2. **本地真源**：Markdown/frontmatter/普通文件仍能被其他工具直接读取，不把正文锁进私有数据库。
+3. **阅读优先**：高频阅读、定位、批注、搜索、恢复比“再增加一个知识库功能”优先。
+4. **文件安全**：外部修改、保存失败、异常退出、升级和恢复都必须可解释、可回滚。
+5. **可持续扩展**：未来 AI、远程内容和扩展通过真实需求提炼出的受控接口进入，不侵入核心文件安全层。
 
-## 当前收敛决策（2026-09-17）
+## 当前路线决策（2026-09-17 深度复查）
 
-当前项目没有改变“轻量、本地优先阅读工作台”的主方向，但功能面已经明显超过单纯 Markdown 查看器。现阶段优先目标不是继续增加能力，而是让已有能力形成稳定、可维护、可发布的闭环。
+项目主方向正确，但 v1.0 前原计划承载的知识库、AI 和扩展基础过多。当前正式 Release 仍为 0.10.x，而 `main` 已积累多轮架构、UI 和测试改动；同时 `App.tsx`、Rust `commands.rs`、`export.ts` 等仍是大型编排点。
 
-在 v0.11 与 v0.12 收口完成前，执行以下范围约束：
+因此从本次复查起执行以下调整：
 
-- **冻结新的大型功能面**：不提前实现 Reading Inbox、Daily Note、Properties 表格、AI provider、RAG、RSS、插件市场或新的远程内容入口。
-- **优先降低高耦合中心**：继续按稳定职责拆分 `App.tsx`、Rust `commands.rs` 与其他大型编排文件；不以“文件行数更小”为目标，而以修改影响面可控、测试边界清楚为目标。
-- **先完成桌面使用体验收口**：按 A07 → A08 → A09 → A10 顺序完成命令面板、右侧上下文面板、顶栏信息架构、Windows DPI 与视觉回归基线。
-- **发布验证优先于继续扩展**：当前 `main` 与最近稳定版之间已有较多结构与 UI 改动；在进入更大功能阶段前，需要完成真实 Windows x64 主流程、安装/升级、PDF 落盘、更新器与签名边界验证。
-- **历史 AI governance 不再作为当前开发模型**：以 `AGENTS.md` + `AI-TASKS.md` 的轻量顺序队列为准；旧 policy/state machine、额外任务板和身份隔离设计只保留为历史记录，不得据此恢复复杂流程。
-- **未来候选必须后置**：v0.13/v0.14 及 Reading Inbox 等长期能力，只能在 v0.11/v0.12 的结构、性能、安全和发布前置条件满足后再切成实现任务。
+- **v1.0 提前**：不再等待轻量知识库、AiProvider、插件/扩展内核完成后才发布 1.0。
+- **v0.11 负责收口**：完成桌面交互、第二轮职责拆分、稳定错误契约和 RC 预检。
+- **v0.12 负责证明可靠**：性能、大文件、阅读位置、安全负向测试、真实主流程和本地诊断。
+- **v0.13 改为 Freeze / Compatibility / RC**：只做兼容、恢复、发布链路、安全文档和阻断级缺陷，不再加入大型产品面。
+- **v1.0 后再扩展**：Reading Inbox 优先于 Daily Note/表格数据库；Metadata/Knowledge 次之；AI 再后；插件、RAG、MCP 和第三方运行时代码继续后置。
+- **不为未来先造空接口**：必须先有一个真实内置用户动作或真实调用方，再提炼 `DocumentAdapter`、`IndexProvider`、`AiProvider`、`PermissionBroker` 等边界。
 
 当前推荐主线：
 
 ```text
 A07 → A08 → A09 → A10
-  → 下一轮职责级 App / Workspace 拆分
-  → v0.11 RC
-  → Windows 实机完整回归与发布链路验证
+  → A11 Workspace/App 职责拆分
+  → A12 稳定错误契约
+  → A13 v0.11 RC / 发布预检
   → v0.11 正式版
-  → v0.12 性能 / 安全 / 大文件 / 大工作区验证
+  → B01…B06 可靠性验证
+  → v0.12 Exit Gate
+  → v0.13 Freeze / Compatibility / RC
+  → v1.0
 ```
 
-这段收敛期内，发现新的产品想法可以记录到 Issue 或长期计划，但默认只分析、不编码、不创建实现 PR。
+在这条主线完成前，新的产品想法可以记录到 Issue 或长期计划，但默认只分析、不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
-以下能力已经存在，不再重复作为“未来功能”开发：文档返回历史、书签、文本批注、回收站/上一版本恢复、阅读历史与本机统计、拼音文件名搜索、阅读位置迁移、主要键盘/a11y 基线和旧审计 #357–#366 中已关闭问题。
+以下能力已经存在，不再重复作为“未来功能”开发：文档返回历史、书签、文本批注、回收站/上一版本恢复、阅读历史/统计、拼音文件名搜索、阅读位置基础保存、主要键盘/a11y 基线和旧审计中已经关闭的问题。
 
 后续工作从当前 `main` 重新验证，不根据旧审计行号重复造轮子。
 
-## v0.11：契约、模块化与使用体验
+## v0.11：结构、桌面体验与 RC 收口
 
-- 完成 TS ↔ Tauri 命令契约集中化和首批运行时响应校验。
-- 渐进拆分 `App.tsx`：先设置/偏好，再文档会话和工作区生命周期。
-- 分阶段拆 `commands.rs`，保持 IPC 名称、授权和文件行为不变。
-- 明确快速打开、文内查找、阅读库搜索和命令面板的用途边界。
-- 补齐命令面板活动项语义、右侧上下文页签键盘模型和焦点恢复。
-- 审查顶栏/More/设置/导出的信息层级，避免高频动作被重复或藏得过深。
-- 验证 Windows 100%/125%/150%/200% DPI 与 720/900/1240px 关键布局。
-- 继续收敛 CSS 令牌，并只为稳定关键场景建立小型视觉回归基线。
-- 完成 #111 剩余的 i18n / 稳定错误码契约，为未来 provider / extension 错误处理打基础。
+重点：
 
-目标不是追求某个文件行数，而是让每次修改只需要理解一个较小职责边界。
+- TS ↔ Tauri 命令契约集中化与首批运行时响应校验保持为已完成基线。
+- 完成命令面板、右侧上下文页签、顶栏信息架构、Windows DPI 和小型视觉回归基线。
+- 在设置控制器、文档会话控制器之后，按稳定职责提取工作区会话/扫描/切换/恢复协调；不追求把 `App.tsx` 机械拆到某个行数。
+- Rust `commands.rs` 继续只按真实职责小步拆分；没有明确收益的拆分不作为版本阻塞项。
+- 完成 #111 的高价值稳定错误码切片：文件访问、保存/恢复、工作区、导出、更新优先。
+- 建立 v0.11 RC / 发布预检：完整主旅程、安装包、PDF 落盘、更新器、恢复与外部修改路径必须有真实结果或明确外部阻塞记录。
 
-## v0.12：稳定性、性能与真实使用
+### v0.11 Exit Gate
 
-- 建立 5k/20k 文件工作区的可重复扫描/搜索 benchmark。
-- 测量 1MB/10MB Markdown 首次可读、编辑、搜索、保存和内存占用。
-- 大文件超过安全阈值时明确降级，而不是卡死或静默失败。
-- 直接从当前 `main` 跑“首次启动 → 打开阅读库 → 找文档 → 阅读 → 编辑 → 保存 → 恢复 → 导出”的真实主流程巡检；只处理可复现且明显影响使用的问题。
-- 对 Tauri opener/process/updater 做权限库存与负向测试；先证明问题，再收权限。
-- 规划可由用户主动导出的本地诊断摘要，不默认上传正文、路径或密钥。
+进入 v0.12 前应满足：
 
-## v0.13：轻量知识库
+- A07–A12 完成；
+- 新功能不再需要默认把业务状态机继续堆进 `App.tsx`；
+- 高频 TS↔Rust 错误可以依赖稳定 code，而不是自然语言关键词；
+- 720/900/1240px 和常见 Windows DPI 下高频操作可用；
+- v0.11 RC 完整主旅程已执行，无法执行的真实 Windows 项明确记录为外部条件，而不是伪装成通过。
 
-- Inbox 快速记录，继续创建普通 Markdown。
-- Daily Note 按用户指定目录生成普通 Markdown。
-- YAML frontmatter Properties 面板从只读升级为安全编辑。
-- 属性 / 标签表格视图，Markdown 仍是真源。
-- 搜索稳定后再评估 saved search / collection 和简单文件模板。
+## v0.12：可靠性、性能与真实使用
 
-不复制 Notion/Obsidian 的全部功能；只吸收对阅读工作台真正高价值的能力。
+重点：
 
-## v0.14：内部扩展内核与 AI 接缝
+1. **大工作区 benchmark**：5k / 20k 文件扫描、冷搜索、暖搜索使用固定语料和可重复报告。
+2. **大文件降级**：测量 1MB / 10MB Markdown 的首次可读、编辑切换、搜索、保存、内存与交互延迟；超过边界时明确降级而不是卡死。
+3. **稳健阅读位置**：从单一 `{ path, scrollTop }` 演进为兼容式 anchor，优先 `headingId + relative offset / progress ratio + scrollTop fallback`；第一版不必保存正文 quote。
+4. **安全负向测试**：覆盖危险 URL scheme、未授权路径和 Tauri opener/process/updater 能力边界。
+5. **真实主流程巡检**：首次启动 → 阅读库 → 定位 → 阅读 → 搜索 → 批注/书签 → 编辑 → 保存 → 外部修改 → 关闭/恢复 → 导出。
+6. **本地诊断摘要**：用户主动导出，不默认遥测，不包含正文、完整私人路径或密钥。
 
-- 将现有文档 adapter registry 逐步升级成真实可执行的 `DocumentAdapter` 内部接口，并明确 `render / extractText / edit / export` 能力。
-- 建立 `IndexProvider`、`CommandService / CommandContribution`、`SettingsNamespace` 与 `PermissionBroker`。
-- 建立 `AiProvider` 与 `ConsentScope`；先使用 mock 验证接口、取消、错误、流式输出和可见上下文范围。
-- provider 普通配置与 secret 分离；API Key/token 不进入 portable settings 或工作区文件。
-- 核心默认不联网；发送内容时展示范围、用途、provider/model；写回提供 diff。
-- v1.0 前仍不加载任意脚本、iframe/WebView 插件，不承诺第三方 ABI。
+### v0.12 Exit Gate
 
-## v0.15：冻结与兼容
+只有以下条件满足后才能进入 Freeze：
 
-- 冻结设置 key/schema、IPC 命令、核心快捷键、command ids 和主要保存行为。
-- 覆盖损坏设置、异常退出、磁盘满、只读文件、外部删除/修改和大文件降级。
-- 验证升级、重装、旧配置和旧版本数据兼容。
-- 冻结 v1.0 所需的最小 DocumentAdapter / IndexProvider / AI provider 配置边界。
-- 关闭所有高严重度缺陷；其余延期必须有明确理由。
+- 20k 文件工作区有已测量、可解释的行为边界；
+- 10MB Markdown 即使不能完整编辑，也有明确且不会卡死的数据安全降级策略；
+- 阅读位置不再只依赖有限数量的绝对 scrollTop；
+- 危险协议、越权路径和关键 capability 有负向测试；
+- 完整真实用户旅程重新走通；
+- 无未处理的高严重度文件安全问题；
+- 阻断级 P1/P2 产品问题已修复或有明确延期理由。
 
-## v1.0：发布出口
+## v0.13：Freeze / Compatibility / Release Candidate
 
-- Windows x64 安装、卸载、升级、恢复和自动更新完整验证。
+v0.13 不再承担知识库或 AI 大功能。目标是锁住 v1.0 公共行为并证明升级安全。
+
+重点：
+
+- 冻结设置 key/schema、关键 IPC 名称、核心快捷键、command ids 和主要保存行为。
+- 覆盖旧配置、损坏配置、异常退出、磁盘满、只读文件、外部删除/修改、临时文件残留与恢复。
+- 验证安装、卸载、重装、旧版本升级、恢复和更新清单一致性。
+- 完成 SECURITY.md / 私密漏洞披露可发现性等低成本安全治理项。
+- RC 阶段只接受阻断发布的缺陷修复；不新增大型产品面或“顺便重构”。
+- Authenticode 有证书则接入；没有证书时明确披露限制、保留 updater 签名与 SHA-256 核验，不把证书缺失无限期作为 v1.0 阻塞。
+
+## v1.0：可靠发布出口
+
+- Windows x64 安装、卸载、升级、恢复和自动更新至少完成一次可追溯实机闭环。
 - Release、安装包、updater `.sig`、`latest.json`、镜像和 SHA-256 一致。
-- 有 Authenticode 证书则完成签名；没有时明确披露，不把 updater 签名描述成 Windows 代码签名。
-- 完整前端、Rust、浏览器、真实桌面、安全和恢复矩阵通过。
+- 文件安全、恢复、浏览器 E2E、真实桌面 E2E、a11y、性能与发布检查达到冻结版本标准。
+- 公开说明 Windows-only、本地优先、普通文件真源和签名状态。
 
-## v1.0 后：按真实需求扩展
+v1.0 **不要求**：Reading Inbox、Daily Note、Properties 表格、AI provider、RAG、MCP、插件 SDK、插件市场或跨平台安装包。
 
-优先候选：
+## v1.1：Reader+ / Reading Inbox（优先候选）
 
-- AI 选区/当前文档解释、总结、翻译和问答；
-- 一个远程 provider + 一个本地/OpenAI-compatible provider；
-- 声明式扩展包（模板、snippet、主题、prompt preset），先不运行任意第三方 JS；
-- PDF 安全文本提取、页码来源与 AI/RAG 上下文；
+如果 v1.0 后继续扩展产品面，优先验证与“阅读器”最直接相关的闭环：
+
+```text
+手动 URL / Digest
+  → 受控抓取与清洗
+  → 普通本地 article.md + assets
+  → 现有 Reader
+  → 阅读位置 / 批注 / 书签 / 搜索
+```
+
+原则：默认关闭、默认不联网；远程来源与 `DocumentAdapter` 分离；导入后的普通 Markdown 仍是真源；不建立第二套 Reader。
+
+RSS、浏览器扩展、MCP bridge、自动推荐和 AI 精读都必须晚于“一个 URL → 本地 Markdown → 离线阅读”的基本闭环。
+
+## v1.2：Metadata / Knowledge（按真实需求）
+
+候选顺序：
+
+1. Quick Capture / Inbox（创建普通 Markdown）；
+2. Frontmatter round-trip safety spike；
+3. 顶层简单 scalar / array 的安全 Properties 编辑；
+4. 复杂 YAML 保持只读或回退源码模式；
+5. 只读属性/标签表格；
+6. 只有安全 patch 模型成熟后才评估表格单元格写回。
+
+Daily Note、saved search、collection 和模板不再自动进入主线，有真实使用需求再立项。
+
+## v1.3：AI 阅读辅助
+
+AI 的第一步必须是一个真实用户动作，而不是先做 provider 框架或 mock 平台。
+
+推荐顺序：
+
+1. 选中文本解释或翻译；
+2. 明确显示将发送的范围、用途、provider/model；
+3. 一个真实 provider 跑通 streaming / cancel / error；
+4. 再从真实调用中提炼 `AiProvider`、`ConsentScope`、secret storage 等稳定边界；
+5. 当前文档问答、摘要和写作辅助继续逐个小切片扩展。
+
+任何写回继续使用 `candidate → preview/diff → user apply → core safe write`。
+
+## v1.4+：互操作与受控扩展
+
+按真实需求逐步评估：
+
+- PDF 安全文本提取与页码来源；
 - EPUB 只读 adapter；
-- saved search / collection；
-- 词法搜索之上的可选语义检索/RAG；
-- 受控的 read-only MCP bridge。
+- 声明式扩展包（模板、snippet、主题、prompt preset）；
+- OpenAI-compatible / 本地 provider；
+- 可选语义检索 / RAG；
+- read-only MCP bridge；
+- RSS / 浏览器导入来源。
 
-更晚再评估：图片 OCR/vision、受控 sidecar 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
+更晚才评估：sidecar/WASM 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
 
 ## 长期边界
 
-v1.0 前暂不投入：账号、云同步、实时协作、移动端、macOS/Linux/Windows ARM 安装包、第三方任意脚本插件、DOCX/PDF 原格式回写、常驻后台服务或捆绑本地大模型。
+v1.0 前明确不投入：账号、云同步、实时协作、移动端、macOS/Linux/Windows ARM 安装包、第三方任意脚本插件、DOCX/PDF 原格式回写、常驻后台服务、内置大模型、RAG、插件市场。
 
-任何长期候选只有在前置条件满足后，才拆成 `AI-TASKS.md` 中 0.5–3 天的小任务；不要为了“未来可能需要”提前制造大框架。
+任何长期候选只有在前置条件满足、存在真实用户路径后，才拆成 `AI-TASKS.md` 中 0.5–3 天的小任务；不要为了“未来可能需要”提前制造大框架。
