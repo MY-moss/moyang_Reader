@@ -69,12 +69,18 @@ async function loadReadingHistoryConfirmation(page: Page, theme: Theme): Promise
   return dialog;
 }
 
-async function expectStateScreenshot(locator: Locator, name: string, theme: Theme): Promise<void> {
+async function expectStateScreenshot(
+  locator: Locator,
+  name: string,
+  theme: Theme,
+  options: { maxDiffPixelRatio?: number } = {},
+): Promise<void> {
   await expect(locator).toHaveScreenshot(`${name}-${theme}.png`, {
     animations: "disabled",
     caret: "hide",
     scale: "css",
-    maxDiffPixels: 200,
+    maxDiffPixels: options.maxDiffPixelRatio ? undefined : 200,
+    maxDiffPixelRatio: options.maxDiffPixelRatio,
   });
 }
 
@@ -90,7 +96,10 @@ for (const theme of THEMES) {
     await expect
       .poll(() => emptyLogo.evaluate((element) => (element as HTMLImageElement).naturalWidth))
       .toBeGreaterThan(0);
-    await expectStateScreenshot(emptyState, "empty-state", theme);
+    // The empty state contains localized display text. Keep the baseline strict
+    // for layout and appearance while allowing the small amount of glyph
+    // rasterization variance between Windows font installations.
+    await expectStateScreenshot(emptyState, "empty-state", theme, { maxDiffPixelRatio: 0.01 });
   });
 
   test(`captures the reader state baseline (${theme})`, async ({ page }) => {
