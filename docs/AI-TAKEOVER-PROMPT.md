@@ -9,7 +9,7 @@
 
 然后读取 AGENTS.md、docs/AI-TASKS.md、docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md；本地还要读取 .codex-cache/agent-context.md，如存在再读取 .codex-cache/agent-handoff.md。检查最新 origin/main、开放 Issue/PR 和目标 CI，旧聊天/旧审计不能替代当前 GitHub 状态。
 
-当前 v1.0 主线固定为：v0.11 收口 → v0.12 可靠性/性能/真实使用 → v0.13 Freeze/Compatibility/RC → v1.0。Reader+、Metadata/Knowledge、AI、RAG、MCP、RSS、声明式扩展等是 v1.x GATED 候选，不得提前实现。
+当前 v1.0 主线固定为：v0.11 收口 → v0.12 可靠性/性能/真实使用 → v0.13 Freeze/Compatibility/RC → v1.0。v1.0 后只有满足 Gate 才继续：v1.1 Reader+、v1.2 Metadata/Knowledge、v1.3 AI、v1.4+ RAG/MCP/RSS/声明式扩展等；不得提前实现。
 
 严格按 AI-TASKS 从上到下推进：只要更早任务处于 IN_PROGRESS / WAITING，或存在与当前最早任务对应、修改同一范围、形成真实合并依赖的开放 PR，就禁止提前开启后续任务。Dependabot、机器人依赖更新、纯维护或明显无关 PR 只检查冲突，不得被误判为整个产品队列冻结。可以分析下一步，但不能提前编码、提交或创建 PR。REMOTE_STATUS=UNKNOWN 时，只允许继续已经存在的本地任务分支，不允许开启新任务。
 
