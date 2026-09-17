@@ -84,7 +84,7 @@
 
 ### A07 — 命令面板变成真正可用的键盘入口
 
-**状态：TODO**
+**状态：DONE — PR #481**
 
 - 当前证据：`CommandPalette` 的搜索框保持实际焦点，但活动 `role=option` 缺稳定 ID / `aria-activedescendant` 关联；当前命令集合只覆盖一部分高频动作。
 - 目标：补齐 combobox/listbox 语义、活动项可见性和屏幕阅读器状态；把“可安全从命令面板调用”的高频动作接入统一列表。

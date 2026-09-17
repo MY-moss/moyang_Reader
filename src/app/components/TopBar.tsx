@@ -434,7 +434,13 @@ export function TopBar({
             <div className="toolbar-overflow-group">
               <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
               <div className="toolbar-overflow-actions">
-                <button type="button" className="toolbar-button" onClick={onOpenCommandPalette}>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={onOpenCommandPalette}
+                  aria-keyshortcuts="Control+Shift+P"
+                  title="打开命令面板 (Ctrl+Shift+P)"
+                >
                   <Icon name="command" size={15} />
                   <span className="toolbar-button-label">{t("action.commands")}</span>
                 </button>
