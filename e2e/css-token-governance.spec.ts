@@ -351,6 +351,75 @@ test("keeps annotation highlights legible across theme modes", async ({ page }) 
   expect(forcedColors.viewport.bodyScrollWidth).toBeLessThanOrEqual(forcedColors.viewport.clientWidth);
 });
 
+test("keeps workspace section labels on a theme-aware semantic foreground", async ({ page }) => {
+  const mountSectionFixture = () =>
+    page.evaluate(() => {
+      document.querySelector<HTMLElement>('[data-e2e="section-muted-theme-fixture"]')?.remove();
+
+      const fixture = document.createElement("div");
+      fixture.dataset.e2e = "section-muted-theme-fixture";
+      fixture.style.cssText = "position:fixed;left:0;top:0;width:320px;visibility:hidden;pointer-events:none;";
+
+      const workspaceLabel = document.createElement("div");
+      workspaceLabel.className = "workspace-subheading";
+      workspaceLabel.textContent = "WORKSPACE";
+
+      const relatedLabel = document.createElement("div");
+      relatedLabel.className = "related-subheading";
+      relatedLabel.textContent = "RELATED";
+
+      fixture.append(workspaceLabel, relatedLabel);
+      document.body.append(fixture);
+    });
+
+  const readSectionTheme = () =>
+    page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const workspaceLabel = document.querySelector<HTMLElement>(
+        '[data-e2e="section-muted-theme-fixture"] .workspace-subheading',
+      );
+      const relatedLabel = document.querySelector<HTMLElement>(
+        '[data-e2e="section-muted-theme-fixture"] .related-subheading',
+      );
+      if (!workspaceLabel || !relatedLabel) throw new Error("section theme fixture is missing");
+
+      return {
+        token: root.getPropertyValue("--section-muted-foreground").trim(),
+        workspaceColor: getComputedStyle(workspaceLabel).color,
+        relatedColor: getComputedStyle(relatedLabel).color,
+      };
+    });
+
+  await page.setViewportSize({ width: 720, height: 820 });
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "light";
+  });
+  await mountSectionFixture();
+  const light = await readSectionTheme();
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  const explicitDark = await readSectionTheme();
+
+  await page.emulateMedia({ colorScheme: "light", forcedColors: "active" });
+  await page.goto("/");
+  await mountSectionFixture();
+  const forcedColors = await readSectionTheme();
+
+  expect(light.token).toBe("#9a9285");
+  expect(light.workspaceColor).toBe("rgb(154, 146, 133)");
+  expect(light.relatedColor).toBe(light.workspaceColor);
+  expect(explicitDark.token).toBe("#a3aaa3");
+  expect(explicitDark.workspaceColor).toBe("rgb(163, 170, 163)");
+  expect(explicitDark.relatedColor).toBe(explicitDark.workspaceColor);
+  expect(forcedColors.token).toBe("CanvasText");
+  expect(forcedColors.workspaceColor).not.toBe(light.workspaceColor);
+  expect(forcedColors.relatedColor).toBe(forcedColors.workspaceColor);
+});
+
 test("keeps document preview canvases legible across theme modes", async ({ page }) => {
   const mountPreviewFixture = () =>
     page.evaluate(() => {
