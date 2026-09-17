@@ -343,12 +343,12 @@ test("keeps topbar overlays mutually exclusive", async ({ page }) => {
   expect(menuGeometry.bottom).toBeLessThanOrEqual(menuGeometry.viewportHeight);
   expect(menuGeometry.right).toBeLessThanOrEqual(menuGeometry.viewportWidth);
 
-  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  await page.getByRole("button", { name: "文内查找", exact: true }).click();
   await expect(page.locator(".settings-menu")).not.toHaveAttribute("open");
-  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "文内查找" })).toBeVisible();
 
   await openSettingsMenu(page);
-  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "文内查找" })).toHaveCount(0);
   await expect(page.locator(".settings-menu")).toHaveAttribute("open", "");
 });
 
@@ -387,4 +387,3 @@ test("dismisses topbar menus with an outside click or Escape", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(overflowMenu).not.toHaveAttribute("open");
 });
-

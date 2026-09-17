@@ -61,7 +61,7 @@ type MarkdownWysiwygEditorProps = {
   onInsertRequestHandled?: () => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
-  onFindText?: (text: string) => void;
+  onFindText?: (text: string, restoreFocusTarget?: HTMLElement | null) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
@@ -617,7 +617,7 @@ function MilkdownSurface({
           .textBetween(view.state.selection.from, view.state.selection.to, "\n")
           .trim();
         if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
-        else onFindTextRef.current?.(selectedText);
+        else onFindTextRef.current?.(selectedText, contextMenu?.restoreFocusTarget ?? contextMenu?.fallbackFocusTarget);
         setContextMenu(null);
         return;
       }

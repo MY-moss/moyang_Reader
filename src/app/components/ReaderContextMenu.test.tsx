@@ -18,6 +18,7 @@ describe("ReaderContextMenu", () => {
     const onToggleBookmark = vi.fn();
     const onAddAnnotation = vi.fn();
     const onClose = vi.fn();
+    const restoreFocusTarget = document.createElement("article");
 
     act(() => {
       root.render(
@@ -27,6 +28,7 @@ describe("ReaderContextMenu", () => {
             y: 18,
             selectedText: "选中的文字",
             linkHref: "https://example.com",
+            restoreFocusTarget,
             annotationSelection: { quote: "选中的文字", prefix: "", suffix: "", start: 0, end: 5 },
           }}
           documentPath="C:/vault/Today.md"
@@ -61,6 +63,9 @@ describe("ReaderContextMenu", () => {
 
     act(() => menuItems()[0]?.click());
     expect(onCopySelection).toHaveBeenCalledWith("选中的文字");
+
+    act(() => menuItems()[1]?.click());
+    expect(onFindSelection).toHaveBeenCalledWith("选中的文字", restoreFocusTarget);
 
     act(() => menuItems()[5]?.click());
     expect(onToggleBookmark).toHaveBeenCalledTimes(1);

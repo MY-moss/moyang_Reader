@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import brandLogo from "../../assets/moyang-reader-logo.png";
 import type {
   DocumentKind,
@@ -40,7 +40,7 @@ type TopBarProps = {
   onExportMarginChange: (margin: ExportMargin) => void;
   onOpen: () => void;
   onAddWorkspace: () => void;
-  onQuickOpen: () => void;
+  onQuickOpen: (restoreFocusTarget?: HTMLElement | null) => void;
   workspaceOpen: boolean;
   workspaceLimitReached: boolean;
   draftCount: number;
@@ -83,7 +83,8 @@ type TopBarProps = {
   onImportSettings: () => void;
   onOpenGuide: () => void;
   settingsPersistenceStatus: SettingsPersistenceStatus;
-  onToggleSearch: () => void;
+  searchButtonRef?: RefObject<HTMLButtonElement>;
+  onToggleSearch: (restoreFocusTarget?: HTMLElement | null) => void;
   onSearchQueryChange: (query: string) => void;
   onSearchPrevious: () => void;
   onSearchNext: () => void;
@@ -161,6 +162,7 @@ export function TopBar({
   onImportSettings,
   onOpenGuide,
   settingsPersistenceStatus,
+  searchButtonRef,
   onToggleSearch,
   onSearchQueryChange,
   onSearchPrevious,
@@ -172,6 +174,7 @@ export function TopBar({
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const settingsMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const menuRefs = [moreMenuRef, settingsMenuRef, exportMenuRef];
     const closeMenus = () => {
@@ -202,6 +205,12 @@ export function TopBar({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchOpen]);
   const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
   const closeDropdownMenus = () => {
@@ -222,10 +231,10 @@ export function TopBar({
     closeDropdownMenus();
     closeSearchIfOpen();
   };
-  const toggleSearch = () => {
+  const toggleSearch = (restoreFocusTarget?: HTMLElement | null) => {
     closeDropdownMenus();
     if (searchOpen) onCloseSearch();
-    else onToggleSearch();
+    else onToggleSearch(restoreFocusTarget);
   };
   const updateLabel =
     updateStatus === "checking"
@@ -329,11 +338,12 @@ export function TopBar({
         <button
           type="button"
           className="toolbar-button toolbar-optional"
-          onClick={() => {
+          onClick={(event) => {
             dismissTopbarOverlays();
-            onQuickOpen();
+            onQuickOpen(event.currentTarget);
           }}
-          title="快速打开文档 (Ctrl+P)"
+          aria-keyshortcuts="Control+P"
+          title="快速打开文件 (Ctrl+P)"
         >
           <Icon name="search" size={15} />
           <span className="toolbar-button-label">{t("action.quickOpen")}</span>
@@ -404,7 +414,14 @@ export function TopBar({
           <Icon name="maximize" size={15} />
           <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
         </button>
-        <button type="button" className="toolbar-button" onClick={toggleSearch} title="查找文档内容 (Ctrl+F)">
+        <button
+          ref={searchButtonRef}
+          type="button"
+          className="toolbar-button"
+          onClick={(event) => toggleSearch(event.currentTarget)}
+          aria-keyshortcuts="Control+F"
+          title="文内查找当前文档 (Ctrl+F)"
+        >
           <Icon name="search" size={15} />
           <span className="toolbar-button-label">{t("action.search")}</span>
         </button>
@@ -424,11 +441,12 @@ export function TopBar({
                 <button
                   type="button"
                   className="toolbar-button"
-                  onClick={() => {
+                  onClick={(event) => {
                     dismissTopbarOverlays();
-                    onQuickOpen();
+                    onQuickOpen(event.currentTarget);
                   }}
-                  title="快速打开文档 (Ctrl+P)"
+                  aria-keyshortcuts="Control+P"
+                  title="快速打开文件 (Ctrl+P)"
                 >
                   <Icon name="search" size={15} />
                   <span className="toolbar-button-label">{t("action.quickOpen")}</span>
@@ -748,32 +766,45 @@ export function TopBar({
       </nav>
 
       {searchOpen && (
-        <div className="findbar" role="search">
+        <div className="findbar" role="search" aria-label="文内查找">
           <input
+            ref={searchInputRef}
             autoFocus
             type="search"
-            aria-label="搜索文档"
-            placeholder={fileName ? "在当前文档中查找" : "先打开一个文档"}
+            aria-label="文内查找"
+            placeholder={fileName ? "在当前文档中查找" : "先打开一个文档后再查找"}
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") onCloseSearch();
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                onCloseSearch();
+                return;
+              }
               if (event.key === "Enter") {
+                event.preventDefault();
                 if (event.shiftKey) onSearchPrevious();
                 else onSearchNext();
               }
             }}
           />
-          <span className="find-count">
-            {searchResultCount === 0 ? "无结果" : `${searchResultIndex + 1} / ${searchResultCount}`}
+          <span className="find-count" role="status" aria-live="polite">
+            {!fileName
+              ? "当前没有可查找的文档"
+              : searchResultCount === 0
+                ? searchQuery.trim()
+                  ? "当前文档没有匹配结果"
+                  : "输入文字开始文内查找"
+                : `${searchResultIndex + 1} / ${searchResultCount}`}
           </span>
-          <button type="button" className="find-button" onClick={onSearchPrevious} aria-label="上一个结果">
+          <button type="button" className="find-button" onClick={onSearchPrevious} aria-label="上一个文内查找结果">
             <Icon name="chevron-up" size={15} />
           </button>
-          <button type="button" className="find-button" onClick={onSearchNext} aria-label="下一个结果">
+          <button type="button" className="find-button" onClick={onSearchNext} aria-label="下一个文内查找结果">
             <Icon name="chevron-down" size={15} />
           </button>
-          <button type="button" className="find-button" onClick={onCloseSearch} aria-label="关闭搜索">
+          <button type="button" className="find-button" onClick={onCloseSearch} aria-label="关闭文内查找">
             <Icon name="close" size={15} />
           </button>
         </div>
