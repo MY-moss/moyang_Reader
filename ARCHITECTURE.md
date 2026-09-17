@@ -4,24 +4,28 @@
 
 Moyang Reader 以“本地文件快速阅读”为第一目标：启动时不加载完整文档解析器，打开文件或文件夹后才按需读取和索引；文档内容默认留在本机，不需要账号或云端数据库。
 
+当前正式产品边界是 **Windows x64、本地优先、普通文件真源的文档阅读工作台**。架构优化的目的不是追求“更漂亮的抽象”，而是让阅读、编辑、搜索、恢复、导出和更新在长期使用下仍然可靠。
+
 ## 分层
 
 ```text
 React UI
-  ├─ App.tsx：窗口组合、打开文档、标签页、工作区生命周期
+  ├─ App.tsx：窗口/区域组合、顶层状态连接与 controller/service 装配
   ├─ components/：顶部栏、命令面板、上下文面板、编辑器、预览
   └─ styles.css：主题、打印样式和阅读布局
 
-应用服务
-  ├─ bridge.ts：Tauri 调用与浏览器开发模式适配
-  ├─ markdown.ts：Markdown/GFM/公式/Obsidian 链接渲染
-  ├─ document-adapters.ts：DOCX/HTML 适配和统一统计、TOC
+应用控制与服务
+  ├─ settings-controller.ts：设置读取、写入、损坏恢复和保存状态
+  ├─ document-session-controller.ts：打开、草稿、保存、冲突、切换、关闭、恢复
+  ├─ bridge.ts + ipc-contract.ts：Tauri 调用与前后端契约边界
   ├─ workspace-index.ts：工作区索引、搜索和标签关系
+  ├─ markdown.ts / document-adapters.ts：阅读与文档格式适配
   ├─ export.ts：HTML、DOCX 和打印导出
-  └─ preferences.ts：本地隐私与更新偏好
+  └─ storage.ts / preferences.ts：本地会话和偏好
 
 Tauri/Rust
-  ├─ commands.rs：路径、文本解码、目录扫描、索引和安全边界
+  ├─ commands.rs：当前仍承担大量路径、工作区、文件、安全和系统协调
+  ├─ commands/document.rs：已提取的文档识别、解码和元数据逻辑
   ├─ lib.rs：应用生命周期、单实例处理、外部导航兜底
   └─ capabilities/：插件权限和文件监听权限
 
@@ -39,25 +43,131 @@ Tauri/Rust
 - 启动参数和单实例请求使用带类型的路径消息区分文档与工作区；传入文件夹时直接进入工作区载入流程，传入支持的文档继续进入标签页流程。
 - 桌面版拖放由 Tauri Webview 的原生文件拖放事件提供路径，再由 Rust 统一过滤、登记权限并返回文档/工作区类型，浏览器开发模式继续使用浏览器 File API。
 - 最近文件和阅读库只持久化本地路径；启动或用户点击最近项目时，Rust 会先规范化、确认存在且类型受支持，再重新登记本次会话的读写范围，不保存文档正文。
-- 阅读位置按本地路径保存有限数量的滚动数值，切换文档时延迟写入并在重新打开后恢复，不参与文档解析或网络请求。
-- 工作区监听采用差量刷新：事件在前端合并 280ms 后，仅将变更文件或目录交给 Rust 重新读取，返回作用域内的文件和索引差量；删除路径会从前端状态中移除，初次打开工作区仍执行完整扫描。
+- 工作区监听采用差量刷新：事件在前端合并后，仅将变更文件或目录交给 Rust 重新读取，返回作用域内的文件和索引差量；删除路径从前端状态移除，初次打开工作区仍执行完整扫描。
 - 全文搜索在 Rust 侧按文件大小和修改时间缓存已解码文本；工作区差量刷新会失效受影响路径，避免连续输入时重复读盘，同时保留首个查询的完整扫描成本。
-- 关系索引在工作区快照变化时一次性建立反向链接 Map，当前文档切换只查询相关键；文件树按规范化目录路径复用文件夹节点，避免对每个文件逐层线性查找。
-- 快速打开只消费前端已有的工作区文件、最近文件和标签状态，使用本地模糊排序，不为定位文档再次读取文件内容；Ctrl+P 打开，Enter 进入当前文档。
+- 关系索引在工作区快照变化时建立反向链接 Map，当前文档切换只查询相关键；文件树按规范化目录路径复用文件夹节点。
+- 快速打开只消费前端已有的工作区文件、最近文件和标签状态，不为定位文档再次读取正文；全文搜索继续由工作区搜索负责。
 - Markdown 目录从最终 HAST 渲染树提取：TOC 使用实际渲染后的 heading id，避免目录锚点与页面不一致。
-- 更新使用 GitHub Releases + Tauri 签名 updater：公钥随应用发布，私钥只放在本地安全存储和 GitHub Actions Secret 中。
+- 更新使用 GitHub Releases + Tauri 签名 updater：updater 签名负责更新包真实性，不等同于 Windows Authenticode 代码签名。
 - HTML 是通用导出中间层：HTML 可打印为 PDF；DOCX 导出只处理安全 HTML 的常用块，不引入服务端转换依赖。
-- 远程资源策略由本地偏好控制：默认只允许 data 和工作区附件协议，开启远程图片后才允许 Markdown 中的 http/https 图片；更新检查同样默认手动，可选开启启动检查。
-- 外部链接采用双层防护：前端点击处理将允许的 `http(s)`、`mailto`、`tel` 链接交给系统打开，Rust/Tauri 的 `on_navigation` 钩子只放行应用来源、开发服务器和本地 asset 协议，阻止主窗口意外导航到外部网页。
-- v0.9 编辑边界：Markdown 编辑时 Milkdown 只负责交互和 Markdown 序列化，`renderSource` 仍负责阅读、搜索和导出；`ContextPanel` 只接收当前文档快照和索引结果，不直接拥有文件树或保存状态。
-- 外部修改同步由工作区 watcher 和编辑器源同步跟踪器共同完成：未保存文档只通知不替换，确认重载前先写入本地草稿；无冲突刷新使用 Milkdown 的状态重建，不回传为本地编辑事件，避免误报脏状态。
-- 真实 Tauri 桌面 E2E 使用 WebdriverIO 的内嵌 WebDriver：`wdio` Cargo feature、测试专用配置和 `VITE_MOYANG_DESKTOP_E2E` 只在桌面 smoke 构建启用；普通构建只使用 `default` capability，不携带测试权限或全局 Tauri API。临时文档路径由 WDIO 配置在主进程与 worker 间复用，避免应用夹具和测试夹具漂移。
-- 工作区 watcher 事件路径与用户可见路径在前端使用同一条归一化规则比较；Windows `\\?\\`/UNC 扩展路径先去除命名空间前缀，避免真实文件监听事件无法匹配当前文档。
+- 远程资源策略由本地偏好控制：默认只允许 data 和工作区附件协议，远程图片和更新检查都是可选联网能力。
+- 外部链接采用双层防护：前端只把允许的 `http(s)`、`mailto`、`tel` 交给系统打开；主 WebView 导航仍由 Tauri/Rust 限制。
+- Markdown 编辑时 Milkdown/源码编辑器负责交互与序列化，统一渲染链仍负责阅读、搜索和导出；编辑器内部状态不得成为持久化真源。
+- 外部修改同步必须保持“未保存时只通知、不静默替换”，确认重载前先保留可恢复草稿。
+- 真实 Tauri desktop E2E 的测试权限只存在于测试构建；普通构建不得携带测试能力或全局 Tauri API。
 
-更详细的发布决策见 [`docs/UPDATE.md`](docs/UPDATE.md)；后续重大架构变化应新增 ADR，而不是覆盖历史说明。
+## 当前已知架构债
 
-## 当前边界与下一步
+### 1. `App.tsx` 仍是大型编排中心
 
-v0.9 的 UI 状态边界为“左工作区导航、中阅读/编辑、右上下文面板”。Markdown 所见即所得编辑器只在进入 Markdown 编辑时按需加载；统一 Markdown 渲染链仍负责阅读和导出，编辑器内部状态不得成为持久化格式。未知 Markdown 结构不能被静默删除，无法安全往返时回退源码模式。领域术语见 [`CONTEXT.md`](CONTEXT.md)，功能验收见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)。
+设置和文档会话已经提取，但工作区载入/切换/session restore、watcher、搜索、导出、弹层和大量顶层 UI 状态仍汇聚在 App。
 
-原生打开/添加文件夹/保存对话框在 Rust 侧登记用户实际选择的路径；读取和写入使用独立的会话级授权范围。单独打开文档时，读取范围包含其所在目录以支持相对图片和附件，但写入范围仍只包含用户明确选择的文件；选择工作区文件夹后才授予该工作区的读写范围。写入使用临时文件替换，避免先删除原文件造成空窗；文本保存成功后清理 `.moyang.bak`，写入或替换失败时保留备份。PDF、图片和相对附件通过授权后的二进制读取转换为内存 Blob URL，不再依赖全局 `asset://**` 作用域；工作区变更监听由 Rust 原生 watcher 按已登记的工作区路径建立，不再给前端 fs 插件授予全局文件 scope。超大文档和增量索引也会在后续版本继续推进。不要把完整 `App.tsx` 拆分或跨平台安装包当作已完成能力。
+下一步只按稳定职责提取 **Workspace Session / 工作区生命周期**。目标不是把文件拆到某个行数，而是让未来修改工作区行为时不必理解整个应用。
+
+### 2. Rust `commands.rs` 仍很大
+
+已经拆出 `commands/document.rs`，但路径、工作区、文件写入、导出和系统能力仍高度集中。后续只有在出现清晰领域边界和测试收益时继续拆；v1.0 不以“commands.rs 必须足够小”为阻塞条件。
+
+### 3. `export.ts` 是复杂领域模块，不是普通 helper
+
+它已经包含 DOCX、ZIP streaming、压缩、分块写入、取消和大文件内存控制。后续若继续演进，应按导出格式/流式写入等稳定领域拆分，不因为文件长就机械搬运代码。
+
+### 4. 当前阅读位置模型不足以支撑长期 Reader
+
+现有阅读位置主要保存 `{ path, top }`，并有有限历史容量。它适合短期恢复，但正文结构变化、长期文章库或大量文档使用时不够稳健。
+
+v0.12 的方向是兼容式增加：
+
+```text
+path
+headingId
+relativeOffset / progressRatio
+scrollTop fallback
+updatedAt
+```
+
+第一版不要求保存正文 quote/context；如果未来确实需要基于正文片段的精确重定位，必须先做隐私和数据分类决策。
+
+### 5. Frontmatter 当前只适合“轻量读取”，不适合直接无损编辑
+
+右侧 Properties 当前通过简单规则读取顶层字段；Rust 的 title/tags 也有轻量字符串提取。这对展示和索引足够，但不能据此推导“YAML 可以安全 parse → stringify 回写”。
+
+未来 Properties 编辑必须先做 round-trip safety spike；复杂对象、注释、未知字段和格式不能被静默重排或丢失。无法安全 patch 时回退源码模式。
+
+## 数据与持久化原则
+
+- **用户正文**：普通用户文件，是真源；必须可被其他工具直接读取。
+- **工作区旁路元数据**：`.moyang/`，不是正文真源；必须版本化。
+- **应用偏好/会话**：app settings/local storage；不得含正文真源和秘密。
+- **秘密**：未来 API key/token 必须进入 OS 安全凭据存储，不进入 portable settings、日志或 Issue/PR。
+- **派生索引/cache**：必须可删除重建。
+
+任何新持久化如果无法先说明属于哪一类，就不能先实现。
+
+## IPC、错误与权限边界
+
+前端到桌面的唯一标准路径是：
+
+```text
+component/view
+  → controller/service
+  → bridge.ts / ipc-contract.ts
+  → Tauri command
+  → Rust authorization + domain/filesystem
+```
+
+规则：
+
+- 组件/业务文件不新增原始 `invoke()`。
+- 新跨层接口必须定义稳定 command/event 名、输入、输出、错误 code、授权范围和测试。
+- 错误长期统一为 `stable code + technical details`，前端再映射本地化用户提示；不新增自然语言正则作为稳定 API。
+- Tauri capability 是桌面权限边界的一部分；未来 AI/扩展不得继承主窗口全部权限。
+- 破坏性文件操作继续由核心 Rust/文件安全层执行，不能下放给 AI/插件。
+
+## 扩展接口的建立顺序
+
+v1.0 前不为未来能力建立没有真实调用方的空 `Provider/Manager/Service`。
+
+正确顺序固定为：
+
+```text
+真实内置用户动作
+  → 明确业务边界
+  → 一个可测试的内部接口
+  → 第二个真实实现/调用方验证
+  → contract tests
+  → 再讨论外部扩展兼容
+```
+
+例如 AI 不采用“先设计 AiProvider + mock，再寻找用途”的顺序。应先让一个真实的“选区解释/翻译”动作通过一个真实 provider 跑通，再从 streaming、cancel、error、model、consent 的真实需要中提炼 `AiProvider` / `ConsentScope`。
+
+同理：
+
+- `DocumentAdapter` 先由真实内置格式迁移验证；
+- `IndexProvider` 先由真实索引/搜索替换需求验证；
+- `PermissionBroker` 只有出现需要隔离的新内部/外部能力时才建立；
+- MCP/RAG/第三方插件不能反向决定核心 Reader 架构。
+
+## v1.0 前的架构完成标准
+
+v1.0 不要求“架构最终形态”，只要求：
+
+- `App.tsx` 不再是新增复杂业务的默认落点；
+- 设置、文档会话、工作区生命周期拥有可测试边界；
+- 关键 IPC 和错误契约稳定；
+- 大工作区、大文件和阅读位置有明确行为边界；
+- 文件恢复和外部修改保护经过真实主流程验证；
+- 发布/更新链路事实可追溯；
+- AI、知识库、插件、RAG 仍可以完全不存在而不影响核心产品完整性。
+
+## v1.0 后的演进顺序
+
+优先级按“是否强化 Reader”排序：
+
+1. **Reader+ / Reading Inbox**：手动 URL → 安全抓取 → 普通 Markdown → 离线阅读/批注/搜索。
+2. **Metadata / Knowledge**：frontmatter 安全编辑和只读派生视图；先证明 round-trip，再提供写入。
+3. **AI 阅读辅助**：真实选区解释/翻译动作优先，再抽 provider/consent/secret 边界。
+4. **Interop / Extensions**：PDF 文本提取、EPUB、声明式扩展、OpenAI-compatible/local provider、RAG、MCP、RSS。
+5. **更晚**：第三方代码插件、插件市场、Agent 大规模写文件、云同步、跨平台。
+
+更详细的执行阶段见 [`docs/ROADMAP.md`](docs/ROADMAP.md)；当前小任务只以 [`docs/AI-TASKS.md`](docs/AI-TASKS.md) 为准。后续重大架构变化新增 ADR，不覆盖历史决策。
