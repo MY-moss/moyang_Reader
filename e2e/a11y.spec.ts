@@ -1,1 +1,474 @@
-import AxeBuilder from "@axe-core/playwright";\nimport { expect, test, type Page } from "@playwright/test";\n\nconst THEME_TOKENS = ["--ink", "--muted", "--accent-deep", "--accent-warm", "--danger", "--surface"] as const;\n\ntype ThemeName = "light" | "dark";\ntype ThemeTokens = Record<(typeof THEME_TOKENS)[number], string>;\n\nconst CONTRAST_PAIRS = [\n  { name: "正文", foreground: "--ink", background: "--surface" },\n  { name: "辅助文字", foreground: "--muted", background: "--surface" },\n  { name: "链接文字", foreground: "--accent-deep", background: "--surface" },\n  { name: "暖色状态", foreground: "--accent-warm", background: "--surface" },\n  { name: "错误状态", foreground: "--danger", background: "--surface" },\n] as const;\n\nfunction parseCssColor(value: string): [number, number, number] {\n  const normalized = value.trim();\n  const hex = normalized.match(/^#([\da-f]{6})$/i);\n  if (hex) {\n    return [0, 1, 2].map((index) => Number.parseInt(hex[1].slice(index * 2, index * 2 + 2), 16)) as [\n      number,\n      number,\n      number,\n    ];\n  }\n\n  const rgb = normalized.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);\n  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];\n  throw new Error(`无法解析颜色：${value}`);\n}\n\nfunction relativeLuminance(value: string): number {\n  return parseCssColor(value)\n    .map((channel) => channel / 255)\n    .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))\n    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);\n}\n\nfunction contrastRatio(foreground: string, background: string): number {\n  const foregroundLuminance = relativeLuminance(foreground);\n  const backgroundLuminance = relativeLuminance(background);\n  return (\n    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /\n    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)\n  );\n}\n\nasync function expectControlContrast(page: Page, selector: string, label: string): Promise<void> {\n  const colors = await page\n    .locator(selector)\n    .first()\n    .evaluate((element) => {\n      const styles = getComputedStyle(element);\n      const imageColors = styles.backgroundImage.match(/(?:rgba?\([^)]*\)|#[\da-f]{3,8})/gi) ?? [];\n      const solidColor = styles.backgroundColor === "rgba(0, 0, 0, 0)" ? [] : [styles.backgroundColor];\n      return {\n        foreground: styles.color,\n        background: styles.background,\n        backgrounds: [...solidColor, ...imageColors],\n      };\n    });\n\n  expect(colors.backgrounds, `${label} 未解析到背景色：${colors.background}`).not.toHaveLength(0);\n  const ratios = colors.backgrounds.map((background) => contrastRatio(colors.foreground, background));\n  expect(\n    Math.min(...ratios),\n    `${label} 对比度不足：${ratios.map((ratio) => ratio.toFixed(2)).join(", ")}`,\n  ).toBeGreaterThanOrEqual(4.5);\n}\n\nasync function switchToRenderedMode(page: Page): Promise<void> {\n  const menu = page.locator(".toolbar-overflow");\n  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();\n  await page.getByRole("button", { name: "源文本", exact: true }).click();\n  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();\n  await page.getByRole("button", { name: "阅读", exact: true }).click();\n  if ((await menu.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();\n}\n\nasync function expectNoSeriousA11yViolations(page: Page, state: string): Promise<void> {\n  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();\n  const blocking = results.violations.filter(\n    (violation) => violation.impact === "critical" || violation.impact === "serious",\n  );\n  await test.info().attach(`axe-${state}`, {\n    body: JSON.stringify({ state, violations: results.violations }, null, 2),\n    contentType: "application/json",\n  });\n  expect(\n    blocking.map((violation) => ({\n      id: violation.id,\n      impact: violation.impact,\n      nodes: violation.nodes.map((node) => node.target),\n    })),\n  ).toEqual([]);\n}\n\nasync function loadReaderFixture(page: Page): Promise<void> {\n  await page.goto("/");\n  await page.locator('input[type="file"]').setInputFiles({\n    name: "a11y-note.md",\n    mimeType: "text/markdown",\n    buffer: Buffer.from("# 可访问性测试\n\n正文内容"),\n  });\n  await expect(page.getByRole("heading", { name: "可访问性测试" })).toBeVisible();\n}\n\nasync function openSettings(page: Page): Promise<void> {\n  const overflow = page.locator(".toolbar-overflow");\n  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();\n  await page.locator(".topbar .settings-menu summary", { hasText: "设置" }).click();\n  await expect(page.getByRole("checkbox", { name: "允许远程图片" })).toBeVisible();\n}\n\ntest("keeps the empty state free of serious accessibility violations", async ({ page }) => {\n  await page.goto("/");\n  await expect(page.locator(".empty-state")).toBeVisible();\n  await expectNoSeriousA11yViolations(page, "empty-state");\n});\n\ntest("keeps the reader state free of serious accessibility violations", async ({ page }) => {\n  await loadReaderFixture(page);\n  await switchToRenderedMode(page);\n  await expectNoSeriousA11yViolations(page, "reader");\n});\n\ntest("keeps the reader article outside broad live regions", async ({ page }) => {\n  await loadReaderFixture(page);\n  await switchToRenderedMode(page);\n\n  const contentArea = page.locator("main.content-area");\n  await expect(contentArea).not.toHaveAttribute("aria-live");\n  await expect(contentArea.locator("article.reader-content")).toBeVisible();\n\n  await page.keyboard.press("Control+Equal");\n  const zoomStatus = contentArea.locator(".reading-zoom-hud");\n  await expect(zoomStatus).toHaveAttribute("role", "status");\n  await expect(zoomStatus).toHaveAttribute("aria-live", "polite");\n\n  const liveDescendants = await contentArea\n    .locator("[aria-live]")\n    .evaluateAll((elements) =>\n      elements.map(\n        (element) => element.getAttribute("class") ?? element.getAttribute("role") ?? element.tagName.toLowerCase(),\n      ),\n    );\n  expect(liveDescendants).toEqual(["reading-zoom-hud"]);\n});\n\ntest("keeps the quick-open dialog free of serious accessibility violations", async ({ page }) => {\n  await loadReaderFixture(page);\n  await page.keyboard.press("Control+P");\n  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toBeVisible();\n  await expectNoSeriousA11yViolations(page, "quick-open");\n});\n\ntest("keeps the command palette free of serious accessibility violations", async ({ page }) => {\n  await loadReaderFixture(page);\n  await page.keyboard.press("Control+Shift+P");\n  const palette = page.getByRole("dialog", { name: "命令面板" });\n  await expect(palette).toBeVisible();\n  await expect(palette.getByRole("combobox", { name: "搜索命令" })).toBeFocused();\n  await expect(palette.getByRole("listbox", { name: "命令面板结果" })).toBeVisible();\n  await expectNoSeriousA11yViolations(page, "command-palette");\n});\n\ntest("keeps the settings panel free of serious accessibility violations", async ({ page }) => {\n  await loadReaderFixture(page);\n  await openSettings(page);\n  await expect(page.getByRole("button", { name: "导出设置" })).toBeVisible();\n  await expect(page.getByRole("button", { name: "导入设置" })).toBeVisible();\n  await expectNoSeriousA11yViolations(page, "settings");\n});\n\ntest("keeps light and dark theme tokens at WCAG AA contrast", async ({ page }) => {\n  await page.goto("/");\n  const themes: ThemeName[] = ["light", "dark"];\n\n  for (const theme of themes) {\n    await page.evaluate((themeName) => {\n      document.documentElement.dataset.theme = themeName;\n    }, theme);\n    const tokens = await page.evaluate((names) => {\n      const styles = getComputedStyle(document.documentElement);\n      return Object.fromEntries(names.map((name) => [name, styles.getPropertyValue(name).trim()])) as ThemeTokens;\n    }, THEME_TOKENS);\n\n    for (const pair of CONTRAST_PAIRS) {\n      const ratio = contrastRatio(tokens[pair.foreground], tokens[pair.background]);\n      expect(ratio, `${theme} ${pair.name} 对比度不足：${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);\n    }\n  }\n});\n\ntest("keeps solid accent controls readable in explicit and system dark themes", async ({ page }) => {\n  await loadReaderFixture(page);\n  await page.addStyleTag({\n    content: "*, *::before, *::after { transition: none !important; animation: none !important; }",\n  });\n  await switchToRenderedMode(page);\n  const overflow = page.locator(".toolbar-overflow");\n  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();\n  await overflow.getByRole("button", { name: "编辑", exact: true }).click();\n  await expect(page.locator(".editor-toolbar-insert-button")).toBeVisible({ timeout: 15_000 });\n\n  for (const theme of ["explicit", "system"] as const) {\n    if (theme === "explicit") {\n      await page.evaluate(() => {\n        document.documentElement.dataset.theme = "dark";\n      });\n    } else {\n      await page.emulateMedia({ colorScheme: "dark" });\n      await page.evaluate(() => {\n        document.documentElement.removeAttribute("data-theme");\n      });\n    }\n\n    if ((await overflow.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();\n    const insertButton = page.locator(".editor-toolbar-insert-button");\n    const insertSubmit = page.locator(".editor-insert-submit");\n    if (!(await insertSubmit.isVisible())) await insertButton.click();\n    await expect(insertSubmit).toBeVisible();\n\n    for (const [selector, label] of [\n      [".editor-toolbar-insert-button", `${theme} dark 编辑器插入按钮`],\n      [".editor-insert-submit", `${theme} dark 插入提交按钮`],\n    ] as const) {\n      const control = page.locator(selector).first();\n      await expectControlContrast(page, selector, `${label} 普通状态`);\n      await control.hover();\n      await expectControlContrast(page, selector, `${label} 悬停状态`);\n    }\n\n    await page.getByRole("button", { name: "关闭插入面板" }).click();\n    if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();\n    const primaryButton = page.locator(".toolbar-overflow-settings .toolbar-button.primary").first();\n    await expect(primaryButton).toBeVisible();\n    await expectControlContrast(\n      page,\n      ".toolbar-overflow-settings .toolbar-button.primary",\n      `${theme} dark 通用主按钮普通状态`,\n    );\n    await primaryButton.hover();\n    await expectControlContrast(\n      page,\n      ".toolbar-overflow-settings .toolbar-button.primary",\n      `${theme} dark 通用主按钮悬停状态`,\n    );\n  }\n});\n\ntest("keeps search focus and context tabs visibly distinct across themes", async ({ page }) => {\n  await loadReaderFixture(page);\n\n  await page.getByRole("button", { name: "文内查找", exact: true }).click();\n  const searchbox = page.getByRole("searchbox", { name: "文内查找" });\n  await expect(searchbox).toBeFocused();\n  const searchFocus = await searchbox.evaluate((element) => {\n    const styles = getComputedStyle(element);\n    return { outlineStyle: styles.outlineStyle, outlineWidth: styles.outlineWidth, boxShadow: styles.boxShadow };\n  });\n  expect(searchFocus.outlineStyle).toBe("solid");\n  expect(searchFocus.outlineWidth).toBe("2px");\n  expect(searchFocus.boxShadow).not.toBe("none");\n\n  await page.keyboard.press("Escape");\n  const contextToggle = page.locator(".context-toggle");\n  if ((await contextToggle.getAttribute("aria-pressed")) !== "true") await contextToggle.click();\n  const contextPanel = page.locator(".context-sidebar");\n  const tabs = page.locator('.context-tab[role="tab"]');\n  await expect(tabs).toHaveCount(5);\n  await expect(contextPanel.getByRole("tablist", { name: "文档上下文视图" })).toHaveAttribute(\n    "aria-orientation",\n    "horizontal",\n  );\n  await expect(tabs.first()).toHaveAttribute("tabindex", "0");\n  await expect(tabs.nth(1)).toHaveAttribute("tabindex", "-1");\n  const contextRelations = await page.evaluate(() => {\n    const tabElements = Array.from(document.querySelectorAll<HTMLElement>('.context-tab[role="tab"]'));\n    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]');\n    return {\n      controls: tabElements.map((tab) => ({ id: tab.id, controls: tab.getAttribute("aria-controls") })),\n      panelId: panel?.id ?? null,\n      panelLabelledBy: panel?.getAttribute("aria-labelledby") ?? null,\n    };\n  });\n  expect(contextRelations.controls).toHaveLength(5);\n  expect(contextRelations.controls.every(({ controls }) => controls === contextRelations.panelId)).toBe(true);\n  expect(contextRelations.panelLabelledBy).toBe(\n    contextRelations.controls.find((tab) => tab.controls === contextRelations.panelId)?.id,\n  );\n  await expectNoSeriousA11yViolations(page, "context-tabs");\n\n  const tokenState = await page.evaluate(() => {\n    const rootStyles = getComputedStyle(document.documentElement);\n    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');\n    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');\n    if (!active || !inactive) throw new Error("context tab states are incomplete");\n    const read = (element: HTMLElement) => {\n      const styles = getComputedStyle(element);\n      return {\n        background: styles.backgroundColor,\n        boxShadow: styles.boxShadow,\n        transitionDuration: styles.transitionDuration,\n      };\n    };\n    return {\n      active: read(active),\n      inactive: read(inactive),\n      motionFast: rootStyles.getPropertyValue("--motion-fast").trim(),\n      fontMono: rootStyles.getPropertyValue("--font-mono").trim(),\n    };\n  });\n\n  expect(tokenState.active.background).not.toBe(tokenState.inactive.background);\n  expect(tokenState.active.boxShadow).not.toBe("none");\n  expect(tokenState.motionFast).toBe(".15s");\n  expect(tokenState.inactive.transitionDuration).toContain("0.15s");\n  expect(tokenState.fontMono).toContain("Cascadia");\n\n  await page.addStyleTag({ content: ".context-tab { transition: none !important; }" });\n  const inactiveTab = page.locator('.context-tab[aria-selected="false"]').first();\n  await inactiveTab.hover();\n  const hoverBackground = await inactiveTab.evaluate((element) => getComputedStyle(element).backgroundColor);\n  expect(hoverBackground).not.toBe(tokenState.inactive.background);\n\n  await page.evaluate(() => {\n    document.documentElement.dataset.theme = "dark";\n  });\n  const darkState = await page.evaluate(() => {\n    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');\n    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');\n    if (!active || !inactive) throw new Error("context tab states are incomplete in dark theme");\n    const read = (element: HTMLElement) => getComputedStyle(element).backgroundColor;\n    return { active: read(active), inactive: read(inactive) };\n  });\n  expect(darkState.active).not.toBe(darkState.inactive);\n});\n\ntest("keeps governed palette values symmetric across explicit and system dark themes", async ({ page }) => {\n  await page.goto("/");\n\n  const semanticTokens = [\n    "--error-border",\n    "--error-surface",\n    "--file-type-surface",\n    "--file-type-foreground",\n    "--inline-code-surface",\n    "--inline-code-foreground",\n    "--statusbar-foreground",\n    "--warning-surface",\n    "--workspace-foreground",\n  ] as const;\n\n  type PaletteSnapshot = {\n    rawTokens: Record<(typeof semanticTokens)[number], string>;\n    resolved: {\n      errorBorder: string;\n      errorSurface: string;\n      fileTypeSurface: string;\n      fileTypeForeground: string;\n      inlineCodeSurface: string;\n      inlineCodeForeground: string;\n      statusbarForeground: string;\n      warningSurface: string;\n      workspaceForeground: string;\n    };\n  };\n\n  const readPalette = async (): Promise<PaletteSnapshot> =>\n    page.evaluate((tokenNames) => {\n      const rootStyles = getComputedStyle(document.documentElement);\n      const holder = document.createElement("div");\n      const error = document.createElement("div");\n      const fileCard = document.createElement("div");\n      const fileType = document.createElement("span");\n      const inlineCode = document.createElement("code");\n      const markdownBody = document.createElement("div");\n      const notice = document.createElement("div");\n      const workspaceFile = document.createElement("button");\n      const statusbar = document.createElement("div");\n\n      holder.style.position = "absolute";\n      holder.style.inset = "-9999px auto auto -9999px";\n      error.className = "error-state";\n      fileCard.className = "file-card";\n      fileType.className = "file-type";\n      inlineCode.textContent = "code";\n      markdownBody.className = "markdown-body";\n      notice.className = "external-change-notice";\n      workspaceFile.className = "workspace-file";\n      statusbar.className = "statusbar";\n      fileCard.append(fileType);\n      markdownBody.append(inlineCode);\n      holder.append(error, fileCard, markdownBody, notice, workspaceFile, statusbar);\n      document.body.append(holder);\n\n      const readColor = (element: Element, property: "color" | "backgroundColor" | "borderTopColor") => {\n        const styles = getComputedStyle(element);\n        if (property === "color") return styles.color;\n        if (property === "backgroundColor") return styles.backgroundColor;\n        return styles.borderTopColor;\n      };\n      const resolved = {\n        errorBorder: readColor(error, "borderTopColor"),\n        errorSurface: readColor(error, "backgroundColor"),\n        fileTypeSurface: readColor(fileType, "backgroundColor"),\n        fileTypeForeground: readColor(fileType, "color"),\n        inlineCodeSurface: readColor(inlineCode, "backgroundColor"),\n        inlineCodeForeground: readColor(inlineCode, "color"),\n        statusbarForeground: readColor(statusbar, "color"),\n        warningSurface: readColor(notice, "backgroundColor"),\n        workspaceForeground: readColor(workspaceFile, "color"),\n      };\n      const rawTokens = Object.fromEntries(\n        tokenNames.map((token) => [token, rootStyles.getPropertyValue(token).trim()]),\n      ) as PaletteSnapshot["rawTokens"];\n      holder.remove();\n      return { rawTokens, resolved };\n    }, semanticTokens);\n\n  const setExplicitTheme = async (theme: "light" | "dark") => {\n    await page.emulateMedia({ colorScheme: theme });\n    await page.evaluate((themeName) => {\n      document.documentElement.dataset.theme = themeName;\n    }, theme);\n  };\n\n  await setExplicitTheme("light");\n  const light = await readPalette();\n  await setExplicitTheme("dark");\n  const explicitDark = await readPalette();\n  await page.evaluate(() => {\n    document.documentElement.removeAttribute("data-theme");\n  });\n  const systemDark = await readPalette();\n\n  expect(explicitDark).toEqual(systemDark);\n  for (const [token, value] of Object.entries(light.rawTokens)) {\n    expect(value, `${token} 浅色令牌为空`).not.toBe("");\n  }\n  for (const [token, value] of Object.entries(explicitDark.rawTokens)) {\n    expect(value, `${token} 深色令牌为空`).not.toBe("");\n  }\n  expect(light.resolved.errorSurface).not.toBe(explicitDark.resolved.errorSurface);\n  expect(light.resolved.fileTypeSurface).not.toBe(explicitDark.resolved.fileTypeSurface);\n  expect(light.resolved.inlineCodeForeground).not.toBe(explicitDark.resolved.inlineCodeForeground);\n  expect(light.resolved.statusbarForeground).not.toBe(explicitDark.resolved.statusbarForeground);\n  expect(light.resolved.warningSurface).not.toBe(explicitDark.resolved.warningSurface);\n  expect(light.resolved.workspaceForeground).not.toBe(explicitDark.resolved.workspaceForeground);\n});\n\ntest("keeps the empty state usable in Windows high-contrast mode", async ({ page }) => {\n  await page.emulateMedia({ forcedColors: "active" });\n  await page.goto("/");\n  await expect(page.locator(".empty-state")).toBeVisible();\n  const forcedColors = await page.evaluate(() => window.matchMedia("(forced-colors: active)").matches);\n  expect(forcedColors).toBe(true);\n  await expectNoSeriousA11yViolations(page, "forced-colors");\n\n  const probe = await page.evaluate(() => {\n    const element = document.createElement("span");\n    element.style.color = "var(--ink)";\n    element.style.backgroundColor = "var(--surface)";\n    element.textContent = "对比度探针";\n    document.body.append(element);\n    const styles = getComputedStyle(element);\n    const result = { foreground: styles.color, background: styles.backgroundColor };\n    element.remove();\n    return result;\n  });\n  expect(contrastRatio(probe.foreground, probe.background)).toBeGreaterThanOrEqual(4.5);\n});\n
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+
+const THEME_TOKENS = ["--ink", "--muted", "--accent-deep", "--accent-warm", "--danger", "--surface"] as const;
+
+type ThemeName = "light" | "dark";
+type ThemeTokens = Record<(typeof THEME_TOKENS)[number], string>;
+
+const CONTRAST_PAIRS = [
+  { name: "正文", foreground: "--ink", background: "--surface" },
+  { name: "辅助文字", foreground: "--muted", background: "--surface" },
+  { name: "链接文字", foreground: "--accent-deep", background: "--surface" },
+  { name: "暖色状态", foreground: "--accent-warm", background: "--surface" },
+  { name: "错误状态", foreground: "--danger", background: "--surface" },
+] as const;
+
+function parseCssColor(value: string): [number, number, number] {
+  const normalized = value.trim();
+  const hex = normalized.match(/^#([\da-f]{6})$/i);
+  if (hex) {
+    return [0, 1, 2].map((index) => Number.parseInt(hex[1].slice(index * 2, index * 2 + 2), 16)) as [
+      number,
+      number,
+      number,
+    ];
+  }
+
+  const rgb = normalized.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  throw new Error(`无法解析颜色：${value}`);
+}
+
+function relativeLuminance(value: string): number {
+  return parseCssColor(value)
+    .map((channel) => channel / 255)
+    .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (
+    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+  );
+}
+
+async function expectControlContrast(page: Page, selector: string, label: string): Promise<void> {
+  const colors = await page
+    .locator(selector)
+    .first()
+    .evaluate((element) => {
+      const styles = getComputedStyle(element);
+      const imageColors = styles.backgroundImage.match(/(?:rgba?\([^)]*\)|#[\da-f]{3,8})/gi) ?? [];
+      const solidColor = styles.backgroundColor === "rgba(0, 0, 0, 0)" ? [] : [styles.backgroundColor];
+      return {
+        foreground: styles.color,
+        background: styles.background,
+        backgrounds: [...solidColor, ...imageColors],
+      };
+    });
+
+  expect(colors.backgrounds, `${label} 未解析到背景色：${colors.background}`).not.toHaveLength(0);
+  const ratios = colors.backgrounds.map((background) => contrastRatio(colors.foreground, background));
+  expect(
+    Math.min(...ratios),
+    `${label} 对比度不足：${ratios.map((ratio) => ratio.toFixed(2)).join(", ")}`,
+  ).toBeGreaterThanOrEqual(4.5);
+}
+
+async function switchToRenderedMode(page: Page): Promise<void> {
+  const menu = page.locator(".toolbar-overflow");
+  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.getByRole("button", { name: "源文本", exact: true }).click();
+  if ((await menu.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.getByRole("button", { name: "阅读", exact: true }).click();
+  if ((await menu.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
+}
+
+async function expectNoSeriousA11yViolations(page: Page, state: string): Promise<void> {
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+  const blocking = results.violations.filter(
+    (violation) => violation.impact === "critical" || violation.impact === "serious",
+  );
+  await test.info().attach(`axe-${state}`, {
+    body: JSON.stringify({ state, violations: results.violations }, null, 2),
+    contentType: "application/json",
+  });
+  expect(
+    blocking.map((violation) => ({
+      id: violation.id,
+      impact: violation.impact,
+      nodes: violation.nodes.map((node) => node.target),
+    })),
+  ).toEqual([]);
+}
+
+async function loadReaderFixture(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "a11y-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# 可访问性测试\n\n正文内容"),
+  });
+  await expect(page.getByRole("heading", { name: "可访问性测试" })).toBeVisible();
+}
+
+async function openSettings(page: Page): Promise<void> {
+  const overflow = page.locator(".toolbar-overflow");
+  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.locator(".topbar .settings-menu summary", { hasText: "设置" }).click();
+  await expect(page.getByRole("checkbox", { name: "允许远程图片" })).toBeVisible();
+}
+
+test("keeps the empty state free of serious accessibility violations", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".empty-state")).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "empty-state");
+});
+
+test("keeps the reader state free of serious accessibility violations", async ({ page }) => {
+  await loadReaderFixture(page);
+  await switchToRenderedMode(page);
+  await expectNoSeriousA11yViolations(page, "reader");
+});
+
+test("keeps the reader article outside broad live regions", async ({ page }) => {
+  await loadReaderFixture(page);
+  await switchToRenderedMode(page);
+
+  const contentArea = page.locator("main.content-area");
+  await expect(contentArea).not.toHaveAttribute("aria-live");
+  await expect(contentArea.locator("article.reader-content")).toBeVisible();
+
+  await page.keyboard.press("Control+Equal");
+  const zoomStatus = contentArea.locator(".reading-zoom-hud");
+  await expect(zoomStatus).toHaveAttribute("role", "status");
+  await expect(zoomStatus).toHaveAttribute("aria-live", "polite");
+
+  const liveDescendants = await contentArea
+    .locator("[aria-live]")
+    .evaluateAll((elements) =>
+      elements.map(
+        (element) => element.getAttribute("class") ?? element.getAttribute("role") ?? element.tagName.toLowerCase(),
+      ),
+    );
+  expect(liveDescendants).toEqual(["reading-zoom-hud"]);
+});
+
+test("keeps the quick-open dialog free of serious accessibility violations", async ({ page }) => {
+  await loadReaderFixture(page);
+  await page.keyboard.press("Control+P");
+  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "quick-open");
+});
+
+test("keeps the command palette free of serious accessibility violations", async ({ page }) => {
+  await loadReaderFixture(page);
+  await page.keyboard.press("Control+Shift+P");
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByRole("combobox", { name: "搜索命令" })).toBeFocused();
+  await expect(palette.getByRole("listbox", { name: "命令面板结果" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "command-palette");
+});
+
+test("keeps the settings panel free of serious accessibility violations", async ({ page }) => {
+  await loadReaderFixture(page);
+  await openSettings(page);
+  await expect(page.getByRole("button", { name: "导出设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "导入设置" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "settings");
+});
+
+test("keeps light and dark theme tokens at WCAG AA contrast", async ({ page }) => {
+  await page.goto("/");
+  const themes: ThemeName[] = ["light", "dark"];
+
+  for (const theme of themes) {
+    await page.evaluate((themeName) => {
+      document.documentElement.dataset.theme = themeName;
+    }, theme);
+    const tokens = await page.evaluate((names) => {
+      const styles = getComputedStyle(document.documentElement);
+      return Object.fromEntries(names.map((name) => [name, styles.getPropertyValue(name).trim()])) as ThemeTokens;
+    }, THEME_TOKENS);
+
+    for (const pair of CONTRAST_PAIRS) {
+      const ratio = contrastRatio(tokens[pair.foreground], tokens[pair.background]);
+      expect(ratio, `${theme} ${pair.name} 对比度不足：${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
+
+test("keeps solid accent controls readable in explicit and system dark themes", async ({ page }) => {
+  await loadReaderFixture(page);
+  await page.addStyleTag({
+    content: "*, *::before, *::after { transition: none !important; animation: none !important; }",
+  });
+  await switchToRenderedMode(page);
+  const overflow = page.locator(".toolbar-overflow");
+  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await overflow.getByRole("button", { name: "编辑", exact: true }).click();
+  await expect(page.locator(".editor-toolbar-insert-button")).toBeVisible({ timeout: 15_000 });
+
+  for (const theme of ["explicit", "system"] as const) {
+    if (theme === "explicit") {
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = "dark";
+      });
+    } else {
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.evaluate(() => {
+        document.documentElement.removeAttribute("data-theme");
+      });
+    }
+
+    if ((await overflow.getAttribute("open")) !== null) await page.locator(".toolbar-overflow-trigger").click();
+    const insertButton = page.locator(".editor-toolbar-insert-button");
+    const insertSubmit = page.locator(".editor-insert-submit");
+    if (!(await insertSubmit.isVisible())) await insertButton.click();
+    await expect(insertSubmit).toBeVisible();
+
+    for (const [selector, label] of [
+      [".editor-toolbar-insert-button", `${theme} dark 编辑器插入按钮`],
+      [".editor-insert-submit", `${theme} dark 插入提交按钮`],
+    ] as const) {
+      const control = page.locator(selector).first();
+      await expectControlContrast(page, selector, `${label} 普通状态`);
+      await control.hover();
+      await expectControlContrast(page, selector, `${label} 悬停状态`);
+    }
+
+    await page.getByRole("button", { name: "关闭插入面板" }).click();
+    if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+    const primaryButton = page.locator(".toolbar-overflow-settings .toolbar-button.primary").first();
+    await expect(primaryButton).toBeVisible();
+    await expectControlContrast(
+      page,
+      ".toolbar-overflow-settings .toolbar-button.primary",
+      `${theme} dark 通用主按钮普通状态`,
+    );
+    await primaryButton.hover();
+    await expectControlContrast(
+      page,
+      ".toolbar-overflow-settings .toolbar-button.primary",
+      `${theme} dark 通用主按钮悬停状态`,
+    );
+  }
+});
+
+test("keeps search focus and context tabs visibly distinct across themes", async ({ page }) => {
+  await loadReaderFixture(page);
+
+  await page.getByRole("button", { name: "文内查找", exact: true }).click();
+  const searchbox = page.getByRole("searchbox", { name: "文内查找" });
+  await expect(searchbox).toBeFocused();
+  const searchFocus = await searchbox.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return { outlineStyle: styles.outlineStyle, outlineWidth: styles.outlineWidth, boxShadow: styles.boxShadow };
+  });
+  expect(searchFocus.outlineStyle).toBe("solid");
+  expect(searchFocus.outlineWidth).toBe("2px");
+  expect(searchFocus.boxShadow).not.toBe("none");
+
+  await page.keyboard.press("Escape");
+  const contextToggle = page.locator(".context-toggle");
+  if ((await contextToggle.getAttribute("aria-pressed")) !== "true") await contextToggle.click();
+  const contextPanel = page.locator(".context-sidebar");
+  const tabs = page.locator('.context-tab[role="tab"]');
+  await expect(tabs).toHaveCount(5);
+  await expect(contextPanel.getByRole("tablist", { name: "文档上下文视图" })).toHaveAttribute(
+    "aria-orientation",
+    "horizontal",
+  );
+  await expect(tabs.first()).toHaveAttribute("tabindex", "0");
+  await expect(tabs.nth(1)).toHaveAttribute("tabindex", "-1");
+  const contextRelations = await page.evaluate(() => {
+    const tabElements = Array.from(document.querySelectorAll<HTMLElement>('.context-tab[role="tab"]'));
+    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]');
+    return {
+      controls: tabElements.map((tab) => ({ id: tab.id, controls: tab.getAttribute("aria-controls") })),
+      panelId: panel?.id ?? null,
+      panelLabelledBy: panel?.getAttribute("aria-labelledby") ?? null,
+    };
+  });
+  expect(contextRelations.controls).toHaveLength(5);
+  expect(contextRelations.controls.every(({ controls }) => controls === contextRelations.panelId)).toBe(true);
+  expect(contextRelations.panelLabelledBy).toBe(
+    contextRelations.controls.find((tab) => tab.controls === contextRelations.panelId)?.id,
+  );
+  await expectNoSeriousA11yViolations(page, "context-tabs");
+
+  const tokenState = await page.evaluate(() => {
+    const rootStyles = getComputedStyle(document.documentElement);
+    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');
+    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');
+    if (!active || !inactive) throw new Error("context tab states are incomplete");
+    const read = (element: HTMLElement) => {
+      const styles = getComputedStyle(element);
+      return {
+        background: styles.backgroundColor,
+        boxShadow: styles.boxShadow,
+        transitionDuration: styles.transitionDuration,
+      };
+    };
+    return {
+      active: read(active),
+      inactive: read(inactive),
+      motionFast: rootStyles.getPropertyValue("--motion-fast").trim(),
+      fontMono: rootStyles.getPropertyValue("--font-mono").trim(),
+    };
+  });
+
+  expect(tokenState.active.background).not.toBe(tokenState.inactive.background);
+  expect(tokenState.active.boxShadow).not.toBe("none");
+  expect(tokenState.motionFast).toBe(".15s");
+  expect(tokenState.inactive.transitionDuration).toContain("0.15s");
+  expect(tokenState.fontMono).toContain("Cascadia");
+
+  await page.addStyleTag({ content: ".context-tab { transition: none !important; }" });
+  const inactiveTab = page.locator('.context-tab[aria-selected="false"]').first();
+  await inactiveTab.hover();
+  const hoverBackground = await inactiveTab.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(hoverBackground).not.toBe(tokenState.inactive.background);
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  const darkState = await page.evaluate(() => {
+    const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');
+    const inactive = document.querySelector<HTMLElement>('.context-tab[aria-selected="false"]');
+    if (!active || !inactive) throw new Error("context tab states are incomplete in dark theme");
+    const read = (element: HTMLElement) => getComputedStyle(element).backgroundColor;
+    return { active: read(active), inactive: read(inactive) };
+  });
+  expect(darkState.active).not.toBe(darkState.inactive);
+});
+
+test("keeps governed palette values symmetric across explicit and system dark themes", async ({ page }) => {
+  await page.goto("/");
+
+  const semanticTokens = [
+    "--error-border",
+    "--error-surface",
+    "--file-type-surface",
+    "--file-type-foreground",
+    "--inline-code-surface",
+    "--inline-code-foreground",
+    "--statusbar-foreground",
+    "--warning-surface",
+    "--workspace-foreground",
+  ] as const;
+
+  type PaletteSnapshot = {
+    rawTokens: Record<(typeof semanticTokens)[number], string>;
+    resolved: {
+      errorBorder: string;
+      errorSurface: string;
+      fileTypeSurface: string;
+      fileTypeForeground: string;
+      inlineCodeSurface: string;
+      inlineCodeForeground: string;
+      statusbarForeground: string;
+      warningSurface: string;
+      workspaceForeground: string;
+    };
+  };
+
+  const readPalette = async (): Promise<PaletteSnapshot> =>
+    page.evaluate((tokenNames) => {
+      const rootStyles = getComputedStyle(document.documentElement);
+      const holder = document.createElement("div");
+      const error = document.createElement("div");
+      const fileCard = document.createElement("div");
+      const fileType = document.createElement("span");
+      const inlineCode = document.createElement("code");
+      const markdownBody = document.createElement("div");
+      const notice = document.createElement("div");
+      const workspaceFile = document.createElement("button");
+      const statusbar = document.createElement("div");
+
+      holder.style.position = "absolute";
+      holder.style.inset = "-9999px auto auto -9999px";
+      error.className = "error-state";
+      fileCard.className = "file-card";
+      fileType.className = "file-type";
+      inlineCode.textContent = "code";
+      markdownBody.className = "markdown-body";
+      notice.className = "external-change-notice";
+      workspaceFile.className = "workspace-file";
+      statusbar.className = "statusbar";
+      fileCard.append(fileType);
+      markdownBody.append(inlineCode);
+      holder.append(error, fileCard, markdownBody, notice, workspaceFile, statusbar);
+      document.body.append(holder);
+
+      const readColor = (element: Element, property: "color" | "backgroundColor" | "borderTopColor") => {
+        const styles = getComputedStyle(element);
+        if (property === "color") return styles.color;
+        if (property === "backgroundColor") return styles.backgroundColor;
+        return styles.borderTopColor;
+      };
+      const resolved = {
+        errorBorder: readColor(error, "borderTopColor"),
+        errorSurface: readColor(error, "backgroundColor"),
+        fileTypeSurface: readColor(fileType, "backgroundColor"),
+        fileTypeForeground: readColor(fileType, "color"),
+        inlineCodeSurface: readColor(inlineCode, "backgroundColor"),
+        inlineCodeForeground: readColor(inlineCode, "color"),
+        statusbarForeground: readColor(statusbar, "color"),
+        warningSurface: readColor(notice, "backgroundColor"),
+        workspaceForeground: readColor(workspaceFile, "color"),
+      };
+      const rawTokens = Object.fromEntries(
+        tokenNames.map((token) => [token, rootStyles.getPropertyValue(token).trim()]),
+      ) as PaletteSnapshot["rawTokens"];
+      holder.remove();
+      return { rawTokens, resolved };
+    }, semanticTokens);
+
+  const setExplicitTheme = async (theme: "light" | "dark") => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.evaluate((themeName) => {
+      document.documentElement.dataset.theme = themeName;
+    }, theme);
+  };
+
+  await setExplicitTheme("light");
+  const light = await readPalette();
+  await setExplicitTheme("dark");
+  const explicitDark = await readPalette();
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+  const systemDark = await readPalette();
+
+  expect(explicitDark).toEqual(systemDark);
+  for (const [token, value] of Object.entries(light.rawTokens)) {
+    expect(value, `${token} 浅色令牌为空`).not.toBe("");
+  }
+  for (const [token, value] of Object.entries(explicitDark.rawTokens)) {
+    expect(value, `${token} 深色令牌为空`).not.toBe("");
+  }
+  expect(light.resolved.errorSurface).not.toBe(explicitDark.resolved.errorSurface);
+  expect(light.resolved.fileTypeSurface).not.toBe(explicitDark.resolved.fileTypeSurface);
+  expect(light.resolved.inlineCodeForeground).not.toBe(explicitDark.resolved.inlineCodeForeground);
+  expect(light.resolved.statusbarForeground).not.toBe(explicitDark.resolved.statusbarForeground);
+  expect(light.resolved.warningSurface).not.toBe(explicitDark.resolved.warningSurface);
+  expect(light.resolved.workspaceForeground).not.toBe(explicitDark.resolved.workspaceForeground);
+});
+
+test("keeps the empty state usable in Windows high-contrast mode", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await page.goto("/");
+  await expect(page.locator(".empty-state")).toBeVisible();
+  const forcedColors = await page.evaluate(() => window.matchMedia("(forced-colors: active)").matches);
+  expect(forcedColors).toBe(true);
+  await expectNoSeriousA11yViolations(page, "forced-colors");
+
+  const probe = await page.evaluate(() => {
+    const element = document.createElement("span");
+    element.style.color = "var(--ink)";
+    element.style.backgroundColor = "var(--surface)";
+    element.textContent = "对比度探针";
+    document.body.append(element);
+    const styles = getComputedStyle(element);
+    const result = { foreground: styles.color, background: styles.backgroundColor };
+    element.remove();
+    return result;
+  });
+  expect(contrastRatio(probe.foreground, probe.background)).toBeGreaterThanOrEqual(4.5);
+});

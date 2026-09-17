@@ -1,1 +1,270 @@
-import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";\nimport type { ContextPanelTab, OpenDocument, ReaderMode, TocItem, WorkspaceIndexEntry } from "../types";\nimport type { DocumentBookmark } from "../bookmarks";\nimport type { TextAnnotation } from "../annotations";\nimport type { AnnotationLocation } from "../annotation-highlighter";\nimport { AnnotationsPanel } from "./AnnotationsPanel";\nimport { BookmarksPanel } from "./BookmarksPanel";\nimport { Outline } from "./Outline";\nimport { ReadingRail } from "./ReadingRail";\nimport { RelatedPanel } from "./RelatedPanel";\n\ntype ContextPanelProps = {\n  documentState: OpenDocument | null;\n  entry?: WorkspaceIndexEntry;\n  backlinks: WorkspaceIndexEntry[];\n  outgoing: Array<{ target: string; entry?: WorkspaceIndexEntry }>;\n  bookmarks: DocumentBookmark[];\n  annotations: TextAnnotation[];\n  annotationLocations: readonly AnnotationLocation[];\n  annotationEnabled: boolean;\n  currentAnnotationPath?: string | null;\n  knownPaths: string[];\n  canCreateNote: boolean;\n  selectedTag: string | null;\n  toc: TocItem[];\n  activeHeadingId: string | null;\n  currentHeading: string | null;\n  readingProgress: number;\n  mode: ReaderMode;\n  activeTab: ContextPanelTab;\n  onTabChange: (tab: ContextPanelTab) => void;\n  onClose: () => void;\n  onOpenFile: (path: string) => void;\n  onOpenBookmark: (bookmark: DocumentBookmark) => void;\n  onDeleteBookmark: (bookmark: DocumentBookmark) => void;\n  onOpenAnnotation: (annotation: TextAnnotation) => void;\n  onDeleteAnnotation: (annotation: TextAnnotation) => void;\n  onCreateNote: (target: string) => void;\n  onOpenGraph: () => void;\n  onSelectTag: (tag: string | null) => void;\n  onScrollToTop: () => void;\n  onScrollToBottom: () => void;\n  onNavigateHeading: (item: TocItem) => void;\n};\n\nconst tabs: Array<{ id: ContextPanelTab; label: string }> = [\n  { id: "outline", label: "目录" },\n  { id: "backlinks", label: "关联" },\n  { id: "properties", label: "属性" },\n  { id: "bookmarks", label: "书签" },\n  { id: "annotations", label: "批注" },\n];\n\nconst contextPanelId = "context-panel-panel";\n\nfunction contextTabId(tab: ContextPanelTab): string {\n  return `context-panel-tab-${tab}`;\n}\n\nfunction fileTypeLabel(kind: OpenDocument["kind"]): string {\n  return kind === "markdown" ? "Markdown" : kind === "text" ? "纯文本" : kind.toUpperCase();\n}\n\nfunction frontmatterProperties(source: string): Array<[string, string]> {\n  if (!source.startsWith("---")) return [];\n  const match = source.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);\n  if (!match) return [];\n\n  return match[1]\n    .split(/\r?\n/)\n    .map((line) => line.match(/^\s*([^:#][^:]*?)\s*:\s*(.*?)\s*$/))\n    .filter((entry): entry is RegExpMatchArray => Boolean(entry?.[1]))\n    .map((entry) => [entry[1], entry[2] || "（空）"]);\n}\n\nexport function ContextPanel({\n  documentState,\n  entry,\n  backlinks,\n  outgoing,\n  bookmarks,\n  annotations,\n  annotationLocations,\n  annotationEnabled,\n  currentAnnotationPath,\n  knownPaths,\n  canCreateNote,\n  selectedTag,\n  toc,\n  activeHeadingId,\n  currentHeading,\n  readingProgress,\n  mode,\n  activeTab,\n  onTabChange,\n  onClose,\n  onOpenFile,\n  onOpenBookmark,\n  onDeleteBookmark,\n  onOpenAnnotation,\n  onDeleteAnnotation,\n  onCreateNote,\n  onOpenGraph,\n  onSelectTag,\n  onScrollToTop,\n  onScrollToBottom,\n  onNavigateHeading,\n}: ContextPanelProps) {\n  const properties = documentState?.kind === "markdown" ? frontmatterProperties(documentState.source) : [];\n  const tabButtonRefs = useRef(new Map<ContextPanelTab, HTMLButtonElement>());\n\n  const focusTabAt = (index: number) => {\n    const nextTab = tabs[index];\n    if (!nextTab) return;\n    onTabChange(nextTab.id);\n    tabButtonRefs.current.get(nextTab.id)?.focus();\n  };\n\n  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {\n    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;\n\n    let nextIndex: number | null = null;\n    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;\n    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;\n    if (event.key === "Home") nextIndex = 0;\n    if (event.key === "End") nextIndex = tabs.length - 1;\n    if (nextIndex === null) return;\n\n    event.preventDefault();\n    focusTabAt(nextIndex);\n  };\n\n  return (\n    <aside className="context-sidebar" aria-label="当前文档上下文">\n      <div className="context-panel-header">\n        <div>\n          <div className="panel-kicker">CONTEXT</div>\n          <h2>文档上下文</h2>\n        </div>\n        <button type="button" className="panel-close-button" onClick={onClose} aria-label="隐藏上下文面板">\n          ×\n        </button>\n      </div>\n\n      {documentState && (\n        <div className="context-document-card">\n          <span className="file-type">{fileTypeLabel(documentState.kind)}</span>\n          <div className="context-document-copy">\n            <strong title={documentState.name}>{documentState.name}</strong>\n            <span>\n              {documentState.externallyModified ? "外部已修改" : documentState.modified ? "有未保存修改" : "已保存"}\n            </span>\n          </div>\n        </div>\n      )}\n\n      {documentState && documentState.kind !== "pdf" && documentState.kind !== "image" && mode === "rendered" && (\n        <ReadingRail\n          progress={readingProgress}\n          currentHeading={currentHeading}\n          headingCount={toc.length}\n          onScrollToTop={onScrollToTop}\n          onScrollToBottom={onScrollToBottom}\n        />\n      )}\n\n      <nav className="context-tab-list" aria-label="文档上下文视图" aria-orientation="horizontal" role="tablist">\n        {tabs.map((tab, index) => (\n          <button\n            type="button"\n            key={tab.id}\n            id={contextTabId(tab.id)}\n            role="tab"\n            aria-selected={activeTab === tab.id}\n            aria-controls={contextPanelId}\n            tabIndex={activeTab === tab.id ? 0 : -1}\n            className={`context-tab ${activeTab === tab.id ? "active" : ""}`}\n            ref={(element) => {\n              if (element) tabButtonRefs.current.set(tab.id, element);\n              else tabButtonRefs.current.delete(tab.id);\n            }}\n            onClick={() => onTabChange(tab.id)}\n            onKeyDown={(event) => handleTabKeyDown(event, index)}\n          >\n            {tab.label}\n          </button>\n        ))}\n      </nav>\n\n      <div id={contextPanelId} className="context-panel-body" role="tabpanel" aria-labelledby={contextTabId(activeTab)}>\n        {activeTab === "outline" && <Outline items={toc} activeId={activeHeadingId} onNavigate={onNavigateHeading} />}\n        {activeTab === "backlinks" && (\n          <RelatedPanel\n            entry={entry}\n            backlinks={backlinks}\n            outgoing={outgoing}\n            canCreateNote={canCreateNote}\n            selectedTag={selectedTag}\n            onOpenFile={onOpenFile}\n            onCreateNote={onCreateNote}\n            onOpenGraph={onOpenGraph}\n            onSelectTag={onSelectTag}\n          />\n        )}\n        {activeTab === "properties" && (\n          <section className="context-properties" aria-labelledby="context-properties-title">\n            <div className="panel-kicker">PROPERTIES</div>\n            <h3 id="context-properties-title">文档属性</h3>\n            {documentState ? (\n              <dl>\n                <div>\n                  <dt>类型</dt>\n                  <dd>{fileTypeLabel(documentState.kind)}</dd>\n                </div>\n                <div>\n                  <dt>字数</dt>\n                  <dd>{documentState.rendered.wordCount.toLocaleString("zh-CN")}</dd>\n                </div>\n                <div>\n                  <dt>阅读时间</dt>\n                  <dd>{documentState.rendered.readingMinutes} 分钟</dd>\n                </div>\n                <div>\n                  <dt>路径</dt>\n                  <dd title={documentState.path}>{documentState.path}</dd>\n                </div>\n              </dl>\n            ) : (\n              <p className="muted-copy">打开文档后显示属性。</p>\n            )}\n            {properties.length > 0 && (\n              <div className="context-frontmatter">\n                <div className="panel-kicker">FRONTMATTER</div>\n                <dl>\n                  {properties.map(([key, value]) => (\n                    <div key={key}>\n                      <dt>{key}</dt>\n                      <dd title={value}>{value}</dd>\n                    </div>\n                  ))}\n                </dl>\n              </div>\n            )}\n            <p className="context-panel-note">YAML 属性编辑将在知识库增强批次中开放，未知字段会保持原样。</p>\n          </section>\n        )}\n        {activeTab === "bookmarks" && (\n          <BookmarksPanel\n            bookmarks={bookmarks}\n            knownPaths={knownPaths}\n            currentPath={documentState?.path}\n            currentHeadingId={activeHeadingId}\n            onOpen={onOpenBookmark}\n            onDelete={onDeleteBookmark}\n          />\n        )}\n        {activeTab === "annotations" && (\n          <AnnotationsPanel\n            annotations={annotations}\n            locations={annotationLocations}\n            currentPath={currentAnnotationPath}\n            enabled={annotationEnabled}\n            onOpen={onOpenAnnotation}\n            onDelete={onDeleteAnnotation}\n          />\n        )}\n      </div>\n    </aside>\n  );\n}\n
+import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { ContextPanelTab, OpenDocument, ReaderMode, TocItem, WorkspaceIndexEntry } from "../types";
+import type { DocumentBookmark } from "../bookmarks";
+import type { TextAnnotation } from "../annotations";
+import type { AnnotationLocation } from "../annotation-highlighter";
+import { AnnotationsPanel } from "./AnnotationsPanel";
+import { BookmarksPanel } from "./BookmarksPanel";
+import { Outline } from "./Outline";
+import { ReadingRail } from "./ReadingRail";
+import { RelatedPanel } from "./RelatedPanel";
+
+type ContextPanelProps = {
+  documentState: OpenDocument | null;
+  entry?: WorkspaceIndexEntry;
+  backlinks: WorkspaceIndexEntry[];
+  outgoing: Array<{ target: string; entry?: WorkspaceIndexEntry }>;
+  bookmarks: DocumentBookmark[];
+  annotations: TextAnnotation[];
+  annotationLocations: readonly AnnotationLocation[];
+  annotationEnabled: boolean;
+  currentAnnotationPath?: string | null;
+  knownPaths: string[];
+  canCreateNote: boolean;
+  selectedTag: string | null;
+  toc: TocItem[];
+  activeHeadingId: string | null;
+  currentHeading: string | null;
+  readingProgress: number;
+  mode: ReaderMode;
+  activeTab: ContextPanelTab;
+  onTabChange: (tab: ContextPanelTab) => void;
+  onClose: () => void;
+  onOpenFile: (path: string) => void;
+  onOpenBookmark: (bookmark: DocumentBookmark) => void;
+  onDeleteBookmark: (bookmark: DocumentBookmark) => void;
+  onOpenAnnotation: (annotation: TextAnnotation) => void;
+  onDeleteAnnotation: (annotation: TextAnnotation) => void;
+  onCreateNote: (target: string) => void;
+  onOpenGraph: () => void;
+  onSelectTag: (tag: string | null) => void;
+  onScrollToTop: () => void;
+  onScrollToBottom: () => void;
+  onNavigateHeading: (item: TocItem) => void;
+};
+
+const tabs: Array<{ id: ContextPanelTab; label: string }> = [
+  { id: "outline", label: "目录" },
+  { id: "backlinks", label: "关联" },
+  { id: "properties", label: "属性" },
+  { id: "bookmarks", label: "书签" },
+  { id: "annotations", label: "批注" },
+];
+
+const contextPanelId = "context-panel-panel";
+
+function contextTabId(tab: ContextPanelTab): string {
+  return `context-panel-tab-${tab}`;
+}
+
+function fileTypeLabel(kind: OpenDocument["kind"]): string {
+  return kind === "markdown" ? "Markdown" : kind === "text" ? "纯文本" : kind.toUpperCase();
+}
+
+function frontmatterProperties(source: string): Array<[string, string]> {
+  if (!source.startsWith("---")) return [];
+  const match = source.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+  if (!match) return [];
+
+  return match[1]
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*([^:#][^:]*?)\s*:\s*(.*?)\s*$/))
+    .filter((entry): entry is RegExpMatchArray => Boolean(entry?.[1]))
+    .map((entry) => [entry[1], entry[2] || "（空）"]);
+}
+
+export function ContextPanel({
+  documentState,
+  entry,
+  backlinks,
+  outgoing,
+  bookmarks,
+  annotations,
+  annotationLocations,
+  annotationEnabled,
+  currentAnnotationPath,
+  knownPaths,
+  canCreateNote,
+  selectedTag,
+  toc,
+  activeHeadingId,
+  currentHeading,
+  readingProgress,
+  mode,
+  activeTab,
+  onTabChange,
+  onClose,
+  onOpenFile,
+  onOpenBookmark,
+  onDeleteBookmark,
+  onOpenAnnotation,
+  onDeleteAnnotation,
+  onCreateNote,
+  onOpenGraph,
+  onSelectTag,
+  onScrollToTop,
+  onScrollToBottom,
+  onNavigateHeading,
+}: ContextPanelProps) {
+  const properties = documentState?.kind === "markdown" ? frontmatterProperties(documentState.source) : [];
+  const tabButtonRefs = useRef(new Map<ContextPanelTab, HTMLButtonElement>());
+
+  const focusTabAt = (index: number) => {
+    const nextTab = tabs[index];
+    if (!nextTab) return;
+    onTabChange(nextTab.id);
+    tabButtonRefs.current.get(nextTab.id)?.focus();
+  };
+
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    focusTabAt(nextIndex);
+  };
+
+  return (
+    <aside className="context-sidebar" aria-label="当前文档上下文">
+      <div className="context-panel-header">
+        <div>
+          <div className="panel-kicker">CONTEXT</div>
+          <h2>文档上下文</h2>
+        </div>
+        <button type="button" className="panel-close-button" onClick={onClose} aria-label="隐藏上下文面板">
+          ×
+        </button>
+      </div>
+
+      {documentState && (
+        <div className="context-document-card">
+          <span className="file-type">{fileTypeLabel(documentState.kind)}</span>
+          <div className="context-document-copy">
+            <strong title={documentState.name}>{documentState.name}</strong>
+            <span>
+              {documentState.externallyModified ? "外部已修改" : documentState.modified ? "有未保存修改" : "已保存"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {documentState && documentState.kind !== "pdf" && documentState.kind !== "image" && mode === "rendered" && (
+        <ReadingRail
+          progress={readingProgress}
+          currentHeading={currentHeading}
+          headingCount={toc.length}
+          onScrollToTop={onScrollToTop}
+          onScrollToBottom={onScrollToBottom}
+        />
+      )}
+
+      <nav className="context-tab-list" aria-label="文档上下文视图" aria-orientation="horizontal" role="tablist">
+        {tabs.map((tab, index) => (
+          <button
+            type="button"
+            key={tab.id}
+            id={contextTabId(tab.id)}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={contextPanelId}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            className={`context-tab ${activeTab === tab.id ? "active" : ""}`}
+            ref={(element) => {
+              if (element) tabButtonRefs.current.set(tab.id, element);
+              else tabButtonRefs.current.delete(tab.id);
+            }}
+            onClick={() => onTabChange(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <div id={contextPanelId} className="context-panel-body" role="tabpanel" aria-labelledby={contextTabId(activeTab)}>
+        {activeTab === "outline" && <Outline items={toc} activeId={activeHeadingId} onNavigate={onNavigateHeading} />}
+        {activeTab === "backlinks" && (
+          <RelatedPanel
+            entry={entry}
+            backlinks={backlinks}
+            outgoing={outgoing}
+            canCreateNote={canCreateNote}
+            selectedTag={selectedTag}
+            onOpenFile={onOpenFile}
+            onCreateNote={onCreateNote}
+            onOpenGraph={onOpenGraph}
+            onSelectTag={onSelectTag}
+          />
+        )}
+        {activeTab === "properties" && (
+          <section className="context-properties" aria-labelledby="context-properties-title">
+            <div className="panel-kicker">PROPERTIES</div>
+            <h3 id="context-properties-title">文档属性</h3>
+            {documentState ? (
+              <dl>
+                <div>
+                  <dt>类型</dt>
+                  <dd>{fileTypeLabel(documentState.kind)}</dd>
+                </div>
+                <div>
+                  <dt>字数</dt>
+                  <dd>{documentState.rendered.wordCount.toLocaleString("zh-CN")}</dd>
+                </div>
+                <div>
+                  <dt>阅读时间</dt>
+                  <dd>{documentState.rendered.readingMinutes} 分钟</dd>
+                </div>
+                <div>
+                  <dt>路径</dt>
+                  <dd title={documentState.path}>{documentState.path}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="muted-copy">打开文档后显示属性。</p>
+            )}
+            {properties.length > 0 && (
+              <div className="context-frontmatter">
+                <div className="panel-kicker">FRONTMATTER</div>
+                <dl>
+                  {properties.map(([key, value]) => (
+                    <div key={key}>
+                      <dt>{key}</dt>
+                      <dd title={value}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+            <p className="context-panel-note">YAML 属性编辑将在知识库增强批次中开放，未知字段会保持原样。</p>
+          </section>
+        )}
+        {activeTab === "bookmarks" && (
+          <BookmarksPanel
+            bookmarks={bookmarks}
+            knownPaths={knownPaths}
+            currentPath={documentState?.path}
+            currentHeadingId={activeHeadingId}
+            onOpen={onOpenBookmark}
+            onDelete={onDeleteBookmark}
+          />
+        )}
+        {activeTab === "annotations" && (
+          <AnnotationsPanel
+            annotations={annotations}
+            locations={annotationLocations}
+            currentPath={currentAnnotationPath}
+            enabled={annotationEnabled}
+            onOpen={onOpenAnnotation}
+            onDelete={onDeleteAnnotation}
+          />
+        )}
+      </div>
+    </aside>
+  );
+}
