@@ -124,6 +124,59 @@ Reading Inbox 的正确形态不是重新造一个在线文章 App，而是：
 
 不能再因为“治理看起来更完整”增加新的 state machine、approval JSON、task digest 或第二套任务板。
 
+## 第二轮深挖发现与已同步修复
+
+### A. Desktop smoke 把性能抖动误当成 correctness 失败
+
+PR #480 的失败日志显示：浏览器 E2E 83 项通过，1 项 retry 后通过；桌面 E2E 17/18 通过，唯一失败是 96 文档批量 Word 导出 benchmark 的第一轮 renderer gap 约 340ms，超过 250ms，而后两轮约 88ms / 101ms。
+
+这说明原门禁把共享 GitHub-hosted Windows Runner 的冷启动/调度抖动混进了功能正确性判断。
+
+已同步措施：
+
+- `npm run test:e2e:desktop` 只跑确定性 desktop correctness smoke；
+- 新增 `npm run test:e2e:desktop:benchmark` 保留完整性能场景；
+- 新增 `.github/workflows/desktop-benchmark.yml`，按 scheduled/manual 方式跟踪性能；
+- required `Quality checks` 不再因单次毫秒抖动失败；
+- v0.12 B01 明确要求固定 fixture、多轮/趋势数据，只有证明低波动后才允许把性能升级为 required gate。
+
+这不是降低性能要求，而是把“性能证据”和“功能正确性证据”分开。
+
+### B. updater 双 endpoint 的顺序存在陈旧镜像遮蔽风险
+
+原 `tauri.conf.json` 把 Cloudflare 镜像放在 GitHub Release 前面。updater fallback 只能在前一个 endpoint 失败时继续；如果镜像返回 2xx 但 metadata 仍旧，客户端可能不会继续查询 GitHub 权威发布源。
+
+已同步措施：
+
+- GitHub Release `latest.json` 改为第一权威源；
+- Cloudflare Pages 改为第二镜像/备用源；
+- 新增 `scripts/updater-endpoint-order.test.mjs` 并接入 `test:release`，防止未来顺序回退；
+- A13/C03/AGENTS/AI-HANDOFF 同步写明“GitHub 权威、镜像备用”。
+
+### C. “任何开放 PR 都阻塞队列”会制造假阻塞
+
+仓库同时存在产品 PR 与 Dependabot/机器人依赖 PR 时，如果把“有开放 PR”解释成全仓冻结，会让顺序队列失去意义。
+
+已同步规则：只有“对应当前最早任务、修改同一范围、或形成真实合并依赖”的开放 PR 才构成队列阻塞；自动依赖更新和明显无关维护 PR 只检查冲突，不冻结产品主线。
+
+### D. `BLOCKED_EXTERNAL` 粒度过粗会把本地工作一起冻结
+
+#227 的 Private Vulnerability Reporting 开关确实依赖仓库设置，但 `SECURITY.md`、披露文案和“不通过公开 Issue 提交敏感细节”的仓库内工作并不依赖外部条件。
+
+已同步规则：`BLOCKED_EXTERNAL` 必须精确到外部子项；代码、文档、测试等可本地完成部分继续执行。#51/#241 也按同样原则记录事实，不让外部条件吞掉所有可执行工作。
+
+### E. AI-HANDOFF 仍残留 v1.0 前 provider-first 描述
+
+旧 handoff 仍写有“v1.0 前稳定 DocumentAdapter / IndexProvider / CommandContribution / AiProvider”等历史路径，与新路线冲突。
+
+已同步：AI-HANDOFF 改为 v0.11 → v0.12 → v0.13 → v1.0，并明确 v1.x 才允许在真实内置用户动作出现后提炼 AI/扩展接口。
+
+### F. CHANGELOG 顶部存在历史治理描述残留
+
+`CHANGELOG.md` 的 Unreleased 顶部仍保留已经退役的 policy/plan/state machine 描述。这些条目属于历史开发记录，但当前表达容易被 Agent 当作仍然生效的工程规则。
+
+处理原则：当前行为真源已经统一到 `AGENTS.md` / `AI-TASKS.md` / `AI-HANDOFF.md`；CHANGELOG 只记录“发生过什么”，不能作为当前开发规则。后续修改 CHANGELOG 时应把这些旧条目标注为“历史治理尝试，已由 #451/2026-09-17 收敛规则取代”，而不是继续把它们写成现行制度。
+
 ## 新的版本主线
 
 ### v0.11 — 收口
