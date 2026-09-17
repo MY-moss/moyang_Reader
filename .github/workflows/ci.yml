@@ -89,7 +89,9 @@ jobs:
       - name: Browser and accessibility smoke test
         run: npm run test:e2e
 
-      - name: Desktop smoke test
+      - name: Desktop correctness smoke test
+        # Performance timing lives in the scheduled/manual Desktop benchmark
+        # workflow so shared-runner jitter cannot masquerade as a correctness regression.
         run: npm run test:e2e:desktop
 
       - name: Dependency audit
