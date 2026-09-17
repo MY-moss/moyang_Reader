@@ -17,5 +17,8 @@ test("keeps GitHub Release authoritative before the updater mirror", () => {
   assert.equal(endpoints[0], githubEndpoint, "GitHub Release must be the first updater metadata source");
   assert.equal(endpoints[1], mirrorEndpoint, "Cloudflare Pages must remain the secondary mirror");
   assert.equal(new Set(endpoints).size, endpoints.length, "updater endpoints must not contain duplicates");
-  assert.ok(endpoints.every((endpoint) => /^https:\/\//i.test(endpoint)), "all updater endpoints must use HTTPS");
+  assert.ok(
+    endpoints.every((endpoint) => /^https:\/\//i.test(endpoint)),
+    "all updater endpoints must use HTTPS",
+  );
 });
