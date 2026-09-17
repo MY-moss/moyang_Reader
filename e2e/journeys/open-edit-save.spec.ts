@@ -475,11 +475,52 @@ test("opens the command palette and restores trigger focus", async ({ page }) =>
   const palette = page.getByRole("dialog", { name: "命令面板" });
   await expect(palette).toBeVisible();
   await expect(palette.getByRole("option", { name: /打开文档/ })).toBeVisible();
-  await expect(palette.getByRole("searchbox", { name: "搜索命令" })).toBeFocused();
+  const commandInput = palette.getByRole("combobox", { name: "搜索命令" });
+  await expect(commandInput).toBeFocused();
+  await expect(commandInput).toHaveAttribute("aria-controls", "command-palette-results");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-palette-option-open");
+  await expect(palette.getByRole("listbox", { name: "命令面板结果" })).toBeVisible();
+
+  await commandInput.fill("搜索当前阅读库");
+  const unavailableWorkspaceSearch = palette.getByRole("option", { name: /搜索当前阅读库/ });
+  await expect(unavailableWorkspaceSearch).toBeDisabled();
+  await expect(unavailableWorkspaceSearch).toHaveAttribute("aria-disabled", "true");
 
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);
   await expect(commandTrigger).toBeFocused();
+});
+
+test("navigates command palette actions and opens document search", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "command-search-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Command search\n\n命令面板可以打开文内查找。"),
+  });
+  await switchToRenderedMode(page);
+
+  await openMoreMenu(page);
+  const commandTrigger = page.getByRole("button", { name: "命令面板", exact: true });
+  await commandTrigger.focus();
+  await page.keyboard.press("Control+Shift+P");
+
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  const commandInput = palette.getByRole("combobox", { name: "搜索命令" });
+  await expect(commandInput).toBeFocused();
+
+  await page.keyboard.press("End");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-palette-option-focus");
+  await page.keyboard.press("Home");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-palette-option-open");
+
+  await commandInput.fill("查找当前文档文字");
+  await expect(commandInput).toHaveAttribute("aria-activedescendant", "command-palette-option-document-search");
+  await page.keyboard.press("Enter");
+
+  await expect(palette).toHaveCount(0);
+  const documentSearch = page.getByRole("searchbox", { name: "文内查找" });
+  await expect(documentSearch).toBeFocused();
 });
 
 test("keeps supported markdown syntax through the wysiwyg editor", async ({ page }) => {
@@ -1327,7 +1368,7 @@ test("closes only the innermost command panel before focus mode", async ({ page 
   await page.keyboard.press("Control+Shift+P");
   const palette = page.getByRole("dialog", { name: "命令面板" });
   await expect(palette).toBeVisible();
-  await expect(palette.getByRole("searchbox", { name: "搜索命令" })).toBeFocused();
+  await expect(palette.getByRole("combobox", { name: "搜索命令" })).toBeFocused();
 
   await page.keyboard.press("Escape");
   await expect(palette).toHaveCount(0);

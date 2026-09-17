@@ -155,6 +155,16 @@ test("keeps the quick-open dialog free of serious accessibility violations", asy
   await expectNoSeriousA11yViolations(page, "quick-open");
 });
 
+test("keeps the command palette free of serious accessibility violations", async ({ page }) => {
+  await loadReaderFixture(page);
+  await page.keyboard.press("Control+Shift+P");
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByRole("combobox", { name: "搜索命令" })).toBeFocused();
+  await expect(palette.getByRole("listbox", { name: "命令面板结果" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "command-palette");
+});
+
 test("keeps the settings panel free of serious accessibility violations", async ({ page }) => {
   await loadReaderFixture(page);
   await openSettings(page);
