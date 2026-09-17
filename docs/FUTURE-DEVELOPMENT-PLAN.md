@@ -4,735 +4,384 @@
 
 ## 1. 产品定位
 
-Moyang Reader 的目标不是复制 Obsidian、Notion、VS Code 或某个 AI 客户端，而是成为一个：
+Moyang Reader 的长期目标不是复制 Obsidian、Notion、VS Code、Readwise Reader 或某个 AI 客户端，而是成为一个：
 
 - **Windows x64 优先**的本地阅读工作台；
-- **普通文件是真源**的轻量知识工具；
+- **普通文件是真源**的轻量文档工具；
 - 能稳定阅读、搜索、关联、批注、编辑、导出和恢复；
-- 在核心稳定后，可以通过受控接口接入 AI、格式适配器和扩展能力；
-- 即使关闭所有 AI / 扩展能力，核心阅读器仍完整可用。
+- 在核心稳定后，可以按真实用户路径接入远程内容、AI、格式适配器和受控扩展；
+- 即使关闭所有联网、AI 和扩展能力，核心阅读器仍完整可用。
 
-产品长期优势应保持为：轻量、本地、可恢复、好搜索、好阅读、可扩展但不失控。
-
----
+长期优势固定为：**轻量、本地、阅读优先、文件安全、可恢复、可扩展但不失控**。
 
 ## 2. 不变原则
 
-### 2.1 用户文件永远优先
+### 2.1 普通文件永远是真源
 
 - Markdown、TXT、DOCX、PDF、图片等普通文件继续是用户内容的真源。
 - 不把正文迁入私有数据库才能使用。
-- `.moyang/` 只保存旁路元数据，例如批注、未来的可重建索引描述或工作区级配置。
-- 派生缓存必须可以删除并重新生成。
-- 所有写文件功能继续遵守原子写入、上一版本恢复、外部修改保护和明确失败反馈。
+- `.moyang/` 只保存旁路元数据；数据库/索引/vector store 只能是可重建派生层。
+- 所有写文件功能继续遵守安全写入、上一版本恢复、外部修改保护和明确失败反馈。
 
 ### 2.2 默认离线
 
 - 核心阅读、编辑、搜索、索引、批注、导出默认不依赖网络。
-- AI、远程图片、更新检查等联网能力必须是独立、可关闭的功能。
-- 关闭 AI 后不能让工作区、搜索或文件格式能力降级。
+- Reading Inbox、AI、远程图片、更新等联网能力必须独立、可关闭。
+- 关闭联网功能后不能让工作区、搜索、文件格式或恢复能力降级。
 
-### 2.3 AI 与插件不能获得“主应用同等权限”
+### 2.3 用户文件安全高于功能速度
 
-- AI provider、扩展包和未来插件不直接调用任意 Tauri IPC。
-- 不直接暴露原始文件系统、`process`、`opener`、`updater` 权限。
-- 所有扩展能力通过核心定义的受控接口和权限代理访问。
-- 第三方代码不得注入主 WebView 运行。
+- 静默覆盖、静默删除、失败后清理用户原文件均不可接受。
+- AI 或扩展写回统一遵循 `candidate → preview/diff → user apply → core safe write`。
+- 批量操作必须展示真实影响范围并可恢复。
 
-### 2.4 写回必须可逆
+### 2.4 不为未来提前造空扩展框架
 
-- AI 或扩展产生的内容默认先形成候选结果。
-- 修改现有文档时必须显示 diff / 变更范围。
-- 大批量修改要显示涉及文件数和路径范围。
-- 删除、覆盖、移动等破坏性动作继续由核心文件安全层执行，而不是由插件自行处理。
+长期接口只能从真实内置需求中提炼，而不是先设计 provider/plugin 平台再寻找调用方。
 
-### 2.5 内部接口先稳定，再开放外部 API
+推荐顺序：
 
-继续遵守 ADR 0012：v1.0 前只建设内部能力端口，不发布插件 SDK，不承诺第三方 ABI。
+```text
+真实用户动作
+  → 一个内置实现
+  → 稳定业务边界
+  → 第二个实现/调用方验证
+  → contract tests
+  → 再讨论外部兼容
+```
 
----
+### 2.5 AI / 扩展不能继承主应用全部权限
 
-## 3. 当前架构审计结论
+- 未来 AI provider、扩展包、sidecar 不直接获得主 WebView 的任意 Tauri IPC、文件系统、process、opener、updater 权限。
+- 文件和网络范围由核心根据用户授权转交。
+- 第三方代码不得直接注入主 WebView。
 
-### 3.1 已经具备、应该继续利用的基础
+## 3. 当前架构现实
 
-- 文档适配器已经有 registry、扩展名映射和能力描述。
-- 工作区已经有索引、全文搜索、标签、链接、反向链接和拼音文件名检索。
-- 命令面板、快捷键、顶栏动作已经形成可统一的雏形。
-- Tauri/Rust 已经承担文件授权、路径校验、读写和 Windows 系统能力。
-- 设置已有版本化快照，迁移备份已有 v2 格式。
-- 已有浏览器 E2E、真实桌面 E2E、axe、WCAG、reduced-motion 和主题测试。
-- 已有书签、批注、阅读历史、恢复、回收站、上一版本等数据安全基础。
+当前已经具备的基础：
 
-这些能力意味着未来不需要重新造一个“AI 版阅读器”或“插件版阅读器”，而应该在现有核心外增加稳定端口。
+- TS ↔ Rust 集中命令契约与首批运行时响应校验；
+- 设置控制器与文档会话控制器；
+- 工作区扫描、索引、全文搜索、标签、双链、反向链接和拼音定位；
+- 多格式阅读、编辑、批注、书签、导出、恢复和更新；
+- 浏览器 E2E、真实桌面 E2E、a11y、主题、发布和架构检查。
 
-### 3.2 当前仍存在的结构风险
+当前主要风险不是“缺少扩展点”，而是大型编排中心尚未完全收敛：`App.tsx`、Rust `commands.rs`、`export.ts` 和部分 UI/样式模块仍承担较多职责。
 
-#### A. 大型编排文件仍然过重
+因此 v1.0 前的工程重点是：
 
-当前 `App.tsx`、Rust `commands.rs`、`styles.css`、`export.ts` 以及部分大型 UI 组件承担较多职责。问题不是文件大本身，而是未来 AI / 插件 / 知识库功能如果继续直接接到这些文件，会重新形成高耦合中心。
+- 工作区生命周期从 App 继续按职责拆出；
+- 高价值错误改为稳定 code；
+- 大工作区/大文件/阅读位置有已测量边界；
+- 文件恢复与发布链路经过真实 Windows 验证。
 
-方向：继续按“设置、文档会话、工作区、命令、索引、导出、AI”职责提取，而不是一次重写。
+## 4. 版本策略：先完成 v1.0，再扩产品面
 
-#### B. DocumentAdapter 目前主要是能力描述
+此前计划把轻量知识库、Capability Ports、AiProvider 等放在 v1.0 前。本次深度复查后调整为：
 
-现有 `DocumentAdapter` 只描述 `id / kind / extensions / capabilities`。长期需要逐步成为真正的行为接口，例如：
+```text
+v0.11 收口
+  → v0.12 可靠性证明
+  → v0.13 Freeze / Compatibility / RC
+  → v1.0
+  → v1.1 Reader+
+  → v1.2 Metadata / Knowledge
+  → v1.3 AI
+  → v1.4+ Interop / Extensions
+```
 
-- `canOpen`
-- `readMetadata`
-- `extractText`
-- `render`
-- `export`
-- `supportsEdit`
+理由：当前产品能力已经足以形成完整 Reader，继续把知识库/AI/插件架构塞进 1.0 前会扩大回归面、延后真实稳定发布，并与“不要提前造空抽象”的架构原则冲突。
 
-`extractText` 很重要：未来搜索、AI、RAG 和引用不能假定所有格式都像 Markdown 一样天然有正文字符串。当前 PDF 主要是预览能力，图片也没有正文文本，因此 AI 接入前必须先定义“哪些格式可以提供安全文本、哪些只能预览、哪些需要额外解析/OCR”。
+## 5. v1.1 — Reader+ / Reading Inbox
 
-不能一次把所有格式重写进一个万能接口。先让内置 Markdown / TXT 通过新接口跑通，再迁移 DOCX；PDF 文本提取和图片 OCR 作为独立后续能力评估。
+这是 v1.0 后的优先产品候选，因为它直接强化“阅读器”而不是把产品变成另一个通用知识库。
 
-#### C. IndexProvider 尚未成为稳定端口
+### 5.1 最小闭环
 
-当前索引、搜索、链接解析和 UI 状态已经具备能力，但没有一个稳定的 provider 边界。未来语义搜索、替代索引实现或插件查询如果直接依赖当前内部结构，会增加耦合。
+第一阶段只证明：
 
-方向：定义只读快照、搜索、刷新/失效、链接查询和统计等最小接口；具体 Rust/TS 实现继续可以变化。
+```text
+一个公开 URL
+  → 用户显式发起
+  → Tauri/Rust 受控抓取
+  → 安全抽取/清洗
+  → 普通本地 article.md + 可选 assets
+  → 现有 Reader 打开
+  → 阅读位置 / 批注 / 书签 / 搜索复用现有核心
+```
 
-#### D. 命令定义仍分散
+### 5.2 不可破坏边界
 
-同一个动作可能同时出现在快捷键、顶栏、命令面板、右键菜单。长期应由 `CommandContribution` / `CommandService` 统一提供：
+- 默认关闭、默认不联网；关闭后现有用户几乎感知不到额外复杂度。
+- URL/RSS/Digest 属于 **Content Source / Article Import**，不能伪装成 `DocumentAdapter`。
+- 导入后的普通 Markdown 是正文真源；索引/队列数据库如以后存在也只能是旁路或派生层。
+- 不建立第二套 Reader/Editor。
+- 不绕过登录墙/付费墙，不读取浏览器 cookies，不默认下载所有远程资源。
+- 网络抓取必须有 redirect、timeout、size、content-type、SSRF 等负向测试。
 
-- id
-- label
-- optional icon
-- shortcut
-- enabled / visible
-- execute
-- category
+### 5.3 后续顺序
 
-UI 只消费命令状态，不各自复制业务判断。
+在手动 URL MVP 之后再依次评估：Queue → Digest manifest → Offline assets → RSS / 浏览器来源 → AI 精读。
 
-#### E. i18n 与错误契约只完成了一半
+不要一开始同时做 RSS、推荐系统、浏览器扩展和 AI。
 
-中文 / English 基座已经存在，但更新器错误仍依赖自然语言关键词分类，Rust 仍缺稳定错误码。未来 AI provider、插件、同步或 MCP 如果继续返回任意字符串，错误处理会越来越脆弱。
+## 6. v1.2 — Metadata / Knowledge
 
-方向：完成 #111，建立稳定的 `code + message + details?` 错误模型；UI 再负责本地化说明。
+知识库能力只有在它继续服务“普通 Markdown 真源”时才值得加入。
 
-#### F. AI provider 与密钥存储尚不存在
+### 6.1 Quick Capture
 
-未来不能把 API Key 放进普通 localStorage、portable settings、`.moyang` 或仓库文件。
+最小能力：用户选择一个目录，一键创建普通 Markdown。文件名冲突、权限和写入失败必须走核心安全文件层。
 
-方向：
+### 6.2 Frontmatter Safety Spike
 
-- provider 普通设置使用版本化、命名空间配置；
-- API Key / token 使用 Windows 安全凭据存储或等价 OS 安全存储；
-- 导出设置默认不包含密钥；
-- 日志和错误信息必须做 secret redaction。
+这是 Properties 编辑的强制前置任务。
 
-#### G. 当前主窗口权限不能直接继承给未来插件
+当前 Properties/索引只需要轻量读取；真正写回 YAML 时必须验证：
 
-当前主窗口具备核心、dialog、opener、process、updater 等 Tauri capability。未来第三方扩展如果运行在同一个 WebView 并继承这些权限，会扩大攻击面。
+- 未知字段不丢失；
+- 注释、空行、字段顺序和常见 scalar/array 风格尽量保留；
+- 无法安全 patch 的复杂 YAML 直接保持只读或回退源码模式；
+- 不采用简单 `parse → object → stringify → 覆盖整段 frontmatter` 作为默认策略。
 
-方向：第三方 UI 如未来确实需要 WebView，应使用独立受限 capability，或更优先使用核心渲染的声明式 UI；插件本身只与 Permission Broker 通讯。
+第一批写入只考虑顶层常见 scalar 和简单数组。复杂对象、anchors、特殊 tags 等继续只读。
 
----
+### 6.3 Table / Collection
 
-## 4. 版本阶段总计划
+顺序固定为：
 
-## v0.11 — 核心模块化与桌面体验收口
+1. 只读派生表格；
+2. 证明字段来源与索引一致；
+3. Properties 安全 patch 已成熟；
+4. 才评估单元格轻编辑。
 
-目标：让“当前功能很多”变成“当前功能稳定、好找、好改”。
+Daily Note、saved search、collection、模板等不自动进入主线，有真实使用需求再立项。
 
-重点：
+## 7. v1.3 — AI 阅读辅助
 
-1. TS ↔ Rust 命令契约集中化与首批运行时校验。
-2. 提取设置控制器、文档会话、后续工作区会话。
-3. Rust `commands.rs` 按领域拆分。
-4. 搜索入口、命令面板、右侧上下文、顶栏信息架构收口。
-5. Windows DPI、主题、视觉回归基线。
-6. 完成 #111 剩余的 i18n / 错误码契约。
+AI 第一阶段不先建立大型 provider 框架，而先完成一个真实用户动作。
 
-退出条件：
+### 7.1 第一条真实路径
 
-- 新功能不再默认直接堆进 `App.tsx`；
-- 主要用户动作拥有稳定 command id；
-- 前后端错误可通过稳定 code 处理；
-- UI 主流程在 720px 和常见 DPI 下可用。
+推荐从“解释/翻译选中文本”开始：
 
-## v0.12 — 性能、安全与真实使用验证
+```text
+用户选中文本
+  → 选择解释或翻译
+  → UI 显示 provider/model/发送范围/用途
+  → 一个真实 provider
+  → streaming result
+  → cancel / retry / error
+```
 
-目标：证明它在真实工作区和异常环境里可靠，而不是只在测试样例里可靠。
+这条路径不要求先改正文即可产生价值，风险较低。
 
-重点：
+### 7.2 从真实调用提炼接口
 
-- 5k / 20k 文件工作区扫描和搜索基准；
-- 1MB / 10MB 文档的读取、编辑、搜索、保存、内存测试；
-- 大文件降级策略；
-- 当前主流程 UX 巡检；
-- Tauri opener/process/updater 权限库存和负向测试；
-- 本地诊断信息：允许用户主动导出不含正文/密钥的诊断摘要，便于个人项目排查问题，不做默认遥测。
-
-退出条件：
-
-- 已知道大工作区和大文件的安全边界；
-- 无已知高严重度文件安全问题；
-- 用户可以在不提供私人正文的情况下报告大多数运行故障。
-
-## v0.13 — 轻量知识库
-
-目标：增强组织能力，但不把阅读器变成大型数据库应用。
-
-重点：
-
-- Inbox 快速记录；
-- Daily Note；
-- 可编辑 Properties；
-- 属性 / 标签表格视图；
-- 可选的保存搜索 / 智能集合（只有在现有搜索体验稳定后再立项）；
-- 简单模板只做普通 Markdown 文件模板，不运行脚本。
-
-退出条件：
-
-- 用户可以从“阅读资料”自然过渡到“记录和整理”；
-- 所有知识库数据仍可直接被其他 Markdown 工具读取。
-
-## v0.14 — 内部扩展内核与 AI 接口
-
-目标：建立未来插件和 AI 可以复用的内部接口，但仍不开放第三方任意代码。
-
-### 4.14.1 Capability Ports
-
-逐步稳定：
-
-- `DocumentAdapter`
-- `IndexProvider`
-- `CommandService / CommandContribution`
-- `SettingsNamespace`
-- `PermissionBroker`
-- `AiProvider`
-- `ConsentScope`
-
-这些接口先只供内置功能使用。至少经过两个版本的真实使用后，再讨论外部兼容承诺。
-
-### 4.14.2 权限模型
-
-建议按能力而不是按“插件是否可信”授权：
-
-只读能力：
-
-- `document.current.read`
-- `document.selection.read`
-- `workspace.metadata.read`
-- `workspace.search`
-- `workspace.file.read`（必须限定用户已授权工作区）
-
-写入能力：
-
-- `document.selection.replace`
-- `document.create`
-- `document.frontmatter.update`
-- `workspace.file.move`
-
-高风险能力默认不对扩展开放：
-
-- 任意进程执行
-- 原始 shell
-- 任意网络
-- updater
-- 任意文件系统路径
-- 无确认删除/覆盖
-
-### 4.14.3 AI Provider 第一阶段
-
-先做 provider-agnostic 接口和 mock，不先绑定任何厂商：
+当第一条真实路径稳定后，再提炼最小 `AiProvider`：
 
 - `id / displayName`
-- `listModels()`
-- `healthCheck()`
+- model selection（确有需要时）
 - `generate()` / streaming
 - `cancel()`
-- 可选 `embed()`
-- 能力声明：text / vision / tools / embeddings 等
+- stable error mapping
 
-第一批真实 provider 只需要验证两类：
+再根据真实需求提炼：
 
-1. 一个远程 API provider；
-2. 一个本地或 OpenAI-compatible endpoint provider。
+- `ConsentScope`
+- secret storage
+- current document / search result context
+- diff writeback
 
-核心业务只依赖 `AiProvider`，不能在阅读/编辑组件里出现特定厂商 SDK 逻辑。
+不要把 vision/tools/embeddings 等未来能力提前塞进第一版接口。
 
-### 4.14.4 ConsentScope
+### 7.3 Secret 与隐私
 
-用户每次发给 AI 的上下文必须可见。建议范围从小到大：
+- API key/token 不进入 localStorage、portable settings、`.moyang`、日志、Issue、PR。
+- 用户每次发送内容都能看见范围和用途。
+- 全工作区上下文不能默认开启。
+- 取消后必须停止后续请求与写回。
 
-- 当前选中文本；
-- 当前文档；
-- 当前打开的若干文档；
-- 当前搜索结果；
-- 用户手动选择的工作区文件集合；
-- 全工作区只能显式选择，不能默认开启。
+### 7.4 AI 后续层级
 
-请求前 UI 显示：provider、model、发送范围、文件数量、用途；取消后必须停止后续请求和写回。
+1. 当前文档解释/翻译/摘要/问答；
+2. 写作辅助，全部 candidate → diff → apply；
+3. 可选语义检索 / RAG；
+4. 最后才评估受控 Agent。
 
-### 4.14.5 AI 写回
+RAG 不能替代现有确定性全文搜索；embedding 永远是可删除重建的派生数据。
 
-AI 第一阶段只产生：
+## 8. v1.4+ — Interop / Extensions
 
-- 回答；
-- 摘要；
-- 解释；
-- 翻译；
-- 标签 / 属性建议；
-- 候选 Markdown。
+### 8.1 高价值格式方向
 
-写回已有文件统一进入 diff 流程。AI 不能直接静默保存。
+- PDF 安全文本提取、页码来源与搜索/AI 上下文；
+- EPUB 只读 adapter；
+- 图片 OCR/vision 仅在用户明确开启时工作。
 
-## v0.15 — 兼容冻结
+### 8.2 声明式扩展优先
 
-目标：为 v1.0 锁住公共行为。
+第一种外部扩展不要执行任意 JavaScript。可以先支持 manifest + 静态资源形式的：
 
-- 设置 schema；
-- portable settings；
-- 工作区 sidecar schema；
-- command ids；
-- IPC 名称；
-- 主要快捷键；
-- DocumentAdapter / IndexProvider 内部最小接口；
-- 文件恢复语义；
-- AI provider 配置格式（如果已落地）。
-
-此阶段不再加入大型新功能。
-
-## v1.0 — 可靠发布
-
-继续以 Windows x64 为唯一正式平台，完成：
-
-- 安装 / 卸载 / 升级 / 回滚 / 自动更新实机闭环；
-- 文件异常恢复矩阵；
-- 安装包签名策略；
-- Release / updater / mirror / SHA-256 一致性；
-- 安全与隐私文档；
-- 核心 E2E / desktop E2E / accessibility / performance 基线。
-
----
-
-## 5. v1.0 之后的插件路线
-
-插件不是 v1.0 的阻塞项。建议分四个阶段推进。
-
-### P0 — 内部 Contribution（v1.0 前）
-
-只允许内置代码通过统一接口注册：
-
-- commands
-- document adapters
-- index providers
-- AI providers
-- settings sections
-- context panel contributions
-
-目的：先证明扩展点设计真的能承载项目自身功能。
-
-### P1 — 声明式扩展包（建议 v1.1+）
-
-第一种外部扩展不要运行任意 JavaScript，只读取 manifest 和静态资源。
-
-可以支持：
-
-- 命令别名 / 命令分组；
-- Markdown 模板；
-- snippets；
-- 主题 token 覆盖；
+- 模板；
+- snippet；
+- 主题 token；
+- prompt preset；
 - 文件类型描述；
-- AI prompt preset；
 - provider 配置描述。
 
-Manifest 建议包含：
+只有声明式能力无法满足真实需求时，才评估 sidecar / WASM / 独立进程插件。
 
-- id
-- version
-- minimumAppVersion
-- displayName
-- author
-- contributions
-- requestedCapabilities
+### 8.3 MCP
 
-这样可以先建立安装、启用/禁用、版本兼容和权限展示，而不引入代码执行风险。
+MCP 是 v1.0 后的互操作层，不是 Moyang Reader 内部架构的唯一基础。
 
-### P2 — 受控 Provider / Sidecar 扩展（建议 v1.2+）
-
-对于必须执行代码的能力，优先考虑“进程外 provider / sidecar + 有限 RPC”，而不是注入主 WebView。
-
-要求：
-
-- 明确协议版本；
-- 请求超时和取消；
-- 消息大小限制；
-- capability allowlist；
-- 崩溃只影响该扩展；
-- 扩展无法直接拿到主窗口 Tauri 权限；
-- 文件内容由核心根据权限按请求转交。
-
-### P3 — 第三方代码插件（需求足够大时再评估）
-
-只有当 P1/P2 无法满足真实用户需求时，才评估：
-
-- WASM sandbox；
-- 独立进程；
-- 签名扩展包；
-- 插件源 / 市场；
-- 权限升级提示；
-- 兼容性和撤回机制。
-
-**明确不采用：** 在主 WebView `eval()`、加载任意远程 JS、让插件直接 import Tauri API。
-
----
-
-## 6. AI 功能路线
-
-### AI 前置：统一可提取文本能力
-
-AI 不应只对 Markdown 好用。每个 DocumentAdapter 要明确 `extractText` 能力和来源质量：
-
-- Markdown/TXT：原始文本；
-- DOCX：从安全解析结果提取正文和标题；
-- PDF：当前预览不等于可供 AI/搜索使用的正文，未来需要独立文本提取能力；
-- 图片：默认无正文，OCR 必须作为可选能力而不是偷偷联网；
-- EPUB：若未来支持，按章节提供结构化文本。
-
-AI UI 必须告诉用户当前格式是“完整正文”“部分提取”“OCR/视觉理解”还是“不支持正文上下文”。
-
-## AI-1：手动辅助阅读
-
-建议最先落地，因为风险低、价值直接：
-
-- 解释选中文本；
-- 总结当前章节 / 当前文档；
-- 翻译；
-- 对当前文档提问；
-- 生成阅读问题；
-- 从当前文档提炼术语 / 人物 / 观点。
-
-回答必须显示上下文来源，例如文档名、标题或选区，不需要复杂 agent。
-
-## AI-2：工作区检索增强 / RAG
-
-不能用向量搜索替换现有全文搜索。正确结构是：
-
-`现有词法检索 + 可选语义召回 + 重排 / 合并`
-
-建议：
-
-- 按 Markdown/EPUB 标题、DOCX 标题或可提取段落切块；
-- PDF 只有在文本提取质量合格后才进入语义索引；
-- 保存 `path + content fingerprint + heading + offsets`；
-- 文件修改时只重算变化块；
-- embeddings 是派生数据，可随时重建；
-- 远程 embedding 必须单独征得同意；
-- 本地 embedding provider 可以后加，不捆绑大模型；
-- 回答展示检索到的文档来源，不只给模型自然语言答案。
-
-## AI-3：写作辅助
-
-- 改写选区；
-- 扩写 / 缩写；
-- 生成标题；
-- 生成 frontmatter 建议；
-- 生成链接建议；
-- 将批注整理为新 Markdown。
-
-全部采用“生成候选 → diff → 应用”流程。
-
-## AI-4：受控 Agent
-
-最后才做 Agent。工具应复用核心命令和 PermissionBroker，而不是另建一套文件 API。
-
-第一批工具只允许：
-
-- search workspace
-- read selected document
-- navigate/open document
-- create draft note
-- propose patch
-
-默认禁止：
-
-- 删除；
-- 覆盖多个文件；
-- shell；
-- 任意网络；
-- 安装插件；
-- 修改应用设置；
-- 发布 / 更新。
-
-后续如果开放写工具，每次执行前仍由核心检查 scope，并记录本地 action log。
-
----
-
-## 7. MCP 的定位
-
-MCP 可以成为 v1.0 之后的互操作层，但**不能成为 Moyang Reader 内部架构的唯一基础**。
-
-推荐两种可选方向：
-
-### 7.1 Moyang Reader 作为 MCP Server
-
-用户显式开启后，对外暴露受控只读工具，例如：
+优先只读能力：
 
 - 搜索当前工作区；
 - 读取用户授权文档；
-- 获取当前文档 / 选区；
+- 获取当前文档/选区；
 - 获取标签、链接、书签和批注。
 
-写工具后置，并继续经过核心 PermissionBroker。
+写工具必须继续经过核心文件安全和权限边界。
 
-### 7.2 Moyang Reader 作为 MCP Client
-
-让 AI provider 通过 MCP 使用外部工具，但工具权限、结果大小、超时和联网状态仍由应用管理。
-
-由于外部协议会持续演进，MCP 必须放在 `McpAdapter` 后面，不让内部 command / AI provider 直接绑定某个传输、SDK 或协议版本；升级 MCP 不应迫使核心文档/索引接口一起重写。
-
----
-
-## 8. 数据与配置分层
-
-长期明确五类数据：
+## 9. 数据与配置分层
 
 | 类型 | 示例 | 位置原则 | 可否重建 |
 | --- | --- | --- | --- |
 | 用户正文 | Markdown/TXT/DOCX | 用户文件夹 | 否 |
-| 工作区元数据 | 批注、未来工作区设置 | `.moyang/` | 部分否 |
-| 应用偏好 | 主题、布局、provider 配置 | App data / settings | 是或可迁移 |
-| 密钥 | API Key、token | Windows 安全凭据存储 | 否，且不导出 |
-| 派生缓存 | 搜索索引、embedding、缩略图/OCR cache | cache | 是 |
+| 工作区旁路元数据 | 批注、未来 queue/metadata | `.moyang/` | 视类型而定 |
+| 应用偏好 | 主题、布局、非敏感 provider 配置 | App data/settings | 是或可迁移 |
+| 密钥 | API Key、token | OS 安全凭据存储 | 否，且不导出 |
+| 派生缓存 | 搜索索引、embedding、OCR cache | cache | 是 |
 
 要求：
 
-- 每种持久格式有 `format/version`；
-- 大的工作区元数据使用原子写；
-- provider / plugin 设置采用 namespace：`provider.<id>` / `extension.<id>`；
-- 卸载插件时默认保留非敏感配置一段时间，但提供“同时清理数据”；
-- portable settings 明确哪些 namespace 可导出；secret 永不进入普通备份。
+- 新持久格式明确 `format/version`；
+- 大的工作区元数据使用安全/原子写入；
+- secret 永不进入普通备份；
+- 派生缓存可删除重建；
+- 不允许数据库逐渐变成正文的隐式唯一真源。
 
----
+## 10. 扩展端口何时才值得建立
 
-## 9. 格式能力路线
+### DocumentAdapter
 
-现有 adapter registry 是正确方向。新增格式或增强既有格式按用户价值与维护成本评估，而不是为了数量。
+只有当至少两个真实内置格式需要统一行为时，才逐步稳定 `canOpen/readMetadata/extractText/render/export/supportsEdit` 等能力。不要一次重写全部格式。
 
-### 既有格式增强：PDF 深度阅读
+### IndexProvider
 
-当前 PDF 的优势是快速预览。后续如果真实需求明确，优先顺序应是：
+只有出现真实替代索引、语义召回或独立查询实现的需求时建立；普通搜索仍是确定性主入口。
 
-1. 安全文本提取；
-2. 文内搜索和复制一致性；
-3. 目录/页码定位；
-4. 将提取文本提供给 AI/RAG，并明确页码来源；
-5. 最后才评估 PDF 批注映射。
+### CommandService / CommandContribution
 
-不以“自己实现完整 PDF 引擎”为目标，也不做 PDF 原格式编辑器。
+A07 及后续 UI 收口可以先统一现有命令模型，因为它有多个真实 UI 入口；但不为外部插件承诺 ABI。
 
-### 既有格式增强：图片 OCR / 视觉理解
+### PermissionBroker
 
-只作为可选功能。优先本地或用户明确配置的 provider；OCR 结果是派生数据，可清除重建。不能因为打开图片就默认把图片发送到远程 AI。
+只有出现 Reading Inbox、AI、sidecar 或其他需要隔离能力的真实调用方时再建立；底层尽量复用 Tauri capability/permission，而不是自造第二套 OS 权限系统。
 
-### 高价值候选：EPUB 只读
+### AiProvider
 
-适合“阅读器优先”定位。先做章节、目录、图片、基础 CSS 的安全阅读；不做 EPUB 原格式编辑。
+只有真实 AI 动作已经通过一个 provider 工作后再提炼；禁止“mock-first → 再找用途”的架构项目。
 
-### 中价值候选：HTML / 单文件网页导入
+## 11. 进入条件，而不是审批状态机
 
-适合本地归档阅读，但要明确远程资源、脚本清理和 base URL 安全语义。
+以下是工程依赖，不是 T0–T3 或审批票据。
 
-### 低优先候选
+### Reading Inbox 开始条件
 
-- CSV：只有属性/表格工作流出现明确需求后再做；
-- PPTX：解析成本高、阅读价值有限；
-- DOCX/PDF 原格式回写：长期仍不建议作为核心目标。
+- v1.0 已发布；
+- 核心工作区/文件安全/阅读位置稳定；
+- 网络抓取可以只通过受控 Rust/Tauri 边界；
+- feature off 时没有额外后台网络行为。
 
-任何新格式先实现内置 adapter，再决定是否适合未来外部扩展。
+### Properties 写回开始条件
 
----
+- Frontmatter safety spike 证明最小 patch 可行；
+- 复杂 YAML 有明确只读/fallback 策略；
+- 文件外部修改/恢复路径可复用。
 
-## 10. 搜索与知识发现
+### AI 真功能开始条件
 
-推荐顺序：
-
-1. 保持当前全文搜索和拼音定位稳定；
-2. 改善排序、字段权重、标题/路径/标签命中解释；
-3. saved search / collection；
-4. 可选语义检索；
-5. AI 问答。
-
-原则：AI 搜索失败时，用户仍可以回到确定性的普通搜索。
-
----
-
-## 11. 同步、云与跨平台
-
-### v1.0 前
-
-不做自建账号、云同步、实时协作。
-
-用户把工作区放在 OneDrive、Dropbox、Syncthing 等普通同步文件夹时，Moyang Reader 应尽量兼容外部文件修改，这是比自建云更符合当前项目成本的路线。
-
-### v1.0 后
-
-只有出现真实需求再评估：
-
-- 工作区元数据冲突合并；
-- 可选端到端加密同步；
-- 多设备阅读位置。
-
-跨平台同理。当前只保证 Windows x64，但内部核心不应主动写死 Windows UI 假设；Windows 特有实现放在 platform adapter / Rust 系统层，未来才有低成本评估 macOS/Linux 的可能。
-
----
-
-## 12. 质量与兼容策略
-
-未来每个新扩展点都要有 contract test：
-
-- DocumentAdapter contract suite；
-- IndexProvider contract suite；
-- CommandContribution contract suite；
-- AiProvider mock contract suite；
-- PermissionBroker deny-by-default 测试；
-- plugin manifest schema 测试；
-- provider 取消、超时、错误、流中断测试；
-- secret redaction 测试；
-- 配置迁移测试。
-
-AI 特别需要测试：
-
-- provider 不可用；
-- 用户中途取消；
-- 超大上下文；
-- 部分流输出后失败；
-- 模型返回空内容；
-- 文档文本提取不完整或失败；
-- diff 应用时原文件已经改变；
-- 远程请求不能偷偷扩大文件范围。
-
----
-
-## 13. 进入条件，而不是审批门禁
-
-以下只是工程依赖，不是恢复旧的 T0–T3 审批体系。
-
-### 外部插件开始条件
-
-同时满足后才把插件 SDK 任务提到 `AI-TASKS.md`：
-
-- DocumentAdapter / IndexProvider / CommandContribution 已被内置功能实际使用；
-- 设置 namespace 和版本迁移存在；
-- PermissionBroker deny-by-default 已测试；
-- 核心接口至少稳定两个小版本；
-- 有至少一个真实插件需求不能用声明式扩展解决。
-
-### AI 真 provider 开始条件
-
-- AiProvider mock contract 通过；
-- secure secret storage 可用；
-- ConsentScope UI 可用；
-- 请求取消 / timeout / error 可控；
-- 至少 Markdown/TXT/DOCX 有稳定 `extractText` 路径；
-- 不需要修改正文即可完成第一个阅读辅助功能。
-
-### PDF / 图片进入 AI 上下文的条件
-
-- PDF 有可验证文本提取，并能保留页码或可定位来源；
-- 图片必须由用户明确启用 OCR/vision；
-- UI 能说明“原文 / 提取文本 / OCR / 视觉模型”的来源类型；
-- 失败时不伪装成完整文档理解。
+- 至少一个明确阅读动作不需要 AI 写文件即可产生价值；
+- secure secret storage 方案明确；
+- 请求取消/timeout/error 可控；
+- 发送范围和 provider/model 对用户可见。
 
 ### 语义索引开始条件
 
-- B01/B02 性能基线完成；
-- 普通搜索仍作为主入口；
-- embedding 数据有明确 cache/version/fingerprint；
-- 用户能清除和重建语义索引。
+- 普通搜索性能基线稳定；
+- embedding 有 cache/version/fingerprint；
+- 用户可清除并重建；
+- 远程 embedding 单独征得同意。
 
 ### Agent 写文件开始条件
 
 - diff + external change + previous version recovery 已统一复用；
-- PermissionBroker 能限制到具体文件集合；
-- 每次写入都有本地记录和可恢复路径。
+- 权限能限制到具体文件集合；
+- 每次写入都有本地可恢复路径。
 
----
+## 12. 方向优先级
 
-## 14. 方向优先级
+### 现在：v0.11–v1.0
 
-### 现在（v0.11–v0.12）
+- 模块职责收口；
+- 稳定错误码；
+- Windows DPI / a11y / UX；
+- 性能与大文件；
+- 稳健阅读位置；
+- 安全负向测试；
+- 文件恢复；
+- 真实 Windows 安装/升级/发布验证。
 
-- 模块化
-- UI/交互收口
-- 错误码
-- 性能
-- 安全负向测试
-- 真实 Windows 使用验证
+### v1.0 后优先
 
-### 接下来（v0.13–v0.15）
-
-- Inbox / Daily / Properties
-- 内部 capability ports
-- 文档统一 `extractText` 边界
-- AI provider mock
-- 权限代理
-- 安全密钥存储
-- 兼容冻结
-
-### v1.0 后优先候选
-
-- AI 选区/当前文档辅助
-- OpenAI-compatible / 本地 provider
-- 声明式扩展包
-- PDF 安全文本提取与 AI 上下文
-- EPUB 只读
-- saved search / collection
-- 可选语义搜索
-- MCP read-only bridge
+1. Reader+ / Reading Inbox；
+2. Metadata / Knowledge；
+3. AI 阅读辅助；
+4. PDF/EPUB/声明式扩展/MCP/RAG/RSS。
 
 ### 明确后置
 
-- Agent 大规模自动改文件
-- 插件市场
-- 任意第三方 JS
-- 自建云账号/同步
-- 实时协作
-- 跨平台安装包
-- 内置大模型
-- DOCX/PDF 原格式编辑器
+- 第三方任意 JS；
+- 插件市场；
+- Agent 大规模自动改文件；
+- 自建云账号/同步；
+- 实时协作；
+- 跨平台安装包；
+- 内置大模型；
+- DOCX/PDF 原格式编辑器。
 
----
-
-## 15. 功能方向矩阵
+## 13. 功能方向矩阵
 
 | 方向 | 价值 | 建议时间 | 当前决定 |
 | --- | --- | --- | --- |
-| UI/交互收口 | 高 | v0.11 | 立即做 |
-| 性能/大文件 | 高 | v0.12 | 立即规划 |
-| Inbox/Daily/Properties | 高 | v0.13 | 做 |
-| PDF 文本提取 | 中高 | v1.0 后或 AI 前置 | 候选 |
-| EPUB 只读 | 中高 | v1.0 后 | 候选 |
-| AI 选区/当前文档辅助 | 高 | v1.0 后 | 优先 AI 功能 |
-| RAG/语义搜索 | 中高 | AI-2 | 普通搜索稳定后做 |
-| 声明式插件 | 中 | v1.1+ | 先于代码插件 |
-| Sidecar/WASM 插件 | 中 | v1.2+ | 有真实需求再做 |
-| MCP | 中 | v1.0 后 | 互操作层，不做核心架构 |
-| OCR/图片视觉理解 | 中 | v1.0 后 | 明确 opt-in |
-| 自建云同步 | 低/成本高 | 更晚 | 暂缓 |
-| 实时协作 | 低/成本高 | 更晚 | 暂缓 |
+| UI/交互/错误收口 | 高 | v0.11 | 当前主线 |
+| 性能/大文件/阅读位置 | 高 | v0.12 | 当前主线 |
+| Freeze/兼容/发布 | 高 | v0.13 | 当前主线 |
+| Reading Inbox | 高 | v1.1 候选 | v1.0 后优先 |
+| Quick Capture / Properties | 中高 | v1.2 候选 | safety spike 后再写 |
+| Daily Note | 中 | v1.2+ | 有真实需求再做 |
+| AI 选区/当前文档辅助 | 高 | v1.3 候选 | 真实动作优先 |
+| PDF 文本提取 | 中高 | v1.4+ 或 AI 前置 | 候选 |
+| EPUB 只读 | 中高 | v1.4+ | 候选 |
+| RAG/语义搜索 | 中高 | AI 后续 | 普通搜索稳定后做 |
+| 声明式扩展 | 中 | v1.4+ | 先于代码插件 |
+| MCP | 中 | v1.4+ | 互操作层 |
+| Sidecar/WASM 插件 | 中 | 更晚 | 有真实需求再做 |
+| 云同步/实时协作 | 低/成本高 | 更晚 | 暂缓 |
 | macOS/Linux | 不确定 | 更晚 | 由真实需求决定 |
-| 插件市场 | 低优先 | 很晚 | 不提前建设 |
-| 内置大模型 | 成本高 | 很晚 | 不捆绑核心 |
+| 插件市场/任意 JS | 低优先 | 很晚 | 不提前建设 |
 
----
-
-## 16. 后续 AI 如何使用本文
+## 14. 后续 AI 如何使用本文
 
 1. 先读 `AGENTS.md` 和 `AI-TASKS.md`。
-2. 本文只用于确认长期方向和边界。
-3. 只有当当前阶段的前置条件已经满足，才把本文某个候选拆成 `AI-TASKS.md` 中 0.5–3 天的小任务。
-4. 开工前检查当前代码、Issue 和 PR，避免实现已经完成的能力。
-5. 每个切片必须写清：目标、用户价值、非目标、验收、测试、回滚。
-6. 不因为“未来需要插件/AI”提前制造复杂框架；优先让当前内置功能真实使用新接口。
+2. 本文只用于长期方向和边界，不自动产生 TODO。
+3. 只有当前版本 Gate 已满足，才把**下一个**长期候选拆成 `AI-TASKS.md` 中 0.5–3 天的小任务。
+4. 开工前检查当前代码、Issue、PR 和真实用户路径，避免实现已经完成或尚无需求的能力。
+5. 每个切片写清：目标、用户价值、非目标、验收、测试、回滚。
+6. 不因为“未来可能需要插件/AI/RAG”提前制造复杂框架。
 7. 不重新引入 policy/plan/state/T0–T3 审批状态机。
 
-这份计划的作用是让项目**有方向但不失控，有扩展性但不提前背兼容债，有 AI 能力但仍然是一个可靠的本地阅读器**。
+这份计划的作用是让项目**先成为一个可靠的本地 Reader，再有节制地向 Reader+、Knowledge、AI 和 Interop 演进**。
