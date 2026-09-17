@@ -16,6 +16,8 @@ const workspacePath = fixtureRoot;
 const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
 const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
 const ownsExportRoot = !configuredExportRoot;
+const skipPerformanceBenchmark = process.env.MOYANG_DESKTOP_E2E_SKIP_BENCHMARK === "1";
+const benchmarkTitle = "measures a 96-document batch Word export matrix across three runs";
 const applicationPath = path.join(
   resolveSharedCargoTargetDir(projectRoot),
   "debug",
@@ -78,6 +80,7 @@ export const config = {
   connectionRetryCount: 3,
   mochaOpts: {
     timeout: 600_000,
+    ...(skipPerformanceBenchmark ? { grep: benchmarkTitle, invert: true } : {}),
   },
   onComplete: cleanupFixture,
 };

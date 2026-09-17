@@ -1,98 +1,176 @@
 # Moyang Reader 产品路线
 
-路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，插件、AI、MCP、数据分层和 v1.0 后扩展策略详见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
+路线图只描述产品阶段；当前可执行小任务统一维护在 [`AI-TASKS.md`](AI-TASKS.md)，长期候选见 [`FUTURE-DEVELOPMENT-PLAN.md`](FUTURE-DEVELOPMENT-PLAN.md)，稳定发布事实见 `release-status.json`。
 
 ## 产品完成态
 
-v1.0 是可靠、离线、本地优先的 Windows x64 阅读工作台。文件安全、打开、阅读、编辑、搜索、关联、导出、恢复和更新构成稳定闭环。
+v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优先的 Windows x64 文档阅读工作台：文件安全、打开、阅读、编辑、搜索、关联、批注、导出、恢复和更新形成稳定闭环。
 
-核心方向不是堆功能，而是形成四个优势：
+核心优势：
 
-1. **轻量**：启动、打开、搜索、切换尽量快，大工作区也有明确降级策略。
-2. **本地真源**：Markdown/frontmatter/普通文件仍能被其他工具直接读取，不把内容锁进私有数据库。
-3. **交互顺手**：高频入口清楚、键鼠逻辑一致、Windows DPI 与主题下可读。
-4. **可持续扩展**：代码按职责拆分、测试边界清楚，未来 AI / 插件通过受控接口进入，不侵入核心文件安全层。
+1. **轻量**：启动、打开、搜索、切换尽量快，大工作区和大文件有明确降级策略。
+2. **本地真源**：Markdown/frontmatter/普通文件可被其他工具直接读取，不把正文锁进私有数据库。
+3. **阅读优先**：阅读、定位、批注、搜索、恢复优先于继续堆知识库功能。
+4. **文件安全**：外部修改、保存失败、异常退出、升级和恢复可解释、可回滚。
+5. **可持续扩展**：未来 AI、远程内容和扩展从真实内置需求提炼接口，不侵入核心文件安全层。
+
+## 2026-09-17 路线决策
+
+项目主方向正确，但此前把知识库、AI 与扩展基础塞进 v1.0 前置链，范围过大。正式 Release 仍是 0.10.x，而 `main` 已积累多轮架构、UI 和测试改动；同时 `App.tsx`、Rust command 层与导出系统仍有大型编排点。
+
+因此执行：
+
+- **v1.0 提前**：不等待轻量知识库、AiProvider、插件/扩展内核完成。
+- **v0.11 负责收口**：桌面交互、职责拆分、稳定错误契约和 RC 预检。
+- **v0.12 负责证明可靠**：性能、大文件、阅读位置、安全负向测试、真实主流程、本地诊断。
+- **v0.13 = Freeze / Compatibility / RC**：只做兼容、恢复、发布链路、安全治理和阻断级缺陷，不加大型产品面。
+- **v1.0 后再扩展**：Reader+ → Metadata/Knowledge → AI → Interop。
+- **不为未来先造空接口**：先有真实内置用户动作/调用方，再提炼 DocumentAdapter、index、command、AI/permission 等长期边界。
+
+当前主线：
+
+```text
+A07 DONE
+  → A08 Context Panel Tab/a11y
+  → A09 TopBar / Windows DPI
+  → A10 CSS / visual baseline
+  → A11 Workspace Session
+  → A12 stable error codes
+  → A13 v0.11 RC / release preflight
+  → v0.11 release
+  → B01…B06 reliability proof
+  → v0.12 Exit Gate
+  → v0.13 Freeze / Compatibility / RC
+  → v1.0
+```
+
+在主线完成前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
-以下能力已经存在，不再重复作为“未来功能”开发：文档返回历史、书签、文本批注、回收站/上一版本恢复、阅读历史与本机统计、拼音文件名搜索、阅读位置迁移、主要键盘/a11y 基线和旧审计 #357–#366 中已关闭问题。
+已有能力包括：导航历史、书签、文本批注、回收站/上一版本恢复、阅读历史/统计、拼音文件名搜索、阅读位置基础保存、主要键盘/a11y 基线，以及旧审计中已关闭的问题。
 
-后续工作从当前 `main` 重新验证，不根据旧审计行号重复造轮子。
+后续从 current `main` 重新验证，不根据旧审计行号重复开发。
 
-## v0.11：契约、模块化与使用体验
+## v0.11：结构、桌面体验与 RC 收口
 
-- 完成 TS ↔ Tauri 命令契约集中化和首批运行时响应校验。
-- 渐进拆分 `App.tsx`：先设置/偏好，再文档会话和工作区生命周期。
-- 分阶段拆 `commands.rs`，保持 IPC 名称、授权和文件行为不变。
-- 明确快速打开、文内查找、阅读库搜索和命令面板的用途边界。
-- 补齐命令面板活动项语义、右侧上下文页签键盘模型和焦点恢复。
-- 审查顶栏/More/设置/导出的信息层级，避免高频动作被重复或藏得过深。
-- 验证 Windows 100%/125%/150%/200% DPI 与 720/900/1240px 关键布局。
-- 继续收敛 CSS 令牌，并只为稳定关键场景建立小型视觉回归基线。
-- 完成 #111 剩余的 i18n / 稳定错误码契约，为未来 provider / extension 错误处理打基础。
+重点：
 
-目标不是追求某个文件行数，而是让每次修改只需要理解一个较小职责边界。
+- A01–A07 作为已完成基线保留：TS↔Tauri contract、运行时响应校验、settings/document session 提取、首批 Rust command 拆分、搜索语义、命令面板键盘入口。
+- A08：右侧 Context Panel 标准 Tab/ARIA/键盘交互。
+- A09：顶栏高频动作 IA 与 Windows 100%/125%/150%/200% DPI 可读性。
+- A10：CSS/主题收敛与小型视觉回归基线。
+- A11：提取 Workspace Session / 扫描 / 切换 / 恢复 / watcher 生命周期，不追求机械行数目标。
+- A12：高价值稳定错误码，优先文件访问、保存/恢复、工作区、导出和更新。
+- A13：v0.11 RC / 发布预检，走通首次启动 → 阅读库 → 定位 → 阅读 → 搜索 → 批注/书签 → 编辑 → 保存 → 外部修改 → 关闭/恢复 → 导出，并核对安装/PDF/更新/恢复/版本事实。
 
-## v0.12：稳定性、性能与真实使用
+### v0.11 Exit Gate
 
-- 建立 5k/20k 文件工作区的可重复扫描/搜索 benchmark。
-- 测量 1MB/10MB Markdown 首次可读、编辑、搜索、保存和内存占用。
-- 大文件超过安全阈值时明确降级，而不是卡死或静默失败。
-- 直接从当前 `main` 跑“首次启动 → 打开阅读库 → 找文档 → 阅读 → 编辑 → 保存 → 恢复 → 导出”的真实主流程巡检；只处理可复现且明显影响使用的问题。
-- 对 Tauri opener/process/updater 做权限库存与负向测试；先证明问题，再收权限。
-- 规划可由用户主动导出的本地诊断摘要，不默认上传正文、路径或密钥。
+进入 v0.12 前必须满足：
 
-## v0.13：轻量知识库
+- **A07–A13 完成**；
+- 新功能不再默认把业务状态机继续堆进 `App.tsx`；
+- 高频 TS↔Rust 错误依赖稳定 code，而不是自然语言关键词；
+- 720/900/1240px 和常见 Windows DPI 下高频操作可用；
+- v0.11 RC 主旅程有可追溯结果；
+- 无法执行的真实 Windows/证书/仓库设置事项被精确记录为 `BLOCKED_EXTERNAL` 子项；
+- GitHub Release metadata 权威源顺序有自动回归检查；
+- desktop correctness smoke 与 performance benchmark 已分离。
 
-- Inbox 快速记录，继续创建普通 Markdown。
-- Daily Note 按用户指定目录生成普通 Markdown。
-- YAML frontmatter Properties 面板从只读升级为安全编辑。
-- 属性 / 标签表格视图，Markdown 仍是真源。
-- 搜索稳定后再评估 saved search / collection 和简单文件模板。
+## v0.12：可靠性、性能与真实使用
 
-不复制 Notion/Obsidian 的全部功能；只吸收对阅读工作台真正高价值的能力。
+1. **B01 大工作区 benchmark**：5k/20k 文件扫描、冷搜索、暖搜索，固定语料、多轮和 JSON 报告。
+2. **B02 大文件降级**：1MB/10MB Markdown 的首次可读、编辑、搜索、保存、内存与交互延迟；超过边界时明确降级而不是卡死。
+3. **B03 Resilient Reading Anchor**：从 `{ path, scrollTop }` 演进为兼容式 `headingId + relative offset/progress ratio + scrollTop fallback + updatedAt`；第一版不必复制正文 quote。
+4. **B04 Tauri 权限库存与负向测试**：危险 URL scheme、未授权路径、opener/process/updater capability 边界。
+5. **B05 当前 main 真实主流程 UX 回归**：只追加可复现且值得修的小任务。
+6. **B06 本地诊断摘要**：用户主动导出、默认无遥测，不包含正文、完整私人路径或秘密。
 
-## v0.14：内部扩展内核与 AI 接缝
+### v0.12 Exit Gate
 
-- 将现有文档 adapter registry 逐步升级成真实可执行的 `DocumentAdapter` 内部接口，并明确 `render / extractText / edit / export` 能力。
-- 建立 `IndexProvider`、`CommandService / CommandContribution`、`SettingsNamespace` 与 `PermissionBroker`。
-- 建立 `AiProvider` 与 `ConsentScope`；先使用 mock 验证接口、取消、错误、流式输出和可见上下文范围。
-- provider 普通配置与 secret 分离；API Key/token 不进入 portable settings 或工作区文件。
-- 核心默认不联网；发送内容时展示范围、用途、provider/model；写回提供 diff。
-- v1.0 前仍不加载任意脚本、iframe/WebView 插件，不承诺第三方 ABI。
+只有以下条件满足后进入 Freeze：
 
-## v0.15：冻结与兼容
+- 20k 文件工作区有已测量、可解释的行为边界；
+- 10MB Markdown 有明确且不会卡死/丢数据的降级策略；
+- 阅读位置不再只依赖有限数量绝对 scrollTop；
+- 危险协议、越权路径和关键 capability 有负向测试；
+- 完整真实用户旅程重新走通；
+- 无未处理的高严重度文件安全问题；
+- 阻断级产品问题已修复或有明确延期理由。
 
-- 冻结设置 key/schema、IPC 命令、核心快捷键、command ids 和主要保存行为。
-- 覆盖损坏设置、异常退出、磁盘满、只读文件、外部删除/修改和大文件降级。
-- 验证升级、重装、旧配置和旧版本数据兼容。
-- 冻结 v1.0 所需的最小 DocumentAdapter / IndexProvider / AI provider 配置边界。
-- 关闭所有高严重度缺陷；其余延期必须有明确理由。
+## v0.13：Freeze / Compatibility / RC
 
-## v1.0：发布出口
+v0.13 不承担知识库或 AI 大功能。
 
-- Windows x64 安装、卸载、升级、恢复和自动更新完整验证。
-- Release、安装包、updater `.sig`、`latest.json`、镜像和 SHA-256 一致。
-- 有 Authenticode 证书则完成签名；没有时明确披露，不把 updater 签名描述成 Windows 代码签名。
-- 完整前端、Rust、浏览器、真实桌面、安全和恢复矩阵通过。
+重点：
 
-## v1.0 后：按真实需求扩展
+- 冻结设置 key/schema、关键 IPC 名称、核心快捷键、command ids 和主要保存行为；
+- 覆盖旧配置、损坏配置、异常退出、磁盘满、只读文件、外部删除/修改、临时文件残留与恢复；
+- 验证安装、卸载、重装、旧版本升级、恢复和更新清单一致性；
+- SECURITY.md 与私密漏洞披露可发现性进入发布治理；
+- RC 只接受阻断发布的缺陷修复，不新增大型产品面或“顺便重构”；
+- Authenticode 有证书则接入；无证书则明确披露限制，保留 updater `.sig` 与 SHA-256 核验，不无限期冻结 v1.0。
 
-优先候选：
+## v1.0：可靠发布出口
 
-- AI 选区/当前文档解释、总结、翻译和问答；
-- 一个远程 provider + 一个本地/OpenAI-compatible provider；
-- 声明式扩展包（模板、snippet、主题、prompt preset），先不运行任意第三方 JS；
-- PDF 安全文本提取、页码来源与 AI/RAG 上下文；
-- EPUB 只读 adapter；
-- saved search / collection；
-- 词法搜索之上的可选语义检索/RAG；
-- 受控的 read-only MCP bridge。
+- Windows x64 安装、卸载、升级、恢复和自动更新至少完成一次可追溯实机闭环；
+- Release、安装包、updater `.sig`、`latest.json`、镜像和 SHA-256 一致；
+- 文件安全、恢复、浏览器 E2E、真实 desktop E2E、a11y、性能与发布检查达到冻结版本标准；
+- 公开说明 Windows-only、本地优先、普通文件真源和签名状态。
 
-更晚再评估：图片 OCR/vision、受控 sidecar 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
+v1.0 **不要求** Reading Inbox、Daily Note、Properties 表格、AI provider、RAG、MCP、插件 SDK、插件市场或跨平台安装包。
+
+## v1.1：Reader+
+
+优先验证与“阅读器”最接近的扩展，例如轻量 Reading Inbox / URL 导入：
+
+```text
+手动 URL / Digest
+  → 受控抓取与清洗
+  → 普通本地 article.md + assets
+  → 现有 Reader
+  → 阅读位置 / 批注 / 书签 / 搜索
+```
+
+原则：默认关闭/默认不联网；Content Source 与 DocumentAdapter 分离；导入后的普通 Markdown 仍是真源；不建立第二套 Reader。
+
+RSS、浏览器扩展、MCP、自动推荐和 AI 精读晚于“一个 URL → 本地 Markdown → 离线阅读”的基本闭环。
+
+## v1.2：Metadata / Knowledge
+
+候选顺序：
+
+1. Quick Capture / Inbox，仍创建普通 Markdown；
+2. frontmatter round-trip safety spike；
+3. 顶层简单 scalar/array 的安全 Properties 编辑；
+4. 复杂 YAML 保持只读或回退源码模式；
+5. 只读属性/标签表格；
+6. 安全 patch 模型成熟后才评估表格单元格写回。
+
+Daily Note、saved search、collection、模板不自动进入主线，有真实需求再立项。
+
+## v1.3：AI
+
+AI 第一步必须是一个真实用户动作，而不是 provider/mock 平台。
+
+推荐顺序：
+
+1. 选中文本解释或翻译；
+2. 明确显示发送范围、用途、provider/model；
+3. 一个真实 provider 跑通 streaming/cancel/error；
+4. 出现第二个真实调用方/实现后再提炼 AiProvider、consent、secret/permission 边界；
+5. 当前文档问答、摘要和写作辅助继续逐个小切片扩展。
+
+任何写回遵循 `candidate → preview/diff → user apply → core safe write`。
+
+## v1.4+：Interop / 受控扩展
+
+按真实需求评估：PDF 安全文本提取、EPUB 只读 adapter、声明式扩展包、更多 provider、可选 semantic/RAG、read-only MCP、RSS/浏览器导入等。
+
+更晚才评估 sidecar/WASM 插件、Agent 写文件、插件市场、自建云同步、跨平台安装包和任意第三方代码执行。
 
 ## 长期边界
 
-v1.0 前暂不投入：账号、云同步、实时协作、移动端、macOS/Linux/Windows ARM 安装包、第三方任意脚本插件、DOCX/PDF 原格式回写、常驻后台服务或捆绑本地大模型。
+v1.0 前明确不投入：账号、云同步、实时协作、移动端、macOS/Linux/Windows ARM 安装包、第三方任意脚本插件、DOCX/PDF 原格式回写、常驻后台服务、内置大模型、RAG、插件市场。
 
-任何长期候选只有在前置条件满足后，才拆成 `AI-TASKS.md` 中 0.5–3 天的小任务；不要为了“未来可能需要”提前制造大框架。
+任何长期候选只有在阶段 Gate 满足、current main 重新验证仍有真实价值后，才拆成 `AI-TASKS.md` 中 0.5–3 天的小任务。

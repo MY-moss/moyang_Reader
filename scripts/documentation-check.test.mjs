@@ -7,6 +7,6 @@ import { validateDocumentation } from "./documentation-check.mjs";
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("keeps update, opener, association, and release-status documentation consistent", () => {
+test("keeps security, updater authority, roadmap gates, opener, association, and release docs consistent", () => {
   assert.deepEqual(validateDocumentation(sourceRoot), []);
 });

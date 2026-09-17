@@ -1,90 +1,133 @@
 # Moyang Reader
 
-一个 Windows x64、阅读器优先的本地文档阅读工具。
+一个 **Windows x64、阅读器优先、本地优先** 的文档阅读/编辑工具。
+
+目标不是复制 Obsidian、Notion、VS Code 或 AI 客户端，而是把本地 Markdown 与常见文档的 **打开 → 阅读 → 查找 → 批注 → 编辑 → 保存 → 恢复 → 导出** 做得可靠、轻量，并保持普通文件始终是真源。
 
 ## 当前状态
 
-v0.10.14 已发布：批量 Word 导出在大文件场景下减少逐块刷盘，并在 Worker 异常时安全清理与回退；修复已包含在 Windows x64 安装包、签名和更新清单中，保持本地优先和轻量启动：
+当前稳定版本：`v0.10.14`。
 
-当前产品边界：只发布和维护 Windows x64 桌面版。浏览器版只用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端及跨平台自动更新暂不支持，以减少安装包、CI、测试和维护成本。
+正式产品边界：只发布和维护 Windows x64 桌面版。浏览器构建仅用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端、云同步、实时协作和任意第三方脚本插件不在 v1.0 范围。
 
-- Tauri 2 + Rust + React/TypeScript 工程骨架
-- 双击传入文件路径、单实例接收后续打开请求；桌面“打开”对话框支持一次选择多个文档并依次打开
-- Markdown、GFM、YAML/TOML frontmatter、数学公式和安全 HTML 清洗
-- TXT、TEXT、LOG 纯文本保留换行阅读
-- DOCX 转安全 HTML 阅读，保留常见标题、段落、列表、表格和内嵌图片
-- PDF 内嵌快速预览，并可在新窗口继续使用系统 PDF 能力
-- PNG/JPG/GIF/WebP/SVG/AVIF 图片附件可在工作区中直接打开预览
-- Obsidian 风格 `[[文档]]` / `[[文档|别名]]` 链接，并支持同目录优先、工作区路径和 `#章节` 跳转
-- 工作区目录扫描、最近打开、全局全文搜索（最多返回 100 条）；同一阅读库连续搜索会复用文件清单和文本缓存，文件变化后自动失效；重启后可自动恢复上次阅读库、有效标签页和最后文档
-- 多个本地资料库可以同时挂载；左侧明确显示“添加阅读库”和切换菜单，并分别保留各库的文件树、筛选、标签页和当前文档
-- 文件树和搜索结果单击即可打开；需要连续定位文档时使用 Ctrl+P 快速打开，避免一次性制造大量标签页
-- 最近记录只保存本地路径，不保存文档正文；恢复前会重新确认路径存在且格式受支持
-- 本地文档会记住最近滚动位置，重新打开时回到上次阅读处；位置数据只保存在本机
-- 正文右键可添加或移除文档/章节书签；右侧“书签”面板支持列出、跳转和删除，书签不写回 Markdown
-- 添加整个文件夹作为单一阅读库，递归扫描支持的文档类型；空白页、顶部“文件夹”按钮和 Ctrl+Shift+O 都可直接进入
-- 启动参数或单实例请求传入整个文件夹时，会自动载入该文件夹作为阅读库；传入支持的文档仍按原流程打开
-- 添加文件夹后先显示目录文件，链接与标签索引在后台整理；连续文件变动会合并并按变更路径增量刷新，减少大目录卡顿
-- 侧栏按真实目录层级展示工作区，文件夹可折叠并显示文件数量
-- 侧栏可通过顶部按钮或 Ctrl/Cmd+Shift+B 收起/恢复，收起后主阅读区会自动展开
-- 左右侧栏都可通过边界拖拽或键盘调整宽度，宽度在本机记住；双击边界恢复默认值，左栏 Ctrl/Cmd+Shift+B、右栏 Ctrl/Cmd+Shift+R 可快速开关
-- 紧凑 Windows 窗口最小宽度为 720px；窄窗口工具栏保留打开、侧栏、上下文、搜索和“更多”等高频入口，其余操作自动收纳或换行，不依赖隐藏滚动条
-- 工作区递归文件监听，文件增删改后自动刷新目录
-- 外部修改提示，避免覆盖当前未保存内容；失效最近文件自动清理
-- Markdown 工作区索引、标签、出链、未解析链接和当前文档反向链接
-- 大工作区搜索使用有界倒排索引、文件级 LRU 和安全线性回退；5000 篇混合中英文文档暖查询 P95 本机为 38 ms
-- 标签筛选、标准 Markdown 本地链接、章节锚点、未解析链接一键创建
-- 阅读库支持按 Markdown、纯文本、Word、PDF 和图片类型筛选，并联动搜索与批量导出
-- 侧栏会显示筛选后的文档数量，并可一键清除标签和类型筛选，明确当前打开/导出的范围
-- 当前文档一跳关系图，可点击节点打开关联文档
-- 多标签页、文件/文件夹打开、最近阅读库切换和文档内链接都会在替换未保存内容前确认
-- Tauri 下支持文档相对图片和 `![[图片]]` 资源路径
-- 文档目录、阅读统计、源文本切换、当前文档搜索
-- 源文本编辑后切回阅读视图会立即保留当前草稿预览，不必先保存才能确认排版
-- 当前文档可一键复制为富文本，粘贴到 Word、邮件或聊天工具时保留常见排版；不支持富文本剪贴板时自动回退为纯文本
-- 批量导出完成后会显示跳过文件的相对路径和原因，方便定位损坏或暂不支持的文档
-- 快速打开面板：Ctrl+P 按文件名或路径即时筛选工作区、最近文件和已打开标签
-- 专注阅读模式：隐藏目录、标签和状态栏，让正文占满窗口；支持 Esc 或 Ctrl+Shift+Enter 退出/切换
-- 设置中可调整正文字号和正文宽度，并在本机记住阅读排版偏好
-- 设置中可调整导出纸张（A4 / Letter）、方向和页边距，并在本机记住这些导出排版偏好
-- 系统/浅色/深色主题切换，并记住选择
-- 浏览器开发模式支持一次选择多个文件和拖放；桌面版还支持把多个文档或整个文件夹拖入窗口
-- 浏览器模式遇到不支持的扩展名会明确提示并跳过，避免把二进制文件误当成 Markdown
-- 浏览器中即使打开多个同名文件，也会分别保留为独立标签页
-- 安装包会注册 Markdown、文本、Word、PDF 和常见图片文件关联，安装后可直接双击交给 Moyang Reader 打开；开发模式不会修改系统文件关联
-- UTF-8、UTF-8 BOM、UTF-16、GB18030 文本读取
-- 写回前创建隐藏备份和临时文件
-- 阅读区提供轻量纸面层次和文档信息提示；打印样式会为无标题文档补充文档名，并优化分页、代码块和表格；可通过系统打印对话框保存为 PDF
-- Windows 文档文件关联配置和应用图标
-- Markdown、纯文本和 DOCX 内容可另存为 HTML（桌面版会尝试内嵌本地图片）；也可按需导出真正的 DOCX Word 文档，自动带统一页眉、页脚和页码字段；Markdown/纯文本还能另存为源文件
-- Word 导出会保留有序列表的实际编号，嵌套列表按各自层级重新计数
-- Word 导出会保留 HTTP、HTTPS 和 mailto 外部超链接，并把 wiki 链接归一化为相对 `.md` 目标
-- 工作区可按当前筛选批量导出为带目录的单文件 HTML、Word（DOCX），或打开批量打印 / PDF 预览，支持 Markdown、纯文本和 DOCX
-- 批量导出会显示当前处理文件、进度和总数；完成后可展开查看每个无法读取或暂不支持的文件及原因
-- 批量导出进行中可随时取消；应用会在当前文档处理完成后停止，并且不会进入最终文件写入或打印预览
-- 批量打印 / PDF 会先进入应用内版式预览，确认合并后的文档目录、分页和纸张设置后再打印或保存 PDF
-- 导出菜单提供当前文档打印版式预览，可在打印前确认纸张、方向、页边距和最终排版；底部会显示预计页数，窗口或图片布局变化后自动重新估算，并明确以系统打印分页为准；主按钮仍保留一键打印 / 保存 PDF
-- 单文档 HTML、打印 / PDF 导出在有多个标题时自动带上可点击的文档目录，长文转发时可以快速跳到章节
-- 阅读区采用应用内滚动，长文档不会把整个窗口撑开；宽屏下右侧提供阅读进度、当前章节和顶部/末尾定位，窄屏自动收起避免挤压正文
-- v0.9 三栏工作区：左侧只负责工作区导航，中间负责阅读/编辑，右侧负责目录、关联、属性摘要、关系图入口和阅读状态；右栏布局偏好在本机记忆
-- Markdown 默认按需加载 Milkdown 所见即所得编辑器；复杂 frontmatter、嵌入、数学公式、原始 HTML 和块引用会安全回退源码模式，避免静默丢失内容
-- Markdown 打开后顶部直接提供“编辑 / 阅读”主动作，默认进入所见即所得编辑；`Ctrl+E` 与主按钮一致，`Ctrl+K` 插入链接，`Ctrl+Shift+P` 打开命令面板；源码模式继续作为高级保真路径，统一 Markdown 渲染链仍负责阅读和导出
-- 源码和所见即所得编辑器都支持 `[[` 双链补全：输入 `[[` 后从当前工作区 Markdown 文档中选择目标，键盘或鼠标确认后插入完整链接
-- 源码和所见即所得编辑器都支持 `/` 块级命令：输入 `/` 弹出标题、列表、表格等插入菜单，输入关键词（含拼音）筛选后回车插入
-- 所见即所得模式保存时会把部分等价 Markdown 写法规范为唯一形式（setext→ATX 标题、`-`→`*` 列表符、紧凑表格加宽、`[[双链]]` 方括号转义、链接引用定义内联化等），语义无损；完整清单见 docs/decisions/0004-serialization-normalization.md，偏好原风格请使用源码模式
-- 左侧文档目录会跟随正文滚动高亮当前章节，长目录自动保持当前条目可见；目录点击、右侧章节提示和正文位置保持一致
-- 右侧目录跳转始终定位当前文档中央阅读区内的标题，支持编码后的标题 ID；切换到源码或所见即所得模式时会先回到阅读视图再完成跳转
-- 中央阅读区和左右侧栏各自只有一个滚动层，文件树、搜索结果和导出失败列表不再制造嵌套滚动条；横向溢出会被截断或在必要位置隐藏
-- 更新检查和远程图片访问均可在顶部“更多 → 设置”中控制，默认只进行本地阅读；更新入口在“更多”操作栏，镜像不可用时回退 GitHub Release，下载完成停在“已更新”，确认保存后由用户手动重启
-- 设置中支持导出/导入本地迁移备份，包含阅读偏好、工作区路径、会话和标签页；备份不包含文档正文或私钥
-- 内置文档适配器注册表统一格式能力，后续可在不改动阅读主流程的情况下接入新格式
-- 核心工具栏和设置区支持简体中文/English 切换；未迁移的状态和错误文案按中文安全回退
-- 更新安装失败后会在下次启动提示保留当前版本、不要降级并等待更高补丁版本；发布前置会校验双更新端点和镜像工作流
-- 首次启动提供轻量“快速上手”教程，空白页和设置中都可重新打开；设置会显示保存状态，并在 Windows 桌面端使用应用配置文件作为本机持久化兜底
+当前开发主线已经收敛为：
 
-生产构建会把 Markdown、DOCX 适配器拆成按需加载的 chunk：空白启动页不需要加载完整文档解析器，打开对应类型时才加载。
+```text
+v0.11 体验/职责收口
+    ↓
+v0.12 可靠性、性能、安全与真实使用证明
+    ↓
+v0.13 Freeze / Compatibility / RC
+    ↓
+v1.0 可靠 Windows x64 基线
+```
 
-- 标签页支持鼠标中键关闭和原生拖拽排序；阅读区支持 Ctrl+滚轮、Ctrl+=/−、Ctrl+0 连续缩放，设置可调 75%–150%。
+v1.0 不等待轻量知识库、AI provider、RAG、MCP 或插件内核完成。
+
+## 核心能力
+
+### 阅读与格式
+
+- Markdown / GFM、YAML/TOML frontmatter、数学公式与安全 HTML 清洗；
+- TXT / TEXT / LOG 纯文本；
+- DOCX 转安全 HTML 阅读，覆盖常见标题、段落、列表、表格和内嵌图片；
+- PDF 内嵌快速预览；
+- PNG / JPG / GIF / WebP / SVG / AVIF 图片预览；
+- UTF-8、UTF-8 BOM、UTF-16、GB18030 文本读取；
+- Markdown、DOCX 等解析能力按需加载，避免空白启动页加载完整解析器。
+
+### 本地阅读库
+
+- 添加整个文件夹为阅读库，并支持同时挂载多个本地资料库；
+- 目录树、最近打开、标签、出链、反向链接、未解析链接与一跳关系图；
+- `[[文档]]` / `[[文档|别名]]`、同目录优先、工作区路径与 `#章节` 跳转；
+- 工作区递归监听，外部文件增删改后增量刷新；
+- 大工作区使用有界扫描、倒排索引、文件级缓存和安全回退；
+- 文件类型/标签筛选与当前范围明确提示；
+- Ctrl+P 快速打开用于“找文件”，Ctrl+F 用于“找当前文档文字”，Ctrl+Shift+F 用于“找当前阅读库内容”，三种语义保持分离。
+
+### 阅读体验
+
+- 多标签页、阅读历史、导航历史、章节目录和滚动位置；
+- 书签、批注与本地阅读统计，不写回 Markdown 正文；
+- 专注阅读、正文宽度/字号、75%–150% 阅读缩放；
+- 浅色/深色/系统主题、Windows 高对比度与 reduced-motion 基线；
+- 左右侧栏独立滚动和可调宽度；
+- 720px 起的紧凑 Windows 窗口布局；
+- 命令面板支持键盘搜索、活动项播报和高频动作入口。
+
+### 编辑与文件安全
+
+- Markdown 所见即所得与源码编辑；复杂语法会安全回退源码模式；
+- 双链补全、`/` 块级命令、链接/图片/表格插入；
+- 源码与所见即所得共享编辑历史；
+- 外部修改冲突提示，避免覆盖未保存内容；
+- 写回前使用临时文件/备份与安全替换策略；
+- 草稿恢复中心、当前磁盘版本对比、上一保存版本恢复；
+- Windows 工作区删除使用回收站语义；
+- 文件/文件夹新建、重命名、复制、移动、剪切/粘贴等操作继续经过受控 Rust/Tauri 文件边界。
+
+### 导出
+
+- 当前文档导出 HTML、DOCX、源文件；
+- 系统打印 / 保存 PDF 前提供应用内版式预览；
+- 阅读库按当前筛选批量导出 HTML / Word / 打印-PDF；
+- 批量导出支持进度、取消、失败清单、临时文件清理和分卷；
+- 大批量 Word 导出保留独立 desktop performance benchmark，不把共享 CI Runner 的单轮毫秒抖动误判成功能回归。
+
+### 本地隐私与恢复
+
+- 核心阅读默认离线；
+- 远程图片默认关闭，可由用户显式开启；
+- 启动自动检查更新默认可关闭，手动更新入口不受影响；
+- 最近文件、阅读位置、书签、批注和设置保存在本机；
+- portable settings 不包含文档正文或秘密；
+- AI、插件、RAG、MCP 尚不是 v1.0 核心依赖。
+
+## 更新与发布
+
+更新入口位于“更多 → 更新”。
+
+- **GitHub Release `latest.json` 是 updater metadata 权威源**；
+- **Cloudflare Pages 只作为备用镜像 / 分发源**；
+- 配置和 release test 会阻止 endpoint 顺序退回到“镜像优先”；
+- 下载完成停在“已更新”，用户确认保存状态后再手动重启；
+- Tauri updater 的 `.sig` 不等于 Windows NSIS 安装包的 Authenticode；
+- 真实 Windows 旧版本 → 新版本自动升级闭环不能由 CI 绿灯替代。
+
+完整更新、签名、镜像和发布说明见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。
+
+## v1.0 前明确不做
+
+为了避免项目再次跑偏，以下内容不进入 v1.0 阻塞链：
+
+- macOS / Linux / Windows ARM / 移动端；
+- 账号、云同步、实时协作；
+- 任意第三方 JavaScript 插件市场；
+- Reading Inbox 完整实现；
+- Knowledge/数据库化工作区替代普通文件真源；
+- AiProvider / PermissionBroker / RAG / MCP 先行架构；
+- bundled local LLM；
+- 把 SQLite/向量库变成用户正文唯一真源。
+
+长期接口只从**真实内置用户动作**提炼，不做 provider/mock-first 架构工程。
+
+## 路线图
+
+1. **v0.10.14**：当前稳定 Windows x64 版本。
+2. **v0.11**：桌面体验和职责边界收口——上下文 Tab/a11y、顶栏/DPI、CSS/视觉基线、Workspace Session、稳定错误码、RC/发布预检。
+3. **v0.12**：可靠性证明——5k/20k 工作区 benchmark、1MB/10MB Markdown 降级、Resilient Reading Anchor、Tauri 权限库存与负向测试、真实主流程、本地诊断。
+4. **v0.13**：Freeze / Compatibility / RC，只处理兼容、恢复、发布和真实 blocker，不承载大型新功能。
+5. **v1.0**：可靠 Windows x64 核心基线与长期维护起点。
+
+v1.0 后的候选顺序：
+
+- **v1.1 Reader+**：增强阅读、轻量捕获/Inbox 等；
+- **v1.2 Metadata / Knowledge**：Properties、表格/保存视图等；frontmatter 写回必须先通过 round-trip safety spike；
+- **v1.3 AI**：从真实“解释选区 / 翻译选区”等低风险动作开始，再根据第二个真实调用方提炼 provider/consent/secret 边界；
+- **v1.4+ Interop**：RAG、MCP、RSS、声明式扩展、更多格式等按 Gate 评估。
+
+详细阶段以 [`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/AI-TASKS.md`](docs/AI-TASKS.md) 为准；[`docs/FUTURE-DEVELOPMENT-PLAN.md`](docs/FUTURE-DEVELOPMENT-PLAN.md) 只保存长期候选，不是开工许可。
 
 ## 开发
 
@@ -92,50 +135,52 @@ v0.10.14 已发布：批量 Word 导出在大文件场景下减少逐块刷盘�
 npm install
 npm run test
 npm run test:coverage
+npm run lint
 npm run build
 npm run test:e2e
 npm run test:e2e:desktop
 npm run desktop
 ```
 
-`npm run dev` 只启动浏览器版 Vite 服务，因此会保留一个命令行窗口作为开发服务器；桌面调试请使用 `npm run desktop`。Windows 桌面调试会把 Tauri 需要的前端服务放在隐藏的辅助进程中，界面只保留一个 Moyang Reader 窗口。发布后的安装版不依赖 Vite 服务，也不会打开命令行窗口。
+桌面正确性 smoke 与性能 benchmark 分开：
 
-`npm run test:e2e:desktop` 会构建带测试能力的 Debug Tauri 应用，并用真实桌面进程验证启动参数、Markdown 编辑和保存写回；它不会生成安装包或 Release。普通 `npm run build` 和不带 `--features wdio` 的 Tauri 构建不会加载 WebdriverIO 测试桥接。
+```powershell
+# 确定性桌面功能正确性，PR gate 使用这一条
+npm run test:e2e:desktop
 
-`npm run tauri -- build --no-bundle` 已在 Windows 上成功生成：
+# 96 文档批量 Word 等性能场景，scheduled/manual 趋势证据
+npm run test:e2e:desktop:benchmark
+```
 
-受管构建缓存中的 `release/moyang-reader.exe`（Windows 默认位于 `%LOCALAPPDATA%\\Moyang Reader\\build-cache\\cargo-target`）。所有工作树和同一项目的本地副本共用这一个目标目录，避免按路径重复生成数 GB 的 Rust 构建物；如需把缓存迁移到其他磁盘，可在用户级环境变量设置 `MOYANG_BUILD_CACHE_DIR`，再通过项目清理器预览和回收可再生文件。
+`npm run dev` 只启动浏览器版 Vite 开发预览；桌面调试请使用 `npm run desktop`。普通生产构建不加载 WebdriverIO 测试桥接。
 
-稳定批次生成的 NSIS 安装包预期路径：
+本地 Tauri/Cargo 构建通过项目脚本使用受管缓存，默认位于 `%LOCALAPPDATA%\Moyang Reader\build-cache\cargo-target`，避免多个 worktree 在项目目录重复生成数 GB Rust 构建物。详细清理规则见 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md)。
 
-受管构建缓存中的 `release/bundle/nsis/Moyang Reader_0.9.1_x64-setup.exe`。项目目录不会生成 `src-tauri/target`。
+## 文档
 
-运行安装程序后会注册 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt`、`.text`、`.log`、`.docx`、`.pdf` 以及常见图片文件关联。Windows 可能保留用户已经选择的其他默认程序，安装包不会强行改写用户偏好。
+- 第一次使用：[`docs/USER-GUIDE.md`](docs/USER-GUIDE.md)
+- 产品需求：[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)
+- UI 交互：[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)
+- 当前架构：[`ARCHITECTURE.md`](ARCHITECTURE.md)
+- 开发架构契约：[`docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`](docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md)
+- 隐私：[`PRIVACY.md`](PRIVACY.md)
+- 安全披露：[`SECURITY.md`](SECURITY.md)
+- 贡献：[`CONTRIBUTING.md`](CONTRIBUTING.md)
+- 更新/发布：[`docs/UPDATE.md`](docs/UPDATE.md) / [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)
+- 版本变化：[`CHANGELOG.md`](CHANGELOG.md)
 
-更新链路、版本规则、GitHub Secrets 配置和发布检查清单见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。PDF 交付通过系统打印对话框中的“保存为 PDF”；当前已支持应用内分页版式预览，后续继续补充更完整的 PDF 模板和附件处理。
+## 安全报告
 
-顶部“设置”中的隐私偏好只保存在本机：默认阻止 Markdown 中的远程图片，并关闭启动时自动检查更新；远程图片设置立即应用，启动更新检查设置从下一次启动生效，手动更新按钮不受影响。更新下载中可以隐藏提示，并从顶部“下载中…”入口恢复进度查看。
+潜在漏洞请先阅读 [`SECURITY.md`](SECURITY.md)。如果仓库 `Security` 页面已经显示 GitHub Private Vulnerability Reporting 的 **Report a vulnerability**，请使用该私密入口。
 
-第一次使用请阅读 [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md)；其中包含打开文件、添加多个阅读库、编辑、设置保存、导出和更新说明。
-
-贡献、架构和隐私说明见 [`CONTRIBUTING.md`](CONTRIBUTING.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md) 和 [`PRIVACY.md`](PRIVACY.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
-
-## 后续版本路线
-
-1. v0.10.14：当前稳定 Windows x64 版本。
-2. v0.11.x：契约治理、结构拆分、搜索入口与视觉维护。
-3. v0.12：性能、稳定性、大文件降级和安全负向测试。
-4. v0.13–v0.14：轻量知识库，以及内部 AI/扩展接口。
-5. v1.0：Windows x64 核心能力冻结并进入长期维护；跨平台、云同步和任意脚本插件不在当前范围。
-
-详细需求、交互契约和产品阶段见 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+如果私密入口暂未启用，不要在公开 Issue / PR / Discussion 中粘贴 PoC、利用细节、用户内容、私有路径、令牌或证书。可以只创建一个不含漏洞细节的最小公开 Issue，请求维护者提供私密渠道。
 
 ## AI 快速接手
 
-根目录 [`AGENTS.md`](AGENTS.md) 提供长期规则；当前可执行任务统一看 [`docs/AI-TASKS.md`](docs/AI-TASKS.md)，完整流程见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。
+当前执行真源：[`AGENTS.md`](AGENTS.md) + [`docs/AI-TASKS.md`](docs/AI-TASKS.md) + [`docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`](docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md)。完整工作流见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。
 
 ```text
-继续开发 Moyang Reader。先读 AGENTS.md 和 docs/AI-TASKS.md，检查目标任务是否已有开放 PR；默认选择第一个可执行 TODO，一次只做一个垂直切片，按改动范围测试，完成后在同一 PR 更新 AI-TASKS.md。
+继续开发 Moyang Reader。先同步最新 main，读 AGENTS.md、docs/AI-TASKS.md 和架构契约；找到最早未完成任务。只有对应该任务、修改同一范围或形成真实依赖的开放 PR 才阻塞；Dependabot/无关维护 PR 不冻结主线。BLOCKED_EXTERNAL 只标真正外部子项。一次只做一个垂直切片，并按改动范围测试。
 ```
 
 需要转交到不自动读取仓库规则的 AI 时，使用 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。

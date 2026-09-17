@@ -6,15 +6,46 @@ const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 const documentationFiles = [
   "README.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
   "PRIVACY.md",
   "docs/UPDATE.md",
   "docs/RELEASE-POLICY.md",
   "docs/USER-GUIDE.md",
   "docs/UI-INTERACTION.md",
+  "docs/ROADMAP.md",
+  "docs/AI-TASKS.md",
+  "docs/AI-HANDOFF.md",
+  "docs/AI-WORKFLOW.md",
+  "docs/AI-TAKEOVER-PROMPT.md",
+  "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
 ];
 
 const requiredFragments = new Map([
-  ["README.md", ["下载完成停在“已更新”", "GitHub Release", "手动重启"]],
+  [
+    "README.md",
+    [
+      "下载完成停在“已更新”",
+      "GitHub Release",
+      "Cloudflare Pages",
+      "手动重启",
+      "SECURITY.md",
+      "v0.13 Freeze / Compatibility / RC",
+      "v1.3 AI",
+    ],
+  ],
+  ["CONTRIBUTING.md", ["SECURITY.md", "不要在公开 Issue", "BLOCKED_EXTERNAL", "Dependabot"]],
+  [
+    "SECURITY.md",
+    [
+      "Private Vulnerability Reporting",
+      "7 个自然日",
+      "14 个自然日",
+      "GitHub Release 的 `latest.json`",
+      "Cloudflare Pages",
+      "Authenticode",
+    ],
+  ],
   ["PRIVACY.md", ["Cloudflare Pages 镜像", "GitHub Releases", "mailto", "不支持的协议会被拦截"]],
   [
     "docs/UPDATE.md",
@@ -31,12 +62,35 @@ const requiredFragments = new Map([
   ["docs/RELEASE-POLICY.md", ["Tauri updater 的 `.sig`", "NSIS Authenticode", "静态镜像工作流", "blocked"]],
   ["docs/USER-GUIDE.md", ["更多 → 更新", "手动重启", "javascript:", "文件关联", "权限"]],
   ["docs/UI-INTERACTION.md", ["更新入口固定在“更多”操作栏", "javascript:", "文件关联"]],
+  ["docs/ROADMAP.md", ["v0.13", "Freeze / Compatibility / RC", "v1.1", "v1.3", "不为未来先造空接口"]],
+  ["docs/AI-TASKS.md", ["Dependabot", "BLOCKED_EXTERNAL", "A13", "v0.13", "v1.0"]],
+  ["docs/AI-HANDOFF.md", ["Dependabot", "BLOCKED_EXTERNAL", "GitHub Release", "v1.x GATED"]],
+  [
+    "docs/AI-WORKFLOW.md",
+    ["Dependabot", "BLOCKED_EXTERNAL", "v0.13", "Freeze / Compatibility / RC", "v1.3", "真实用户动作"],
+  ],
+  [
+    "docs/AI-TAKEOVER-PROMPT.md",
+    ["Dependabot", "BLOCKED_EXTERNAL", "v0.13 Freeze/Compatibility/RC", "v1.3 AI", "provider/mock-first"],
+  ],
+  [
+    "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
+    ["真实内置用户动作", "B04", "v0.13", "v1.3", "provider-first", "SECURITY.md"],
+  ],
 ]);
 
 const staleClaims = [
   ["README.md", /签名更新包安装后自动重启/],
+  ["README.md", /镜像不可用时回退 GitHub Release/],
+  ["README.md", /v0\.13[–-]v0\.14[^\n]*轻量知识库/],
   ["docs/USER-GUIDE.md", /校验通过后自动重启/],
   ["docs/UPDATE.md", /(?:本次|当前) `?v0\.10\.2`? (?:发布后|的静态)/],
+  ["docs/AI-WORKFLOW.md", /v0\.14[^\n]*AiProvider/],
+  ["docs/AI-WORKFLOW.md", /v1\.0 前先稳定内部能力接口/],
+  ["docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md", /未来方向（D01）/],
+  ["docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md", /D02 才稳定/],
+  ["docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md", /D03 mock/],
+  ["docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md", /v0\.14[^\n]*AiProvider/],
 ];
 
 function readText(projectRoot, relativePath, errors) {
@@ -106,8 +160,13 @@ export function validateDocumentation(projectRoot = defaultRoot) {
 
   for (const [relativePath, pattern] of staleClaims) {
     if (pattern.test(documents.get(relativePath) ?? "")) {
-      errors.push(`${relativePath} 仍包含过时的更新行为说明：${pattern}`);
+      errors.push(`${relativePath} 仍包含过时的路线/更新行为说明：${pattern}`);
     }
+  }
+
+  const roadmap = documents.get("docs/ROADMAP.md") ?? "";
+  if (!roadmap.includes("A07–A13 完成")) {
+    errors.push("docs/ROADMAP.md 的 v0.11 Exit Gate 必须覆盖 A07–A13，不能漏掉 RC/发布预检 A13。");
   }
 
   const statusText = readText(projectRoot, "docs/release-status.json", errors);
@@ -139,7 +198,9 @@ export function runDocumentationCheck(projectRoot = defaultRoot) {
     errors.forEach((error) => console.error("- " + error));
     return 1;
   }
-  console.log("Documentation check passed: links and update/opener guidance are consistent.");
+  console.log(
+    "Documentation check passed: links, security guidance, updater authority and roadmap gates are consistent.",
+  );
   return 0;
 }
 

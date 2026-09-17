@@ -4,9 +4,10 @@
 
 ### Improved
 
-- AI 开发采用受保护 policy/plan 与可变 state 双层控制面；`NEXT.md` 改为生成摘要，并增加队列、风险、文件范围、上下文预算、自我授权和退役入口回归门禁。
-- G03 外部 GitHub App、Code Owner 探针和强制身份隔离按计划修订取消；G01/G02 保留，M1101 改为直接依赖 G02，已取消项保留原因但不计入完成。
-- AI 状态机固定为逐阶段转换；工作树清理新增 `codex/` 分支、已合入 `origin/main`、目录干净和无链接四重证据，删除型工具纳入 Code Owner 保护。
+- AI 开发治理已由 #451 与 2026-09-17 收敛规则取代旧 policy/plan/state/NEXT 审批状态机；当前执行真源为 `AGENTS.md` + `docs/AI-TASKS.md` 的轻量顺序队列，历史 ADR/治理记录不再作为现行开发规则。
+- v1.0 主线收敛为 v0.11 体验/职责收口 → v0.12 可靠性证明 → v0.13 Freeze/Compatibility/RC；Reading Inbox、Metadata/Knowledge、AI、RAG、MCP 和插件等改为 v1.x GATED 候选。
+- updater metadata 改为 GitHub Release 权威优先、Cloudflare Pages 镜像备用，并增加端点顺序回归测试，避免返回 2xx 的陈旧镜像遮蔽新版本。
+- Desktop correctness smoke 与性能 benchmark 分离：PR 门禁继续阻断真实功能回归，96 文档批量 Word 性能场景保留在独立 scheduled/manual benchmark 中，不再让共享 Runner 单轮毫秒抖动伪装成功能失败。
 - #112：统一更新器、镜像、外部链接和 Windows 文件关联的用户/维护者说明；明确镜像回退、手动重启、权限失败、工作区授权、协议白名单、Tauri updater 签名与 NSIS Authenticode 的边界，并补充文档/链接一致性检查。
 - G-02：新增只读 `release:status` 结构化检查，核对版本、CHANGELOG、唯一下一步、Windows x64 发布资产、镜像/外部阻塞和交接链接，不会触发发布或读取凭据。
 - G-03：清理器预览新增受管 Cargo target 的大小/闲置时间预算提示和显式 `--dry-run` 入口；超限只给出路径、大小、年龄和清理建议，不自动删除正在使用的 target。
