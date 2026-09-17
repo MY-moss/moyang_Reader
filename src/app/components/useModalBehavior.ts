@@ -3,6 +3,7 @@ import { useEffect, useRef, type RefObject } from "react";
 type ModalBehaviorOptions = {
   containerRef: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  restoreFocusTarget?: HTMLElement | null;
   onClose: () => void;
 };
 
@@ -30,7 +31,12 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * keyboard focus containment, and focus restoration after unmount. Escape is
  * consumed immediately so a page-level shortcut cannot close an outer mode too.
  */
-export function useModalBehavior({ containerRef, initialFocusRef, onClose }: ModalBehaviorOptions): void {
+export function useModalBehavior({
+  containerRef,
+  initialFocusRef,
+  restoreFocusTarget,
+  onClose,
+}: ModalBehaviorOptions): void {
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
@@ -38,7 +44,8 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
   }, [onClose]);
 
   useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousFocus =
+      restoreFocusTarget ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const modalContainer = containerRef.current;
     const initialFocus = initialFocusRef?.current ?? modalContainer;
     initialFocus?.focus();
@@ -92,5 +99,5 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
         previousFocus.focus();
       }
     };
-  }, [containerRef, initialFocusRef]);
+  }, [containerRef, initialFocusRef, restoreFocusTarget]);
 }

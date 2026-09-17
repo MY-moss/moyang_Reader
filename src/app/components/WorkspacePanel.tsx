@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 
 import type {
   RecentFile,
@@ -39,6 +39,7 @@ type WorkspacePanelProps = {
   recentWorkspaces: RecentWorkspace[];
   mountedWorkspaces: RecentWorkspace[];
   activePath: string | null;
+  searchInputRef?: RefObject<HTMLInputElement>;
   searchQuery: string;
   searchResults: WorkspaceSearchResult[];
   searchLoading: boolean;
@@ -106,6 +107,7 @@ export function WorkspacePanel({
   recentWorkspaces,
   mountedWorkspaces,
   activePath,
+  searchInputRef,
   searchQuery,
   searchResults,
   searchLoading,
@@ -362,7 +364,7 @@ export function WorkspacePanel({
           </small>
         </div>
       ) : (
-        <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和全文搜索。</p>
+        <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和阅读库搜索。</p>
       )}
       {workspaceExportNotice && (
         <div className="workspace-export-note" role="status">
@@ -431,8 +433,8 @@ export function WorkspacePanel({
             <span>
               {searchQuery.trim()
                 ? searchLoading
-                  ? "正在整理搜索结果…"
-                  : `当前结果 ${visibleResultCount} 项`
+                  ? "正在整理当前阅读库搜索结果…"
+                  : `当前阅读库匹配 ${visibleResultCount} 项`
                 : `显示 ${visibleFiles.length} / ${files.length} 项`}
             </span>
             {hasFilters && (
@@ -449,10 +451,11 @@ export function WorkspacePanel({
             )}
           </div>
           <input
+            ref={searchInputRef}
             className="workspace-search"
             type="search"
-            aria-label="搜索工作区"
-            placeholder="搜索整个阅读库"
+            aria-label="当前阅读库搜索"
+            placeholder="搜索当前阅读库内容"
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
           />
@@ -492,10 +495,10 @@ export function WorkspacePanel({
 
       {searchQuery.trim() ? (
         <div className="workspace-results" aria-live="polite">
-          {searchQuery.trim().length < 2 && <p className="muted-copy">再输入一个字符开始搜索。</p>}
-          {searchLoading && <p className="muted-copy">正在搜索…</p>}
+          {searchQuery.trim().length < 2 && <p className="muted-copy">至少输入 2 个字符后搜索当前阅读库。</p>}
+          {searchLoading && <p className="muted-copy">正在搜索当前阅读库…</p>}
           {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
-            <p className="muted-copy">没有找到匹配文档。</p>
+            <p className="muted-copy">当前阅读库没有匹配文档。</p>
           )}
           {!searchLoading &&
             searchResults.map((result) => (

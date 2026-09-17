@@ -26,17 +26,17 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 
-  const quickOpenTrigger = page.locator('.toolbar > button[title="快速打开文档 (Ctrl+P)"]');
+  const quickOpenTrigger = page.locator('.toolbar > button[title="快速打开文件 (Ctrl+P)"]');
   await quickOpenTrigger.click();
-  await expect(page.getByRole("dialog", { name: "快速打开" })).toBeVisible();
-  await expect(page.getByRole("searchbox", { name: "快速打开文档" })).toBeFocused();
+  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "快速打开文件" })).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toHaveCount(0);
   await expect(quickOpenTrigger).toBeFocused();
 
   await page.keyboard.press("Control+P");
-  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开" });
-  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文档" });
+  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开文件" });
+  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文件" });
   await expect(quickOpenDialog).toBeVisible();
   await expect(quickOpenSearch).toBeFocused();
   await page.keyboard.press("Shift+Tab");
@@ -47,10 +47,44 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await quickOpenSearch.fill("quick-note");
   await expect(page.getByRole("option", { name: /quick-note\.md/ })).toBeVisible();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "快速打开" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "目录" })).toBeVisible();
   await expect(page.getByRole("tab")).toHaveCount(5);
+});
+
+test("keeps document search scopes distinct and restores their trigger focus", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "search-scope-note.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Search scopes\n\nneedle in the current document"),
+  });
+  await switchToRenderedMode(page);
+
+  const findTrigger = page.getByRole("button", { name: "文内查找", exact: true });
+  await findTrigger.focus();
+  await page.keyboard.press("Control+F");
+  const documentSearch = page.getByRole("searchbox", { name: "文内查找" });
+  await expect(documentSearch).toBeFocused();
+  await expect(documentSearch).toHaveAttribute("placeholder", "在当前文档中查找");
+
+  await page.keyboard.press("Escape");
+  await expect(documentSearch).toHaveCount(0);
+  await expect(findTrigger).toBeFocused();
+
+  await page.keyboard.press("Control+P");
+  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开文件" });
+  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文件" });
+  await expect(quickOpenDialog).toBeVisible();
+  await expect(quickOpenSearch).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(quickOpenDialog).toHaveCount(0);
+  await expect(findTrigger).toBeFocused();
+
+  await page.keyboard.press("Control+Shift+F");
+  await expect(page.getByText("请先添加阅读库，再搜索当前阅读库。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "文内查找" })).toHaveCount(0);
 });
 
 test("moves the active document tab with horizontal keyboard navigation", async ({ page }) => {
@@ -106,9 +140,9 @@ test("keeps the quick-open highlight visible and announced as it moves", async (
   );
 
   await page.keyboard.press("Control+P");
-  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开" });
-  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文档" });
-  const quickOpenResults = quickOpenDialog.getByRole("listbox", { name: "快速打开结果" });
+  const quickOpenDialog = page.getByRole("dialog", { name: "快速打开文件" });
+  const quickOpenSearch = page.getByRole("searchbox", { name: "快速打开文件" });
+  const quickOpenResults = quickOpenDialog.getByRole("listbox", { name: "快速打开文件结果" });
 
   await expect(quickOpenResults.getByRole("option")).toHaveCount(20);
   await expect(quickOpenSearch).toHaveAttribute("aria-controls", "quick-open-results");
@@ -693,7 +727,11 @@ test("finds selected text from the editor context menu", async ({ page }) => {
   await expect(menu).toBeVisible();
   await menu.getByRole("menuitem", { name: "查找选中文本" }).click();
 
-  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toHaveValue("在当前文档中查找这句话。");
+  const searchbox = page.getByRole("searchbox", { name: "文内查找" });
+  await expect(searchbox).toHaveValue("在当前文档中查找这句话。");
+  await expect(searchbox).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(editable).toBeFocused();
 });
 
 test("opens a reader context menu for selected text and links", async ({ page }) => {
@@ -742,9 +780,10 @@ test("opens a reader context menu for selected text and links", async ({ page })
   await expect(menu.getByRole("menuitem", { name: "复制选中文本" })).toBeEnabled();
   await expect(menu.getByRole("menuitem", { name: "查找选中文本" })).toBeEnabled();
   await menu.getByRole("menuitem", { name: "查找选中文本" }).click();
-  await expect(page.getByRole("searchbox", { name: "搜索文档" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "文内查找" })).toBeVisible();
 
   await page.keyboard.press("Escape");
+  await expect(page.locator("article.reader-content")).toBeFocused();
   const link = page.locator('.reader-content a[href="https://example.com"]');
   await link.click({ button: "right" });
   const linkMenu = page.getByRole("menu", { name: "阅读内容菜单" });
@@ -1214,17 +1253,17 @@ test("debounces in-document search and navigates highlighted matches", async ({ 
   await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Search note" })).toBeVisible();
 
-  await page.getByRole("button", { name: "搜索" }).click();
-  await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
+  await page.getByRole("button", { name: "文内查找" }).click();
+  await page.getByRole("searchbox", { name: "文内查找" }).fill("needle");
 
   await expectSearchHighlightCount(page, 3);
   await expect(page.locator(".find-count")).toHaveText("1 / 3");
 
-  await page.getByRole("button", { name: "下一个结果" }).click();
+  await page.getByRole("button", { name: "下一个文内查找结果" }).click();
   await expect(page.locator(".find-count")).toHaveText("2 / 3");
   await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-active-result", "2");
 
-  await page.getByRole("button", { name: "上一个结果" }).click();
+  await page.getByRole("button", { name: "上一个文内查找结果" }).click();
   await expect(page.locator(".find-count")).toHaveText("1 / 3");
   await expect(page.locator("article.reader-content")).toHaveAttribute("data-search-active-result", "1");
 });
@@ -1240,8 +1279,8 @@ test("keeps search highlights readable when following the system dark theme", as
   });
   await switchToRenderedMode(page);
 
-  await page.getByRole("button", { name: "搜索" }).click();
-  await page.getByRole("searchbox", { name: "搜索文档" }).fill("needle");
+  await page.getByRole("button", { name: "文内查找" }).click();
+  await page.getByRole("searchbox", { name: "文内查找" }).fill("needle");
 
   await expect(page.locator("html")).not.toHaveAttribute("data-theme");
   await expectSearchHighlightCount(page, 2);
@@ -1410,4 +1449,3 @@ test("does not scan every heading on each reading scroll update", async ({ page 
   expect(metrics?.headingQueries ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(1);
   expect(metrics?.headingRects ?? Number.POSITIVE_INFINITY).toBeLessThan(500);
 });
-

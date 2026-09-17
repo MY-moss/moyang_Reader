@@ -151,7 +151,7 @@ test("keeps the reader article outside broad live regions", async ({ page }) => 
 test("keeps the quick-open dialog free of serious accessibility violations", async ({ page }) => {
   await loadReaderFixture(page);
   await page.keyboard.press("Control+P");
-  await expect(page.getByRole("dialog", { name: "快速打开" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "快速打开文件" })).toBeVisible();
   await expectNoSeriousA11yViolations(page, "quick-open");
 });
 
@@ -243,8 +243,8 @@ test("keeps solid accent controls readable in explicit and system dark themes", 
 test("keeps search focus and context tabs visibly distinct across themes", async ({ page }) => {
   await loadReaderFixture(page);
 
-  await page.getByRole("button", { name: "搜索", exact: true }).click();
-  const searchbox = page.getByRole("searchbox", { name: "搜索文档" });
+  await page.getByRole("button", { name: "文内查找", exact: true }).click();
+  const searchbox = page.getByRole("searchbox", { name: "文内查找" });
   await expect(searchbox).toBeFocused();
   const searchFocus = await searchbox.evaluate((element) => {
     const styles = getComputedStyle(element);

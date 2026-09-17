@@ -344,12 +344,35 @@ function duplicateEntryName(path: string, kind: "file" | "folder"): string {
   return `${name} 副本`;
 }
 
+function focusElementWithoutScroll(element: HTMLElement | null): boolean {
+  if (!element?.isConnected) return false;
+  try {
+    element.focus({ preventScroll: true });
+  } catch {
+    element.focus();
+  }
+  return document.activeElement === element;
+}
+
 function focusEditorSurface(surface: Element | null): void {
   if (!surface) return;
   const target = surface.matches('textarea, [contenteditable="true"], .cm-content')
     ? surface
     : surface.querySelector<HTMLElement>('.cm-content, [contenteditable="true"], textarea');
-  if (target instanceof HTMLElement) target.focus();
+  if (target instanceof HTMLElement) {
+    focusElementWithoutScroll(target);
+    return;
+  }
+  if (surface instanceof HTMLElement) focusElementWithoutScroll(surface);
+}
+
+function focusSearchRestoreTarget(target: HTMLElement | null): boolean {
+  if (!target?.isConnected) return false;
+  if (target.matches(".source-editor, .wysiwyg-editor")) {
+    focusEditorSurface(target);
+    return document.activeElement instanceof HTMLElement && target.contains(document.activeElement);
+  }
+  return focusElementWithoutScroll(target);
 }
 
 async function copyPlainText(text: string): Promise<void> {
@@ -678,6 +701,7 @@ export function App() {
   const [selectedFileKind, setSelectedFileKind] = useState<WorkspaceKindFilter>("all");
   const [graphOpen, setGraphOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [quickOpenRestoreFocusTarget, setQuickOpenRestoreFocusTarget] = useState<HTMLElement | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [workspaceEntryDetails, setWorkspaceEntryDetails] = useState<WorkspaceEntryDetails | null>(null);
   const [readerContextMenu, setReaderContextMenu] = useState<ReaderContextTarget | null>(null);
@@ -697,6 +721,9 @@ export function App() {
   const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const workspaceSearchInputRef = useRef<HTMLInputElement>(null);
+  const searchRestoreFocusRef = useRef<HTMLElement | null>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const focusExitRef = useRef<HTMLButtonElement>(null);
@@ -3315,7 +3342,9 @@ export function App() {
         .catch((cause) => {
           if (active) {
             setWorkspaceResults([]);
-            setError(cause instanceof Error ? cause.message : "工作区搜索失败。");
+            setError(
+              cause instanceof Error ? `当前阅读库搜索失败：${cause.message}` : "当前阅读库搜索失败，请稍后重试。",
+            );
           }
         })
         .finally(() => {
@@ -3375,13 +3404,52 @@ export function App() {
     });
   }, []);
 
-  const handleFindEditorText = useCallback((text: string) => {
-    const query = text.trim();
-    if (!query) return;
+  const openDocumentSearch = useCallback((restoreFocusTarget?: HTMLElement | null) => {
+    if (!searchRestoreFocusRef.current?.isConnected) {
+      const activeElement =
+        restoreFocusTarget ??
+        (document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body &&
+        document.activeElement !== document.documentElement
+          ? document.activeElement
+          : null);
+      searchRestoreFocusRef.current = activeElement;
+    }
     setSearchOpen(true);
-    setSearchQuery(query);
-    setSearchResultIndex(0);
   }, []);
+
+  const closeDocumentSearch = useCallback(() => {
+    const restoreFocusTarget = searchRestoreFocusRef.current;
+    searchRestoreFocusRef.current = null;
+    setSearchOpen(false);
+    setSearchQuery("");
+
+    if (!focusSearchRestoreTarget(restoreFocusTarget)) {
+      focusSearchRestoreTarget(searchButtonRef.current);
+    }
+  }, []);
+
+  const focusWorkspaceSearch = useCallback(() => {
+    if (!workspacePath) {
+      notify("请先添加阅读库，再搜索当前阅读库。", "info");
+      return;
+    }
+
+    setFocusMode(false);
+    setSidebarCollapsed(false);
+    window.requestAnimationFrame(() => workspaceSearchInputRef.current?.focus());
+  }, [notify, workspacePath]);
+
+  const handleFindEditorText = useCallback(
+    (text: string, restoreFocusTarget?: HTMLElement | null) => {
+      const query = text.trim();
+      if (!query) return;
+      openDocumentSearch(restoreFocusTarget);
+      setSearchQuery(query);
+      setSearchResultIndex(0);
+    },
+    [openDocumentSearch],
+  );
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -3443,6 +3511,12 @@ export function App() {
         return;
       }
 
+      if (!isTextEntry && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        focusWorkspaceSearch();
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") {
         event.preventDefault();
         if (event.shiftKey) {
@@ -3467,7 +3541,7 @@ export function App() {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        setSearchOpen(true);
+        openDocumentSearch();
       }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
@@ -3476,6 +3550,7 @@ export function App() {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
         event.preventDefault();
+        setQuickOpenRestoreFocusTarget(null);
         setQuickOpen(true);
       }
       if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {
@@ -3500,10 +3575,12 @@ export function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [
     focusMode,
+    focusWorkspaceSearch,
     handleChooseWorkspace,
     handleNavigateBack,
     mode,
     openSelectedFile,
+    openDocumentSearch,
     requestEditorInsert,
     saveDocument,
     setReadingZoom,
@@ -5720,7 +5797,10 @@ export function App() {
         onAddWorkspace={() => void handleChooseWorkspace()}
         workspaceOpen={Boolean(workspacePath)}
         workspaceLimitReached={mountedWorkspaces.length >= MAX_MOUNTED_WORKSPACES}
-        onQuickOpen={() => setQuickOpen(true)}
+        onQuickOpen={(restoreFocusTarget) => {
+          setQuickOpenRestoreFocusTarget(restoreFocusTarget ?? null);
+          setQuickOpen(true);
+        }}
         draftCount={draftSnapshots.length}
         onOpenRecovery={() => setDraftRecoveryOpen(true)}
         previousVersionAvailable={Boolean(previousVersion)}
@@ -5756,7 +5836,8 @@ export function App() {
         onExportMarkdown={() => void handleExportMarkdown()}
         onExportHtml={() => void handleExportHtml()}
         onExportDocx={() => void handleExportDocx()}
-        onToggleSearch={() => setSearchOpen((current) => !current)}
+        searchButtonRef={searchButtonRef}
+        onToggleSearch={(restoreFocusTarget) => openDocumentSearch(restoreFocusTarget)}
         updateStatus={updateStatus}
         updateVersion={availableUpdate?.version ?? null}
         onCheckUpdates={() => {
@@ -5769,10 +5850,7 @@ export function App() {
         }}
         onSearchPrevious={() => moveSearchResult(-1)}
         onSearchNext={() => moveSearchResult(1)}
-        onCloseSearch={() => {
-          setSearchOpen(false);
-          setSearchQuery("");
-        }}
+        onCloseSearch={closeDocumentSearch}
         onCycleTheme={() => {
           cycleTheme();
           notify("阅读主题已更新。");
@@ -5841,6 +5919,7 @@ export function App() {
             recentWorkspaces={recentWorkspaces}
             mountedWorkspaces={mountedWorkspaces}
             activePath={documentState?.path ?? null}
+            searchInputRef={workspaceSearchInputRef}
             searchQuery={workspaceQuery}
             searchResults={visibleWorkspaceResults}
             searchLoading={workspaceSearchLoading}
@@ -6073,7 +6152,7 @@ export function App() {
               canAnnotate={canAnnotate}
               editLabel={documentState.kind === "markdown" ? "进入所见即所得编辑" : "进入文本编辑"}
               onCopySelection={(text) => void handleCopyReaderText(text)}
-              onFindSelection={(text) => handleFindEditorText(text)}
+              onFindSelection={handleFindEditorText}
               onCopyLink={(href) => void handleCopyReaderLink(href)}
               onOpenLink={handleOpenReaderLink}
               onEdit={toggleReadingEditing}
@@ -6194,9 +6273,14 @@ export function App() {
       {quickOpen && (
         <QuickOpenPalette
           items={quickOpenItems}
-          onClose={() => setQuickOpen(false)}
+          restoreFocusTarget={quickOpenRestoreFocusTarget}
+          onClose={() => {
+            setQuickOpen(false);
+            setQuickOpenRestoreFocusTarget(null);
+          }}
           onOpenFile={(path) => {
             setQuickOpen(false);
+            setQuickOpenRestoreFocusTarget(null);
             void handleSelectTab(path);
           }}
         />

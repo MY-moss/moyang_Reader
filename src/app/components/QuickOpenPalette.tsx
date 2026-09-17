@@ -4,6 +4,7 @@ import { useModalBehavior } from "./useModalBehavior";
 
 type QuickOpenPaletteProps = {
   items: QuickOpenCandidate[];
+  restoreFocusTarget?: HTMLElement | null;
   onClose: () => void;
   onOpenFile: (path: string) => void;
 };
@@ -17,7 +18,7 @@ function kindLabel(kind: string | undefined): string {
   return "FILE";
 }
 
-export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPaletteProps) {
+export function QuickOpenPalette({ items, restoreFocusTarget, onClose, onOpenFile }: QuickOpenPaletteProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -26,7 +27,7 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
   const results = useMemo(() => rankQuickOpenItems(items, query), [items, query]);
   const activeResultIndex = results.length ? Math.min(activeIndex, results.length - 1) : 0;
 
-  useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, onClose });
+  useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, restoreFocusTarget, onClose });
 
   useEffect(() => {
     setActiveIndex(0);
@@ -80,7 +81,7 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
         <div className="quick-open-header">
           <div>
             <div className="quick-open-kicker">QUICK OPEN</div>
-            <h2 id="quick-open-title">快速打开</h2>
+            <h2 id="quick-open-title">快速打开文件</h2>
           </div>
           <kbd>ESC</kbd>
         </div>
@@ -89,7 +90,7 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
           <input
             ref={inputRef}
             type="search"
-            aria-label="快速打开文档"
+            aria-label="快速打开文件"
             aria-controls="quick-open-results"
             aria-activedescendant={results.length ? `quick-open-option-${activeResultIndex}` : undefined}
             placeholder="输入文件名或路径…"
@@ -103,11 +104,11 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
           id="quick-open-results"
           className="quick-open-results"
           role="listbox"
-          aria-label="快速打开结果"
+          aria-label="快速打开文件结果"
         >
           {results.length === 0 ? (
             <div className="quick-open-empty">
-              <strong>{items.length ? "没有匹配的文档" : "还没有可打开的文档"}</strong>
+              <strong>{items.length ? "没有匹配的文件" : "还没有可打开的文件"}</strong>
               <span>{items.length ? "换个文件名或路径试试" : "先打开文件，或添加一个阅读库文件夹"}</span>
             </div>
           ) : (

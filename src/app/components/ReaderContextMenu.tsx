@@ -21,7 +21,7 @@ type ReaderContextMenuProps = {
   canAnnotate?: boolean;
   editLabel: string;
   onCopySelection: (text: string) => void;
-  onFindSelection: (text: string) => void;
+  onFindSelection: (text: string, restoreFocusTarget?: HTMLElement | null) => void;
   onCopyLink: (href: string) => void;
   onOpenLink: (href: string) => void;
   onEdit: () => void;
@@ -74,7 +74,8 @@ export function ReaderContextMenu({
               label: "查找选中文本",
               shortcut: "Ctrl F",
               disabled: !hasSelection,
-              onSelect: () => onFindSelection(target.selectedText),
+              onSelect: () =>
+                onFindSelection(target.selectedText, target.restoreFocusTarget ?? target.fallbackFocusTarget),
             },
             ...(canAnnotate
               ? [

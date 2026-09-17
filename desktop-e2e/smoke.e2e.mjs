@@ -719,6 +719,48 @@ describe("Moyang Reader desktop runtime", () => {
     });
   });
 
+  it("focuses and scopes the current reading library search", async () => {
+    await resetDesktopSession();
+
+    const shell = await browser.$(".app-shell");
+    const workspaceSearch = await browser.$('input[aria-label="当前阅读库搜索"]');
+    await workspaceSearch.waitForDisplayed();
+
+    await browser.$(".focus-button.toolbar-optional").click();
+    await browser.waitUntil(() => shell.getAttribute("class").then((value) => value?.includes("focus-mode")), {
+      timeout: 5_000,
+      timeoutMsg: "focus mode did not open before workspace search shortcut coverage",
+    });
+
+    await dispatchDesktopKey("f", { code: "KeyF", ctrlKey: true, shiftKey: true });
+    await browser.waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
+      timeout: 5_000,
+      timeoutMsg: "workspace search shortcut did not restore the sidebar from focus mode",
+    });
+    await browser.waitUntil(
+      () =>
+        browser
+          .execute(() => document.activeElement?.getAttribute("aria-label"))
+          .then((label) => label === "当前阅读库搜索"),
+      {
+        timeout: 5_000,
+        timeoutMsg: "workspace search shortcut did not focus the current library searchbox",
+      },
+    );
+
+    await workspaceSearch.setValue("Desktop E2E");
+    const result = await browser.$(".workspace-result");
+    await result.waitForDisplayed({ timeout: 15_000 });
+    assert.match(await result.getText(), /desktop-e2e\.md/i);
+
+    await workspaceSearch.setValue("no-such-desktop-search-term");
+    const results = await browser.$(".workspace-results");
+    await browser.waitUntil(() => results.getText().then((text) => text.includes("当前阅读库没有匹配文档。")), {
+      timeout: 15_000,
+      timeoutMsg: "workspace search did not explain an empty current-library result",
+    });
+  });
+
   it("opens an initial Markdown path, edits it, and writes it back to disk", async () => {
     await browser.execute(() => window.localStorage.clear());
     await browser.refresh();

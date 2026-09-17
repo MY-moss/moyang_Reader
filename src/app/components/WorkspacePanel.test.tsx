@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
@@ -183,6 +183,30 @@ describe("WorkspacePanel", () => {
     const recentSection = container.querySelector<HTMLElement>('[aria-label="最近打开"]');
     expect(recentSection?.textContent).toContain("最近打开：1 小时前");
     expect(recentSection?.textContent).toContain("打开时间未知");
+    cleanup(container, root);
+  });
+
+  it("labels the search as the current reading library and exposes a focus target", () => {
+    const searchInputRef = createRef<HTMLInputElement>();
+    const { container, root } = renderPanel([], { searchInputRef });
+    const searchInput = container.querySelector<HTMLInputElement>(".workspace-search");
+
+    expect(searchInput?.getAttribute("aria-label")).toBe("当前阅读库搜索");
+    expect(searchInput?.getAttribute("placeholder")).toBe("搜索当前阅读库内容");
+
+    act(() => searchInputRef.current?.focus());
+    expect(document.activeElement).toBe(searchInput);
+    cleanup(container, root);
+  });
+
+  it("explains when the current reading library has no matches", () => {
+    const { container, root } = renderPanel([], {
+      searchQuery: "missing",
+      searchResults: [],
+      visibleResultCount: 0,
+    });
+
+    expect(container.textContent).toContain("当前阅读库没有匹配文档。");
     cleanup(container, root);
   });
 });

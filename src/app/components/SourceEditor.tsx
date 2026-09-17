@@ -27,7 +27,7 @@ type SourceEditorProps = {
   onInsertRequestHandled?: () => void;
   onUndo?: (focusTarget?: Element | null) => void;
   onRedo?: (focusTarget?: Element | null) => void;
-  onFindText?: (text: string) => void;
+  onFindText?: (text: string, restoreFocusTarget?: HTMLElement | null) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onStatusMessage?: (message: string) => void;
@@ -431,7 +431,7 @@ export function SourceEditor({
     if (action === "find-selection") {
       const selectedText = currentValue.slice(selectionStart, selectionEnd).trim();
       if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
-      else onFindTextRef.current?.(selectedText);
+      else onFindTextRef.current?.(selectedText, target?.restoreFocusTarget ?? target?.fallbackFocusTarget);
       setContextMenu(null);
       return;
     }
