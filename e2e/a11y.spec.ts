@@ -267,8 +267,30 @@ test("keeps search focus and context tabs visibly distinct across themes", async
   await page.keyboard.press("Escape");
   const contextToggle = page.locator(".context-toggle");
   if ((await contextToggle.getAttribute("aria-pressed")) !== "true") await contextToggle.click();
+  const contextPanel = page.locator(".context-sidebar");
   const tabs = page.locator('.context-tab[role="tab"]');
   await expect(tabs).toHaveCount(5);
+  await expect(contextPanel.getByRole("tablist", { name: "文档上下文视图" })).toHaveAttribute(
+    "aria-orientation",
+    "horizontal",
+  );
+  await expect(tabs.first()).toHaveAttribute("tabindex", "0");
+  await expect(tabs.nth(1)).toHaveAttribute("tabindex", "-1");
+  const contextRelations = await page.evaluate(() => {
+    const tabElements = Array.from(document.querySelectorAll<HTMLElement>('.context-tab[role="tab"]'));
+    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]');
+    return {
+      controls: tabElements.map((tab) => ({ id: tab.id, controls: tab.getAttribute("aria-controls") })),
+      panelId: panel?.id ?? null,
+      panelLabelledBy: panel?.getAttribute("aria-labelledby") ?? null,
+    };
+  });
+  expect(contextRelations.controls).toHaveLength(5);
+  expect(contextRelations.controls.every(({ controls }) => controls === contextRelations.panelId)).toBe(true);
+  expect(contextRelations.panelLabelledBy).toBe(
+    contextRelations.controls.find((tab) => tab.controls === contextRelations.panelId)?.id,
+  );
+  await expectNoSeriousA11yViolations(page, "context-tabs");
 
   const tokenState = await page.evaluate(() => {
     const rootStyles = getComputedStyle(document.documentElement);

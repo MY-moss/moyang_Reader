@@ -54,7 +54,8 @@ type TopBarProps = {
   onToggleMode: () => void;
   onCycleMode: () => void;
   rightPanelOpen: boolean;
-  onToggleRightPanel: () => void;
+  contextToggleRef?: RefObject<HTMLButtonElement>;
+  onToggleRightPanel: (restoreFocusTarget?: HTMLElement | null) => void;
   onOpenCommandPalette: () => void;
   onSave: () => void;
   onCopy: () => void;
@@ -133,6 +134,7 @@ export function TopBar({
   onToggleMode,
   onCycleMode,
   rightPanelOpen,
+  contextToggleRef,
   onToggleRightPanel,
   onOpenCommandPalette,
   onSave,
@@ -392,9 +394,10 @@ export function TopBar({
           </span>
         </button>
         <button
+          ref={contextToggleRef}
           type="button"
           className="toolbar-button context-toggle"
-          onClick={onToggleRightPanel}
+          onClick={(event) => onToggleRightPanel(event.currentTarget)}
           aria-pressed={rightPanelOpen}
           aria-keyshortcuts="Control+Shift+R"
           title={rightPanelOpen ? "隐藏上下文面板 (Ctrl+Shift+R)" : "显示上下文面板 (Ctrl+Shift+R)"}
