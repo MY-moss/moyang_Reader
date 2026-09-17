@@ -1,3 +1,4 @@
+import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { ContextPanelTab, OpenDocument, ReaderMode, TocItem, WorkspaceIndexEntry } from "../types";
 import type { DocumentBookmark } from "../bookmarks";
 import type { TextAnnotation } from "../annotations";
@@ -50,6 +51,12 @@ const tabs: Array<{ id: ContextPanelTab; label: string }> = [
   { id: "annotations", label: "批注" },
 ];
 
+const contextPanelId = "context-panel-panel";
+
+function contextTabId(tab: ContextPanelTab): string {
+  return `context-panel-tab-${tab}`;
+}
+
 function fileTypeLabel(kind: OpenDocument["kind"]): string {
   return kind === "markdown" ? "Markdown" : kind === "text" ? "纯文本" : kind.toUpperCase();
 }
@@ -100,6 +107,28 @@ export function ContextPanel({
   onNavigateHeading,
 }: ContextPanelProps) {
   const properties = documentState?.kind === "markdown" ? frontmatterProperties(documentState.source) : [];
+  const tabButtonRefs = useRef(new Map<ContextPanelTab, HTMLButtonElement>());
+
+  const focusTabAt = (index: number) => {
+    const nextTab = tabs[index];
+    if (!nextTab) return;
+    onTabChange(nextTab.id);
+    tabButtonRefs.current.get(nextTab.id)?.focus();
+  };
+
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    focusTabAt(nextIndex);
+  };
 
   return (
     <aside className="context-sidebar" aria-label="当前文档上下文">
@@ -135,22 +164,30 @@ export function ContextPanel({
         />
       )}
 
-      <nav className="context-tab-list" aria-label="文档上下文视图" role="tablist">
-        {tabs.map((tab) => (
+      <nav className="context-tab-list" aria-label="文档上下文视图" aria-orientation="horizontal" role="tablist">
+        {tabs.map((tab, index) => (
           <button
             type="button"
             key={tab.id}
+            id={contextTabId(tab.id)}
             role="tab"
             aria-selected={activeTab === tab.id}
+            aria-controls={contextPanelId}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             className={`context-tab ${activeTab === tab.id ? "active" : ""}`}
+            ref={(element) => {
+              if (element) tabButtonRefs.current.set(tab.id, element);
+              else tabButtonRefs.current.delete(tab.id);
+            }}
             onClick={() => onTabChange(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
           >
             {tab.label}
           </button>
         ))}
       </nav>
 
-      <div className="context-panel-body" role="tabpanel">
+      <div id={contextPanelId} className="context-panel-body" role="tabpanel" aria-labelledby={contextTabId(activeTab)}>
         {activeTab === "outline" && <Outline items={toc} activeId={activeHeadingId} onNavigate={onNavigateHeading} />}
         {activeTab === "backlinks" && (
           <RelatedPanel

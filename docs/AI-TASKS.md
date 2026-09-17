@@ -72,7 +72,7 @@
 
 ### A08 — 右侧上下文面板 Tab 键盘与 ARIA 收口
 
-**状态：TODO**
+**状态：DONE — PR #482**
 
 - 当前证据：`ContextPanel` 已有 `tablist/tab/tabpanel`，但缺 roving tabindex、方向键切换和 tab ↔ panel 明确关联。
 - 目标：让目录、关联、属性、书签、批注成为标准桌面 Tab 交互。

@@ -722,8 +722,10 @@ export function App() {
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const contextToggleRef = useRef<HTMLButtonElement>(null);
   const workspaceSearchInputRef = useRef<HTMLInputElement>(null);
   const searchRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const contextPanelRestoreFocusRef = useRef<HTMLElement | null>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const focusExitRef = useRef<HTMLButtonElement>(null);
@@ -3429,6 +3431,35 @@ export function App() {
     }
   }, []);
 
+  const closeContextPanel = useCallback(() => {
+    const restoreFocusTarget = contextPanelRestoreFocusRef.current;
+    contextPanelRestoreFocusRef.current = null;
+    setRightPanelOpen(false);
+    window.requestAnimationFrame(() => {
+      if (!focusElementWithoutScroll(restoreFocusTarget)) focusElementWithoutScroll(contextToggleRef.current);
+    });
+  }, []);
+
+  const toggleContextPanel = useCallback(
+    (restoreFocusTarget?: HTMLElement | null) => {
+      if (rightPanelOpen) {
+        closeContextPanel();
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      contextPanelRestoreFocusRef.current =
+        restoreFocusTarget ??
+        (activeElement instanceof HTMLElement &&
+        activeElement !== document.body &&
+        activeElement !== document.documentElement
+          ? activeElement
+          : null);
+      setRightPanelOpen(true);
+    },
+    [closeContextPanel, rightPanelOpen],
+  );
+
   const focusWorkspaceSearch = useCallback(() => {
     if (!workspacePath) {
       notify("请先添加阅读库，再搜索当前阅读库。", "info");
@@ -3559,7 +3590,7 @@ export function App() {
       }
       if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "r") {
         event.preventDefault();
-        setRightPanelOpen((current) => !current);
+        toggleContextPanel();
       }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
@@ -3584,6 +3615,7 @@ export function App() {
     requestEditorInsert,
     saveDocument,
     setReadingZoom,
+    toggleContextPanel,
     toggleReadingEditing,
   ]);
 
@@ -5326,7 +5358,7 @@ export function App() {
           requestEditorInsert("link");
           break;
         case "context":
-          setRightPanelOpen((current) => !current);
+          toggleContextPanel();
           break;
         case "focus":
           setFocusMode((current) => !current);
@@ -5342,6 +5374,7 @@ export function App() {
       requestEditorInsert,
       redoEditor,
       saveDocument,
+      toggleContextPanel,
       toggleReadingEditing,
       undoEditor,
     ],
@@ -5854,7 +5887,8 @@ export function App() {
         onToggleMode={toggleReadingEditing}
         onCycleMode={toggleDocumentMode}
         rightPanelOpen={rightPanelOpen}
-        onToggleRightPanel={() => setRightPanelOpen((current) => !current)}
+        contextToggleRef={contextToggleRef}
+        onToggleRightPanel={toggleContextPanel}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onSave={() => void saveDocument()}
         onCopy={() => void handleCopy()}
@@ -6238,7 +6272,7 @@ export function App() {
             mode={mode}
             activeTab={activeContextTab}
             onTabChange={setActiveContextTab}
-            onClose={() => setRightPanelOpen(false)}
+            onClose={closeContextPanel}
             onOpenFile={(path) => void handleSelectTab(path)}
             onOpenBookmark={(bookmark) => void handleOpenBookmark(bookmark)}
             onDeleteBookmark={handleDeleteBookmark}

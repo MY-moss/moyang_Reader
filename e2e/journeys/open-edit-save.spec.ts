@@ -127,6 +127,59 @@ test("moves the active document tab with horizontal keyboard navigation", async 
   await expect(labels.nth(activeIndex)).toHaveAttribute("aria-pressed", "true");
 });
 
+test("navigates context tabs with roving focus and restores the toggle focus", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "context-tabs.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Context tabs\n\n上下文面板键盘交互。"),
+  });
+  await switchToRenderedMode(page);
+
+  const contextToggle = page.locator(".context-toggle");
+  if ((await contextToggle.getAttribute("aria-pressed")) === "true") await contextToggle.click();
+  await contextToggle.click();
+
+  const contextPanel = page.locator(".context-sidebar");
+  const tabs = contextPanel.getByRole("tab");
+  await expect(contextPanel).toBeVisible();
+  await expect(tabs).toHaveCount(5);
+  await expect(tabs.nth(0)).toHaveAttribute("tabindex", "0");
+  await expect(tabs.nth(1)).toHaveAttribute("tabindex", "-1");
+
+  const relations = await tabs.evaluateAll((elements) => {
+    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]');
+    return {
+      controls: elements.map((element) => element.getAttribute("aria-controls")),
+      panelId: panel?.id,
+      panelLabelledBy: panel?.getAttribute("aria-labelledby"),
+    };
+  });
+  expect(relations.controls).toEqual(Array.from({ length: 5 }, () => relations.panelId));
+  expect(relations.panelLabelledBy).toBe(await tabs.nth(0).getAttribute("id"));
+
+  await tabs.nth(0).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(1)).toBeFocused();
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.nth(0)).toHaveAttribute("tabindex", "-1");
+  await expect(tabs.nth(1)).toHaveAttribute("tabindex", "0");
+
+  await page.keyboard.press("End");
+  await expect(tabs.nth(4)).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(tabs.nth(0)).toBeFocused();
+
+  await contextPanel.getByRole("button", { name: "隐藏上下文面板" }).click();
+  await expect(contextPanel).toHaveCount(0);
+  await expect(contextToggle).toBeFocused();
+
+  await page.keyboard.press("Control+Shift+R");
+  await expect(contextPanel).toBeVisible();
+  await contextPanel.getByRole("button", { name: "隐藏上下文面板" }).click();
+  await expect(contextToggle).toBeFocused();
+});
+
 test("keeps the quick-open highlight visible and announced as it moves", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 520 });
   await page.goto("/");
