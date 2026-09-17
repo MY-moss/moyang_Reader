@@ -251,7 +251,7 @@ test("keeps toolbar icons consistent and readable at 900px", async ({ page }) =>
   const visibleIconNames = await page
     .locator(".topbar .toolbar .moyang-icon:visible")
     .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("data-icon")));
-  expect(visibleIconNames).toEqual(["folder-open", "panel-left", "panel-right", "search", "more-horizontal"]);
+  expect(visibleIconNames).toEqual(["folder-open", "save", "panel-left", "panel-right", "search", "more-horizontal"]);
 
   const metrics = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,

@@ -122,6 +122,11 @@ test("keeps the empty state free of serious accessibility violations", async ({ 
 test("keeps the reader state free of serious accessibility violations", async ({ page }) => {
   await loadReaderFixture(page);
   await switchToRenderedMode(page);
+  const primaryToolbar = page.getByRole("navigation", { name: "文档主要操作" });
+  const saveButton = primaryToolbar.getByRole("button", { name: "保存当前文档" });
+  await expect(saveButton).toBeVisible();
+  await expect(saveButton).toBeDisabled();
+  await expect(saveButton).toHaveAttribute("aria-keyshortcuts", "Control+S");
   await expectNoSeriousA11yViolations(page, "reader");
 });
 

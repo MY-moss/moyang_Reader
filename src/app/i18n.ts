@@ -19,6 +19,7 @@ export type MessageKey =
   | "action.source"
   | "action.read"
   | "action.save"
+  | "action.saveDocument"
   | "action.copy"
   | "action.copied"
   | "action.theme.system"
@@ -26,6 +27,7 @@ export type MessageKey =
   | "action.theme.dark"
   | "action.more"
   | "action.moreTools"
+  | "action.primaryTools"
   | "action.documentTools"
   | "action.appearance"
   | "settings.title"
@@ -85,6 +87,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.source": "源文本",
     "action.read": "阅读",
     "action.save": "保存",
+    "action.saveDocument": "保存当前文档",
     "action.copy": "复制",
     "action.copied": "已复制",
     "action.theme.system": "系统",
@@ -92,6 +95,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.dark": "深色",
     "action.more": "更多",
     "action.moreTools": "更多文档工具",
+    "action.primaryTools": "文档主要操作",
     "action.documentTools": "文档操作",
     "action.appearance": "外观与更新",
     "settings.title": "设置",
@@ -150,6 +154,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.source": "Source",
     "action.read": "Read",
     "action.save": "Save",
+    "action.saveDocument": "Save current document",
     "action.copy": "Copy",
     "action.copied": "Copied",
     "action.theme.system": "System",
@@ -157,6 +162,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.dark": "Dark",
     "action.more": "More",
     "action.moreTools": "More document tools",
+    "action.primaryTools": "Primary document actions",
     "action.documentTools": "Document actions",
     "action.appearance": "Appearance & updates",
     "settings.title": "Settings",
