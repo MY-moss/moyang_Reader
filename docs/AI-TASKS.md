@@ -1,6 +1,6 @@
 # Moyang Reader — AI 任务队列
 
-> 后续 AI 默认从上到下处理任务。只要更早任务处于 `IN_PROGRESS` / `WAITING`，或已有对应开放 PR，就禁止提前开启后续任务。一个任务一个分支、一个 PR；不得用 stacked PR、多 Track 并行或额外任务板绕过顺序。完成后改为 `DONE` 并附 PR 号；遇到新问题先确认当前代码和 Issues，避免根据旧审计重复开发。
+> 后续 AI 默认从上到下处理任务。只要更早任务处于 `IN_PROGRESS` / `WAITING`，或已有**与该任务对应 / 修改同一范围**的开放 PR，就禁止提前开启后续任务。Dependabot、机器人依赖更新、纯维护或明显无关的开放 PR 不得被误判为“整个产品队列冻结”。一个任务一个分支、一个 PR；不得用 stacked PR、多 Track 并行或额外任务板绕过顺序。完成后改为 `DONE` 并附 PR 号；遇到新问题先确认当前代码和 Issues，避免根据旧审计重复开发。
 
 ## 使用原则
 
@@ -8,6 +8,8 @@
 - UI 任务必须从“用户能否更快、更清楚、更稳定地完成动作”出发，不为改样式而改样式。
 - 旧审计只作为线索，任何问题都必须在当前 `main` 重新确认；已关闭 Issue 不重新实现。
 - 前序任务未完成时，后续任务最多可以分析，不得提前编码、提交或创建 PR。
+- 开放 PR 只有在对应当前最早任务、修改同一范围或制造实际合并依赖时才算队列阻塞；自动依赖更新和无关维护 PR 只需检查冲突，不阻塞产品任务。
+- `BLOCKED_EXTERNAL` 只能标记真正依赖外部设置、证书、凭据或真机的子项；仓库内仍可完成的代码、文档、测试和检查必须拆开继续做。
 - 不为了未来 AI / 插件 / RAG 提前建立没有真实内置调用方的空 Provider/Manager/Service。
 - v1.0 前的主线只剩：v0.11 收口 → v0.12 可靠性 → v0.13 Freeze/RC → v1.0。
 - Reading Inbox、Knowledge、AI、MCP、RAG、插件等长期方向不在当前执行队列，满足对应 Gate 后再提升为 0.5–3 天的小任务。
@@ -122,8 +124,9 @@
 
 - 目标：把当前 `main` 压成一个可真实安装和回归的候选版本，而不是继续加功能。
 - 核心旅程：首次启动 → 添加阅读库 → 快速打开 → 阅读 → 文内搜索 → 批注/书签 → 编辑 → 保存 → 外部修改 → 关闭/恢复 → 导出。
-- 发布检查：安装包、PDF 落盘、更新检查、恢复、版本/manifest/签名事实一致。
-- 规则：无法执行的真实 Windows/证书条件必须明确记录为 `BLOCKED_EXTERNAL`，不能用 CI 绿灯替代真机结果。
+- 发布检查：安装包、PDF 落盘、更新检查、恢复、版本/manifest/签名事实一致；GitHub Release 作为 updater metadata 权威源，Cloudflare 仅作镜像/备用源，自动检查必须阻止 endpoint 顺序回退。
+- CI 规则：桌面功能正确性 smoke 作为 PR 阻断门禁；共享 Runner 上的性能毫秒阈值进入独立 scheduled/manual benchmark，不以单轮抖动伪装成功能回归。
+- 外部规则：无法执行的真实 Windows/证书条件必须精确记录为 `BLOCKED_EXTERNAL` 子项，不能用 CI 绿灯替代真机结果，也不能把仓库内可完成的部分一起冻结。
 - 验收：形成可追溯 RC 结果；只把真实阻断问题拆成独立小任务。
 
 ### v0.11 Exit Gate
@@ -134,7 +137,8 @@
 - 新功能不再默认继续堆进 `App.tsx`；
 - 高频跨层错误有稳定 code；
 - 常见窗口宽度/DPI 高可用；
-- RC 主旅程完成，外部阻塞项状态真实。
+- RC 主旅程完成，外部阻塞项状态真实；
+- updater 权威源/镜像顺序有自动回归检查，性能 benchmark 与 correctness gate 已分离。
 
 ---
 
@@ -145,7 +149,8 @@
 **状态：TODO**
 
 - 目标：把 5k / 20k 文件工作区的扫描、冷搜索、暖搜索变成可重复 benchmark。
-- 产物：固定语料生成器 + JSON 报告；CI 不设脆弱的毫秒硬门槛。
+- 产物：固定语料生成器 + JSON 报告 + scheduled/manual benchmark；PR correctness CI 不设脆弱的单轮毫秒硬门槛。
+- 判定：优先比较多轮统计、趋势和固定环境；只有证明低波动、可重复后，性能指标才允许升级为 required gate。
 - 用户价值：性能优化基于证据，不靠感觉。
 
 ### B02 — 大文件阅读与编辑降级策略
@@ -224,7 +229,8 @@
 **状态：TODO**
 
 - 关联：#51 / #227 / #241
-- 目标：校验版本/tag/manifest/package 一致性，完成 SECURITY.md / 私密漏洞入口可发现性，并把 Windows 实机/签名事实写清楚。
+- 目标：校验版本/tag/manifest/package 一致性，完成 `SECURITY.md` / 安全披露说明，并把 Windows 实机/签名事实写清楚；GitHub Private Vulnerability Reporting 仅把“仓库设置中开启入口”保留为外部子项。
+- 更新器：验证 GitHub Release 权威 metadata → Cloudflare 镜像备用顺序、`latest.json`/安装包/`.sig` 一致性，以及真实旧版 → 新版升级闭环。
 - 规则：无 Authenticode 证书时明确披露限制与哈希核验，不把 updater `.sig` 误称为 Windows 代码签名。
 
 ### C04 — v1.0 RC 稳定化
@@ -238,7 +244,7 @@
 
 - **Windows 安装/升级实机闭环 — BLOCKED_EXTERNAL**：#241，需要真实 Windows x64 旧安装环境；v1.0 前至少成功跑通一次完整旧版 → 新版升级链路。
 - **Windows Authenticode — BLOCKED_EXTERNAL / NON-FATAL IF DISCLOSED**：#51；有证书时接入，没有时明确披露和哈希核验，不无限期阻塞 1.0。
-- **Private Vulnerability Reporting — BLOCKED_EXTERNAL**：#227；维护者开启 GitHub 私密报告入口，代码/文档可先做独立部分。
+- **Private Vulnerability Reporting 开关 — BLOCKED_EXTERNAL**：#227；只有 GitHub 仓库设置中的“开启私密报告入口”依赖维护者操作。`SECURITY.md`、披露文案和不引导公开 Issue 提交敏感细节的仓库内部分不得因此挂起。
 
 ---
 
@@ -264,3 +270,5 @@
 - 用户临时改变优先级时，直接移动 Markdown 条目，但必须同时更新依赖/Gate 说明。
 - UI/UX 新问题必须带最短复现路径和用户影响；“看起来可能不好”不直接进入开发队列。
 - 新 CI Gate 必须能说明它要阻止哪一类真实回归；不为治理本身增加治理。
+- 性能指标默认进入 benchmark/趋势证据，不直接与 correctness gate 混用；要升级为 required gate 必须先证明稳定、可重复、低噪声。
+- `BLOCKED_EXTERNAL` 必须写清“外部子项”和“仓库内仍可做部分”，避免制造假阻塞。
