@@ -151,7 +151,7 @@ PR #480 的失败日志显示：浏览器 E2E 83 项通过，1 项 retry 后通�
 - GitHub Release `latest.json` 改为第一权威源；
 - Cloudflare Pages 改为第二镜像/备用源；
 - 新增 `scripts/updater-endpoint-order.test.mjs` 并接入 `test:release`，防止未来顺序回退；
-- A13/C03/AGENTS/AI-HANDOFF 同步写明“GitHub 权威、镜像备用”。
+- `docs/UPDATE.md`、A13/C03、AGENTS/AI-HANDOFF 同步写明“GitHub 权威、镜像备用”。
 
 ### C. “任何开放 PR 都阻塞队列”会制造假阻塞
 
@@ -171,11 +171,11 @@ PR #480 的失败日志显示：浏览器 E2E 83 项通过，1 项 retry 后通�
 
 已同步：AI-HANDOFF 改为 v0.11 → v0.12 → v0.13 → v1.0，并明确 v1.x 才允许在真实内置用户动作出现后提炼 AI/扩展接口。
 
-### F. CHANGELOG 顶部存在历史治理描述残留
+### F. CHANGELOG 顶部历史治理描述已纠偏
 
-`CHANGELOG.md` 的 Unreleased 顶部仍保留已经退役的 policy/plan/state machine 描述。这些条目属于历史开发记录，但当前表达容易被 Agent 当作仍然生效的工程规则。
+`CHANGELOG.md` 的 Unreleased 顶部原先把已经退役的 policy/plan/state machine 写成现行改进，容易被 Agent 误读为当前制度。
 
-处理原则：当前行为真源已经统一到 `AGENTS.md` / `AI-TASKS.md` / `AI-HANDOFF.md`；CHANGELOG 只记录“发生过什么”，不能作为当前开发规则。后续修改 CHANGELOG 时应把这些旧条目标注为“历史治理尝试，已由 #451/2026-09-17 收敛规则取代”，而不是继续把它们写成现行制度。
+已同步：删除现行化表述，改为明确记录 #451 与 2026-09-17 已收敛旧状态机；同时把新的 v1.0 路线、updater 权威源顺序和 correctness/performance 分流作为当前 Unreleased 事实。当前行为真源仍统一到 `AGENTS.md` / `AI-TASKS.md` / `AI-HANDOFF.md`；CHANGELOG 只负责记录“发生过什么”。
 
 ## 新的版本主线
 
