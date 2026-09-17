@@ -5298,6 +5298,15 @@ export function App() {
         case "quick-open":
           setQuickOpen(true);
           break;
+        case "document-search":
+          openDocumentSearch();
+          break;
+        case "workspace-search":
+          focusWorkspaceSearch();
+          break;
+        case "toggle-sidebar":
+          setSidebarCollapsed((current) => !current);
+          break;
         case "navigate-back":
           void handleNavigateBack();
           break;
@@ -5325,9 +5334,11 @@ export function App() {
       }
     },
     [
+      focusWorkspaceSearch,
       handleChooseWorkspace,
       handleNavigateBack,
       openSelectedFile,
+      openDocumentSearch,
       requestEditorInsert,
       redoEditor,
       saveDocument,
@@ -5354,6 +5365,24 @@ export function App() {
         id: "quick-open",
         label: "快速打开",
         shortcut: "Ctrl P",
+      },
+      {
+        id: "document-search",
+        label: "查找当前文档文字",
+        shortcut: "Ctrl F",
+        disabled: !documentState,
+      },
+      {
+        id: "workspace-search",
+        label: "搜索当前阅读库",
+        shortcut: "Ctrl ⇧ F",
+        disabled: !workspacePath,
+      },
+      {
+        id: "toggle-sidebar",
+        label: sidebarCollapsed ? "显示工作区侧栏" : "隐藏工作区侧栏",
+        shortcut: "Ctrl ⇧ B",
+        disabled: focusMode,
       },
       {
         id: "navigate-back",
@@ -5389,12 +5418,13 @@ export function App() {
         id: "link",
         label: "插入 Markdown 链接",
         shortcut: "Ctrl K",
-        disabled: !canEdit,
+        disabled: !canEditHistory,
       },
       {
         id: "context",
         label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
         shortcut: "Ctrl ⇧ R",
+        disabled: focusMode,
       },
       {
         id: "focus",
@@ -5403,7 +5433,19 @@ export function App() {
         disabled: !documentState,
       },
     ],
-    [canEdit, canRedo, canUndo, focusMode, mode, navigationHistory, rightPanelOpen, documentState],
+    [
+      canEdit,
+      canEditHistory,
+      canRedo,
+      canUndo,
+      focusMode,
+      mode,
+      navigationHistory,
+      rightPanelOpen,
+      sidebarCollapsed,
+      workspacePath,
+      documentState,
+    ],
   );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
