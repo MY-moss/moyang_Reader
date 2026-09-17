@@ -198,7 +198,9 @@ export function runDocumentationCheck(projectRoot = defaultRoot) {
     errors.forEach((error) => console.error("- " + error));
     return 1;
   }
-  console.log("Documentation check passed: links, security guidance, updater authority and roadmap gates are consistent.");
+  console.log(
+    "Documentation check passed: links, security guidance, updater authority and roadmap gates are consistent.",
+  );
   return 0;
 }
 
