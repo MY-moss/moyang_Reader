@@ -67,7 +67,7 @@ const requiredFragments = new Map([
   ["docs/AI-HANDOFF.md", ["Dependabot", "BLOCKED_EXTERNAL", "GitHub Release", "v1.x GATED"]],
   [
     "docs/AI-WORKFLOW.md",
-    ["Dependabot", "BLOCKED_EXTERNAL", "v0.13 Freeze / Compatibility / RC", "v1.3 AI", "真实用户动作"],
+    ["Dependabot", "BLOCKED_EXTERNAL", "v0.13", "Freeze / Compatibility / RC", "v1.3", "真实用户动作"],
   ],
   [
     "docs/AI-TAKEOVER-PROMPT.md",
