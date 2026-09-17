@@ -305,7 +305,7 @@ export function TopBar({
         )}
       </div>
 
-      <nav className="toolbar" aria-label="文档操作">
+      <nav className="toolbar" aria-label={t("action.primaryTools")}>
         <button
           type="button"
           className="toolbar-button"
@@ -367,6 +367,21 @@ export function TopBar({
             <span className="toolbar-button-label">{mode === "rendered" ? t("action.edit") : t("action.read")}</span>
           </button>
         )}
+        <button
+          type="button"
+          className={`toolbar-button save-button${modified ? " primary" : ""}`}
+          onClick={() => {
+            dismissTopbarOverlays();
+            onSave();
+          }}
+          disabled={!modified}
+          aria-keyshortcuts="Control+S"
+          aria-label={t("action.saveDocument")}
+          title={`${t("action.saveDocument")} (Ctrl+S)`}
+        >
+          <Icon name="save" size={15} />
+          <span className="toolbar-button-label">{t("action.save")}</span>
+        </button>
         {draftCount > 0 && (
           <button
             type="button"
@@ -479,10 +494,6 @@ export function TopBar({
                         ? t("action.source")
                         : t("action.read")}
                   </span>
-                </button>
-                <button type="button" className="toolbar-button" onClick={onSave} disabled={!modified}>
-                  <Icon name="save" size={15} />
-                  <span className="toolbar-button-label">{t("action.save")}</span>
                 </button>
                 <button
                   type="button"
