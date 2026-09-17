@@ -2,7 +2,7 @@
 
 ## 更新链路
 
-Moyang Reader 使用 Tauri 官方 updater 插件、Cloudflare Pages 镜像和 GitHub Releases：
+Moyang Reader 使用 Tauri 官方 updater 插件、GitHub Releases 和 Cloudflare Pages 镜像：
 
 1. 发布者给 main 打一个 vX.Y.Z 形式的版本标签，例如 v0.5.3。
 2. GitHub Actions 在 Windows runner 上运行测试、构建并生成 NSIS 安装包。
@@ -17,13 +17,13 @@ Moyang Reader 使用 Tauri 官方 updater 插件、Cloudflare Pages 镜像和 Gi
 
 “启动时检查更新”只在应用启动时读取一次。运行期间修改该偏好只保存设置，不立即触发检查；需要重新启动应用后才按新设置执行。
 
-更新器会先访问 Cloudflare Pages 镜像，失败时再回退到 GitHub Release：
-
-https://moyang-reader-mirror.pages.dev/latest.json
+GitHub Release 是 updater metadata 的权威来源。更新器先访问 GitHub Release；只有权威端点不可用时才尝试 Cloudflare Pages 镜像。这样可以避免镜像仍返回 HTTP 2xx 但 metadata 已陈旧时遮蔽 GitHub 上的新版本：
 
 https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
-没有有效签名的更新包不会安装。
+https://moyang-reader-mirror.pages.dev/latest.json
+
+端点顺序由 `scripts/updater-endpoint-order.test.mjs` 自动检查；镜像可用性仍由镜像健康检查独立验证。没有有效签名的更新包不会安装。
 
 更新提示中的“签名”是 Tauri updater 对 manifest/安装包的公钥校验，不等同于 Windows NSIS Authenticode 证书。当前 Authenticode 证书条件仍按 [`release-status.json`](release-status.json) 记录为 `blocked`，不能把 updater 签名当成 Windows 代码签名结论。
 
@@ -38,7 +38,7 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 ### 更新失败时
 
-- **镜像不可用或网络超时**：更新器先尝试公开 Cloudflare Pages 地址，再使用 GitHub Release 回退地址。检查网络后重试；仍失败时可从 [GitHub Release](https://github.com/MY-moss/moyang_Reader/releases/latest) 手动下载当前 Windows x64 安装包。
+- **GitHub Release 不可用或网络超时**：更新器先尝试 GitHub Release 权威地址，再使用 Cloudflare Pages 镜像。检查网络后重试；仍失败时可从 [GitHub Release](https://github.com/MY-moss/moyang_Reader/releases/latest) 手动下载当前 Windows x64 安装包。
 - **签名校验失败**：安装会停止。只从仓库的 GitHub Release 页面重新下载可信安装包，不使用聊天、文档或第三方页面提供的 `.exe`、`.sig` 或私钥。
 - **权限或文件被占用**：保留当前版本，先关闭正在运行的旧实例或占用安装目录的程序，再重试；也可以从 GitHub Release 手动安装。不要删除用户文档、修改注册表来绕过文件关联，也不要关闭 Windows 安全策略或运行未知脚本。
 - **上次更新没有完成**：当前版本会保留。不要降级覆盖；等待更高的补丁版本发布后再重试，应用启动时可能显示恢复提示。
@@ -76,7 +76,7 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 ## v0.10.12 发布记录（2026-08-29）
 
-- GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开，包含 Windows x64 安装包、`.sig` 和 `latest.json`。
+- GitHub Release：[v0.10.12](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.12) 已公开，包含 Windows x64 NSIS 安装包、`.sig` 和 `latest.json`。
 - 安装包：4,976,921 字节，SHA-256 `de577b06d78eabc837df87da4e20ab5f127c8ddcd15fcd8d62e1f4ac558d8e74`；签名文件 428 字节，SHA-256 `fcedb0c65194abb42838ba079458506e98b5e6fbeb2207309108b7b36bdec65d`。
 - Cloudflare Pages 的 `latest.json` 已返回 `0.10.12`，镜像安装包和签名 HTTP 200，大小与 SHA-256 和 GitHub Release 一致。
 - Release 的静态镜像 job 因缺少 Cloudflare Actions Secrets 失败；公开镜像当前可用，但自动同步链路仍需维护者安全配置 Secret 后重跑验证。本轮未上传任何凭据。
@@ -169,9 +169,9 @@ https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json
 
 https://moyang-reader-mirror.pages.dev
 
-当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 动态代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。截至 `v0.10.14`，公开动态镜像的 manifest、安装包和签名可访问；这表示公开回退入口可用，不表示静态镜像工作流已经完成。
+当前公开地址由已部署的轻量 Cloudflare Pages Worker/Functions 动态代理提供：`scripts/mirror-worker.js` 读取 GitHub 最新 Release 的 `latest.json`，将 Windows 下载地址改写到镜像的 `/vX.Y.Z/` 路径，并代理安装包和 `.sig`。截至 `v0.10.14`，公开动态镜像的 manifest、安装包和签名可访问；这表示公开备用入口可用，不表示静态镜像工作流已经完成。
 
-镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.14` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用，GitHub Release 仍保留，客户端也会在镜像无法取得可用 manifest 时回退到第二个更新端点。结构化事实以 [`release-status.json`](release-status.json) 为准，静态镜像为 `blocked` 时不能写成发布成功。
+镜像工作流只使用 Release `published` 和手动按版本同步两个入口，不再同时监听 `workflow_run`，避免同一版本重复部署。当前 `v0.10.14` 的静态镜像子任务因可复用工作流缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 在步骤前失败；公开动态镜像仍可用。客户端现在以 GitHub Release 为第一更新端点，只有权威端点不可用时才尝试 Cloudflare 镜像。结构化事实以 [`release-status.json`](release-status.json) 为准，静态镜像为 `blocked` 时不能写成发布成功。
 
 `scripts/mirror-worker.js` 保留为手动应急回滚方案，不是当前默认发布路径。静态镜像部署完成后，工作流会重试检查根 manifest、版本目录 manifest、安装包和 `.sig`，并校验版本、HTTP 状态和安装包大小。
 
@@ -203,6 +203,7 @@ git push origin v0.9.0
 - GitHub Secrets 已配置，且镜像工作流实际执行了静态资产上传。
 - Release 不是 Draft，且 latest.json 已上传。
 - Release 中存在 NSIS 安装包、对应的 `.exe.sig` 签名文件，以及 tauri-action 上传的 `latest.json`。
+- updater 配置与 `scripts/updater-endpoint-order.test.mjs` 均确认 GitHub Release 为第一权威端点、Cloudflare 为第二备用端点。
 - 新安装包能正常打开 Markdown、添加整个文件夹和读取图片附件。
 - 从旧版本点击“更新”能检测到新版本并完成重启。
 
@@ -230,7 +231,7 @@ git push origin v0.9.0
 - Windows x64 NSIS 安装包：4,867,204 字节，SHA-256 `dd59f1f7b70b77df118672e4ce0ffe5af92f5895e5b54fcb962067a08418fe6b`；`.sig`：424 字节，SHA-256 `4cc07d181afa855172f3ffdb688c0bb110c0ccd48fe166cbb94b3a138e457838`。
 - Cloudflare Pages 的根 manifest、`/v0.9.4/` 安装包和 `.sig` 均 HTTP 200；镜像安装包和签名的大小及 SHA-256 与 GitHub Release 一致，镜像 manifest 版本为 `0.9.4`，下载地址指向镜像。
 - 已登记的 v0.9.3 Windows 安装实例已通过应用内更新升级到 v0.9.4；签名校验、替换和自动重启成功，注册表 `DisplayVersion`、文件 `ProductVersion`、运行进程和页面版本均为 v0.9.4。
-- Release 镜像子任务 [98382698574](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；公开镜像当前可用不等于本次自动部署 workflow 全绿，#241 暂不关闭。
+- Release 镜像子任务 [98382698574](https://github.com/MY-moss/moyang_Reader/actions/runs/33030470944/job/98382698574) 因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 失败；公开镜像当前可用不等于本次自动部署 workflow 全绿，#241 暂不关闭。
 
 ## v0.9.5 在线核验记录（2026-08-27）
 
