@@ -83,7 +83,14 @@ for (const theme of THEMES) {
     await page.setViewportSize(VISUAL_VIEWPORT);
     await page.goto("/");
     await setTheme(page, theme);
-    await expectStateScreenshot(page.locator(".empty-state"), "empty-state", theme);
+    const emptyState = page.locator(".empty-state");
+    await expect(emptyState).toBeVisible();
+    const emptyLogo = emptyState.locator(".empty-logo");
+    await expect(emptyLogo).toBeVisible();
+    await expect
+      .poll(() => emptyLogo.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expectStateScreenshot(emptyState, "empty-state", theme);
   });
 
   test(`captures the reader state baseline (${theme})`, async ({ page }) => {
