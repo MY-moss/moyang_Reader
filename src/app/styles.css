@@ -88,6 +88,7 @@
   --warning-button-foreground: #6d5224;
   --warning-button-hover: #fff1c9;
   --workspace-foreground: var(--muted);
+  --section-muted-foreground: #9a9285;
   --backlink-foreground: #70695e;
   --workspace-hover-surface: color-mix(in srgb, var(--surface-strong) 72%, transparent);
   --workspace-active-surface: var(--accent-soft);
@@ -2445,7 +2446,7 @@ html.pane-resizing * {
 }
 .workspace-subheading {
   padding: 0 7px 5px;
-  color: #9a9285;
+  color: var(--section-muted-foreground);
   font-size: var(--type-caption);
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -2707,7 +2708,7 @@ html.pane-resizing * {
 .related-subheading {
   margin-top: 18px;
   padding: 0 7px 5px;
-  color: #9a9285;
+  color: var(--section-muted-foreground);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -4400,6 +4401,7 @@ html.pane-resizing * {
     --warning-button-surface: #423a2a;
     --warning-button-foreground: #efd28b;
     --draft-recovery-muted: #d2b77f;
+    --section-muted-foreground: var(--muted);
     --workspace-foreground: #b6b7ae;
     --backlink-foreground: #b6b7ae;
     --workspace-hover-surface: #2a3531;
@@ -4469,6 +4471,7 @@ html.pane-resizing * {
   --warning-button-surface: #423a2a;
   --warning-button-foreground: #efd28b;
   --draft-recovery-muted: #d2b77f;
+  --section-muted-foreground: var(--muted);
   --workspace-foreground: #b6b7ae;
   --backlink-foreground: #b6b7ae;
   --workspace-hover-surface: #2a3531;
@@ -4516,6 +4519,7 @@ html.pane-resizing * {
     --primary-foreground: ButtonText;
     --shadow-primary: none;
     --page-background: Canvas;
+    --section-muted-foreground: CanvasText;
     --annotation-border: Highlight;
     --annotation-surface: Highlight;
     --preview-surface: Canvas;

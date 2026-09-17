@@ -25,6 +25,7 @@ const semanticTokens = [
   "annotation-border",
   "annotation-surface",
   "workspace-foreground",
+  "section-muted-foreground",
   "workspace-hover-surface",
 ];
 const spacingTokens = [
@@ -173,6 +174,8 @@ test("keeps the governed palette behind semantic tokens", () => {
   assert.match(styles, /\.error-state\s*\{[^}]*border-color:\s*var\(--error-border\)/s);
   assert.match(styles, /\.external-change-notice\s*\{[^}]*background:\s*var\(--warning-surface\)/s);
   assert.match(styles, /\.workspace-file\.active\s*\{[^}]*background:\s*var\(--workspace-active-surface\)/s);
+  assert.match(styles, /\.workspace-subheading\s*\{[^}]*color:\s*var\(--section-muted-foreground\)/s);
+  assert.match(styles, /\.related-subheading\s*\{[^}]*color:\s*var\(--section-muted-foreground\)/s);
   assert.match(styles, /\.markdown-body code\s*\{[^}]*background:\s*var\(--inline-code-surface\)/s);
 });
 
