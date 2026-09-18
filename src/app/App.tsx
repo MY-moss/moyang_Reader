@@ -260,14 +260,7 @@ import {
   findLinkedEntry,
 } from "./workspace-index";
 import type { QuickOpenCandidate } from "./quick-open";
-import {
-  applyWorkspaceFileDelta,
-  applyWorkspaceFolderDelta,
-  applyWorkspaceIndexDelta,
-  isCurrentWorkspaceLoad,
-  workspaceFilesMatch,
-  workspaceFoldersMatch,
-} from "./workspace-refresh";
+import { createWorkspaceSessionController, type WorkspaceSessionController } from "./workspace-session-controller";
 import { resolveExternalChangeAction } from "./external-change";
 import { isPathWithin, normalizePathKey } from "./path-key";
 import {
@@ -542,22 +535,6 @@ type PdfBatchExportState = {
   };
 };
 
-type CachedWorkspace = {
-  path: string;
-  name: string;
-  files: WorkspaceFile[];
-  folders: WorkspaceDirectory[];
-  index: WorkspaceIndexEntry[];
-  listingStatus: WorkspaceListingStatus;
-  indexReady: boolean;
-  revision: number;
-  selectedTag: string | null;
-  selectedFileKind: WorkspaceKindFilter;
-  searchQuery: string;
-  tabs: RecentFile[];
-  activeDocumentPath: string | null;
-};
-
 type DraftComparisonRequest = {
   snapshot: RecoverySnapshot;
   comparisonSource: string | null;
@@ -577,34 +554,6 @@ type OpenPathsOutcome = {
   duplicateCount: number;
   cancelled: boolean;
 };
-
-function updateCachedWorkspace(
-  cache: Map<string, CachedWorkspace>,
-  root: string,
-  changes: Partial<Omit<CachedWorkspace, "path">>,
-): void {
-  const key = comparablePath(root);
-  const current = cache.get(key);
-  if (!current) return;
-  cache.set(key, { ...current, ...changes });
-}
-
-function persistCachedWorkspaceSession(cache: Map<string, CachedWorkspace>, root: string): void {
-  const cached = cache.get(comparablePath(root));
-  if (!cached) return;
-  saveWorkspaceSession({
-    path: cached.path,
-    tabs: cached.tabs,
-    activeDocumentPath: cached.activeDocumentPath,
-  });
-}
-
-function pruneWorkspaceCache(cache: Map<string, CachedWorkspace>, mounted: RecentWorkspace[]): void {
-  const mountedKeys = new Set(mounted.map((workspace) => comparablePath(workspace.path)));
-  for (const key of cache.keys()) {
-    if (!mountedKeys.has(key)) cache.delete(key);
-  }
-}
 
 function isContextMenuKeyboardEvent(event: ReactKeyboardEvent<HTMLElement>): boolean {
   return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
@@ -762,14 +711,8 @@ export function App() {
   const openTabsRef = useRef<RecentFile[]>(openTabs);
   const readingZoomNoticeTimerRef = useRef<number | null>(null);
   const workspaceRestorePendingRef = useRef(false);
-  const mountedWorkspaceCacheRef = useRef(new Map<string, CachedWorkspace>());
   const documentCacheRef = useRef(new DocumentCache());
-  const pendingWorkspaceMountsRef = useRef(new Set<string>());
-  const workspaceLoadRequestRef = useRef(0);
-  const workspaceRefreshQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const workspaceReloadTimerRef = useRef<number | null>(null);
   const notificationSequenceRef = useRef(0);
-  const pendingWorkspacePathsRef = useRef(new Set<string>());
   const selfWritingPathsRef = useRef(new Set<string>());
   const fileDropStateRef = useRef<FileDropState>(idleFileDropState);
   const fileDropDepthRef = useRef(0);
@@ -780,6 +723,81 @@ export function App() {
   const settingsCloseInFlightRef = useRef(false);
   const draftComparisonRequestIdRef = useRef(0);
   const previousVersionRequestIdRef = useRef(0);
+  const setWorkspacePathValue = useCallback((path: string | null) => {
+    workspacePathRef.current = path;
+    setWorkspacePath(path);
+  }, []);
+  const getWorkspacePathValue = useCallback(() => workspacePathRef.current, []);
+  const getOpenTabsValue = useCallback(() => openTabsRef.current, []);
+  const getCurrentDocumentValue = useCallback(() => documentStateRef.current, []);
+  const invalidateWorkspaceDocumentCache = useCallback((paths: string[]) => {
+    documentCacheRef.current.invalidate(paths);
+  }, []);
+  const markWorkspaceRestorePending = useCallback(() => {
+    workspaceRestorePendingRef.current = true;
+  }, []);
+  const [workspaceSessionController] = useState<WorkspaceSessionController>(() =>
+    createWorkspaceSessionController({
+      isNative: isTauriRuntime(),
+      maxMountedWorkspaces: MAX_MOUNTED_WORKSPACES,
+      view: {
+        setWorkspaceFiles,
+        setWorkspaceFolders,
+        setWorkspaceListingStatus,
+        setWorkspaceIndex,
+        setWorkspaceLoading,
+        setWorkspaceIndexLoading,
+        setWorkspaceRevision,
+        setWorkspaceWatchError,
+        setRecentWorkspaces,
+        setMountedWorkspaces,
+        setWorkspaceQuery,
+        setSelectedTag,
+        setSelectedFileKind,
+        setOpenTabs,
+        clearWorkspaceResults: () => setWorkspaceResults([]),
+        setError,
+      },
+      runtime: {
+        getWorkspacePath: () => null,
+        setWorkspacePath: () => undefined,
+        getOpenTabs: () => [],
+        getCurrentDocument: () => null,
+        invalidateDocumentCache: () => undefined,
+        markWorkspaceRestorePending: () => undefined,
+      },
+      loadMountedWorkspaces,
+      loadWorkspaceSessions,
+      listWorkspaceEntries,
+      indexWorkspace,
+      refreshWorkspace,
+      subscribeToWorkspaceChanges,
+      rememberRecentWorkspace,
+      rememberMountedWorkspace,
+      saveMountedWorkspaces,
+      saveWorkspacePath,
+      saveWorkspaceSession,
+      forgetWorkspaceSession,
+    }),
+  );
+  useEffect(() => {
+    workspaceSessionController.setRuntime({
+      getWorkspacePath: getWorkspacePathValue,
+      setWorkspacePath: setWorkspacePathValue,
+      getOpenTabs: getOpenTabsValue,
+      getCurrentDocument: getCurrentDocumentValue,
+      invalidateDocumentCache: invalidateWorkspaceDocumentCache,
+      markWorkspaceRestorePending,
+    });
+  }, [
+    getCurrentDocumentValue,
+    getOpenTabsValue,
+    getWorkspacePathValue,
+    invalidateWorkspaceDocumentCache,
+    markWorkspaceRestorePending,
+    setWorkspacePathValue,
+    workspaceSessionController,
+  ]);
   const linkIndex = useMemo(() => createLinkIndex(workspaceIndex), [workspaceIndex]);
   const renderedHtml = documentState?.rendered.html ?? "";
   const progressiveReaderReady =
@@ -1574,33 +1592,27 @@ export function App() {
 
   useEffect(() => {
     if (!workspacePath) return;
-    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
+    workspaceSessionController.syncSelection(workspacePath, {
       selectedTag,
       selectedFileKind,
       searchQuery: workspaceQuery,
     });
-  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
+  }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery, workspaceSessionController]);
 
   useEffect(() => {
     if (!workspacePath) return;
-    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
-      tabs: openTabsRef.current.filter(
-        (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, workspacePath),
-      ),
-    });
-  }, [openTabs, workspacePath]);
+    workspaceSessionController.syncOpenTabs(workspacePath, openTabsRef.current);
+  }, [openTabs, workspacePath, workspaceSessionController]);
 
   useEffect(() => {
     if (!workspacePath || !documentState?.path || !isPathWithin(documentState.path, workspacePath)) return;
-    updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, {
-      activeDocumentPath: documentState.path,
-    });
-  }, [documentState?.path, workspacePath]);
+    workspaceSessionController.syncActiveDocument(workspacePath, documentState.path);
+  }, [documentState?.path, workspacePath, workspaceSessionController]);
 
   useEffect(() => {
     if (!workspacePath) return;
-    persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
-  }, [documentState?.path, openTabs, workspacePath]);
+    workspaceSessionController.persistWorkspaceSession(workspacePath);
+  }, [documentState?.path, openTabs, workspacePath, workspaceSessionController]);
 
   useEffect(
     () => () => {
@@ -1608,8 +1620,9 @@ export function App() {
       previewUrlsRef.current.clear();
       browserDocumentsRef.current.clear();
       documentCacheRef.current.clear();
+      workspaceSessionController.dispose();
     },
-    [],
+    [workspaceSessionController],
   );
 
   const releaseDocumentResources = useCallback((path: string) => {
@@ -1782,298 +1795,17 @@ export function App() {
     };
   }, [checkForUpdates]);
 
-  const refreshWorkspaceChanges = useCallback((root: string, paths: string[]): Promise<void> => {
-    if (!isTauriRuntime() || paths.length === 0) return Promise.resolve();
+  const refreshWorkspaceChanges = useCallback(
+    (root: string, paths: string[]): Promise<void> => workspaceSessionController.refreshWorkspaceChanges(root, paths),
+    [workspaceSessionController],
+  );
 
-    const loadRequestId = workspaceLoadRequestRef.current;
-    const refresh = workspaceRefreshQueueRef.current.then(async () => {
-      const isActiveWorkspace = () =>
-        loadRequestId === workspaceLoadRequestRef.current &&
-        comparablePath(workspacePathRef.current ?? "") === comparablePath(root);
-
-      if (!isActiveWorkspace()) return;
-
-      setWorkspaceIndexLoading(true);
-      try {
-        const delta = await refreshWorkspace(root, paths);
-        if (!isActiveWorkspace()) return;
-
-        if (delta.truncated) {
-          setWorkspaceListingStatus((current) => {
-            const next = {
-              truncated: true,
-              scannedTotal: Math.max(current.scannedTotal, delta.scannedTotal),
-            };
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { listingStatus: next });
-            return next;
-          });
-        }
-
-        setWorkspaceFiles((current) => {
-          const next = applyWorkspaceFileDelta(current, delta);
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { files: next });
-          return next;
-        });
-        setWorkspaceFolders((current) => {
-          const next = applyWorkspaceFolderDelta(current, delta);
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { folders: next });
-          return next;
-        });
-        setWorkspaceIndex((current) => {
-          const next = applyWorkspaceIndexDelta(current, delta);
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index: next });
-          return next;
-        });
-        setWorkspaceRevision((current) => {
-          const next = current + 1;
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
-          return next;
-        });
-      } catch {
-        if (isActiveWorkspace()) setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
-      } finally {
-        if (isActiveWorkspace()) setWorkspaceIndexLoading(false);
-      }
-    });
-    workspaceRefreshQueueRef.current = refresh.catch(() => undefined);
-    return refresh;
-  }, []);
-
-  const loadWorkspace = useCallback(async (root: string, silent = false) => {
-    if (!isTauriRuntime()) return;
-
-    const mounted = loadMountedWorkspaces();
-    const rootKey = comparablePath(root);
-    const alreadyMounted = mounted.some((workspace) => comparablePath(workspace.path) === rootKey);
-    const alreadyPending = pendingWorkspaceMountsRef.current.has(rootKey);
-    if (
-      !alreadyMounted &&
-      !alreadyPending &&
-      mounted.length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES
-    ) {
-      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
-      return;
-    }
-    const ownsPendingMount = !alreadyMounted && !alreadyPending;
-    if (ownsPendingMount) pendingWorkspaceMountsRef.current.add(rootKey);
-
-    const previousWorkspacePath = workspacePathRef.current;
-    const storedSession = loadWorkspaceSessions().find(
-      (session) => comparablePath(session.path) === comparablePath(root),
-    );
-    const switchedWorkspace =
-      comparablePath(previousWorkspacePath ?? "") !== comparablePath(root) && Boolean(previousWorkspacePath);
-    if (switchedWorkspace || (storedSession && !previousWorkspacePath)) {
-      workspaceRestorePendingRef.current = true;
-    }
-    if (switchedWorkspace && previousWorkspacePath) {
-      const currentDocument = documentStateRef.current;
-      updateCachedWorkspace(mountedWorkspaceCacheRef.current, previousWorkspacePath, {
-        tabs: openTabsRef.current.filter(
-          (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, previousWorkspacePath),
-        ),
-        activeDocumentPath:
-          currentDocument && isPathWithin(currentDocument.path, previousWorkspacePath) ? currentDocument.path : null,
-      });
-      persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, previousWorkspacePath);
-    }
-
-    const requestId = ++workspaceLoadRequestRef.current;
-    setWorkspaceLoading(true);
-    setWorkspaceIndexLoading(true);
-    try {
-      const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
-      if (cached) {
-        const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(cached.path);
-        workspacePathRef.current = cached.path;
-        setWorkspacePath(cached.path);
-        setWorkspaceFiles(cached.files);
-        setWorkspaceFolders(cached.folders);
-        setWorkspaceListingStatus(cached.listingStatus);
-        setWorkspaceIndex(cached.index);
-        setWorkspaceRevision(cached.revision);
-        setWorkspaceQuery(cached.searchQuery);
-        setSelectedTag(cached.selectedTag);
-        setSelectedFileKind(cached.selectedFileKind);
-        if (switchedWorkspace) {
-          setWorkspaceResults([]);
-          setOpenTabs(cached.tabs ?? []);
-        }
-        saveWorkspacePath(cached.path);
-        setRecentWorkspaces(
-          rememberRecentWorkspace({
-            path: cached.path,
-            name: cached.name,
-          }),
-        );
-        const nextMountedWorkspaces = rememberMountedWorkspace({
-          path: cached.path,
-          name: cached.name,
-        });
-        pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
-        setMountedWorkspaces(nextMountedWorkspaces);
-        if (!silent) setError(null);
-        setWorkspaceLoading(false);
-
-        void (async () => {
-          try {
-            const listing = await listWorkspaceEntries(cached.path);
-            const { files, folders } = listing;
-            if (
-              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
-            ) {
-              return;
-            }
-            const filesChanged = !workspaceFilesMatch(cached.files, files);
-            const foldersChanged = !workspaceFoldersMatch(cached.folders, folders);
-            const listingStatusChanged =
-              cached.listingStatus.truncated !== listing.truncated ||
-              cached.listingStatus.scannedTotal !== listing.scannedTotal;
-            if (filesChanged) {
-              setWorkspaceFiles(files);
-              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { files });
-            }
-            if (foldersChanged) {
-              setWorkspaceFolders(folders);
-              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { folders });
-            }
-            if (listingStatusChanged) {
-              const listingStatus = {
-                truncated: listing.truncated,
-                scannedTotal: listing.scannedTotal,
-              };
-              setWorkspaceListingStatus(listingStatus);
-              updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { listingStatus });
-            }
-            if (filesChanged || foldersChanged) {
-              setWorkspaceRevision((current) => {
-                const next = current + 1;
-                updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { revision: next });
-                return next;
-              });
-            }
-            if (cached.indexReady && !filesChanged) return;
-
-            const index = await indexWorkspace(cached.path);
-            if (
-              !isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, cached.path, workspacePathRef.current)
-            ) {
-              return;
-            }
-            setWorkspaceIndex(index);
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, cached.path, { index, indexReady: true });
-          } catch (cause) {
-            if (requestId === workspaceLoadRequestRef.current && !silent) {
-              setError(cause instanceof Error ? cause.message : "工作区刷新失败。");
-            }
-          } finally {
-            if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
-          }
-        })();
-        return;
-      }
-
-      const listing = await listWorkspaceEntries(root);
-      const { files, folders } = listing;
-      if (requestId !== workspaceLoadRequestRef.current) return;
-
-      const switchedWorkspace = comparablePath(workspacePathRef.current ?? "") !== comparablePath(root);
-      const workspaceRecord = {
-        path: root,
-        name: fileNameFromPath(root.replace(/[\\/]+$/, "")) || root,
-      };
-      mountedWorkspaceCacheRef.current.set(comparablePath(root), {
-        ...workspaceRecord,
-        files,
-        folders,
-        listingStatus: {
-          truncated: listing.truncated,
-          scannedTotal: listing.scannedTotal,
-        },
-        index: [],
-        indexReady: false,
-        revision: 0,
-        selectedTag: null,
-        selectedFileKind: "all",
-        searchQuery: "",
-        tabs: storedSession?.tabs ?? [],
-        activeDocumentPath: storedSession?.activeDocumentPath ?? null,
-      });
-      workspacePathRef.current = root;
-      setWorkspacePath(root);
-      setWorkspaceFiles(files);
-      setWorkspaceFolders(folders);
-      setWorkspaceListingStatus({ truncated: listing.truncated, scannedTotal: listing.scannedTotal });
-      if (switchedWorkspace || !previousWorkspacePath) {
-        setWorkspaceIndex([]);
-        setWorkspaceResults([]);
-        setWorkspaceQuery("");
-        setSelectedTag(null);
-        setSelectedFileKind("all");
-        setOpenTabs(storedSession?.tabs ?? []);
-      }
-      setWorkspaceRevision((current) => {
-        const next = current + 1;
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { revision: next });
-        return next;
-      });
-      saveWorkspacePath(root);
-      setRecentWorkspaces(rememberRecentWorkspace(workspaceRecord));
-      const nextMountedWorkspaces = rememberMountedWorkspace(workspaceRecord);
-      pruneWorkspaceCache(mountedWorkspaceCacheRef.current, nextMountedWorkspaces);
-      setMountedWorkspaces(nextMountedWorkspaces);
-      if (!silent) setError(null);
-      setWorkspaceLoading(false);
-
-      void indexWorkspace(root)
-        .then((index) => {
-          if (!isCurrentWorkspaceLoad(requestId, workspaceLoadRequestRef.current, root, workspacePathRef.current))
-            return;
-          setWorkspaceIndex(index);
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, { index, indexReady: true });
-        })
-        .catch((cause) => {
-          if (requestId !== workspaceLoadRequestRef.current) return;
-          setWorkspaceIndex([]);
-          if (!silent) {
-            setError(cause instanceof Error ? cause.message : "工作区索引失败。");
-          }
-        })
-        .finally(() => {
-          if (requestId === workspaceLoadRequestRef.current) setWorkspaceIndexLoading(false);
-        });
-    } catch (cause) {
-      if (requestId !== workspaceLoadRequestRef.current) return;
-      setWorkspaceLoading(false);
-      setWorkspaceIndexLoading(false);
-      if (silent) {
-        setWorkspacePath(null);
-        workspacePathRef.current = null;
-        setWorkspaceFiles([]);
-        setWorkspaceFolders([]);
-        setWorkspaceListingStatus({ truncated: false, scannedTotal: 0 });
-        setWorkspaceIndex([]);
-        saveWorkspacePath(null);
-        mountedWorkspaceCacheRef.current.delete(comparablePath(root));
-        forgetWorkspaceSession(root);
-        setMountedWorkspaces((current) => {
-          const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(root));
-          saveMountedWorkspaces(next);
-          return next;
-        });
-      } else {
-        setError(cause instanceof Error ? cause.message : "工作区读取失败。");
-      }
-    } finally {
-      if (ownsPendingMount) pendingWorkspaceMountsRef.current.delete(rootKey);
-    }
-  }, []);
+  const loadWorkspace = useCallback(
+    (root: string, silent = false): Promise<boolean> => workspaceSessionController.loadWorkspace(root, silent),
+    [workspaceSessionController],
+  );
 
   const handleChooseWorkspace = useCallback(async () => {
-    if (loadMountedWorkspaces().length + pendingWorkspaceMountsRef.current.size >= MAX_MOUNTED_WORKSPACES) {
-      setError(`最多同时挂载 ${MAX_MOUNTED_WORKSPACES} 个阅读库，请先从切换菜单移除一个。`);
-      return;
-    }
     const selected = await chooseWorkspacePath();
     if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {
       await loadWorkspace(selected);
@@ -2095,17 +1827,12 @@ export function App() {
     [confirmWorkspaceSwitch, loadWorkspace],
   );
 
-  const handleRemoveMountedWorkspace = useCallback((path: string) => {
-    if (comparablePath(path) === comparablePath(workspacePathRef.current ?? "")) return;
-    mountedWorkspaceCacheRef.current.delete(comparablePath(path));
-    documentCacheRef.current.invalidate([path]);
-    forgetWorkspaceSession(path);
-    setMountedWorkspaces((current) => {
-      const next = current.filter((workspace) => comparablePath(workspace.path) !== comparablePath(path));
-      saveMountedWorkspaces(next);
-      return next;
-    });
-  }, []);
+  const handleRemoveMountedWorkspace = useCallback(
+    (path: string) => {
+      workspaceSessionController.removeMountedWorkspace(path);
+    },
+    [workspaceSessionController],
+  );
 
   const openSource = useCallback(
     async (
@@ -2431,8 +2158,7 @@ export function App() {
     if (!workspaceRestorePendingRef.current) return;
     workspaceRestorePendingRef.current = false;
 
-    const cached = mountedWorkspaceCacheRef.current.get(comparablePath(workspacePath));
-    const targetPath = cached?.activeDocumentPath ?? null;
+    const targetPath = workspaceSessionController.getActiveDocumentPath(workspacePath);
     const currentPath = documentStateRef.current?.path ?? null;
     const currentBelongs = currentPath ? isPathWithin(currentPath, workspacePath) : false;
     const targetBelongs = targetPath ? isPathWithin(targetPath, workspacePath) : false;
@@ -2454,14 +2180,14 @@ export function App() {
     let active = true;
     void openPath(targetPath).then((opened) => {
       if (active && !opened) {
-        updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
-        persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, workspacePath);
+        workspaceSessionController.clearActiveDocumentPath(workspacePath);
+        workspaceSessionController.persistWorkspaceSession(workspacePath);
       }
     });
     return () => {
       active = false;
     };
-  }, [openPath, releaseDocumentResources, workspacePath]);
+  }, [openPath, releaseDocumentResources, workspacePath, workspaceSessionController]);
 
   const handleOpenPaths = useCallback(
     async (paths: OpenPath[]): Promise<OpenPathsOutcome> => {
@@ -2699,18 +2425,18 @@ export function App() {
           return nextFiles;
         });
 
-        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        const cached = workspaceSessionController.getCachedWorkspace(root);
         if (cached) {
           const cachedTabs = nextTabs.filter(
             (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root),
           );
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+          workspaceSessionController.updateCachedWorkspace(root, {
             tabs: cachedTabs,
             activeDocumentPath: cached.activeDocumentPath
               ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, renamedPath)
               : null,
           });
-          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+          workspaceSessionController.persistWorkspaceSession(root);
         }
 
         let reopenFailed = false;
@@ -2738,7 +2464,15 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");
       }
     },
-    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [
+      notify,
+      openPath,
+      refreshWorkspaceChanges,
+      releaseDocumentResources,
+      resetEditorHistory,
+      saveDocument,
+      workspaceSessionController,
+    ],
   );
 
   const handleDeleteWorkspaceEntry = useCallback(
@@ -2783,13 +2517,13 @@ export function App() {
           return nextFiles;
         });
 
-        const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+        const cached = workspaceSessionController.getCachedWorkspace(root);
         if (cached) {
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+          workspaceSessionController.updateCachedWorkspace(root, {
             tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
             activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,
           });
-          persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+          workspaceSessionController.persistWorkspaceSession(root);
         }
 
         let nextTabFailed = false;
@@ -2815,7 +2549,15 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
       }
     },
-    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [
+      notify,
+      openPath,
+      refreshWorkspaceChanges,
+      releaseDocumentResources,
+      resetEditorHistory,
+      saveDocument,
+      workspaceSessionController,
+    ],
   );
 
   const handleTransferWorkspaceEntry = useCallback(
@@ -2863,15 +2605,15 @@ export function App() {
             return nextFiles;
           });
 
-          const cached = mountedWorkspaceCacheRef.current.get(comparablePath(root));
+          const cached = workspaceSessionController.getCachedWorkspace(root);
           if (cached) {
-            updateCachedWorkspace(mountedWorkspaceCacheRef.current, root, {
+            workspaceSessionController.updateCachedWorkspace(root, {
               tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
               activeDocumentPath: cached.activeDocumentPath
                 ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, transferredPath)
                 : null,
             });
-            persistCachedWorkspaceSession(mountedWorkspaceCacheRef.current, root);
+            workspaceSessionController.persistWorkspaceSession(root);
           }
 
           if (currentIsAffected && current) {
@@ -2903,7 +2645,15 @@ export function App() {
         return false;
       }
     },
-    [notify, openPath, refreshWorkspaceChanges, releaseDocumentResources, resetEditorHistory, saveDocument],
+    [
+      notify,
+      openPath,
+      refreshWorkspaceChanges,
+      releaseDocumentResources,
+      resetEditorHistory,
+      saveDocument,
+      workspaceSessionController,
+    ],
   );
 
   const handleCopyWorkspacePath = useCallback(
@@ -3120,13 +2870,7 @@ export function App() {
           if (activeWorkspace) {
             await loadWorkspace(activeWorkspace.path, true);
           } else if (candidates.length > 0) {
-            saveWorkspacePath(null);
-            workspacePathRef.current = null;
-            setWorkspacePath(null);
-            setWorkspaceFiles([]);
-            setWorkspaceFolders([]);
-            setWorkspaceListingStatus({ truncated: false, scannedTotal: 0 });
-            setWorkspaceIndex([]);
+            workspaceSessionController.clearActiveWorkspace();
           }
         }
 
@@ -3181,7 +2925,7 @@ export function App() {
       active = false;
       unlisten?.();
     };
-  }, [handleOpenPaths, loadWorkspace, openPath]);
+  }, [handleOpenPaths, loadWorkspace, openPath, workspaceSessionController]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -3257,26 +3001,7 @@ export function App() {
   useEffect(() => {
     if (!workspacePath || !isTauriRuntime()) return;
 
-    let active = true;
-    let unwatch: (() => void) | null = null;
-    const pendingWorkspacePaths = pendingWorkspacePathsRef.current;
-    setWorkspaceWatchError(null);
-
-    void subscribeToWorkspaceChanges(workspacePath, (paths) => {
-      if (!active) return;
-
-      documentCacheRef.current.invalidate(paths);
-      for (const path of paths) pendingWorkspacePaths.add(path);
-      if (workspaceReloadTimerRef.current !== null) {
-        window.clearTimeout(workspaceReloadTimerRef.current);
-      }
-      workspaceReloadTimerRef.current = window.setTimeout(() => {
-        workspaceReloadTimerRef.current = null;
-        const changedPaths = [...pendingWorkspacePaths];
-        pendingWorkspacePaths.clear();
-        void refreshWorkspaceChanges(workspacePath, changedPaths);
-      }, 280);
-
+    return workspaceSessionController.watchWorkspace(workspacePath, (paths) => {
       const current = documentStateRef.current;
       if (!current || current.path.startsWith("browser://")) return;
 
@@ -3303,28 +3028,8 @@ export function App() {
       } else {
         void openPath(current.path, true);
       }
-    })
-      .then((dispose) => {
-        if (!active) {
-          dispose?.();
-        } else {
-          unwatch = dispose;
-        }
-      })
-      .catch(() => {
-        if (active) setWorkspaceWatchError("文件监听不可用，目录仍可手动刷新。");
-      });
-
-    return () => {
-      active = false;
-      if (workspaceReloadTimerRef.current !== null) {
-        window.clearTimeout(workspaceReloadTimerRef.current);
-        workspaceReloadTimerRef.current = null;
-      }
-      pendingWorkspacePaths.clear();
-      unwatch?.();
-    };
-  }, [openPath, refreshWorkspaceChanges, workspacePath]);
+    });
+  }, [openPath, workspacePath, workspaceSessionController]);
 
   useEffect(() => {
     const query = workspaceQuery.trim();
@@ -4647,11 +4352,18 @@ export function App() {
         setError(null);
         saveLastDocumentPath(null);
         if (workspacePath) {
-          updateCachedWorkspace(mountedWorkspaceCacheRef.current, workspacePath, { activeDocumentPath: null });
+          workspaceSessionController.clearActiveDocumentPath(workspacePath);
         }
       }
     },
-    [commitNavigationHistory, flushCurrentDraft, openPath, releaseDocumentResources, workspacePath],
+    [
+      commitNavigationHistory,
+      flushCurrentDraft,
+      openPath,
+      releaseDocumentResources,
+      workspacePath,
+      workspaceSessionController,
+    ],
   );
 
   const handleCloseTab = useCallback(
