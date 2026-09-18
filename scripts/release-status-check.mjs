@@ -158,15 +158,24 @@ function validateReleaseAssets(projectRoot, release, version, errors) {
     if (!/^https:\/\//i.test(asset.url ?? "")) {
       errors.push(`${label} 下载地址必须使用 HTTPS。`);
     }
-    if (!Number.isInteger(asset.size) || asset.size <= 0) {
-      errors.push(`${label} 必须记录正整数文件大小。`);
-    }
-    if (!/^[0-9a-f]{64}$/i.test(asset.sha256 ?? "")) {
-      errors.push(`${label} 必须记录 64 位 SHA-256。`);
-    }
     const expectedStatus = release.status === "published" ? "verified" : "pending";
     if (asset.status !== expectedStatus) {
       errors.push(`${label} 在 ${release.status} 状态下必须标记为 ${expectedStatus}。`);
+    }
+    if (asset.status === "pending") {
+      if (asset.size !== null && (!Number.isInteger(asset.size) || asset.size <= 0)) {
+        errors.push(`${label} 若已记录大小，必须是正整数；未生成时应为 null。`);
+      }
+      if (asset.sha256 !== null && !/^[0-9a-f]{64}$/i.test(asset.sha256 ?? "")) {
+        errors.push(`${label} 若已记录哈希，必须是 64 位 SHA-256；未生成时应为 null。`);
+      }
+    } else {
+      if (!Number.isInteger(asset.size) || asset.size <= 0) {
+        errors.push(`${label} 必须记录正整数文件大小。`);
+      }
+      if (!/^[0-9a-f]{64}$/i.test(asset.sha256 ?? "")) {
+        errors.push(`${label} 必须记录 64 位 SHA-256。`);
+      }
     }
   }
   for (const kind of requiredAssetKinds) {

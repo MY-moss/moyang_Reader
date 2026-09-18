@@ -1,45 +1,47 @@
 {
   "schemaVersion": 1,
   "release": {
-    "version": "0.10.14",
-    "tag": "v0.10.14",
-    "status": "published",
-    "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14",
+    "version": "0.11.0",
+    "tag": "v0.11.0",
+    "status": "planned",
+    "evidence": "docs/handoff/v0.11-release-prep.md",
     "githubRelease": {
-      "status": "verified",
-      "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14"
+      "status": "pending",
+      "reason": "候选提交尚未合并并推送 v0.11.0 tag，GitHub Release 尚未创建。",
+      "evidence": "docs/handoff/v0.11-release-prep.md"
     },
     "assets": [
       {
         "kind": "installer",
-        "status": "verified",
-        "name": "Moyang.Reader_0.10.14_x64-setup.exe",
-        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/Moyang.Reader_0.10.14_x64-setup.exe",
-        "size": 5243339,
-        "sha256": "293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59"
+        "status": "pending",
+        "name": "Moyang.Reader_0.11.0_x64-setup.exe",
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/Moyang.Reader_0.11.0_x64-setup.exe",
+        "size": null,
+        "sha256": null
       },
       {
         "kind": "signature",
-        "status": "verified",
-        "name": "Moyang.Reader_0.10.14_x64-setup.exe.sig",
-        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/Moyang.Reader_0.10.14_x64-setup.exe.sig",
-        "size": 428,
-        "sha256": "fd832a5689c9064118dd0bb8e9c3ba3d88e0a75da0c061bbd6809b069ab70adf"
+        "status": "pending",
+        "name": "Moyang.Reader_0.11.0_x64-setup.exe.sig",
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/Moyang.Reader_0.11.0_x64-setup.exe.sig",
+        "size": null,
+        "sha256": null
       },
       {
         "kind": "manifest",
-        "status": "verified",
+        "status": "pending",
         "name": "latest.json",
-        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/latest.json",
-        "size": 1413,
-        "sha256": "dfb110ba23f248d6c374d714613888511f99a4aae2b038219caeea27350af8cc"
+        "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/latest.json",
+        "size": null,
+        "sha256": null
       }
     ]
   },
   "mirror": {
     "publicAssets": {
-      "status": "verified",
-      "evidence": "https://moyang-reader-mirror.pages.dev/latest.json"
+      "status": "pending",
+      "reason": "v0.11.0 尚未发布；公开镜像当前仍对应 v0.10.14。",
+      "evidence": "docs/handoff/v0.11-release-prep.md"
     },
     "staticWorkflow": {
       "status": "blocked",
