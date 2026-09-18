@@ -70,6 +70,35 @@ where
         .map_err(|error| format!("{operation}后台任务失败：{error}"))?
 }
 
+pub const FILE_READ_FAILED: &str = "FILE_READ_FAILED";
+pub const FILE_WRITE_FAILED: &str = "FILE_WRITE_FAILED";
+pub const WORKSPACE_ACCESS_DENIED: &str = "WORKSPACE_ACCESS_DENIED";
+pub const WORKSPACE_OPERATION_FAILED: &str = "WORKSPACE_OPERATION_FAILED";
+pub const EXPORT_FAILED: &str = "EXPORT_FAILED";
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AppError {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+}
+
+impl AppError {
+    fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+            details: None,
+        }
+    }
+}
+
+fn map_app_error<T>(result: Result<T, String>, code: &str) -> Result<T, AppError> {
+    result.map_err(|message| AppError::new(code, message))
+}
+
 #[derive(Default)]
 pub struct AccessRegistry {
     read_entries: Mutex<Vec<PathBuf>>,
@@ -1368,8 +1397,15 @@ pub fn authorize_stored_path(
     path: String,
     workspace: bool,
     access: State<'_, AccessRegistry>,
-) -> Result<String, String> {
-    authorize_stored_path_inner(PathBuf::from(path), workspace, access.inner())
+) -> Result<String, AppError> {
+    map_app_error(
+        authorize_stored_path_inner(PathBuf::from(path), workspace, access.inner()),
+        if workspace {
+            WORKSPACE_ACCESS_DENIED
+        } else {
+            FILE_READ_FAILED
+        },
+    )
 }
 
 fn authorize_stored_path_inner(
@@ -1713,14 +1749,20 @@ fn write_annotations_inner(
 pub async fn read_annotations(
     root: String,
     access: State<'_, AccessRegistry>,
-) -> Result<Vec<StoredAnnotation>, String> {
+) -> Result<Vec<StoredAnnotation>, AppError> {
     if !access.is_workspace_allowed(Path::new(&root)) {
-        return Err("拒绝读取未通过用户选择的工作区批注。请重新选择文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户选择的工作区批注。请重新选择文件夹。",
+        ));
     }
-    run_blocking("读取阅读批注", move || {
-        read_annotations_inner(PathBuf::from(root))
-    })
-    .await
+    map_app_error(
+        run_blocking("读取阅读批注", move || {
+            read_annotations_inner(PathBuf::from(root))
+        })
+        .await,
+        FILE_READ_FAILED,
+    )
 }
 
 #[tauri::command]
@@ -1728,28 +1770,40 @@ pub async fn write_annotations(
     root: String,
     annotations: Vec<StoredAnnotation>,
     access: State<'_, AccessRegistry>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     if !access.is_workspace_allowed(Path::new(&root)) {
-        return Err("拒绝写入未通过用户选择的工作区批注。请重新选择文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝写入未通过用户选择的工作区批注。请重新选择文件夹。",
+        ));
     }
-    run_blocking("保存阅读批注", move || {
-        write_annotations_inner(PathBuf::from(root), annotations)
-    })
-    .await
+    map_app_error(
+        run_blocking("保存阅读批注", move || {
+            write_annotations_inner(PathBuf::from(root), annotations)
+        })
+        .await,
+        FILE_WRITE_FAILED,
+    )
 }
 
 #[tauri::command]
 pub async fn read_text_file(
     path: String,
     access: State<'_, AccessRegistry>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     if !access.is_read_allowed(Path::new(&path)) {
-        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。",
+        ));
     }
-    run_blocking("读取文本文件", move || {
-        read_text_file_inner(PathBuf::from(path))
-    })
-    .await
+    map_app_error(
+        run_blocking("读取文本文件", move || {
+            read_text_file_inner(PathBuf::from(path))
+        })
+        .await,
+        FILE_READ_FAILED,
+    )
 }
 
 fn read_text_file_inner(path: PathBuf) -> Result<String, String> {
@@ -1789,33 +1843,46 @@ fn read_previous_version_inner(path: PathBuf) -> Result<Option<String>, String> 
 pub async fn read_previous_version(
     path: String,
     access: State<'_, AccessRegistry>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, AppError> {
     if !access.is_read_allowed(Path::new(&path)) {
-        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。",
+        ));
     }
-    run_blocking("读取上一保存版本", move || {
-        read_previous_version_inner(PathBuf::from(path))
-    })
-    .await
+    map_app_error(
+        run_blocking("读取上一保存版本", move || {
+            read_previous_version_inner(PathBuf::from(path))
+        })
+        .await,
+        FILE_READ_FAILED,
+    )
 }
 
 #[tauri::command]
 pub async fn read_binary_file(
     path: String,
     access: State<'_, AccessRegistry>,
-) -> Result<tauri::ipc::Response, String> {
+) -> Result<tauri::ipc::Response, AppError> {
     let path = PathBuf::from(path);
     if !access.is_read_allowed(&path) {
-        return Err("拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户文件选择的路径。请重新选择文件或文件夹。",
+        ));
     }
-    let bytes = run_blocking("读取二进制文件", move || {
-        let metadata = fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
-        if metadata.len() > MAX_READ_FILE_BYTES {
-            return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
-        }
-        fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))
-    })
-    .await?;
+    let bytes = map_app_error(
+        run_blocking("读取二进制文件", move || {
+            let metadata =
+                fs::metadata(&path).map_err(|error| format!("无法读取文件信息：{error}"))?;
+            if metadata.len() > MAX_READ_FILE_BYTES {
+                return Err("文件过大，暂不支持直接打开超过 100 MB 的附件。".to_string());
+            }
+            fs::read(&path).map_err(|error| format!("无法读取文件：{error}"))
+        })
+        .await,
+        FILE_READ_FAILED,
+    )?;
     Ok(tauri::ipc::Response::new(bytes))
 }
 
@@ -2167,16 +2234,22 @@ fn list_workspace_files_inner(root: PathBuf) -> Result<Vec<WorkspaceFile>, Strin
 pub async fn list_workspace_entries(
     root: String,
     access: State<'_, AccessRegistry>,
-) -> Result<WorkspaceListing, String> {
+) -> Result<WorkspaceListing, AppError> {
     if !access.is_read_allowed(Path::new(&root)) {
-        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户选择的工作区。请重新添加文件夹。",
+        ));
     }
-    run_blocking("读取工作区目录", move || {
-        let root = fs::canonicalize(PathBuf::from(root))
-            .map_err(|error| format!("无法确认工作区路径：{error}"))?;
-        sorted_workspace_listing(&root)
-    })
-    .await
+    map_app_error(
+        run_blocking("读取工作区目录", move || {
+            let root = fs::canonicalize(PathBuf::from(root))
+                .map_err(|error| format!("无法确认工作区路径：{error}"))?;
+            sorted_workspace_listing(&root)
+        })
+        .await,
+        WORKSPACE_OPERATION_FAILED,
+    )
 }
 
 #[tauri::command]
@@ -3011,17 +3084,23 @@ pub async fn refresh_workspace(
     paths: Vec<String>,
     access: State<'_, AccessRegistry>,
     cache: State<'_, WorkspaceSearchCache>,
-) -> Result<WorkspaceRefreshResult, String> {
+) -> Result<WorkspaceRefreshResult, AppError> {
     if !access.is_read_allowed(Path::new(&root)) {
-        return Err("拒绝读取未通过用户选择的工作区。请重新添加工作区。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝读取未通过用户选择的工作区。请重新添加工作区。",
+        ));
     }
     let cache = cache.inner().clone();
-    run_blocking("刷新工作区", move || {
-        let result = refresh_workspace_inner(PathBuf::from(root), paths)?;
-        cache.invalidate_scopes(&result.scope_paths);
-        Ok(result)
-    })
-    .await
+    map_app_error(
+        run_blocking("刷新工作区", move || {
+            let result = refresh_workspace_inner(PathBuf::from(root), paths)?;
+            cache.invalidate_scopes(&result.scope_paths);
+            Ok(result)
+        })
+        .await,
+        WORKSPACE_OPERATION_FAILED,
+    )
 }
 
 fn index_entry_for_file(file: WorkspaceFile) -> Option<WorkspaceIndexEntry> {
@@ -3190,15 +3269,21 @@ pub async fn write_text_file(
     path: String,
     contents: String,
     access: State<'_, AccessRegistry>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let path = PathBuf::from(path);
     if !is_export_write_allowed_for_new_path(&access, &path) {
-        return Err("拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝写入未通过用户文件选择的路径。请重新选择文件或文件夹。",
+        ));
     }
-    run_blocking("保存文本文件", move || {
-        write_text_file_inner(path, contents)
-    })
-    .await
+    map_app_error(
+        run_blocking("保存文本文件", move || {
+            write_text_file_inner(path, contents)
+        })
+        .await,
+        FILE_WRITE_FAILED,
+    )
 }
 
 fn write_text_file_inner(path: PathBuf, contents: String) -> Result<(), String> {
@@ -3247,26 +3332,38 @@ pub async fn export_pdf_file(
     path: String,
     html: String,
     access: State<'_, AccessRegistry>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let path = PathBuf::from(path);
     if !is_write_allowed_for_new_path(&access, &path) {
-        return Err("拒绝写入未通过用户文件选择的路径。请重新选择保存位置。".to_string());
+        return Err(AppError::new(
+            WORKSPACE_ACCESS_DENIED,
+            "拒绝写入未通过用户文件选择的路径。请重新选择保存位置。",
+        ));
     }
     if html.trim().is_empty() {
-        return Err("没有可导出的文档内容。".to_string());
+        return Err(AppError::new(EXPORT_FAILED, "没有可导出的文档内容。"));
     }
     if html.len() > MAX_PDF_HTML_BYTES {
-        return Err("文档内容过大，暂时无法生成 PDF。请先拆分文档后重试。".to_string());
+        return Err(AppError::new(
+            EXPORT_FAILED,
+            "文档内容过大，暂时无法生成 PDF。请先拆分文档后重试。",
+        ));
     }
 
     #[cfg(windows)]
     {
-        run_blocking("生成 PDF", move || export_pdf_file_windows(path, &html)).await
+        map_app_error(
+            run_blocking("生成 PDF", move || export_pdf_file_windows(path, &html)).await,
+            EXPORT_FAILED,
+        )
     }
     #[cfg(not(windows))]
     {
         let _ = (path, html);
-        Err("PDF 文件导出仅支持 Windows 桌面版。".to_string())
+        Err(AppError::new(
+            EXPORT_FAILED,
+            "PDF 文件导出仅支持 Windows 桌面版。",
+        ))
     }
 }
 
@@ -3771,9 +3868,9 @@ mod tests {
         source_search_tokens, sync_binary_file_inner, touch_indexed_file,
         transfer_workspace_entry_inner, validate_export_stream_parent,
         validate_export_stream_temp_path, write_annotations_inner, write_binary_file_chunk_inner,
-        write_bytes_file_inner, write_text_file_inner, AccessRegistry, CachedSearchIndex,
+        write_bytes_file_inner, write_text_file_inner, AccessRegistry, AppError, CachedSearchIndex,
         CachedSearchText, OpenPath, OpenPathKind, StoredAnnotation, WorkspaceSearchCache,
-        MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
+        FILE_READ_FAILED, MAX_READ_FILE_BYTES, MAX_SEARCH_CACHE_BYTES, MAX_SEARCH_CACHE_ENTRIES,
         MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, MAX_WORKSPACE_DEPTH,
         MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
     };
@@ -3787,6 +3884,16 @@ mod tests {
         assert!(has_pdf_header(b"%PDF-1.7\n"));
         assert!(!has_pdf_header(b"PDF-1.7\n"));
         assert!(!has_pdf_header(b"%PDF"));
+    }
+
+    #[test]
+    fn serializes_stable_error_code_with_message() {
+        let error = AppError::new(FILE_READ_FAILED, "读取失败");
+        let value = serde_json::to_value(error).expect("error envelope should serialize");
+
+        assert_eq!(value["code"], "FILE_READ_FAILED");
+        assert_eq!(value["message"], "读取失败");
+        assert!(value.get("details").is_none());
     }
 
     #[cfg(windows)]

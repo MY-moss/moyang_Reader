@@ -1,5 +1,7 @@
 import { isTauriRuntime } from "./bridge";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import { ERROR_CODES, normalizeAppError } from "./error-contract";
+import { translate, type Locale } from "./i18n";
 
 export type UpdateStatus = "idle" | "checking" | "available" | "downloading" | "ready" | "error" | "up-to-date";
 
@@ -32,25 +34,18 @@ export async function relaunchApp(): Promise<void> {
   await relaunch();
 }
 
-export function describeUpdateError(cause: unknown): string {
-  const raw = cause instanceof Error ? cause.message : String(cause);
-  const message = raw.toLocaleLowerCase();
-
-  if (/signature|public key|invalid key|verify/.test(message)) {
-    return "更新包签名校验失败，已停止安装。请从 GitHub Release 页面手动下载可信版本。";
+export function describeUpdateError(cause: unknown, locale: Locale = "zh-CN"): string {
+  const error = normalizeAppError(cause, ERROR_CODES.UPDATE_FAILED, "更新失败。");
+  switch (error.code) {
+    case ERROR_CODES.UPDATE_SIGNATURE_INVALID:
+      return translate(locale, "error.updateSignature");
+    case ERROR_CODES.UPDATE_PERMISSION_DENIED:
+      return translate(locale, "error.updatePermission");
+    case ERROR_CODES.UPDATE_CONFIGURATION_INVALID:
+      return translate(locale, "error.updateConfiguration");
+    case ERROR_CODES.UPDATE_NETWORK_FAILED:
+      return translate(locale, "error.updateNetwork");
+    default:
+      return translate(locale, "error.updateFailed") + error.message;
   }
-
-  if (/permission|access denied|elevation|administrator/.test(message)) {
-    return "更新需要系统权限，安装没有完成。可以稍后重试或从 GitHub Release 页面手动安装。";
-  }
-
-  if (/endpoint|pubkey|updater.*config|not configured/.test(message)) {
-    return "更新服务尚未配置完成，当前版本仍可正常使用。";
-  }
-
-  if (/fetch|network|connection|timeout|404|not found|dns/.test(message)) {
-    return "暂时无法连接更新服务器，请检查网络后重试。";
-  }
-
-  return "更新失败：" + raw;
 }
