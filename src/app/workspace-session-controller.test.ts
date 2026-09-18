@@ -126,9 +126,6 @@ function createHarness(overrides: Partial<WorkspaceSessionControllerOptions> = {
   const subscribeToWorkspaceChanges = vi.fn().mockResolvedValue(vi.fn());
 
   const view: WorkspaceSessionView = {
-    setWorkspacePath: (path) => {
-      state.workspacePath = path;
-    },
     setWorkspaceFiles: (next) => {
       state.files = setValue(state.files, next);
     },
