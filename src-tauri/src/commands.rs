@@ -43,6 +43,8 @@ const MAX_WORKSPACE_DIRECTORIES: usize = 10_000;
 const MAX_WORKSPACE_DEPTH: usize = 32;
 const MAX_PDF_HTML_BYTES: usize = 32 * 1024 * 1024;
 const EXPORT_STREAM_TEMP_MARKER: &str = ".moyang-export-part-";
+const ATOMIC_WRITE_TEMP_MARKER: &str = ".moyang.tmp-";
+const ATOMIC_BACKUP_TEMP_MARKER: &str = ".moyang.bak.tmp-";
 #[cfg(windows)]
 const PDF_RENDER_WAIT_ATTEMPTS: usize = 150;
 #[cfg(windows)]
@@ -3784,12 +3786,12 @@ fn write_bytes_file_inner(
 
     if create_backup && path.is_file() {
         let backup = previous_version_path(&path)?;
-        fs::copy(&path, &backup).map_err(|error| format!("创建备份失败：{error}"))?;
+        copy_file_atomically(&path, &backup)?;
     }
 
     let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let temp = parent.join(format!(
-        ".{file_name}.moyang.tmp-{}-{nonce}",
+        ".{file_name}{ATOMIC_WRITE_TEMP_MARKER}{}-{nonce}",
         std::process::id()
     ));
     let result = (|| {
@@ -3797,20 +3799,77 @@ fn write_bytes_file_inner(
             .create_new(true)
             .write(true)
             .open(&temp)
-            .map_err(|error| format!("创建临时文件失败：{error}"))?;
+            .map_err(|error| format_write_io_error("创建临时文件失败", &error))?;
         file.write_all(contents)
-            .map_err(|error| format!("写入临时文件失败：{error}"))?;
+            .map_err(|error| format_retained_temp_error("写入临时文件失败", &temp, &error))?;
         file.sync_all()
-            .map_err(|error| format!("刷新临时文件失败：{error}"))?;
+            .map_err(|error| format_retained_temp_error("刷新临时文件失败", &temp, &error))?;
         drop(file);
 
-        replace_file(&temp, &path).map_err(|error| format!("完成文件替换失败：{error}"))?;
+        replace_file(&temp, &path)
+            .map_err(|error| format_retained_temp_error("完成文件替换失败", &temp, &error))?;
         Ok(())
     })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temp);
-    }
     result
+}
+
+fn copy_file_atomically(source: &Path, destination: &Path) -> Result<(), String> {
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "备份路径没有父目录。".to_string())?;
+    let file_name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "备份文件名无法解析。".to_string())?;
+    let nonce = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let temp = parent.join(format!(
+        ".{file_name}{ATOMIC_BACKUP_TEMP_MARKER}{}-{nonce}",
+        std::process::id()
+    ));
+
+    let result = (|| {
+        fs::copy(source, &temp)
+            .map_err(|error| format_retained_temp_error("创建备份临时文件失败", &temp, &error))?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&temp)
+            .map_err(|error| format_retained_temp_error("打开备份临时文件失败", &temp, &error))?;
+        file.sync_all()
+            .map_err(|error| format_retained_temp_error("刷新备份临时文件失败", &temp, &error))?;
+        drop(file);
+        replace_file(&temp, destination)
+            .map_err(|error| format_retained_temp_error("完成备份替换失败", &temp, &error))?;
+        Ok(())
+    })();
+    result
+}
+
+fn format_write_io_error(operation: &str, error: &std::io::Error) -> String {
+    let hint = match error.raw_os_error() {
+        Some(28 | 39 | 112 | 122) => Some("可能是磁盘空间不足或磁盘配额已用尽"),
+        Some(19 | 30) => Some("目标路径可能处于只读或写保护状态"),
+        _ if error.kind() == std::io::ErrorKind::WriteZero => Some("可能是磁盘空间不足"),
+        _ if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            Some("目标文件或所在文件夹可能不可写")
+        }
+        _ if error.kind() == std::io::ErrorKind::NotFound => {
+            Some("目标文件或所在文件夹可能已不存在")
+        }
+        _ => None,
+    };
+    match hint {
+        Some(hint) => format!("{operation}：{error}。{hint}。"),
+        None => format!("{operation}：{error}。"),
+    }
+}
+
+fn format_retained_temp_error(operation: &str, temp: &Path, error: &std::io::Error) -> String {
+    format!(
+        "{} 原文件未覆盖；临时恢复副本已保留在：{}",
+        format_write_io_error(operation, error),
+        temp.display()
+    )
 }
 
 #[cfg(not(windows))]
@@ -3857,8 +3916,8 @@ mod tests {
         access_path_key, add_indexed_file_with_limit, authorize_stored_path_inner,
         collect_open_paths, create_markdown_file_inner, create_workspace_folder_inner,
         create_workspace_note_inner, decode_ipc_path, delete_workspace_entry_inner,
-        duplicate_workspace_entry_inner, has_pdf_header, index_workspace_inner,
-        is_export_write_allowed_for_new_path, is_write_allowed_for_new_path,
+        duplicate_workspace_entry_inner, format_write_io_error, has_pdf_header,
+        index_workspace_inner, is_export_write_allowed_for_new_path, is_write_allowed_for_new_path,
         list_workspace_files_inner, normalize_access_path, path_exists_inner,
         persistent_search_index_path, pinyin_initials, prune_search_entries,
         read_annotations_inner, read_previous_version_inner, read_text_file_inner,
@@ -4555,6 +4614,52 @@ mod tests {
             Some("new".to_string())
         );
         fs::remove_dir_all(root).expect("remove atomic test directory");
+    }
+
+    #[test]
+    fn retains_atomic_temp_when_destination_cannot_be_replaced() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-atomic-failure-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&root).expect("create atomic failure directory");
+        let path = root.join("note.md");
+        fs::create_dir(&path).expect("create directory at destination path");
+
+        let error = write_bytes_file_inner(path.clone(), b"recovery content", false)
+            .expect_err("directory destination must reject atomic replacement");
+        assert!(error.contains("原文件未覆盖"));
+        assert!(error.contains("临时恢复副本已保留"));
+
+        let temp = fs::read_dir(&root)
+            .expect("read atomic failure directory")
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .find(|candidate| {
+                candidate
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with(".note.md.moyang.tmp-"))
+                    .unwrap_or(false)
+            })
+            .expect("failed atomic write must leave a recovery temp");
+        assert_eq!(
+            fs::read(&temp).expect("read retained atomic temp"),
+            b"recovery content"
+        );
+        assert!(path.is_dir(), "destination must remain untouched");
+
+        fs::remove_dir_all(root).expect("remove atomic failure directory");
+    }
+
+    #[test]
+    fn describes_disk_full_and_read_only_write_errors_without_hiding_the_cause() {
+        let disk_full = std::io::Error::from_raw_os_error(112);
+        let read_only = std::io::Error::from_raw_os_error(30);
+
+        assert!(format_write_io_error("写入文件失败", &disk_full).contains("磁盘空间不足"));
+        assert!(format_write_io_error("写入文件失败", &read_only).contains("只读或写保护"));
     }
 
     #[test]

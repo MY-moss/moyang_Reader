@@ -29,7 +29,7 @@ import {
 } from "./components/DraftRecoveryComparisonDialog";
 import { PreviousVersionNotice } from "./components/PreviousVersionNotice";
 import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
-import { ExternalChangeNotice } from "./components/ExternalChangeNotice";
+import { ExternalChangeNotice, type ExternalChangeKind } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { GettingStartedDialog } from "./components/GettingStartedDialog";
 import { ImagePreview } from "./components/ImagePreview";
@@ -258,6 +258,7 @@ import {
   createDocumentSessionController,
   type DocumentOpenNavigation,
   type DocumentSaveCommit,
+  type DocumentSaveFailure,
   type DocumentSessionController,
   type DraftFlushOutcome,
 } from "./document-session-controller";
@@ -654,6 +655,7 @@ export function App() {
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
+  const [externalChangeKind, setExternalChangeKind] = useState<ExternalChangeKind>("modified");
   const [externalOverwriteConfirmationOpen, setExternalOverwriteConfirmationOpen] = useState(false);
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
@@ -708,6 +710,22 @@ export function App() {
     contentKey: string;
     controller: AnnotationHighlightController;
   } | null>(null);
+
+  const markExternalChange = useCallback((path: string, kind: ExternalChangeKind = "modified") => {
+    setExternalChangeKind(kind);
+    setExternalChangePath(path);
+  }, []);
+  const clearExternalChange = useCallback(() => {
+    setExternalChangePath(null);
+    setExternalChangeKind("modified");
+  }, []);
+  const handleExternalChangePath = useCallback(
+    (path: string | null) => {
+      if (path) markExternalChange(path);
+      else clearExternalChange();
+    },
+    [clearExternalChange, markExternalChange],
+  );
   const readerBodyRef = useRef<HTMLDivElement>(null);
   const pendingAnnotationIdRef = useRef<string | null>(null);
   const readingHeadingsRef = useRef<HTMLElement[]>([]);
@@ -2231,6 +2249,9 @@ export function App() {
       latest && isSameDocumentPath(latest.path, path) ? { ...latest, externallyModified: true } : latest,
     );
   }, []);
+  const handleDocumentSaveFailure = useCallback((failure: DocumentSaveFailure) => {
+    if (failure.draftSaved && failure.snapshot) setDraftRecovery(failure.snapshot);
+  }, []);
   const handleDocumentSessionError = useCallback((message: string) => setError(message), []);
   const downloadDocumentText = useCallback((name: string, contents: string) => downloadText(name, contents), []);
 
@@ -2250,7 +2271,8 @@ export function App() {
       onDraftSaved: handleDraftSaveResult,
       onSaveCommitted: handleDocumentSaveCommit,
       onSaveConflict: handleDocumentSaveConflict,
-      onExternalChangePath: setExternalChangePath,
+      onSaveFailure: handleDocumentSaveFailure,
+      onExternalChangePath: handleExternalChangePath,
       onError: handleDocumentSessionError,
       invalidateCache: invalidateDocumentCache,
       getSelfWritingPaths,
@@ -2273,8 +2295,10 @@ export function App() {
     getWorkspacePath,
     handleDocumentSaveCommit,
     handleDocumentSaveConflict,
+    handleDocumentSaveFailure,
     handleDocumentSessionError,
     handleDraftSaveResult,
+    handleExternalChangePath,
     invalidateDocumentCache,
     loadDocument,
     renderDocumentSource,
@@ -3159,16 +3183,36 @@ export function App() {
         selfWrittenPathsRef.current.delete(currentPath);
       }
 
-      if (action === "notify") {
-        setExternalChangePath(current.path);
-        setDocumentState((latest) =>
-          latest && isSameDocumentPath(latest.path, current.path) ? { ...latest, externallyModified: true } : latest,
-        );
-      } else {
-        void openPath(current.path, true);
-      }
+      void fileExists(current.path)
+        .then((exists) => {
+          const latest = documentStateRef.current;
+          if (!latest || !isSameDocumentPath(latest.path, current.path)) return;
+
+          if (action === "notify") {
+            markExternalChange(current.path, exists ? "modified" : "deleted");
+            setDocumentState((document) =>
+              document && isSameDocumentPath(document.path, current.path)
+                ? { ...document, externallyModified: true }
+                : document,
+            );
+            return;
+          }
+
+          if (!exists) {
+            markExternalChange(current.path, "deleted");
+            return;
+          }
+
+          void openPath(current.path, true).then((opened) => {
+            if (!opened) markExternalChange(current.path, "modified");
+          });
+        })
+        .catch(() => {
+          if (action === "notify") markExternalChange(current.path, "modified");
+          else void openPath(current.path, true).then((opened) => !opened && markExternalChange(current.path));
+        });
     });
-  }, [openPath, workspacePath, workspaceSessionController]);
+  }, [markExternalChange, openPath, workspacePath, workspaceSessionController]);
 
   useEffect(() => {
     const query = workspaceQuery.trim();
@@ -5742,7 +5786,7 @@ export function App() {
         modified={documentState?.modified ?? false}
         externallyModified={documentState?.externallyModified ?? false}
         onShowExternalChange={() => {
-          if (documentState?.path) setExternalChangePath(documentState.path);
+          if (documentState?.path) markExternalChange(documentState.path);
         }}
         searchOpen={searchOpen}
         searchQuery={searchQuery}
@@ -5886,7 +5930,7 @@ export function App() {
           activePath={documentState?.path ?? null}
           externallyModified={documentState?.externallyModified ?? false}
           onShowExternalChange={() => {
-            if (documentState?.path) setExternalChangePath(documentState.path);
+            if (documentState?.path) markExternalChange(documentState.path);
           }}
           onSelect={(path) => void handleSelectTab(path)}
           onClose={(path) => void handleCloseTab(path)}
@@ -6011,10 +6055,11 @@ export function App() {
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
               fileName={documentState.name}
+              changeKind={externalChangeKind}
               onReload={() => void reloadExternalChange()}
               onOverwrite={overwriteExternalChange}
               onSaveAs={() => void handleExportMarkdown()}
-              onDismiss={() => setExternalChangePath(null)}
+              onDismiss={clearExternalChange}
             />
           )}
           {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
@@ -6081,7 +6126,7 @@ export function App() {
                       <button
                         type="button"
                         className="reader-external-change"
-                        onClick={() => setExternalChangePath(documentState.path)}
+                        onClick={() => markExternalChange(documentState.path)}
                       >
                         文件已被外部修改 · 处理
                       </button>
@@ -6230,7 +6275,7 @@ export function App() {
           <button
             type="button"
             className="statusbar-external-change"
-            onClick={() => setExternalChangePath(documentState.path)}
+            onClick={() => markExternalChange(documentState.path)}
           >
             外部修改待处理
           </button>

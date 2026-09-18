@@ -112,6 +112,55 @@ describe("document session controller", () => {
     expect(options.onExternalChangePath).toHaveBeenCalledWith("C:\\Notes\\today.md");
   });
 
+  it("preserves a local recovery draft when the filesystem rejects a save", async () => {
+    const saveDraft = vi.fn().mockReturnValue({
+      ok: true,
+      prunedCount: 0,
+      snapshots: [{ path: "C:\\Notes\\today.md", draft: "draft", baseSource: "base", savedAt: 10 }],
+    });
+    const onSaveFailure = vi.fn();
+    const onSaveCommitted = vi.fn();
+    const writeTextFile = vi.fn().mockRejectedValue({
+      code: "FILE_WRITE_FAILED",
+      message: "磁盘空间不足",
+    });
+    const options = createOptions(createDocument(), {
+      saveDraft,
+      writeTextFile,
+      onSaveFailure,
+      onSaveCommitted,
+      now: vi.fn().mockReturnValue(10),
+    });
+    const controller = createDocumentSessionController(options);
+
+    await expect(controller.saveDocument()).resolves.toBe(false);
+    expect(saveDraft).toHaveBeenCalledWith({
+      path: "C:\\Notes\\today.md",
+      draft: "draft",
+      baseSource: "base",
+      savedAt: 10,
+    });
+    expect(onSaveFailure).toHaveBeenCalledWith({
+      kind: "disk-full",
+      draftSaved: true,
+      snapshot: { path: "C:\\Notes\\today.md", draft: "draft", baseSource: "base", savedAt: 10 },
+    });
+    expect(onSaveCommitted).not.toHaveBeenCalled();
+    expect(options.onError).toHaveBeenLastCalledWith(expect.stringContaining("草稿恢复中心"));
+  });
+
+  it("keeps the edit available when both disk and draft recovery storage fail", async () => {
+    const options = createOptions(createDocument(), {
+      saveDraft: vi.fn().mockReturnValue({ ok: false, prunedCount: 0, snapshots: [] }),
+      writeTextFile: vi.fn().mockRejectedValue({ code: "FILE_WRITE_FAILED", message: "目标文件为只读" }),
+    });
+    const controller = createDocumentSessionController(options);
+
+    await expect(controller.saveDocument()).resolves.toBe(false);
+    expect(options.onError).toHaveBeenLastCalledWith(expect.stringContaining("另存为"));
+    expect(options.onSaveCommitted).not.toHaveBeenCalled();
+  });
+
   it("writes safely and reports the committed rendered document", async () => {
     const onSaveCommitted = vi.fn();
     const snapshots = [{ path: "C:\\Notes\\other.md", draft: "x", baseSource: "y", savedAt: 1 }];
