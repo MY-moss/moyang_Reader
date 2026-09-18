@@ -4,9 +4,14 @@ Moyang Reader 是 Windows x64、本地优先的文档阅读/编辑工具。安�
 
 ## 支持范围
 
-- 当前稳定版本：`v0.10.14`。后续稳定版本发布后，以最新稳定 Windows x64 版本为主要支持对象。
+- 当前稳定版本：`v0.11.0`。以最新稳定 Windows x64 版本为主要支持对象。
 - `main` 会接收尚未发布的安全修复，但不能把 `main` 的 CI 结果当作已发布版本已经修复的证据。
 - 旧版本是否回补取决于漏洞影响、修复风险和发布条件；不要默认所有历史版本都会获得补丁。
+
+## 当前报告渠道状态
+
+- GitHub **Private Vulnerability Reporting** 当前仍是 `BLOCKED_EXTERNAL`：需要维护者在仓库 `Security` 设置中启用并实际确认 **Report a vulnerability** 入口；仓库文档不会把未核验的设置写成已开启。
+- 在该私密入口确认可用前，只能创建不含漏洞细节的最小公开 Issue，请求维护者提供或开启私密渠道；不要在公开位置提交 PoC、用户内容、私有路径、令牌、证书或签名材料。
 
 ## 如何报告漏洞
 
@@ -69,6 +74,11 @@ Moyang Reader 是 Windows x64、本地优先的文档阅读/编辑工具。安�
 - GitHub Release 的 `latest.json` 是 updater metadata 权威源；Cloudflare Pages 只作为备用镜像/分发源。
 - 发布、镜像、签名与真实 Windows 升级验证要求见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。
 - 已知外部阻塞必须如实记录；不能用 CI 绿灯伪装真机升级、证书或外部设置已经完成。
+
+## v0.11.0 发布事实
+
+- GitHub Release、Windows x64 安装包、updater `.sig` 和 `latest.json` 已在线核验；精确 URL、大小和 SHA-256 以 [`docs/release-status.json`](docs/release-status.json) 为准。
+- Cloudflare 静态镜像、`v0.10.14 → v0.11.0` 旧版本自动更新实机闭环和 NSIS Authenticode 仍记录为 `BLOCKED_EXTERNAL`。updater `.sig` 与 SHA-256 可用于更新链路核验，但不代表 Windows 代码签名已完成。
 
 ## 研究与测试约束
 

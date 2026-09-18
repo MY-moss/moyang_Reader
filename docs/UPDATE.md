@@ -27,6 +27,13 @@ https://moyang-reader-mirror.pages.dev/latest.json
 
 更新提示中的“签名”是 Tauri updater 对 manifest/安装包的公钥校验，不等同于 Windows NSIS Authenticode 证书。当前 Authenticode 证书条件仍按 [`release-status.json`](release-status.json) 记录为 `blocked`，不能把 updater 签名当成 Windows 代码签名结论。
 
+## v0.11.0 发布记录（2026-09-18）
+
+- GitHub Release：[v0.11.0](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.11.0) 已公开，发布代码为 `main@286b1f597102881e577ddae3a7359ad15df422f7`；Release run `35361595825` 的质量门禁、Windows 构建、updater 签名和 GitHub Release 发布成功。
+- Windows x64 安装包、`.sig` 和 `latest.json` 的版本、大小与 SHA-256 已在线核验，精确记录见 [`docs/release-status.json`](release-status.json)。
+- GitHub Release 是 updater metadata 权威源，Cloudflare Pages 仍为备用源；本次 Cloudflare 静态镜像因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 保持 `BLOCKED_EXTERNAL`。
+- `v0.10.14 → v0.11.0` 旧版本自动更新实机闭环和 NSIS Authenticode 仍保持 `BLOCKED_EXTERNAL`；updater `.sig` 不等同于 Windows Authenticode，不能用 CI 绿灯替代真实 Windows 证据。
+
 ## 用户侧更新与打开器排查
 
 ### 更新状态
