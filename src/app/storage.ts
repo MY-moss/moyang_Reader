@@ -1,6 +1,7 @@
 import type { ContextPanelTab, RecentFile, RecentWorkspace } from "./types";
 import { isPathWithin, normalizePathKey } from "./path-key";
 import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
+import { normalizeReadingPositionAnchor, type ReadingPositionAnchor } from "./reading-position";
 
 const workspaceKey = "moyang-reader-workspace";
 const recentFilesKey = "moyang-reader-recent-files";
@@ -18,7 +19,7 @@ export const MAX_RECENT_FILES = 50;
 const maxRecentWorkspaces = 8;
 export const MAX_MOUNTED_WORKSPACES = 5;
 const maxOpenTabs = 16;
-export const MAX_READING_POSITIONS = 32;
+export const MAX_READING_POSITIONS = 256;
 
 export type WorkspaceSession = {
   path: string;
@@ -285,20 +286,39 @@ export function saveOpenTabs(tabs: RecentFile[]): void {
   }
 }
 
-export type ReadingPosition = {
+export type ReadingPosition = ReadingPositionAnchor & {
   path: string;
   top: number;
+  updatedAt?: number;
 };
 
-function isReadingPosition(value: unknown): value is ReadingPosition {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as ReadingPosition).path === "string" &&
-    typeof (value as ReadingPosition).top === "number" &&
-    Number.isFinite((value as ReadingPosition).top) &&
-    (value as ReadingPosition).top >= 0
-  );
+function normalizeReadingPosition(value: unknown): ReadingPosition | null {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as ReadingPosition).path !== "string" ||
+    typeof (value as ReadingPosition).top !== "number" ||
+    !Number.isFinite((value as ReadingPosition).top) ||
+    (value as ReadingPosition).top < 0
+  ) {
+    return null;
+  }
+
+  const candidate = value as ReadingPosition;
+  const path = candidate.path.trim();
+  if (!path) return null;
+
+  const anchor = normalizeReadingPositionAnchor(candidate);
+  const updatedAt =
+    typeof candidate.updatedAt === "number" && Number.isFinite(candidate.updatedAt) && candidate.updatedAt >= 0
+      ? Math.round(candidate.updatedAt)
+      : undefined;
+  return {
+    path,
+    top: Math.max(0, Math.round(candidate.top)),
+    ...anchor,
+    ...(updatedAt !== undefined ? { updatedAt } : {}),
+  };
 }
 
 export function normalizeReadingPositions(value: unknown): ReadingPosition[] {
@@ -306,9 +326,8 @@ export function normalizeReadingPositions(value: unknown): ReadingPosition[] {
 
   const seen = new Set<string>();
   return value
-    .filter(isReadingPosition)
-    .map((item) => ({ path: item.path.trim(), top: Math.max(0, Math.round(item.top)) }))
-    .filter((item) => item.path.length > 0)
+    .map(normalizeReadingPosition)
+    .filter((item): item is ReadingPosition => item !== null)
     .filter((item) => {
       const key = comparablePath(item.path);
       if (!key || seen.has(key)) return false;
@@ -337,15 +356,27 @@ export function saveReadingPositions(positions: readonly ReadingPosition[]): voi
 }
 
 export function loadReadingPosition(path: string): number {
-  const key = comparablePath(path);
-  return loadReadingPositions().find((item) => comparablePath(item.path) === key)?.top ?? 0;
+  return loadReadingPositionAnchor(path)?.top ?? 0;
 }
 
-export function saveReadingPosition(path: string, top: number): void {
+export function loadReadingPositionAnchor(path: string): ReadingPosition | null {
+  const key = comparablePath(path);
+  return loadReadingPositions().find((item) => comparablePath(item.path) === key) ?? null;
+}
+
+export function saveReadingPosition(path: string, top: number, anchor?: ReadingPositionAnchor): void {
   const key = comparablePath(path);
   if (!key || !Number.isFinite(top)) return;
 
-  saveReadingPositions([{ path, top }, ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key)]);
+  saveReadingPositions([
+    {
+      path,
+      top,
+      ...normalizeReadingPositionAnchor(anchor),
+      updatedAt: Date.now(),
+    },
+    ...loadReadingPositions().filter((item) => comparablePath(item.path) !== key),
+  ]);
 }
 
 function parseWorkspaceList(raw: string | null, limit: number): RecentWorkspace[] {
