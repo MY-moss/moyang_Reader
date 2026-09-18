@@ -162,6 +162,15 @@ import {
 } from "./reading-zoom";
 import { reorderTabs } from "./tab-order";
 import { checkMarkdownEditorSafety } from "./markdown-editor-support";
+import {
+  createSourceOnlyRenderedDocument,
+  isLargeMarkdownDocument,
+  isLargeMarkdownOpenDocument,
+  LARGE_DOCUMENT_SOURCE_MODE_THRESHOLD_BYTES,
+  LARGE_DOCUMENT_SOURCE_MODE_BLOCKED_NOTICE,
+  LARGE_DOCUMENT_SOURCE_MODE_NOTICE,
+  utf8ByteLength,
+} from "./large-document-policy";
 import { shouldUseProgressiveReader } from "./progressive-render";
 import { buildWikiLinkCandidates } from "./wiki-link-completion";
 import {
@@ -1850,12 +1859,15 @@ export function App() {
         if (!kind || (kind !== "markdown" && kind !== "text")) {
           throw new Error("当前文件不是可编辑的 Markdown 或文本文件。");
         }
+        const sourceBytes = stamp?.size ?? utf8ByteLength(source);
+        const largeMarkdown = isLargeMarkdownDocument(kind, sourceBytes);
         const editorSafety = kind === "markdown" ? checkMarkdownEditorSafety(source) : { safe: false };
-        const rendered =
-          renderedOverride ??
-          (await renderSource(path, source, {
-            allowRemoteResources: preferencesRef.current.allowRemoteResources,
-          }));
+        const rendered = largeMarkdown
+          ? createSourceOnlyRenderedDocument(source)
+          : (renderedOverride ??
+            (await renderSource(path, source, {
+              allowRemoteResources: preferencesRef.current.allowRemoteResources,
+            })));
         releaseDocumentResources(path);
         if (path.startsWith("browser://")) {
           browserDocumentsRef.current.set(path, { kind, source });
@@ -1865,6 +1877,7 @@ export function App() {
           name: fileNameFromPath(path),
           kind,
           source,
+          sourceBytes,
           rendered,
           modified: false,
           externallyModified: false,
@@ -1884,7 +1897,10 @@ export function App() {
           setRecentFiles(rememberRecentFile({ path, name: fileNameFromPath(path) }));
           saveLastDocumentPath(path);
         }
-        setMode((current) => nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe));
+        setMode((current) =>
+          largeMarkdown ? "source" : nextReaderModeAfterOpen(current, preserveMode, kind, editorSafety.safe),
+        );
+        if (largeMarkdown) notify(LARGE_DOCUMENT_SOURCE_MODE_NOTICE, "info");
         if (kind === "markdown" && !editorSafety.safe) {
           notify(`该 Markdown 含有暂不支持的结构，编辑时已保留源码模式：${editorSafety.reason}`, "info");
         }
@@ -2039,6 +2055,10 @@ export function App() {
       }),
     [],
   );
+  const shouldRenderDocumentOnSave = useCallback(
+    (document: OpenDocument) => !isLargeMarkdownOpenDocument(document),
+    [],
+  );
   const loadDocument = useCallback(
     async (path: string, preserveMode: boolean): Promise<boolean> => {
       let opened = false;
@@ -2106,6 +2126,7 @@ export function App() {
       readTextFile,
       writeTextFile,
       renderSource: renderDocumentSource,
+      shouldRenderOnSave: shouldRenderDocumentOnSave,
       downloadText: downloadDocumentText,
       loadDocument,
       commitNavigation: commitDocumentOpenNavigation,
@@ -2140,6 +2161,7 @@ export function App() {
     invalidateDocumentCache,
     loadDocument,
     renderDocumentSource,
+    shouldRenderDocumentOnSave,
   ]);
 
   const openPath = useCallback(
@@ -3085,6 +3107,10 @@ export function App() {
   const toggleDocumentMode = useCallback(() => {
     const currentDocument = documentStateRef.current;
     if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+    if (isLargeMarkdownOpenDocument(currentDocument)) {
+      notify(LARGE_DOCUMENT_SOURCE_MODE_BLOCKED_NOTICE, "info");
+      return;
+    }
 
     if (currentDocument.kind === "markdown" && !checkMarkdownEditorSafety(sourceDraftRef.current).safe) {
       notify("该 Markdown 含有暂不支持的结构，已切换到源码模式以避免丢失内容。", "info");
@@ -3103,13 +3129,17 @@ export function App() {
   const toggleReadingEditing = useCallback(() => {
     const currentDocument = documentStateRef.current;
     if (!currentDocument || !isEditableDocument(currentDocument.kind)) return;
+    if (isLargeMarkdownOpenDocument(currentDocument)) {
+      notify(LARGE_DOCUMENT_SOURCE_MODE_BLOCKED_NOTICE, "info");
+      return;
+    }
 
     setMode((current) => {
       if (current !== "rendered") return "rendered";
       if (currentDocument.kind !== "markdown") return "source";
       return checkMarkdownEditorSafety(sourceDraftRef.current).safe ? "wysiwyg" : "source";
     });
-  }, []);
+  }, [notify]);
 
   const openDocumentSearch = useCallback((restoreFocusTarget?: HTMLElement | null) => {
     if (!searchRestoreFocusRef.current?.isConnected) {
@@ -3351,10 +3381,12 @@ export function App() {
   }, [mode, redoEditor, undoEditor]);
 
   useEffect(() => {
+    const current = documentStateRef.current;
     const path = documentState?.path;
     const kind = documentState?.kind;
     const requestId = ++sourceRenderRequestRef.current;
     if (mode !== "source" || !path || !kind || !isEditableDocument(kind)) return;
+    if (current && isLargeMarkdownOpenDocument(current)) return;
 
     const nextSource = sourceDraft;
     const cancel = scheduleSourceRender(() => {
@@ -3378,6 +3410,7 @@ export function App() {
   useEffect(() => {
     const current = documentStateRef.current;
     if ((mode !== "rendered" && mode !== "wysiwyg") || !current || !isEditableDocument(current.kind)) return;
+    if (isLargeMarkdownOpenDocument(current)) return;
 
     const requestId = ++sourceRenderRequestRef.current;
     const path = current.path;
@@ -3402,6 +3435,10 @@ export function App() {
   const updateSource = useCallback((nextSource: string, options: { merge?: boolean } = {}) => {
     const current = documentStateRef.current;
     if (!current || !isEditableDocument(current.kind)) return;
+    const nextSourceBytes =
+      current.kind === "markdown" && (current.sourceBytes ?? 0) < LARGE_DOCUMENT_SOURCE_MODE_THRESHOLD_BYTES
+        ? utf8ByteLength(nextSource)
+        : current.sourceBytes;
 
     const history = editorHistoryRef.current;
     const nextHistory = isSameDocumentPath(history.documentKey, current.path)
@@ -3413,7 +3450,9 @@ export function App() {
     }
     sourceDraftRef.current = nextSource;
     setSourceDraft(nextSource);
-    setDocumentState((document) => (document ? { ...document, modified: nextSource !== document.source } : document));
+    setDocumentState((document) =>
+      document ? { ...document, sourceBytes: nextSourceBytes, modified: nextSource !== document.source } : document,
+    );
   }, []);
 
   useEffect(() => {
@@ -3877,12 +3916,23 @@ export function App() {
     [saveClipboardImageAsset, updateSource],
   );
 
+  const resolveCurrentRenderedDocument = useCallback(async () => {
+    if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
+    if (!isLargeMarkdownOpenDocument(documentState)) return documentState.rendered;
+
+    return renderSource(documentState.path, sourceDraft, {
+      allowRemoteResources: preferencesRef.current.allowRemoteResources,
+    });
+  }, [documentState, sourceDraft]);
+
   const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
+    const rendered = await resolveCurrentRenderedDocument();
+    if (!rendered) return null;
 
     const body = isTauriRuntime()
       ? await inlineLocalImages(
-          documentState.rendered.html,
+          rendered.html,
           (source) => {
             const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
             if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
@@ -3892,7 +3942,7 @@ export function App() {
           imageMimeType,
           fileSize,
         )
-      : documentState.rendered.html;
+      : rendered.html;
 
     return buildHtmlExport(
       documentState.name,
@@ -3902,9 +3952,15 @@ export function App() {
         orientation: preferences.exportOrientation,
         margin: preferences.exportMargin,
       },
-      documentState.rendered.toc,
+      rendered.toc,
     );
-  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+  }, [
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+    resolveCurrentRenderedDocument,
+  ]);
 
   const savePdfDocument = useCallback(
     async (html: string, defaultPath: string): Promise<boolean> => {
@@ -4100,14 +4156,16 @@ export function App() {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
 
     try {
-      await copyRichText(documentState.rendered.html);
+      const rendered = await resolveCurrentRenderedDocument();
+      if (!rendered) return;
+      await copyRichText(rendered.html);
       setCopyFeedback(true);
       window.setTimeout(() => setCopyFeedback(false), 1_600);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "复制文档失败。");
     }
-  }, [documentState]);
+  }, [documentState, resolveCurrentRenderedDocument]);
 
   const handleExportMarkdown = useCallback(async () => {
     if (!documentState || !isEditableDocument(documentState.kind)) return;
@@ -4131,30 +4189,32 @@ export function App() {
   const handleExportHtml = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
 
-    const body = isTauriRuntime()
-      ? await inlineLocalImages(
-          documentState.rendered.html,
-          (source) => {
-            const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
-            if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
-            return resolveRelativePath(documentState.path, safeDecode(target));
-          },
-          readBinaryFile,
-          imageMimeType,
-          fileSize,
-        )
-      : documentState.rendered.html;
-    const contents = buildHtmlExport(
-      documentState.name,
-      body,
-      {
-        paper: preferences.exportPaper,
-        orientation: preferences.exportOrientation,
-        margin: preferences.exportMargin,
-      },
-      documentState.rendered.toc,
-    );
     try {
+      const rendered = await resolveCurrentRenderedDocument();
+      if (!rendered) return;
+      const body = isTauriRuntime()
+        ? await inlineLocalImages(
+            rendered.html,
+            (source) => {
+              const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
+              if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
+              return resolveRelativePath(documentState.path, safeDecode(target));
+            },
+            readBinaryFile,
+            imageMimeType,
+            fileSize,
+          )
+        : rendered.html;
+      const contents = buildHtmlExport(
+        documentState.name,
+        body,
+        {
+          paper: preferences.exportPaper,
+          orientation: preferences.exportOrientation,
+          margin: preferences.exportMargin,
+        },
+        rendered.toc,
+      );
       if (isTauriRuntime()) {
         const path = await chooseSavePath(pathWithExtension(documentState.path, "html"), "html");
         if (!path) return;
@@ -4166,15 +4226,23 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 HTML 失败。");
     }
-  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+  }, [
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+    resolveCurrentRenderedDocument,
+  ]);
 
   const handleExportDocx = useCallback(async () => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return;
 
     try {
+      const rendered = await resolveCurrentRenderedDocument();
+      if (!rendered) return;
       const body = isTauriRuntime()
         ? await inlineLocalImages(
-            documentState.rendered.html,
+            rendered.html,
             (source) => {
               const target = source.startsWith("moyang-embed:") ? source.slice("moyang-embed:".length) : source;
               if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return null;
@@ -4184,7 +4252,7 @@ export function App() {
             imageMimeType,
             fileSize,
           )
-        : documentState.rendered.html;
+        : rendered.html;
       const contents = await buildDocxExport(documentState.name, body, {
         paper: preferences.exportPaper,
         orientation: preferences.exportOrientation,
@@ -4210,7 +4278,13 @@ export function App() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "导出 Word 失败。");
     }
-  }, [documentState, preferences.exportMargin, preferences.exportOrientation, preferences.exportPaper]);
+  }, [
+    documentState,
+    preferences.exportMargin,
+    preferences.exportOrientation,
+    preferences.exportPaper,
+    resolveCurrentRenderedDocument,
+  ]);
 
   const handleBrowserFiles = useCallback(
     async (files: FileList | File[] | null | undefined, source: "picker" | "drop" = "picker") => {

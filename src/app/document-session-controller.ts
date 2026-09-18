@@ -28,6 +28,7 @@ export type DocumentSessionControllerOptions = {
   readTextFile: (path: string) => Promise<string>;
   writeTextFile: (path: string, contents: string) => Promise<void>;
   renderSource: (path: string, source: string) => Promise<RenderedMarkdown>;
+  shouldRenderOnSave?: (document: OpenDocument) => boolean;
   downloadText: (name: string, contents: string) => void;
   loadDocument: (path: string, preserveMode: boolean) => Promise<boolean>;
   commitNavigation: (path: string, navigation: DocumentOpenNavigation, previousPath: string | null) => void;
@@ -201,7 +202,8 @@ export function createDocumentSessionController(options: DocumentSessionControll
         options.downloadText(current.name, draft);
       }
 
-      const rendered = await options.renderSource(path, draft);
+      const rendered =
+        options.shouldRenderOnSave?.(current) === false ? current.rendered : await options.renderSource(path, draft);
       const snapshots = clearDraft(path);
       options.onSaveCommitted({ path, draft, rendered, snapshots });
       options.onExternalChangePath(null);
