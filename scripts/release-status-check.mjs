@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { URL, fileURLToPath, pathToFileURL } from "node:url";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const allowedStatuses = new Set(["verified", "blocked", "pending"]);
@@ -103,6 +103,49 @@ function validateStatusEntry(projectRoot, entry, label, errors) {
   }
 }
 
+function parseHttpsUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function validatePublishedReleaseUrls(release, version, errors) {
+  if (release.status !== "published") return;
+
+  const expectedTag = `v${version}`;
+  const releaseUrl = parseHttpsUrl(release.evidence);
+  if (!releaseUrl || !releaseUrl.pathname.endsWith(`/releases/tag/${expectedTag}`)) {
+    errors.push(`Release 总证据的 URL 版本必须是 ${expectedTag}。`);
+  }
+
+  const githubReleaseUrl = parseHttpsUrl(release.githubRelease?.evidence);
+  if (!githubReleaseUrl || githubReleaseUrl.href !== releaseUrl?.href) {
+    errors.push("GitHub Release 证据必须与 Release 总证据一致。");
+  }
+
+  const expectedDownloadMarker = `/releases/download/${expectedTag}/`;
+  for (const asset of Array.isArray(release.assets) ? release.assets : []) {
+    const label = `Release 资产 ${asset?.kind ?? "未知"}`;
+    const assetUrl = parseHttpsUrl(asset?.url);
+    let decodedPath = "";
+    try {
+      decodedPath = assetUrl ? decodeURIComponent(assetUrl.pathname) : "";
+    } catch {
+      // The version/path error below is the actionable result for malformed URLs.
+    }
+    if (!assetUrl || !decodedPath.includes(expectedDownloadMarker)) {
+      errors.push(`${label}资产下载地址的版本必须是 ${expectedTag}。`);
+      continue;
+    }
+    if (!decodedPath.endsWith(`/${asset.name}`)) {
+      errors.push(`${label}资产下载地址文件名必须与记录一致。`);
+    }
+  }
+}
+
 function validateReleaseAssets(projectRoot, release, version, errors) {
   if (!release || typeof release !== "object" || Array.isArray(release)) {
     errors.push("release-status.json 缺少 release 状态对象。");
@@ -123,6 +166,7 @@ function validateReleaseAssets(projectRoot, release, version, errors) {
   if (release.githubRelease?.status !== expectedGithubStatus) {
     errors.push(`GitHub Release 在 ${release.status} 状态下必须标记为 ${expectedGithubStatus}。`);
   }
+  validatePublishedReleaseUrls(release, version, errors);
 
   if (!Array.isArray(release.assets) || release.assets.length !== requiredAssetKinds.length) {
     errors.push("Release 资产必须恰好包含 Windows x64 安装包、签名文件和 latest.json。");

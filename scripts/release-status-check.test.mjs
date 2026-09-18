@@ -97,6 +97,30 @@ test("rejects release status when versions, assets, or changelog drift", () => {
   }
 });
 
+test("rejects published release evidence and asset URLs that drift from the release tag", () => {
+  const root = copyStatusFixture();
+  try {
+    const status = readStatus(root);
+    status.release.evidence = "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.10.14";
+    status.release.githubRelease.evidence = status.release.evidence;
+    status.release.assets[1].url =
+      "https://github.com/MY-moss/moyang_Reader/releases/download/v0.10.14/Moyang.Reader_0.11.0_x64-setup.exe.sig";
+    writeStatus(root, status);
+
+    const errors = validateReleaseStatus(root);
+    assert.equal(
+      errors.some((error) => error.includes("Release 总证据") && error.includes("版本")),
+      true,
+    );
+    assert.equal(
+      errors.some((error) => error.includes("资产下载地址") && error.includes("版本")),
+      true,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("requires evidence for blocked external release checks and existing handoff links", () => {
   const root = copyStatusFixture();
   try {
