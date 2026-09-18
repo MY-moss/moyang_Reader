@@ -267,10 +267,13 @@
 
 ### C04 — v1.0 RC 稳定化
 
-**状态：TODO**
+**状态：IN_PROGRESS — PR #503**
 
 - 目标：只接受阻断发布的缺陷修复，停止大型产品功能和非必要重构。
 - 验收：至少一个 RC 完成完整前端、Rust、浏览器、desktop、a11y、performance、release 和真实 Windows 核验矩阵；结果可追溯。
+- 当前结果：修复独立 Windows desktop performance workflow 的 Rust 报告路径。Cargo 单元测试在 `src-tauri` 工作目录运行，原相对路径会把报告写到 `src-tauri/artifacts`，导致上传步骤错误失败；现在使用 `${{ github.workspace }}` 绝对路径，并加入工作流回归测试。
+- 性能证据：GitHub Actions [`Desktop benchmark`](https://github.com/MY-moss/moyang_Reader/actions/runs/35393264851) 在 PR #503 分支通过；工作区 5,000 / 20,000 文档、1MB / 10MB 大文档测试和两份报告上传均成功，原始报告留在 Actions artifacts。
+- 当前边界：仓库内 RC 证据继续沿用 C01–C03 的前端、Rust、浏览器、desktop、a11y 和 release 检查；真实旧版 → 新版 Windows x64 升级仍受 #241 的实机环境限制，不能标记 C04 完成。
 
 ### 外部条件项
 
