@@ -3874,10 +3874,228 @@ mod tests {
         MAX_SEARCH_INDEX_TOKENS_PER_FILE, MAX_SEARCH_INDEX_TOKEN_CHARS, MAX_WORKSPACE_DEPTH,
         MAX_WORKSPACE_FILES, TEMP_FILE_COUNTER,
     };
+    use serde::Serialize;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::Ordering;
-    use std::time::{Duration, Instant};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WorkspaceBenchmarkStats {
+        sample_count: usize,
+        min_ms: f64,
+        median_ms: f64,
+        p95_ms: f64,
+        max_ms: f64,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WorkspaceBenchmarkRound {
+        round: usize,
+        fixture_generation_ms: f64,
+        scan_ms: f64,
+        cold_search_ms: f64,
+        warm_search_ms: Vec<f64>,
+        result_count: usize,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WorkspaceBenchmarkCase {
+        document_count: usize,
+        file_size_bytes: usize,
+        rounds: Vec<WorkspaceBenchmarkRound>,
+        scan: WorkspaceBenchmarkStats,
+        cold_search: WorkspaceBenchmarkStats,
+        warm_search: WorkspaceBenchmarkStats,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WorkspaceBenchmarkReport {
+        schema_version: u32,
+        generated_at_epoch_seconds: u64,
+        query: &'static str,
+        rounds: usize,
+        warm_samples_per_round: usize,
+        cases: Vec<WorkspaceBenchmarkCase>,
+    }
+
+    fn benchmark_env_usize(name: &str, fallback: usize) -> usize {
+        std::env::var(name)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(fallback)
+    }
+
+    fn benchmark_sizes() -> Vec<usize> {
+        let mut sizes = std::env::var("MOYANG_WORKSPACE_BENCHMARK_SIZES")
+            .ok()
+            .into_iter()
+            .flat_map(|value| {
+                value
+                    .split(',')
+                    .filter_map(|part| part.trim().parse::<usize>().ok())
+                    .filter(|size| *size > 0 && *size <= MAX_WORKSPACE_FILES)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if sizes.is_empty() {
+            sizes = vec![5_000, 20_000];
+        }
+        sizes.sort_unstable();
+        sizes.dedup();
+        sizes
+    }
+
+    fn benchmark_stats(samples: &[f64]) -> WorkspaceBenchmarkStats {
+        assert!(!samples.is_empty(), "benchmark samples must not be empty");
+        let mut sorted = samples.to_vec();
+        sorted.sort_by(f64::total_cmp);
+        let p95_index = ((sorted.len() * 95).saturating_add(99) / 100).saturating_sub(1);
+        WorkspaceBenchmarkStats {
+            sample_count: sorted.len(),
+            min_ms: sorted[0],
+            median_ms: sorted[(sorted.len() - 1) / 2],
+            p95_ms: sorted[p95_index],
+            max_ms: sorted[sorted.len() - 1],
+        }
+    }
+
+    fn create_workspace_benchmark_fixture(root: &Path, document_count: usize) -> usize {
+        const DIRECTORY_STRIDE: usize = 500;
+        const TARGET_FILE_SIZE_BYTES: usize = 2 * 1024;
+        let mut file_size_bytes = 0;
+
+        for index in 0..document_count {
+            let directory = root.join(format!("set-{:03}", index / DIRECTORY_STRIDE));
+            fs::create_dir_all(&directory).expect("create benchmark fixture directory");
+            let mut source = if index + 1 == document_count {
+                String::from("needle in the target note\n")
+            } else {
+                String::from("unrelated deterministic document content\n")
+            };
+            while source.len() < TARGET_FILE_SIZE_BYTES {
+                source.push_str("fixed benchmark corpus with English and 中文阅读 content.\n");
+            }
+            file_size_bytes = source.len();
+            fs::write(directory.join(format!("note-{index:05}.md")), source)
+                .expect("write benchmark fixture document");
+        }
+
+        file_size_bytes
+    }
+
+    #[test]
+    #[ignore = "large workspace benchmark runs only in scheduled/manual benchmark workflow"]
+    fn benchmarks_large_workspaces() {
+        const QUERY: &str = "needle";
+        let rounds = benchmark_env_usize("MOYANG_WORKSPACE_BENCHMARK_ROUNDS", 3);
+        let warm_samples_per_round =
+            benchmark_env_usize("MOYANG_WORKSPACE_BENCHMARK_WARM_SAMPLES", 10);
+        let mut cases = Vec::new();
+
+        for document_count in benchmark_sizes() {
+            let root = std::env::temp_dir().join(format!(
+                "moyang-reader-workspace-benchmark-{}-{}-{}",
+                std::process::id(),
+                document_count,
+                TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir_all(&root).expect("create benchmark fixture root");
+            let fixture_started = Instant::now();
+            let file_size_bytes = create_workspace_benchmark_fixture(&root, document_count);
+            let fixture_generation_ms = fixture_started.elapsed().as_secs_f64() * 1000.0;
+            let mut benchmark_rounds = Vec::with_capacity(rounds);
+
+            for round in 0..rounds {
+                let scan_started = Instant::now();
+                let files =
+                    list_workspace_files_inner(root.clone()).expect("scan benchmark workspace");
+                let scan_ms = scan_started.elapsed().as_secs_f64() * 1000.0;
+                assert_eq!(files.len(), document_count);
+
+                let cache = WorkspaceSearchCache::default();
+                cache.enable_event_driven_root(&root);
+                let cold_started = Instant::now();
+                let cold_results =
+                    search_workspace_inner_with_cache(root.clone(), QUERY.to_string(), &cache)
+                        .expect("cold-search benchmark workspace");
+                let cold_search_ms = cold_started.elapsed().as_secs_f64() * 1000.0;
+                assert_eq!(cold_results.len(), 1);
+
+                let mut warm_search_ms = Vec::with_capacity(warm_samples_per_round);
+                for _ in 0..warm_samples_per_round {
+                    let warm_started = Instant::now();
+                    let warm_results =
+                        search_workspace_inner_with_cache(root.clone(), QUERY.to_string(), &cache)
+                            .expect("warm-search benchmark workspace");
+                    warm_search_ms.push(warm_started.elapsed().as_secs_f64() * 1000.0);
+                    assert_eq!(warm_results.len(), 1);
+                }
+
+                benchmark_rounds.push(WorkspaceBenchmarkRound {
+                    round: round + 1,
+                    fixture_generation_ms,
+                    scan_ms,
+                    cold_search_ms,
+                    warm_search_ms,
+                    result_count: cold_results.len(),
+                });
+            }
+
+            let scan_samples = benchmark_rounds
+                .iter()
+                .map(|round| round.scan_ms)
+                .collect::<Vec<_>>();
+            let cold_samples = benchmark_rounds
+                .iter()
+                .map(|round| round.cold_search_ms)
+                .collect::<Vec<_>>();
+            let warm_samples = benchmark_rounds
+                .iter()
+                .flat_map(|round| round.warm_search_ms.iter().copied())
+                .collect::<Vec<_>>();
+
+            cases.push(WorkspaceBenchmarkCase {
+                document_count,
+                file_size_bytes,
+                rounds: benchmark_rounds,
+                scan: benchmark_stats(&scan_samples),
+                cold_search: benchmark_stats(&cold_samples),
+                warm_search: benchmark_stats(&warm_samples),
+            });
+            fs::remove_dir_all(root).expect("remove benchmark fixture root");
+        }
+
+        let report = WorkspaceBenchmarkReport {
+            schema_version: 1,
+            generated_at_epoch_seconds: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            query: QUERY,
+            rounds,
+            warm_samples_per_round,
+            cases,
+        };
+        let report_json =
+            serde_json::to_string_pretty(&report).expect("serialize benchmark report");
+        let report_path = std::env::var("MOYANG_WORKSPACE_BENCHMARK_REPORT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                std::env::temp_dir().join("moyang-reader-workspace-benchmark.json")
+            });
+        if let Some(parent) = report_path.parent() {
+            fs::create_dir_all(parent).expect("create benchmark report directory");
+        }
+        fs::write(&report_path, &report_json).expect("write benchmark report");
+        println!("workspace-benchmark-report {}", report_path.display());
+        println!("{report_json}");
+    }
 
     #[test]
     fn recognizes_pdf_file_signature() {
