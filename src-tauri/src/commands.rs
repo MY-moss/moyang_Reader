@@ -4269,6 +4269,57 @@ mod tests {
     }
 
     #[test]
+    fn denies_unregistered_paths_before_native_file_operations() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-reader-negative-access-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let vault = root.join("vault");
+        let outside = root.join("outside");
+        let selected = vault.join("selected.md");
+        let outside_file = outside.join("secret.md");
+        fs::create_dir_all(&vault).expect("create negative access workspace");
+        fs::create_dir_all(&outside).expect("create negative access sibling");
+        fs::write(&selected, "selected").expect("write selected file");
+        fs::write(&outside_file, "secret").expect("write outside file");
+
+        let access = AccessRegistry::default();
+        access
+            .register_workspace_path(&vault)
+            .expect("register selected workspace");
+
+        let unregistered_paths = [
+            outside_file.clone(),
+            root.join("outside").join("missing.md"),
+            vault.join("..").join("outside").join("secret.md"),
+        ];
+        for path in &unregistered_paths {
+            assert!(
+                !access.is_read_allowed(path),
+                "read unexpectedly allowed: {path:?}"
+            );
+            assert!(
+                !access.is_write_allowed(path),
+                "write unexpectedly allowed: {path:?}"
+            );
+            assert!(
+                !is_write_allowed_for_new_path(&access, path),
+                "new-file write unexpectedly allowed: {path:?}"
+            );
+            assert!(
+                !is_export_write_allowed_for_new_path(&access, path),
+                "export write unexpectedly allowed: {path:?}"
+            );
+        }
+
+        assert!(access.is_read_allowed(&selected));
+        assert!(access.is_write_allowed(&selected));
+
+        fs::remove_dir_all(root).expect("remove negative access workspace");
+    }
+
+    #[test]
     fn persists_workspace_annotations_in_a_sidecar() {
         let root = std::env::temp_dir().join(format!(
             "moyang-reader-annotations-{}-{}",
