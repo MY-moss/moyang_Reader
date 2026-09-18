@@ -33,7 +33,8 @@ v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优
 A07–A13 DONE
   → A14 v0.11.0 Release / Publish DONE
   → B01–B04 DONE
-  → B05–B06 reliability proof
+  → B05 DONE
+  → B06 reliability proof
   → v0.12 Exit Gate
   → v0.13 Freeze / Compatibility / RC
   → v1.0
@@ -78,7 +79,7 @@ A07–A13 DONE
 2. **B02 大文件降级**：1MB/10MB Markdown 的首次可读、编辑、搜索、保存、内存与交互延迟；超过边界时明确降级而不是卡死。
 3. **B03 Resilient Reading Anchor**：从 `{ path, scrollTop }` 演进为兼容式 `headingId + relative offset/progress ratio + scrollTop fallback + updatedAt`；第一版不必复制正文 quote。
 4. **B04 Tauri 权限库存与负向测试**：危险 URL scheme、未授权路径、opener/process/updater capability 边界。
-5. **B05 当前 main 真实主流程 UX 回归**：只追加可复现且值得修的小任务。
+5. **B05 当前 main 真实主流程 UX 回归 DONE**：窄窗口上下文抽屉补齐遮罩、Esc 取消和焦点归还；只追加可复现且值得修的小任务。
 6. **B06 本地诊断摘要**：用户主动导出、默认无遥测，不包含正文、完整私人路径或秘密。
 
 ### v0.12 Exit Gate

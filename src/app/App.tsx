@@ -3355,6 +3355,17 @@ export function App() {
         event.preventDefault();
         toggleContextPanel();
       }
+      if (
+        event.key === "Escape" &&
+        window.innerWidth <= 1180 &&
+        rightPanelOpen &&
+        !focusMode &&
+        !event.defaultPrevented
+      ) {
+        event.preventDefault();
+        closeContextPanel();
+        return;
+      }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
         setFocusMode(false);
@@ -3368,6 +3379,7 @@ export function App() {
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [
+    closeContextPanel,
     focusMode,
     focusWorkspaceSearch,
     handleChooseWorkspace,
@@ -3376,6 +3388,7 @@ export function App() {
     openSelectedFile,
     openDocumentSearch,
     requestEditorInsert,
+    rightPanelOpen,
     saveDocument,
     setReadingZoom,
     toggleContextPanel,
@@ -6053,6 +6066,9 @@ export function App() {
             />
           )}
         </main>
+        {rightPanelOpen && !focusMode && (
+          <div className="context-panel-backdrop" role="presentation" onClick={closeContextPanel} />
+        )}
         {rightPanelOpen && !focusMode && (
           <PaneResizeHandle
             side="context"

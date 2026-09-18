@@ -5051,6 +5051,9 @@ html.pane-resizing * {
 }
 
 @media screen {
+  .context-panel-backdrop {
+    display: none;
+  }
   .workspace-grid {
     position: relative;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--context-width);
@@ -5951,6 +5954,14 @@ html.pane-resizing * {
     bottom: 0;
     width: min(var(--context-width), calc(100vw - 56px));
     box-shadow: var(--shadow-lifted);
+  }
+  .context-panel-backdrop {
+    display: block;
+    position: absolute;
+    z-index: 13;
+    inset: 0;
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+    backdrop-filter: blur(1px);
   }
   .pane-resize-handle-context {
     right: min(var(--context-width), calc(100vw - 56px));
