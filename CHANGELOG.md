@@ -4,6 +4,7 @@
 
 ### Improved
 
+- B05：窄窗口右侧上下文面板改为带遮罩的可关闭抽屉；点击遮罩或按 Esc 可安全关闭，并恢复触发按钮焦点。
 - AI 开发治理已由 #451 与 2026-09-17 收敛规则取代旧 policy/plan/state/NEXT 审批状态机；当前执行真源为 `AGENTS.md` + `docs/AI-TASKS.md` 的轻量顺序队列，历史 ADR/治理记录不再作为现行开发规则。
 - v1.0 主线收敛为 v0.11 体验/职责收口 → v0.12 可靠性证明 → v0.13 Freeze/Compatibility/RC；Reading Inbox、Metadata/Knowledge、AI、RAG、MCP 和插件等改为 v1.x GATED 候选。
 - updater metadata 改为 GitHub Release 权威优先、Cloudflare Pages 镜像备用，并增加端点顺序回归测试，避免返回 2xx 的陈旧镜像遮蔽新版本。

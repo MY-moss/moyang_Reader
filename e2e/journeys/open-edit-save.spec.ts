@@ -180,6 +180,41 @@ test("navigates context tabs with roving focus and restores the toggle focus", a
   await expect(contextToggle).toBeFocused();
 });
 
+test("makes the compact context panel a dismissible drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 820 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "compact-context-drawer.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Compact context drawer\n\n编辑器或正文不应被无提示地覆盖。"),
+  });
+  await switchToRenderedMode(page);
+
+  const contextToggle = page.locator(".context-toggle");
+  if ((await contextToggle.getAttribute("aria-pressed")) !== "true") await contextToggle.click();
+
+  const contextPanel = page.locator(".context-sidebar");
+  const backdrop = page.locator(".context-panel-backdrop");
+  await expect(contextPanel).toBeVisible();
+  await expect(backdrop).toBeVisible();
+
+  const layering = await page.evaluate(() => ({
+    backdrop: Number.parseInt(getComputedStyle(document.querySelector(".context-panel-backdrop")!).zIndex, 10),
+    panel: Number.parseInt(getComputedStyle(document.querySelector(".context-sidebar")!).zIndex, 10),
+  }));
+  expect(layering.panel).toBeGreaterThan(layering.backdrop);
+
+  await backdrop.click({ position: { x: 12, y: 12 } });
+  await expect(contextPanel).toHaveCount(0);
+  await expect(contextToggle).toBeFocused();
+
+  await contextToggle.click();
+  await expect(contextPanel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(contextPanel).toHaveCount(0);
+  await expect(contextToggle).toBeFocused();
+});
+
 test("keeps the quick-open highlight visible and announced as it moves", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 520 });
   await page.goto("/");
