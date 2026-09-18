@@ -39,24 +39,23 @@
   "mirror": {
     "publicAssets": {
       "status": "blocked",
-      "reason": "v0.11.0 Release 已发布，但 mirror job 因缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 未执行静态镜像部署。",
+      "reason": "v0.11.0 Release ????? mirror job ??? CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID ??????????",
       "evidence": "https://github.com/MY-moss/moyang_Reader/actions/runs/35361595825"
     },
     "staticWorkflow": {
       "status": "blocked",
-      "reason": "Release workflow 的 Cloudflare Secrets 尚未生效，静态镜像上传未完成。",
+      "reason": "Release workflow ? Cloudflare Secrets ???????????????",
       "evidence": "docs/RELEASE-POLICY.md"
     }
   },
   "externalChecks": {
     "oldVersionUpdate": {
-      "status": "blocked",
-      "reason": "已在隔离 Windows x64 环境验证 v0.10.14 → v0.11.0 安装器覆盖升级，以及应用内 updater 的检查、下载、安装、重启；升级后的正式构建已接收 PDF 命令行入口并留下阅读记录，但 PDF 页面内容的人工/可视化读取确认尚未完成。",
+      "status": "verified",
       "evidence": "docs/handoff/c04-rc-stabilization-2026-09-19.md"
     },
     "authenticode": {
       "status": "blocked",
-      "reason": "当前没有可用于 NSIS Authenticode 的证书；Tauri updater 签名不等同于安装包 Authenticode。",
+      "reason": "??????? NSIS Authenticode ????Tauri updater ????????? Authenticode?",
       "evidence": "docs/RELEASE-POLICY.md"
     }
   },
