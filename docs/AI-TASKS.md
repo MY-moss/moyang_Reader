@@ -171,7 +171,7 @@
 
 ### B03 — 稳健阅读位置 / Resilient Reading Anchor
 
-**状态：IN_PROGRESS — PR #491**
+**状态：DONE — PR #491**
 
 - 当前证据：现有位置主要是 `{ path, top }`，并有有限历史容量；长期开大量文档或正文结构变化后恢复不够稳健。
 - 目标：兼容旧数据，新增 `headingId + relativeOffset/progressRatio + scrollTop fallback + updatedAt` 等稳定定位信息。
