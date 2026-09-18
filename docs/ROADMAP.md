@@ -30,15 +30,10 @@ v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优
 当前主线：
 
 ```text
-A07 DONE
-  → A08 Context Panel Tab/a11y
-  → A09 TopBar / Windows DPI
-  → A10 CSS / visual baseline
-  → A11 Workspace Session
-  → A12 stable error codes
-  → A13 v0.11 RC / release preflight
-  → v0.11 release
-  → B01…B06 reliability proof
+A07–A13 DONE
+  → A14 v0.11 Release / Publish Candidate
+  → B01–B04 DONE
+  → B05–B06 reliability proof
   → v0.12 Exit Gate
   → v0.13 Freeze / Compatibility / RC
   → v1.0
