@@ -151,12 +151,13 @@
 
 ### B01 — 可重复的大工作区性能基准
 
-**状态：TODO**
+**状态：DONE**
 
 - 目标：把 5k / 20k 文件工作区的扫描、冷搜索、暖搜索变成可重复 benchmark。
 - 产物：固定语料生成器 + JSON 报告 + scheduled/manual benchmark；PR correctness CI 不设脆弱的单轮毫秒硬门槛。
 - 判定：优先比较多轮统计、趋势和固定环境；只有证明低波动、可重复后，性能指标才允许升级为 required gate。
 - 用户价值：性能优化基于证据，不靠感觉。
+- 结果：新增仅在 `#[ignore]` 基准入口中运行的 Rust 大工作区 benchmark，默认生成 5k/20k、每 500 个文件分桶的确定性 Markdown 语料，分别测量扫描、冷搜索和暖搜索，并输出含原始多轮样本、min/median/p95/max 的 JSON 报告；`.github/workflows/desktop-benchmark.yml` 保持 scheduled/manual 触发并上传报告，不进入 PR correctness gate。本机 5k/20k smoke（各 1 轮、3 次暖搜索）成功，报告示例与边界记录见 [`handoff/b01-workspace-benchmark.md`](handoff/b01-workspace-benchmark.md)。
 
 ### B02 — 大文件阅读与编辑降级策略
 
