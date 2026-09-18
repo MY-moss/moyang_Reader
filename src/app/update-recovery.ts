@@ -1,4 +1,6 @@
-const updateRecoveryKey = "moyang-reader-update-recovery";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
+
+const updateRecoveryKey = PERSISTED_STORAGE_KEYS.updateRecovery;
 
 export type UpdateRecoveryRecord = {
   attemptedVersion: string;

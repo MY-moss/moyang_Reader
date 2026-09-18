@@ -236,6 +236,7 @@ import { saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { saveLocale } from "./i18n";
 import { buildDiagnosticReport, recordDiagnosticError, serializeDiagnosticReport } from "./diagnostics";
+import { CORE_SHORTCUTS, matchesPrimaryShortcut, READER_COMMAND_IDS } from "./compatibility-contract";
 import { ERROR_CODES } from "./error-contract";
 import {
   addAnnotation,
@@ -3376,9 +3377,7 @@ export function App() {
       }
       if (
         !isTextEntry &&
-        (event.ctrlKey || event.metaKey) &&
-        event.altKey &&
-        event.key === "ArrowLeft" &&
+        matchesPrimaryShortcut(event, CORE_SHORTCUTS.navigateBack) &&
         canGoBack(navigationHistoryRef.current)
       ) {
         event.preventDefault();
@@ -3386,60 +3385,60 @@ export function App() {
         return;
       }
       if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === "f" &&
+        matchesPrimaryShortcut(event, CORE_SHORTCUTS.documentSearch) &&
         (event.defaultPrevented || isCodeMirrorEditor)
       ) {
         return;
       }
 
-      if (!isTextEntry && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+      if (!isTextEntry && matchesPrimaryShortcut(event, CORE_SHORTCUTS.workspaceSearch)) {
         event.preventDefault();
         focusWorkspaceSearch();
         return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.workspace)) {
         event.preventDefault();
-        if (event.shiftKey) {
-          void handleChooseWorkspace();
-          return;
-        }
+        void handleChooseWorkspace();
+        return;
+      }
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.open)) {
+        event.preventDefault();
         void openSelectedFile();
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.save)) {
         event.preventDefault();
         void saveDocument();
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "e") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.toggleMode)) {
         event.preventDefault();
         toggleReadingEditing();
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.defaultPrevented) {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.insertLink) && !event.defaultPrevented) {
         if (mode === "wysiwyg" || mode === "source") {
           event.preventDefault();
           requestEditorInsert("link");
         }
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.documentSearch)) {
         event.preventDefault();
         openDocumentSearch();
       }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.commandPalette)) {
         event.preventDefault();
         setCommandPaletteOpen(true);
         return;
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.quickOpen)) {
         event.preventDefault();
         setQuickOpenRestoreFocusTarget(null);
         setQuickOpen(true);
       }
-      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "b") {
+      if (!focusMode && matchesPrimaryShortcut(event, CORE_SHORTCUTS.toggleSidebar)) {
         event.preventDefault();
         setSidebarCollapsed((current) => !current);
       }
-      if (!focusMode && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "r") {
+      if (!focusMode && matchesPrimaryShortcut(event, CORE_SHORTCUTS.toggleContext)) {
         event.preventDefault();
         toggleContextPanel();
       }
@@ -3458,7 +3457,7 @@ export function App() {
         event.preventDefault();
         setFocusMode(false);
       }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === "Enter" && documentStateRef.current) {
+      if (matchesPrimaryShortcut(event, CORE_SHORTCUTS.focusMode) && documentStateRef.current) {
         event.preventDefault();
         setFocusMode((current) => !current);
       }
@@ -3494,9 +3493,10 @@ export function App() {
       const focusIsDocument = activeElement === document.body || activeElement === document.documentElement;
       if (!editorSurface && !focusIsDocument) return;
 
-      const key = event.key.toLowerCase();
-      const isUndo = key === "z" && !event.shiftKey;
-      const isRedo = key === "y" || (key === "z" && event.shiftKey);
+      const isUndo = matchesPrimaryShortcut(event, CORE_SHORTCUTS.undo);
+      const isRedo =
+        matchesPrimaryShortcut(event, CORE_SHORTCUTS.redo) ||
+        matchesPrimaryShortcut(event, CORE_SHORTCUTS.redoAlternate);
       if (!isUndo && !isRedo) return;
 
       event.preventDefault();
@@ -5236,49 +5236,49 @@ export function App() {
   const executeCommand = useCallback(
     (commandId: string) => {
       switch (commandId) {
-        case "open":
+        case READER_COMMAND_IDS.open:
           void openSelectedFile();
           break;
-        case "workspace":
+        case READER_COMMAND_IDS.workspace:
           void handleChooseWorkspace();
           break;
-        case "quick-open":
+        case READER_COMMAND_IDS.quickOpen:
           setQuickOpen(true);
           break;
-        case "document-search":
+        case READER_COMMAND_IDS.documentSearch:
           openDocumentSearch();
           break;
-        case "workspace-search":
+        case READER_COMMAND_IDS.workspaceSearch:
           focusWorkspaceSearch();
           break;
-        case "export-diagnostics":
+        case READER_COMMAND_IDS.exportDiagnostics:
           void exportDiagnosticSummary();
           break;
-        case "toggle-sidebar":
+        case READER_COMMAND_IDS.toggleSidebar:
           setSidebarCollapsed((current) => !current);
           break;
-        case "navigate-back":
+        case READER_COMMAND_IDS.navigateBack:
           void handleNavigateBack();
           break;
-        case "toggle-mode":
+        case READER_COMMAND_IDS.toggleMode:
           toggleReadingEditing();
           break;
-        case "save":
+        case READER_COMMAND_IDS.save:
           void saveDocument();
           break;
-        case "undo":
+        case READER_COMMAND_IDS.undo:
           undoEditor();
           break;
-        case "redo":
+        case READER_COMMAND_IDS.redo:
           redoEditor();
           break;
-        case "link":
+        case READER_COMMAND_IDS.link:
           requestEditorInsert("link");
           break;
-        case "context":
+        case READER_COMMAND_IDS.context:
           toggleContextPanel();
           break;
-        case "focus":
+        case READER_COMMAND_IDS.focus:
           setFocusMode((current) => !current);
           break;
       }
@@ -5304,88 +5304,88 @@ export function App() {
   const commandItems = useMemo<ReaderCommand[]>(
     () => [
       {
-        id: "open",
+        id: READER_COMMAND_IDS.open,
         label: "打开文档",
-        shortcut: "Ctrl O",
+        shortcut: CORE_SHORTCUTS.open.label,
       },
       {
-        id: "workspace",
+        id: READER_COMMAND_IDS.workspace,
         label: "添加整个文件夹",
-        shortcut: "Ctrl ⇧ O",
+        shortcut: CORE_SHORTCUTS.workspace.label,
       },
       {
-        id: "quick-open",
+        id: READER_COMMAND_IDS.quickOpen,
         label: "快速打开",
-        shortcut: "Ctrl P",
+        shortcut: CORE_SHORTCUTS.quickOpen.label,
       },
       {
-        id: "document-search",
+        id: READER_COMMAND_IDS.documentSearch,
         label: "查找当前文档文字",
-        shortcut: "Ctrl F",
+        shortcut: CORE_SHORTCUTS.documentSearch.label,
         disabled: !documentState,
       },
       {
-        id: "workspace-search",
+        id: READER_COMMAND_IDS.workspaceSearch,
         label: "搜索当前阅读库",
-        shortcut: "Ctrl ⇧ F",
+        shortcut: CORE_SHORTCUTS.workspaceSearch.label,
         disabled: !workspacePath,
       },
       {
-        id: "export-diagnostics",
+        id: READER_COMMAND_IDS.exportDiagnostics,
         label: "导出本地诊断摘要",
       },
       {
-        id: "toggle-sidebar",
+        id: READER_COMMAND_IDS.toggleSidebar,
         label: sidebarCollapsed ? "显示工作区侧栏" : "隐藏工作区侧栏",
-        shortcut: "Ctrl ⇧ B",
+        shortcut: CORE_SHORTCUTS.toggleSidebar.label,
         disabled: focusMode,
       },
       {
-        id: "navigate-back",
+        id: READER_COMMAND_IDS.navigateBack,
         label: "返回上一文档",
-        shortcut: "Ctrl Alt ←",
+        shortcut: CORE_SHORTCUTS.navigateBack.label,
         disabled: !canGoBack(navigationHistory),
       },
       {
-        id: "toggle-mode",
+        id: READER_COMMAND_IDS.toggleMode,
         label: mode === "rendered" ? "进入编辑模式" : "切换到阅读模式",
-        shortcut: "Ctrl E",
+        shortcut: CORE_SHORTCUTS.toggleMode.label,
         disabled: !canEdit,
       },
       {
-        id: "save",
+        id: READER_COMMAND_IDS.save,
         label: "保存当前文档",
-        shortcut: "Ctrl S",
+        shortcut: CORE_SHORTCUTS.save.label,
         disabled: !documentState?.modified,
       },
       {
-        id: "undo",
+        id: READER_COMMAND_IDS.undo,
         label: "撤销上一次编辑",
-        shortcut: "Ctrl Z",
+        shortcut: CORE_SHORTCUTS.undo.label,
         disabled: !canUndo,
       },
       {
-        id: "redo",
+        id: READER_COMMAND_IDS.redo,
         label: "重做上一次编辑",
-        shortcut: "Ctrl Y",
+        shortcut: CORE_SHORTCUTS.redo.label,
         disabled: !canRedo,
       },
       {
-        id: "link",
+        id: READER_COMMAND_IDS.link,
         label: "插入 Markdown 链接",
-        shortcut: "Ctrl K",
+        shortcut: CORE_SHORTCUTS.insertLink.label,
         disabled: !canEditHistory,
       },
       {
-        id: "context",
+        id: READER_COMMAND_IDS.context,
         label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
-        shortcut: "Ctrl ⇧ R",
+        shortcut: CORE_SHORTCUTS.toggleContext.label,
         disabled: focusMode,
       },
       {
-        id: "focus",
+        id: READER_COMMAND_IDS.focus,
         label: focusMode ? "退出专注阅读" : "进入专注阅读",
-        shortcut: "Ctrl ⇧ Enter",
+        shortcut: CORE_SHORTCUTS.focusMode.label,
         disabled: !documentState,
       },
     ],
@@ -5993,9 +5993,9 @@ export function App() {
               type="button"
               className="sidebar-restore"
               onClick={() => setSidebarCollapsed(false)}
-              title="显示侧栏 (Ctrl+Shift+B)"
+              title={`显示侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`}
             >
-              显示侧栏 <span>Ctrl+Shift+B</span>
+              显示侧栏 <span>{CORE_SHORTCUTS.toggleSidebar.title}</span>
             </button>
           )}
           {focusMode && (

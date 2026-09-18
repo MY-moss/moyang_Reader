@@ -1,4 +1,5 @@
 import type { RecentFile, RecentWorkspace, ThemeMode } from "./types";
+import { PORTABLE_SETTINGS_SCHEMA } from "./compatibility-contract";
 import type { WorkspaceSession } from "./storage";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
 import type { Locale } from "./i18n";
@@ -7,8 +8,8 @@ import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 import { normalizeBookmarks, type DocumentBookmark } from "./bookmarks";
 import { normalizeReadingPositions, type ReadingPosition } from "./storage";
 
-const PORTABLE_SETTINGS_FORMAT = "moyang-reader-settings";
-const PORTABLE_SETTINGS_VERSION = 2;
+const PORTABLE_SETTINGS_FORMAT = PORTABLE_SETTINGS_SCHEMA.format;
+const PORTABLE_SETTINGS_VERSION = PORTABLE_SETTINGS_SCHEMA.currentVersion;
 const MAX_WORKSPACES = 5;
 const MAX_TABS = 16;
 
@@ -193,12 +194,12 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
   if (
     !isRecord(parsed) ||
     parsed.format !== PORTABLE_SETTINGS_FORMAT ||
-    (parsed.version !== 1 && parsed.version !== PORTABLE_SETTINGS_VERSION)
+    !PORTABLE_SETTINGS_SCHEMA.supportedVersions.includes(parsed.version as 1 | 2)
   ) {
     throw new Error("设置备份版本不受支持。");
   }
 
-  const version = parsed.version;
+  const version = parsed.version === 1 ? 1 : PORTABLE_SETTINGS_VERSION;
 
   const theme =
     parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system" ? parsed.theme : "system";

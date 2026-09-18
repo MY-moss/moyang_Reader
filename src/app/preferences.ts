@@ -1,4 +1,5 @@
 import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth } from "./types";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 
 export type ReaderPreferences = {
@@ -25,7 +26,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   exportMargin: "standard",
 };
 
-const readerPreferencesKey = "moyang-reader-preferences";
+const readerPreferencesKey = PERSISTED_STORAGE_KEYS.preferences;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

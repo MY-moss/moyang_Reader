@@ -1,4 +1,5 @@
 import { normalizePathKey } from "./path-key";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 
 /**
  * A bookmark is a lightweight reading location, not a second copy of the
@@ -19,7 +20,7 @@ export type BookmarkOptions = {
   createdAt?: number;
 };
 
-export const bookmarksStorageKey = "moyang-reader-bookmarks";
+export const bookmarksStorageKey = PERSISTED_STORAGE_KEYS.bookmarks;
 export const MAX_BOOKMARKS = 256;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

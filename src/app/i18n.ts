@@ -1,3 +1,5 @@
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
+
 export type Locale = "zh-CN" | "en-US";
 
 export type MessageKey =
@@ -254,7 +256,7 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
   },
 };
 
-const localeKey = "moyang-reader-locale";
+const localeKey = PERSISTED_STORAGE_KEYS.locale;
 
 export function translate(locale: Locale, key: MessageKey): string {
   return messages[locale][key] ?? messages["zh-CN"][key];

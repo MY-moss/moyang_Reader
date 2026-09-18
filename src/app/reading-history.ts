@@ -1,6 +1,7 @@
 import { normalizePathKey } from "./path-key";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 
-export const READING_HISTORY_STORAGE_KEY = "moyang-reader-reading-history";
+export const READING_HISTORY_STORAGE_KEY = PERSISTED_STORAGE_KEYS.readingHistory;
 export const READING_HEARTBEAT_INTERVAL_MS = 60_000;
 export const MAX_READING_HISTORY_ENTRIES = 256;
 export const MAX_READING_HISTORY_DAYS = 366;

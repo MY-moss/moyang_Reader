@@ -1,6 +1,7 @@
 import { normalizePathKey } from "./path-key";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 
-const draftStorageKey = "moyang-reader-drafts";
+const draftStorageKey = PERSISTED_STORAGE_KEYS.drafts;
 const maxDrafts = 8;
 export const MAX_DRAFT_CHARACTERS = 1_000_000;
 export const MAX_DRAFT_STORAGE_BYTES = 3_000_000;

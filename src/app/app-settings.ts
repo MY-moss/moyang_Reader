@@ -1,12 +1,11 @@
 import type { Locale } from "./i18n";
+import { APP_SETTINGS_SCHEMA, LEGACY_APP_SETTINGS_KEYS } from "./compatibility-contract";
 import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pane-layout";
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 import type { ContextPanelTab, ThemeMode } from "./types";
 
-const appSettingsKey = "moyang-reader-app-settings";
-const appSettingsFormat = "moyang-reader-app-settings";
-const appSettingsVersion = 1;
+const { storageKey: appSettingsKey, format: appSettingsFormat, version: appSettingsVersion } = APP_SETTINGS_SCHEMA;
 
 export type SettingsPersistenceStatus = "idle" | "saving" | "saved" | "fallback" | "error";
 
@@ -144,18 +143,8 @@ export function hasStoredAppSettingsSnapshot(): boolean {
  * A native fallback must not overwrite valid legacy values during the first upgrade.
  */
 export function hasLegacyAppSettings(): boolean {
-  const keys = [
-    "moyang-reader-preferences",
-    "moyang-reader-theme",
-    "moyang-reader-locale",
-    "moyang-reader-sidebar-collapsed",
-    "moyang-reader-context-panel-open",
-    "moyang-reader-context-panel-tab",
-    "moyang-reader-pane-widths",
-  ];
-
   try {
-    return keys.some((key) => localStorage.getItem(key) !== null);
+    return LEGACY_APP_SETTINGS_KEYS.some((key) => localStorage.getItem(key) !== null);
   } catch {
     return false;
   }
