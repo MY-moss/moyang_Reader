@@ -51,7 +51,7 @@
   "externalChecks": {
     "oldVersionUpdate": {
       "status": "blocked",
-      "reason": "已在隔离 Windows x64 环境验证 v0.10.14 → v0.11.0 安装器覆盖升级、版本/卸载注册信息和应用/PDF 入口 smoke；应用内 updater 的检查、下载、重启及 PDF 内容读取闭环尚未完成。",
+      "reason": "已在隔离 Windows x64 环境验证 v0.10.14 → v0.11.0 安装器覆盖升级，以及应用内 updater 的检查、下载、安装、重启；升级后的正式构建已接收 PDF 命令行入口并留下阅读记录，但 PDF 页面内容的人工/可视化读取确认尚未完成。",
       "evidence": "docs/handoff/c04-rc-stabilization-2026-09-19.md"
     },
     "authenticode": {
