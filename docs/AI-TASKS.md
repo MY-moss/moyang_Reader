@@ -180,11 +180,12 @@
 
 ### B04 — Tauri 权限库存与负向安全测试
 
-**状态：TODO**
+**状态：DONE — PR #493**
 
 - 目标：列出 `opener` / `process` / `updater` 的真实调用点，并补危险协议、未授权路径和 capability 拒绝测试。
 - 用户价值：1.0 前证明最小权限，而不是为了“看起来安全”盲目删 capability。
 - 验收：危险/未知协议拒绝；正常 http/https/mailto/tel 与更新流程不回归；未授权文件路径无法绕过 Rust/Tauri 边界。
+- 结果：外部链接在 bridge 边界收紧为 http/https/mailto/tel；Tauri opener/process/updater capability 改为最小调用集合；补齐前端、配置和 Rust 负向测试，并通过浏览器、桌面和 Rust CI 门禁。
 
 ### B05 — 当前 main 的真实主流程 UX 回归
 
