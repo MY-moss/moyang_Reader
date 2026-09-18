@@ -130,6 +130,8 @@ export type OpenDocument = {
   name: string;
   kind: DocumentKind;
   source: string;
+  /** UTF-8 byte size used to keep large Markdown in source mode. */
+  sourceBytes?: number;
   rendered: RenderedMarkdown;
   previewUrl?: string;
   modified: boolean;

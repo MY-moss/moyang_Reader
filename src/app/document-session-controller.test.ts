@@ -141,6 +141,32 @@ describe("document session controller", () => {
     expect(options.onExternalChangePath).toHaveBeenLastCalledWith(null);
   });
 
+  it("keeps the existing rendered snapshot when a large document saves in source mode", async () => {
+    const onSaveCommitted = vi.fn();
+    const renderSource = vi.fn().mockResolvedValue({
+      html: "<p>should not be used</p>",
+      toc: [],
+      wordCount: 4,
+      readingMinutes: 1,
+    });
+    const options = createOptions(createDocument({ sourceBytes: 512 * 1024, rendered }), {
+      onSaveCommitted,
+      renderSource,
+      shouldRenderOnSave: () => false,
+    });
+    const controller = createDocumentSessionController(options);
+
+    await expect(controller.saveDocument()).resolves.toBe(true);
+
+    expect(renderSource).not.toHaveBeenCalled();
+    expect(onSaveCommitted).toHaveBeenCalledWith({
+      path: "C:\\Notes\\today.md",
+      draft: "draft",
+      rendered,
+      snapshots: [],
+    });
+  });
+
   it("only commits navigation after a successful open", async () => {
     const commitNavigation = vi.fn();
     const loadDocument = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
