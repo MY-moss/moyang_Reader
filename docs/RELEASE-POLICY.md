@@ -51,7 +51,7 @@ Moyang Reader 使用 `MAJOR.MINOR.PATCH` 版本号。当前仍处于 `0.x` 阶�
 
 ## 更新与 opener 安全边界
 
-- 更新端点按配置顺序先尝试公开 Cloudflare Pages 动态镜像，再回退到 GitHub Release。动态镜像可访问不等于静态镜像工作流成功；静态部署必须由 `mirror-release.yml` 使用 Release 资产和 Cloudflare Secret 完成，并由 `mirror-health.yml` 巡检。
+- 更新端点按配置顺序先尝试 GitHub Release 权威源，再回退到公开 Cloudflare Pages 动态镜像。动态镜像可访问不等于静态镜像工作流成功；静态部署必须由 `mirror-release.yml` 使用 Release 资产和 Cloudflare Secret 完成，并由 `mirror-health.yml` 巡检。
 - Tauri updater 的 `.sig` 是更新 manifest/安装包的公钥签名校验，不是 Windows 的 `NSIS Authenticode` 证书。当前没有可用 Authenticode 证书时，`release-status.json` 必须保持 `blocked`，不能用 updater 签名替代证书结论。
 - `opener:default` 只提供调用系统默认程序的能力，不代表允许任意 URI。阅读链接入口只把 `http:`、`https:`、`mailto:`、`tel:` 交给 Windows；`javascript:`、`file:`、未知协议以及未授权的本地路径必须拒绝，主窗口导航 guard 也不能被外部页面绕过。新增 opener 调用必须复用同一白名单；本切片不修改运行时代码。
 - 本地相对链接必须落在用户已选择并登记的文件或阅读库范围内。权限失败、文件关联缺失或路径不在授权范围时，用户动作是重新选择/添加路径、调整 Windows 默认应用或重试，不是删除文件、修改注册表绕过权限或关闭安全策略。

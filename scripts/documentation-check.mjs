@@ -93,6 +93,21 @@ const staleClaims = [
   ["docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md", /v0\.14[^\n]*AiProvider/],
 ];
 
+const updaterAuthorityClaims = [
+  ["docs/RELEASE-POLICY.md", /更新端点按配置顺序先尝试公开 Cloudflare Pages 动态镜像，再回退到 GitHub Release/],
+  ["docs/USER-GUIDE.md", /更新器先尝试公开 Cloudflare Pages 镜像，镜像不可用时回退 GitHub Release/],
+];
+
+export function validateUpdaterAuthorityClaims(documents) {
+  const errors = [];
+  for (const [relativePath, pattern] of updaterAuthorityClaims) {
+    if (pattern.test(documents.get(relativePath) ?? "")) {
+      errors.push(`${relativePath} 仍把 Cloudflare 镜像写成 GitHub Release 之前的更新源：${pattern}`);
+    }
+  }
+  return errors;
+}
+
 function readText(projectRoot, relativePath, errors) {
   try {
     return fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
@@ -163,6 +178,8 @@ export function validateDocumentation(projectRoot = defaultRoot) {
       errors.push(`${relativePath} 仍包含过时的路线/更新行为说明：${pattern}`);
     }
   }
+
+  errors.push(...validateUpdaterAuthorityClaims(documents));
 
   const roadmap = documents.get("docs/ROADMAP.md") ?? "";
   if (!roadmap.includes("A07–A13 完成")) {
