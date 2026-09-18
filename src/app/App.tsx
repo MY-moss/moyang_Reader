@@ -235,6 +235,8 @@ import { relativeMarkdownAssetPath } from "./markdown-path";
 import { saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { saveLocale } from "./i18n";
+import { buildDiagnosticReport, recordDiagnosticError, serializeDiagnosticReport } from "./diagnostics";
+import { ERROR_CODES } from "./error-contract";
 import {
   addAnnotation,
   createAnnotation,
@@ -833,6 +835,22 @@ export function App() {
     setNotifications((current) => appendNotification(current, notification));
   }, []);
 
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      recordDiagnosticError(event.error ?? event.message, ERROR_CODES.UNKNOWN_ERROR, "window:error");
+    };
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      recordDiagnosticError(event.reason, ERROR_CODES.UNKNOWN_ERROR, "window:unhandledrejection");
+    };
+
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
+  }, []);
+
   const persistReadingHistory = useCallback((path: string, seconds: number, at: number) => {
     recordReadingSeconds(path, seconds, at);
     setReadingHistory(loadReadingHistory());
@@ -1125,6 +1143,73 @@ export function App() {
   const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, action: string) => {
     return documentSessionControllerRef.current?.confirmWorkspaceSwitch(nextWorkspacePath, action) ?? true;
   }, []);
+
+  const exportDiagnosticSummary = useCallback(async () => {
+    const report = buildDiagnosticReport({
+      appVersion: currentVersion,
+      runtime: isTauriRuntime() ? "tauri" : "browser-preview",
+      locale,
+      theme,
+      mode,
+      focusMode,
+      sidebarCollapsed,
+      rightPanelOpen,
+      capabilities: {
+        annotations: preferences.annotationEnabled,
+        remoteResources: preferences.allowRemoteResources,
+        startupUpdateCheck: preferences.startupUpdateCheck,
+        updater: isTauriRuntime(),
+        workspaceSearch: Boolean(workspacePath),
+      },
+      workspace: {
+        open: Boolean(workspacePath),
+        fileCount: workspaceFiles.length,
+        folderCount: workspaceFolders.length,
+        indexEntryCount: workspaceIndex.length,
+        scannedTotal: workspaceListingStatus.scannedTotal,
+        truncated: workspaceListingStatus.truncated,
+      },
+      document: {
+        open: Boolean(documentState),
+        kind: documentState?.kind ?? null,
+        bytes: documentState?.sourceBytes ?? null,
+        modified: documentState?.modified ?? false,
+        externallyModified: documentState?.externallyModified ?? false,
+      },
+    });
+    const serialized = serializeDiagnosticReport(report);
+
+    try {
+      if (isTauriRuntime()) {
+        const targetPath = await chooseSavePath("Moyang Reader - diagnostics.json", "json");
+        if (!targetPath) return;
+        await writeTextFile(targetPath, serialized);
+        notify(`诊断摘要已保存：${fileNameFromPath(targetPath)}`);
+      } else {
+        downloadText("moyang-reader-diagnostics.json", serialized, "application/json");
+        notify("诊断摘要已下载；不包含正文、完整路径或密钥。", "success");
+      }
+    } catch (cause) {
+      recordDiagnosticError(cause, ERROR_CODES.EXPORT_FAILED, "diagnostics:export");
+      notify(cause instanceof Error ? cause.message : "诊断摘要导出失败。", "error");
+    }
+  }, [
+    currentVersion,
+    documentState,
+    focusMode,
+    locale,
+    mode,
+    notify,
+    preferences,
+    rightPanelOpen,
+    sidebarCollapsed,
+    theme,
+    workspaceFiles.length,
+    workspaceFolders.length,
+    workspaceIndex.length,
+    workspaceListingStatus,
+    workspacePath,
+  ]);
 
   const exportPortableSettings = useCallback(async () => {
     try {
@@ -1715,6 +1800,7 @@ export function App() {
         setUpdateStatus("available");
         setUpdateNoticeVisible(true);
       } catch (cause) {
+        recordDiagnosticError(cause, ERROR_CODES.UPDATE_FAILED, "update:check");
         if (manual) {
           setUpdateStatus("error");
           setUpdateError(describeUpdateError(cause, locale));
@@ -1762,6 +1848,7 @@ export function App() {
       await pending.close().catch(() => undefined);
       setUpdateStatus("ready");
     } catch (cause) {
+      recordDiagnosticError(cause, ERROR_CODES.UPDATE_FAILED, "update:install");
       setUpdateStatus("error");
       const reason = describeUpdateError(cause, locale);
       const recovery = {
@@ -1780,6 +1867,7 @@ export function App() {
     try {
       await relaunchApp();
     } catch (cause) {
+      recordDiagnosticError(cause, ERROR_CODES.UPDATE_FAILED, "update:relaunch");
       setUpdateStatus("error");
       setUpdateError(describeUpdateError(cause, locale));
       setUpdateNoticeVisible(true);
@@ -5163,6 +5251,9 @@ export function App() {
         case "workspace-search":
           focusWorkspaceSearch();
           break;
+        case "export-diagnostics":
+          void exportDiagnosticSummary();
+          break;
         case "toggle-sidebar":
           setSidebarCollapsed((current) => !current);
           break;
@@ -5194,6 +5285,7 @@ export function App() {
     },
     [
       focusWorkspaceSearch,
+      exportDiagnosticSummary,
       handleChooseWorkspace,
       handleNavigateBack,
       openSelectedFile,
@@ -5237,6 +5329,10 @@ export function App() {
         label: "搜索当前阅读库",
         shortcut: "Ctrl ⇧ F",
         disabled: !workspacePath,
+      },
+      {
+        id: "export-diagnostics",
+        label: "导出本地诊断摘要",
       },
       {
         id: "toggle-sidebar",
@@ -5693,6 +5789,7 @@ export function App() {
         }}
         onExportSettings={() => void exportPortableSettings()}
         onImportSettings={importPortableSettings}
+        onExportDiagnostics={() => void exportDiagnosticSummary()}
         onOpenGuide={() => setGuideOpen(true)}
         settingsPersistenceStatus={settingsPersistenceStatus}
         onOpen={() => void openSelectedFile()}

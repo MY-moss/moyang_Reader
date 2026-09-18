@@ -82,6 +82,7 @@ type TopBarProps = {
   onAnnotationEnabledChange: (enabled: boolean) => void;
   onExportSettings: () => void;
   onImportSettings: () => void;
+  onExportDiagnostics: () => void;
   onOpenGuide: () => void;
   settingsPersistenceStatus: SettingsPersistenceStatus;
   searchButtonRef?: RefObject<HTMLButtonElement>;
@@ -162,6 +163,7 @@ export function TopBar({
   onAnnotationEnabledChange,
   onExportSettings,
   onImportSettings,
+  onExportDiagnostics,
   onOpenGuide,
   settingsPersistenceStatus,
   searchButtonRef,
@@ -723,6 +725,13 @@ export function TopBar({
                     </button>
                   </div>
                   <small className="settings-note">{t("settings.backupNote")}</small>
+                  <div className="settings-divider">{t("settings.diagnostics")}</div>
+                  <div className="settings-actions">
+                    <button type="button" className="quiet-button" onClick={onExportDiagnostics}>
+                      {t("settings.exportDiagnostics")}
+                    </button>
+                  </div>
+                  <small className="settings-note">{t("settings.diagnosticsNote")}</small>
                 </div>
               </details>
             </div>

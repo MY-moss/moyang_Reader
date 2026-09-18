@@ -62,6 +62,9 @@ export type MessageKey =
   | "settings.exportSettings"
   | "settings.importSettings"
   | "settings.backupNote"
+  | "settings.diagnostics"
+  | "settings.exportDiagnostics"
+  | "settings.diagnosticsNote"
   | "settings.exportNote"
   | "settings.language"
   | "settings.language.zh"
@@ -142,6 +145,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.exportSettings": "导出设置",
     "settings.importSettings": "导入设置",
     "settings.backupNote": "只备份偏好、阅读库路径和标签页，不包含文档正文或私钥。",
+    "settings.diagnostics": "诊断",
+    "settings.exportDiagnostics": "导出诊断摘要",
+    "settings.diagnosticsNote": "仅包含版本、环境、能力、错误 code 和性能摘要；不包含正文、完整路径或密钥。",
     "settings.exportNote": "应用于打印 / PDF、HTML 和 Word 导出。",
     "settings.language": "界面语言",
     "settings.language.zh": "简体中文",
@@ -222,6 +228,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.importSettings": "Import settings",
     "settings.backupNote":
       "Only preferences, workspace paths, and tabs are backed up; document content and keys are excluded.",
+    "settings.diagnostics": "Diagnostics",
+    "settings.exportDiagnostics": "Export diagnostic summary",
+    "settings.diagnosticsNote":
+      "Includes version, environment, capabilities, error codes, and performance summary only; no content, full paths, or secrets.",
     "settings.exportNote": "Used by print / PDF, HTML, and Word exports.",
     "settings.language": "Interface language",
     "settings.language.zh": "简体中文",
