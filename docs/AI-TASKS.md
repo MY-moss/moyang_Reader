@@ -256,12 +256,14 @@
 
 ### C03 — 发布链路与安全披露收口
 
-**状态：TODO**
+**状态：DONE — PR #502**
 
 - 关联：#51 / #227 / #241
 - 目标：校验版本/tag/manifest/package 一致性，完成 `SECURITY.md` / 安全披露说明，并把 Windows 实机/签名事实写清楚；GitHub Private Vulnerability Reporting 仅把“仓库设置中开启入口”保留为外部子项。
 - 更新器：验证 GitHub Release 权威 metadata → Cloudflare 镜像备用顺序、`latest.json`/安装包/`.sig` 一致性，以及真实旧版 → 新版升级闭环。
 - 规则：无 Authenticode 证书时明确披露限制与哈希核验，不把 updater `.sig` 误称为 Windows 代码签名。
+- 结果：发布状态校验阻止已发布版本的 Release/资产 URL 与 tag、文件名漂移；`SECURITY.md` 和 `docs/UPDATE.md` 已同步 v0.11.0、PVR/Authenticode/旧版升级的真实外部状态和敏感信息处理边界。
+- 验证：发布测试 25/25、工作流测试 35/35、文档检查、release:check、release:status、Lint、Build、Prettier、Vitest 106 文件 / 464 项通过；不升版本、不生成新 Release。
 
 ### C04 — v1.0 RC 稳定化
 
