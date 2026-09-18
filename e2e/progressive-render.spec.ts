@@ -48,7 +48,9 @@ test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
 
 test("mounts large reader content incrementally and eventually exposes every heading", async ({ page }) => {
   await page.goto("/");
-  const paragraph = "渐进渲染性能测试。".repeat(3_000);
+  // Keep the source below the large-document source-mode cutoff so this test
+  // exercises progressive reading instead of the protected source-only path.
+  const paragraph = "Progressive rendering performance test. ".repeat(50);
   const sections = Array.from({ length: 120 }, (_, index) => `## 第 ${index + 1} 节\n\n${paragraph}\n\n`).join("");
   await page.locator('input[type="file"]').setInputFiles({
     name: "large-progressive-note.md",
@@ -63,7 +65,7 @@ test("mounts large reader content incrementally and eventually exposes every hea
   const totalCount = Number(await reader.getAttribute("data-progressive-reader-total"));
   expect(mountedCount).toBeGreaterThan(0);
   expect(mountedCount).toBeLessThan(totalCount);
-  expect(totalCount).toBeGreaterThan(30);
+  expect(totalCount).toBeGreaterThan(5);
 
   await expect(reader).toHaveAttribute("data-progressive-reader-ready", "true", { timeout: 8_000 });
   await expect(page.locator(".reader-content h2")).toHaveCount(120);
