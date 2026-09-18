@@ -33,7 +33,7 @@
 ## 外部阻塞
 
 - #227：仓库内 `SECURITY.md`、披露说明和安全联系方式可以独立完成；只有 GitHub Private Vulnerability Reporting 的“开启设置”本身依赖维护者在仓库设置中操作。未开启前不要声称已有可用私密报告入口，也不要让研究者通过公开 Issue 发送敏感细节。
-- #241：完整旧版本自动更新回归需要真实 Windows x64 旧安装环境和发布条件；CI 不能替代这项实机证据。
+- #241：已在隔离 Windows x64 环境完成 v0.10.14 → v0.11.0 安装器覆盖升级 smoke；完整旧版本自动更新仍需要桌面交互完成检查、下载、重启和 PDF 内容读取，CI 不能替代这项实机证据。
 - #51：Tauri updater `.sig` 不等于 Windows Authenticode。当前没有代码签名证书时，只能明确披露限制并提供 updater 签名 / SHA-256 核验；这不是无限期冻结 v1.0 的理由。
 
 精确发布资产、版本和哈希仍以 `docs/release-status.json` 为准。
