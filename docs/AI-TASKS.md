@@ -161,11 +161,13 @@
 
 ### B02 — 大文件阅读与编辑降级策略
 
-**状态：TODO**
+**状态：IN_PROGRESS — PR #489**
 
 - 目标：测量 1MB / 10MB Markdown 的首次可读、编辑切换、搜索、保存、内存和交互延迟。
 - 验收：形成明确阈值；超过阈值时关闭昂贵能力或提示只读/源码模式，而不是卡死。
 - 非目标：先测量，不先假设优化方案。
+
+- 当前结果：基于 Windows desktop E2E 测得未保护的 1 MiB 富文本路径超过 10 分钟 runner 上限；已将 Markdown `>= 512 KiB` 默认保持为源文本模式，保留 CodeMirror 原生查找和保存，并在富文本切换时给出说明。1 MiB / 10 MiB 两组复测均通过；详见 [`handoff/b02-large-document.md`](handoff/b02-large-document.md) 和 PR #489。
 
 ### B03 — 稳健阅读位置 / Resilient Reading Anchor
 
