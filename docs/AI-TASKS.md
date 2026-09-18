@@ -124,7 +124,7 @@
 
 ### A13 — v0.11 RC / 发布预检
 
-**状态：TODO**
+**状态：DONE**
 
 - 目标：把当前 `main` 压成一个可真实安装和回归的候选版本，而不是继续加功能。
 - 核心旅程：首次启动 → 添加阅读库 → 快速打开 → 阅读 → 文内搜索 → 批注/书签 → 编辑 → 保存 → 外部修改 → 关闭/恢复 → 导出。
@@ -132,6 +132,7 @@
 - CI 规则：桌面功能正确性 smoke 作为 PR 阻断门禁；共享 Runner 上的性能毫秒阈值进入独立 scheduled/manual benchmark，不以单轮抖动伪装成功能回归。
 - 外部规则：无法执行的真实 Windows/证书条件必须精确记录为 `BLOCKED_EXTERNAL` 子项，不能用 CI 绿灯替代真机结果，也不能把仓库内可完成的部分一起冻结。
 - 验收：形成可追溯 RC 结果；只把真实阻断问题拆成独立小任务。
+- 结果：完成 v0.10.14 基线的 RC 预检和在线资产核验；`release:check`、`release:status`、22 项发布测试、33 项工作流/架构测试通过，PR #486 的 Quality checks 通过并包含 104 项 Playwright、17 项 Windows desktop smoke、Rust 与发布门禁。确认 GitHub Release 的安装包、`.sig`、`latest.json` 与公开镜像版本/大小/HTTP 状态一致；修正文档中的镜像优先旧文案，并加入顺序倒置检查。旧版 Windows 自动更新实机、Cloudflare 静态镜像 Secret、NSIS Authenticode 证书继续作为 `BLOCKED_EXTERNAL` 记录在 `docs/release-status.json`，未伪装成完成。
 
 ### v0.11 Exit Gate
 
