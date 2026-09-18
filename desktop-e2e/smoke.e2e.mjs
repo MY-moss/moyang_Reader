@@ -514,6 +514,23 @@ async function waitForSavedReadingPosition(fileName) {
   );
 }
 
+async function getSavedReadingPosition(fileName) {
+  return browser.execute((expectedName) => {
+    try {
+      const raw = window.localStorage.getItem("moyang-reader-reading-positions");
+      const positions = raw ? JSON.parse(raw) : [];
+      return (
+        Array.isArray(positions) &&
+        positions.find(
+          (item) => item && typeof item.path === "string" && item.path.split(/[\\/]/).pop() === expectedName,
+        )
+      );
+    } catch {
+      return null;
+    }
+  }, fileName);
+}
+
 async function clickWorkspaceFile(name) {
   const files = await browser.$$(".workspace-file");
   for (const file of files) {
@@ -1847,7 +1864,7 @@ describe("Moyang Reader desktop runtime", () => {
       await browser.execute(() => {
         const contentArea = document.querySelector(".content-area");
         if (!(contentArea instanceof HTMLElement)) throw new Error("the reader content area was not found");
-        contentArea.scrollTop = contentArea.scrollHeight;
+        contentArea.scrollTop = Math.round((contentArea.scrollHeight - contentArea.clientHeight) * 0.5);
         const EventConstructor = document.defaultView?.Event;
         if (!EventConstructor) throw new Error("the browser Event constructor was not found");
         contentArea.dispatchEvent(new EventConstructor("scroll"));
@@ -1863,6 +1880,19 @@ describe("Moyang Reader desktop runtime", () => {
         { timeout: 5_000, timeoutMsg: "the long document did not record a non-zero reading position" },
       );
       await waitForSavedReadingPosition(longName);
+      const savedPosition = await getSavedReadingPosition(longName);
+      assert.ok(savedPosition, "reading position should be available after persistence");
+      assert.equal(typeof savedPosition?.headingId, "string", "reading position should include a heading anchor");
+      assert.equal(typeof savedPosition?.relativeOffset, "number", "reading position should include a heading offset");
+      assert.equal(typeof savedPosition?.progressRatio, "number", "reading position should include a progress ratio");
+      assert.ok(savedPosition.progressRatio >= 0 && savedPosition.progressRatio <= 1);
+      assert.equal(typeof savedPosition?.updatedAt, "number", "reading position should include an update timestamp");
+
+      const insertedSections = Array.from(
+        { length: 12 },
+        (_, index) => `## Inserted preface ${index + 1}\n\n用于验证正文前部插入后仍按标题锚点恢复。\n\n`,
+      );
+      fs.writeFileSync(longPath, `# Long position note\n\n${insertedSections.join("")}${sections.join("")}`, "utf8");
       await clickWorkspaceFile(shortName);
       await ensureRenderedMode();
       await browser.$("h1=Short position note").waitForDisplayed();
@@ -1882,12 +1912,18 @@ describe("Moyang Reader desktop runtime", () => {
       await browser.waitUntil(
         () =>
           browser.execute(
-            () =>
-              (document.querySelector(".content-area") instanceof HTMLElement
-                ? document.querySelector(".content-area").scrollTop
-                : 0) > 0,
+            (headingId, expectedOffset) => {
+              const contentArea = document.querySelector(".content-area");
+              const heading = document.getElementById(headingId);
+              if (!(contentArea instanceof HTMLElement) || !(heading instanceof HTMLElement)) return false;
+              const areaRect = contentArea.getBoundingClientRect();
+              const headingRect = heading.getBoundingClientRect();
+              return contentArea.scrollTop > 0 && Math.abs(headingRect.top - areaRect.top - expectedOffset) <= 8;
+            },
+            savedPosition.headingId,
+            savedPosition.relativeOffset,
           ),
-        { timeout: 5_000, timeoutMsg: "the long document did not restore its reading position" },
+        { timeout: 5_000, timeoutMsg: "the long document did not restore its anchored reading position" },
       );
     } finally {
       try {

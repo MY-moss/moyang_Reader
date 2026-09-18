@@ -6,8 +6,10 @@ import {
   loadWorkspaceSessions,
   loadLastDocumentPath,
   loadOpenTabs,
+  loadReadingPositionAnchor,
   loadReadingPosition,
   loadReadingPositions,
+  MAX_READING_POSITIONS,
   loadSidebarCollapsed,
   loadContextPanelOpen,
   loadContextPanelTab,
@@ -166,12 +168,51 @@ describe("reader storage", () => {
     saveReadingPosition("c:\\NOTES\\GUIDE.md", 90);
     expect(loadReadingPosition("C:/Notes/Guide.md")).toBe(90);
 
-    for (let index = 0; index < 40; index += 1) {
+    for (let index = 0; index < MAX_READING_POSITIONS + 8; index += 1) {
       saveReadingPosition(`C:/Notes/${index}.md`, index);
     }
-    expect(loadReadingPosition("C:/Notes/0.md")).toBe(0);
-    expect(loadReadingPosition("C:/Notes/39.md")).toBe(39);
-    expect(JSON.parse(localStorage.getItem("moyang-reader-reading-positions") ?? "[]")).toHaveLength(32);
+    expect(loadReadingPositions().some((item) => /[\\/]0\.md$/.test(item.path))).toBe(false);
+    expect(loadReadingPosition(`C:/Notes/${MAX_READING_POSITIONS + 7}.md`)).toBe(MAX_READING_POSITIONS + 7);
+    expect(JSON.parse(localStorage.getItem("moyang-reader-reading-positions") ?? "[]")).toHaveLength(
+      MAX_READING_POSITIONS,
+    );
+  });
+
+  it("keeps stable reading anchors while accepting legacy top-only records", () => {
+    saveReadingPositions([
+      { path: "C:/Notes/legacy.md", top: 320 },
+      {
+        path: "C:/Notes/anchored.md",
+        top: 640,
+        headingId: "chapter-two",
+        relativeOffset: -24,
+        progressRatio: 0.42,
+        updatedAt: 123,
+      },
+    ]);
+
+    expect(loadReadingPositionAnchor("c:\\notes\\legacy.md")).toEqual({ path: "C:/Notes/legacy.md", top: 320 });
+    expect(loadReadingPositionAnchor("C:/Notes/ANCHORED.md")).toEqual({
+      path: "C:/Notes/anchored.md",
+      top: 640,
+      headingId: "chapter-two",
+      relativeOffset: -24,
+      progressRatio: 0.42,
+      updatedAt: 123,
+    });
+
+    saveReadingPosition("C:/Notes/anchored.md", 700, {
+      headingId: "chapter-three",
+      relativeOffset: 36,
+      progressRatio: 0.5,
+    });
+    expect(loadReadingPositionAnchor("C:/Notes/anchored.md")).toMatchObject({
+      top: 700,
+      headingId: "chapter-three",
+      relativeOffset: 36,
+      progressRatio: 0.5,
+    });
+    expect(loadReadingPositionAnchor("C:/Notes/anchored.md")?.updatedAt).toBeGreaterThan(0);
   });
 
   it("normalizes a portable reading-position snapshot before persisting it", () => {
