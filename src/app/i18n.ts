@@ -65,7 +65,19 @@ export type MessageKey =
   | "settings.exportNote"
   | "settings.language"
   | "settings.language.zh"
-  | "settings.language.en";
+  | "settings.language.en"
+  | "error.fileRead"
+  | "error.fileWrite"
+  | "error.fileConflict"
+  | "error.workspaceAccessDenied"
+  | "error.workspaceOperation"
+  | "error.export"
+  | "error.updateSignature"
+  | "error.updatePermission"
+  | "error.updateConfiguration"
+  | "error.updateNetwork"
+  | "error.updateFailed"
+  | "error.ipcInvalidResponse";
 
 const messages: Record<Locale, Record<MessageKey, string>> = {
   "zh-CN": {
@@ -134,6 +146,18 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.language": "界面语言",
     "settings.language.zh": "简体中文",
     "settings.language.en": "English",
+    "error.fileRead": "无法读取文件。",
+    "error.fileWrite": "无法保存文件。",
+    "error.fileConflict": "文件已被外部修改，未覆盖本地内容。",
+    "error.workspaceAccessDenied": "当前路径未获授权，请重新选择阅读库或文件。",
+    "error.workspaceOperation": "工作区操作失败，请重试。",
+    "error.export": "导出失败，请检查目标路径后重试。",
+    "error.updateSignature": "更新包签名校验失败，已停止安装。请从 GitHub Release 页面手动下载可信版本。",
+    "error.updatePermission": "更新需要系统权限，安装没有完成。可以稍后重试或从 GitHub Release 页面手动安装。",
+    "error.updateConfiguration": "更新服务尚未配置完成，当前版本仍可正常使用。",
+    "error.updateNetwork": "暂时无法连接更新服务器，请检查网络后重试。",
+    "error.updateFailed": "更新失败：",
+    "error.ipcInvalidResponse": "应用收到无效的本机响应。请重试；若持续出现，请导出诊断信息。",
   },
   "en-US": {
     "brand.subtitle": "LOCAL READER",
@@ -202,6 +226,21 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.language": "Interface language",
     "settings.language.zh": "简体中文",
     "settings.language.en": "English",
+    "error.fileRead": "Unable to read the file.",
+    "error.fileWrite": "Unable to save the file.",
+    "error.fileConflict": "The file changed externally; local content was not overwritten.",
+    "error.workspaceAccessDenied": "This path is not authorized. Choose the library or file again.",
+    "error.workspaceOperation": "The workspace operation failed. Try again.",
+    "error.export": "Export failed. Check the destination and try again.",
+    "error.updateSignature":
+      "The update signature could not be verified. Installation stopped. Download a trusted version from GitHub Releases.",
+    "error.updatePermission":
+      "The update needs system permission and was not installed. Try again later or install it from GitHub Releases.",
+    "error.updateConfiguration": "The update service is not configured yet. The current version remains usable.",
+    "error.updateNetwork": "The update server could not be reached. Check the network and try again.",
+    "error.updateFailed": "Update failed: ",
+    "error.ipcInvalidResponse":
+      "The app received an invalid local response. Try again; if it persists, export diagnostics.",
   },
 };
 
@@ -209,6 +248,10 @@ const localeKey = "moyang-reader-locale";
 
 export function translate(locale: Locale, key: MessageKey): string {
   return messages[locale][key] ?? messages["zh-CN"][key];
+}
+
+export function getMessageKeys(locale: Locale): readonly MessageKey[] {
+  return Object.keys(messages[locale]) as MessageKey[];
 }
 
 export function loadLocale(): Locale {

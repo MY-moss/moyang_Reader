@@ -81,6 +81,29 @@ describe("binary bridge", () => {
     expect(invoke).toHaveBeenCalledWith("read_previous_version", { path: "C:\\Notes\\Today.md" });
   });
 
+  it("normalizes a legacy native rejection to the command error code", async () => {
+    invoke.mockRejectedValue("无法读取文件");
+
+    await expect(readTextFile("C:\\Notes\\Today.md")).rejects.toMatchObject({
+      code: "FILE_READ_FAILED",
+      message: "无法读取文件",
+    });
+  });
+
+  it("preserves a structured cross-layer error envelope and details", async () => {
+    invoke.mockRejectedValue({
+      code: "WORKSPACE_ACCESS_DENIED",
+      message: "拒绝读取工作区",
+      details: "root was not registered",
+    });
+
+    await expect(listWorkspaceEntries("C:\\Vault")).rejects.toMatchObject({
+      code: "WORKSPACE_ACCESS_DENIED",
+      message: "拒绝读取工作区",
+      details: "root was not registered",
+    });
+  });
+
   it.each([
     {
       command: "read_app_settings",

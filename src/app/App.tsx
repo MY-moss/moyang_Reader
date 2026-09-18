@@ -1680,7 +1680,7 @@ export function App() {
       } catch (cause) {
         if (manual) {
           setUpdateStatus("error");
-          setUpdateError(describeUpdateError(cause));
+          setUpdateError(describeUpdateError(cause, locale));
           setUpdateNoticeVisible(true);
         } else {
           setUpdateStatus("idle");
@@ -1691,7 +1691,7 @@ export function App() {
         updateCheckInFlightRef.current = false;
       }
     },
-    [closePendingUpdate],
+    [closePendingUpdate, locale],
   );
 
   const installUpdate = useCallback(async () => {
@@ -1726,7 +1726,7 @@ export function App() {
       setUpdateStatus("ready");
     } catch (cause) {
       setUpdateStatus("error");
-      const reason = describeUpdateError(cause);
+      const reason = describeUpdateError(cause, locale);
       const recovery = {
         attemptedVersion: pending.version,
         currentVersion,
@@ -1737,17 +1737,17 @@ export function App() {
       setUpdateError(reason);
       setUpdateNoticeVisible(true);
     }
-  }, [currentVersion]);
+  }, [currentVersion, locale]);
 
   const relaunchUpdatedApp = useCallback(async () => {
     try {
       await relaunchApp();
     } catch (cause) {
       setUpdateStatus("error");
-      setUpdateError(describeUpdateError(cause));
+      setUpdateError(describeUpdateError(cause, locale));
       setUpdateNoticeVisible(true);
     }
-  }, []);
+  }, [locale]);
 
   const dismissUpdateNotice = useCallback(() => {
     setUpdateNoticeVisible(false);

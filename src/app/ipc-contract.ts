@@ -1,5 +1,6 @@
 import { invoke as tauriInvoke, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import type { TextAnnotation } from "./annotations";
+import { AppError, ERROR_CODES, errorCodeForIpcCommand, normalizeAppError } from "./error-contract";
 import type {
   DocumentKind,
   FileStamp,
@@ -157,26 +158,31 @@ export type IpcRawCommand = typeof IPC_COMMANDS.writeBinaryFileRaw | typeof IPC_
 type IpcArgs<C extends IpcCommand> = IpcCommandMap[C]["args"];
 type IpcResult<C extends IpcCommand> = IpcCommandMap[C]["result"];
 
-export const IPC_INVALID_RESPONSE_CODE = "IPC_INVALID_RESPONSE" as const;
+export const IPC_INVALID_RESPONSE_CODE = ERROR_CODES.IPC_INVALID_RESPONSE;
 
-export class IpcResponseValidationError extends Error {
-  readonly code = IPC_INVALID_RESPONSE_CODE;
+export class IpcResponseValidationError extends AppError {
+  readonly command: IpcCommand;
 
-  constructor(readonly command: IpcCommand) {
-    super(`IPC 命令 ${command} 返回了无效响应。`);
+  constructor(command: IpcCommand) {
+    super(IPC_INVALID_RESPONSE_CODE, `IPC 命令 ${command} 返回了无效响应。`, { command });
     this.name = "IpcResponseValidationError";
+    this.command = command;
   }
 }
 
 export type IpcResponseValidator<T> = (value: unknown) => value is T;
 
 /** Invoke a normal registered Rust command with its statically declared payload/result. */
-export function invokeCommand<C extends IpcCommand>(
+export async function invokeCommand<C extends IpcCommand>(
   command: C,
   ...args: IpcArgs<C> extends undefined ? [] : [args: IpcArgs<C>]
 ): Promise<IpcResult<C>> {
-  if (args.length === 0) return tauriInvoke<IpcResult<C>>(command);
-  return tauriInvoke<IpcResult<C>>(command, args[0] as InvokeArgs);
+  try {
+    if (args.length === 0) return await tauriInvoke<IpcResult<C>>(command);
+    return await tauriInvoke<IpcResult<C>>(command, args[0] as InvokeArgs);
+  } catch (cause) {
+    throw normalizeAppError(cause, errorCodeForIpcCommand(command));
+  }
 }
 
 export function assertIpcResponse<T>(command: IpcCommand, value: unknown, validator: IpcResponseValidator<T>): T {
