@@ -12,6 +12,7 @@ import type {
 import { translate, type Locale, type MessageKey } from "../i18n";
 import type { UpdateStatus } from "../updater";
 import type { SettingsPersistenceStatus } from "../app-settings";
+import { CORE_SHORTCUTS } from "../compatibility-contract";
 import { Icon } from "./Icon";
 
 type TopBarProps = {
@@ -315,7 +316,7 @@ export function TopBar({
             dismissTopbarOverlays();
             onOpen();
           }}
-          title="打开文件 (Ctrl+O)"
+          title={`打开文件 (${CORE_SHORTCUTS.open.title})`}
         >
           <Icon name="folder-open" size={15} />
           <span className="toolbar-button-label">{t("action.open")}</span>
@@ -332,7 +333,7 @@ export function TopBar({
             title={
               workspaceLimitReached
                 ? "已达到阅读库上限，请先移除一个已挂载阅读库"
-                : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (Ctrl+Shift+O)`
+                : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (${CORE_SHORTCUTS.workspace.title})`
             }
           >
             <Icon name="folder-plus" size={15} />
@@ -346,8 +347,8 @@ export function TopBar({
             dismissTopbarOverlays();
             onQuickOpen(event.currentTarget);
           }}
-          aria-keyshortcuts="Control+P"
-          title="快速打开文件 (Ctrl+P)"
+          aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
+          title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
         >
           <Icon name="search" size={15} />
           <span className="toolbar-button-label">{t("action.quickOpen")}</span>
@@ -362,8 +363,8 @@ export function TopBar({
             }}
             aria-pressed={mode !== "rendered"}
             aria-label={mode === "rendered" ? "直接进入编辑模式" : "直接返回阅读模式"}
-            aria-keyshortcuts="Control+E"
-            title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (Ctrl+E)`}
+            aria-keyshortcuts={CORE_SHORTCUTS.toggleMode.aria}
+            title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (${CORE_SHORTCUTS.toggleMode.title})`}
           >
             <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
             <span className="toolbar-button-label">{mode === "rendered" ? t("action.edit") : t("action.read")}</span>
@@ -377,9 +378,9 @@ export function TopBar({
             onSave();
           }}
           disabled={!modified}
-          aria-keyshortcuts="Control+S"
+          aria-keyshortcuts={CORE_SHORTCUTS.save.aria}
           aria-label={t("action.saveDocument")}
-          title={`${t("action.saveDocument")} (Ctrl+S)`}
+          title={`${t("action.saveDocument")} (${CORE_SHORTCUTS.save.title})`}
         >
           <Icon name="save" size={15} />
           <span className="toolbar-button-label">{t("action.save")}</span>
@@ -402,8 +403,12 @@ export function TopBar({
           className="toolbar-button sidebar-toggle"
           onClick={onToggleSidebar}
           aria-pressed={sidebarCollapsed}
-          aria-keyshortcuts="Control+Shift+B"
-          title={sidebarCollapsed ? "显示侧栏 (Ctrl+Shift+B)" : "隐藏侧栏 (Ctrl+Shift+B)"}
+          aria-keyshortcuts={CORE_SHORTCUTS.toggleSidebar.aria}
+          title={
+            sidebarCollapsed
+              ? `显示侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
+              : `隐藏侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
+          }
         >
           <Icon name="panel-left" size={15} />
           <span className="toolbar-button-label">
@@ -416,8 +421,12 @@ export function TopBar({
           className="toolbar-button context-toggle"
           onClick={(event) => onToggleRightPanel(event.currentTarget)}
           aria-pressed={rightPanelOpen}
-          aria-keyshortcuts="Control+Shift+R"
-          title={rightPanelOpen ? "隐藏上下文面板 (Ctrl+Shift+R)" : "显示上下文面板 (Ctrl+Shift+R)"}
+          aria-keyshortcuts={CORE_SHORTCUTS.toggleContext.aria}
+          title={
+            rightPanelOpen
+              ? `隐藏上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
+              : `显示上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
+          }
         >
           <Icon name="panel-right" size={15} />
           <span className="toolbar-button-label">
@@ -429,7 +438,7 @@ export function TopBar({
           className="toolbar-button focus-button toolbar-optional"
           onClick={onToggleFocusMode}
           disabled={!fileName}
-          title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
+          title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
         >
           <Icon name="maximize" size={15} />
           <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
@@ -439,8 +448,8 @@ export function TopBar({
           type="button"
           className="toolbar-button"
           onClick={(event) => toggleSearch(event.currentTarget)}
-          aria-keyshortcuts="Control+F"
-          title="文内查找当前文档 (Ctrl+F)"
+          aria-keyshortcuts={CORE_SHORTCUTS.documentSearch.aria}
+          title={`文内查找当前文档 (${CORE_SHORTCUTS.documentSearch.title})`}
         >
           <Icon name="search" size={15} />
           <span className="toolbar-button-label">{t("action.search")}</span>
@@ -458,8 +467,8 @@ export function TopBar({
                   type="button"
                   className="toolbar-button"
                   onClick={onOpenCommandPalette}
-                  aria-keyshortcuts="Control+Shift+P"
-                  title="打开命令面板 (Ctrl+Shift+P)"
+                  aria-keyshortcuts={CORE_SHORTCUTS.commandPalette.aria}
+                  title={`打开命令面板 (${CORE_SHORTCUTS.commandPalette.title})`}
                 >
                   <Icon name="command" size={15} />
                   <span className="toolbar-button-label">{t("action.commands")}</span>
@@ -471,8 +480,8 @@ export function TopBar({
                     dismissTopbarOverlays();
                     onQuickOpen(event.currentTarget);
                   }}
-                  aria-keyshortcuts="Control+P"
-                  title="快速打开文件 (Ctrl+P)"
+                  aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
+                  title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
                 >
                   <Icon name="search" size={15} />
                   <span className="toolbar-button-label">{t("action.quickOpen")}</span>
@@ -537,7 +546,7 @@ export function TopBar({
                     onToggleFocusMode();
                   }}
                   disabled={!fileName}
-                  title={focusMode ? "退出专注阅读 (Esc)" : "进入专注阅读 (Ctrl+Shift+Enter)"}
+                  title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
                 >
                   <Icon name="maximize" size={15} />
                   <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>

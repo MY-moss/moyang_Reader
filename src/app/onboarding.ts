@@ -1,4 +1,6 @@
-const gettingStartedSeenKey = "moyang-reader-getting-started-seen";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
+
+const gettingStartedSeenKey = PERSISTED_STORAGE_KEYS.gettingStartedSeen;
 
 export function hasSeenGettingStarted(): boolean {
   try {

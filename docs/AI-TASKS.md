@@ -237,10 +237,13 @@
 
 ### C01 — 设置 / IPC / 快捷键兼容矩阵
 
-**状态：TODO**
+**状态：DONE — PR #500**
 
 - 目标：冻结 v1.0 需要稳定的设置 key/schema、关键 IPC、command ids、核心快捷键和主要保存行为。
 - 验收：旧配置、损坏配置、迁移和 fallback 有自动或手工可追溯结果。
+- 结果：集中维护应用设置/便携备份 schema、全部浏览器持久化 key、命令面板 ID 和应用级核心快捷键；现有读写、CodeMirror 原生 Ctrl+F、外部修改保护和草稿保存语义保持不变。
+- 证据：[`handoff/c01-compatibility-matrix-2026-09-19.md`](handoff/c01-compatibility-matrix-2026-09-19.md)；旧快照/坏配置/便携 v1/v2、IPC 名称、命令 ID、快捷键和保存保护均有回归测试。
+- 验证：Vitest 105 文件 / 454 项、Lint、生产构建、Prettier、文档检查通过；不升版本、不生成 Release。
 
 ### C02 — 文件异常恢复矩阵
 

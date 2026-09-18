@@ -1,4 +1,5 @@
 import { isTauriRuntime, readAppSettings, writeAppSettings } from "./bridge";
+import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 import {
   createAppSettingsSnapshot,
   loadAppSettingsSnapshot,
@@ -56,7 +57,7 @@ type PendingNativeWrite = {
 
 function readSavedTheme(): ThemeMode {
   try {
-    const saved = localStorage.getItem("moyang-reader-theme");
+    const saved = localStorage.getItem(PERSISTED_STORAGE_KEYS.theme);
     return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
   } catch {
     return "system";
