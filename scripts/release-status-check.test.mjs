@@ -51,7 +51,11 @@ test("allows planned pending assets to omit not-yet-generated size and hash", ()
   const root = copyStatusFixture();
   try {
     const status = readStatus(root);
+    status.release.status = "planned";
+    status.release.githubRelease.status = "pending";
+    status.release.githubRelease.reason = "test fixture represents a pre-publish release";
     for (const asset of status.release.assets) {
+      asset.status = "pending";
       asset.size = null;
       asset.sha256 = null;
     }

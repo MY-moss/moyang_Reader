@@ -145,16 +145,16 @@
 - RC 主旅程完成，外部阻塞项状态真实；
 - updater 权威源/镜像顺序有自动回归检查，性能 benchmark 与 correctness gate 已分离。
 
-### A14 — v0.11 Release / Publish Candidate
+### A14 — v0.11 Release / Publish
 
-**状态：IN_PROGRESS**
+**状态：DONE — v0.11.0 / Release run 35361595825**
 
 - 目标：把已经完成 A07–A13 的当前 `main` 形成可安装、可验证的 Windows x64 `v0.11` 发布候选；B01–B04 已完成，在该任务完成前不继续 B05/B06。
 - 版本交付：统一 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 版本号，更新 `CHANGELOG.md` 与发布说明，生成并核验 Git tag、NSIS 安装包、updater `.sig`、`latest.json`、GitHub Release 与 SHA-256。
 - 发布门禁：运行前端、Rust、浏览器、a11y、Windows desktop correctness smoke、发布检查和 Release 测试；合并发布提交后再推送 tag，由 Release workflow 构建并创建非 Draft、非 Pre-release Release。
 - 外部事实：旧版 `v0.10.14 → v0.11.0` 实机升级、Cloudflare 静态镜像 Secret、NSIS Authenticode 证书必须分别记录为 `verified` 或精确的 `BLOCKED_EXTERNAL`，不能用 CI 结果替代。
 - 非目标：不借发布准备继续增加产品功能，不重做索引算法、IPC 或 Rust 行为；B05/B06 只能在 A14 的发布结果明确后恢复执行。
-- 当前切片：版本统一为 `0.11.0`，发布状态先记为 `planned`；尚未创建 tag、安装包或 GitHub Release。
+- 当前结果：`v0.11.0` tag 已指向合并后的 `main@286b1f597102881e577ddae3a7359ad15df422f7`；GitHub Release、NSIS 安装包、updater `.sig`、`latest.json` 和 SHA-256 已在线核验并记录在 `docs/release-status.json`。Release workflow 的主发布 job 与完整质量门禁通过；Cloudflare 静态镜像因 Secrets 缺失保持 `BLOCKED_EXTERNAL`，旧版本自动更新实机和 Authenticode 也保持精确外部阻塞。
 
 ---
 

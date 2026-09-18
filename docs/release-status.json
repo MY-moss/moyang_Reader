@@ -3,45 +3,44 @@
   "release": {
     "version": "0.11.0",
     "tag": "v0.11.0",
-    "status": "planned",
-    "evidence": "docs/handoff/v0.11-release-prep.md",
+    "status": "published",
+    "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.11.0",
     "githubRelease": {
-      "status": "pending",
-      "reason": "候选提交尚未合并并推送 v0.11.0 tag，GitHub Release 尚未创建。",
-      "evidence": "docs/handoff/v0.11-release-prep.md"
+      "status": "verified",
+      "evidence": "https://github.com/MY-moss/moyang_Reader/releases/tag/v0.11.0"
     },
     "assets": [
       {
         "kind": "installer",
-        "status": "pending",
+        "status": "verified",
         "name": "Moyang.Reader_0.11.0_x64-setup.exe",
         "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/Moyang.Reader_0.11.0_x64-setup.exe",
-        "size": null,
-        "sha256": null
+        "size": 5270278,
+        "sha256": "836957cc37eab63f48e9b26ac8a5d467472b72549c6797dd28c515a2a3b6186a"
       },
       {
         "kind": "signature",
-        "status": "pending",
+        "status": "verified",
         "name": "Moyang.Reader_0.11.0_x64-setup.exe.sig",
         "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/Moyang.Reader_0.11.0_x64-setup.exe.sig",
-        "size": null,
-        "sha256": null
+        "size": 428,
+        "sha256": "373dd40af07007f16e7492a74987f94b073f4b022e7bce12aec1526356dcaab9"
       },
       {
         "kind": "manifest",
-        "status": "pending",
+        "status": "verified",
         "name": "latest.json",
         "url": "https://github.com/MY-moss/moyang_Reader/releases/download/v0.11.0/latest.json",
-        "size": null,
-        "sha256": null
+        "size": 1411,
+        "sha256": "7d98662ead7bb9088c7b5e7767a1b1f56c1bbc2cd09a769dfc77088d6dc85a46"
       }
     ]
   },
   "mirror": {
     "publicAssets": {
-      "status": "pending",
-      "reason": "v0.11.0 尚未发布；公开镜像当前仍对应 v0.10.14。",
-      "evidence": "docs/handoff/v0.11-release-prep.md"
+      "status": "blocked",
+      "reason": "v0.11.0 Release 已发布，但 mirror job 因缺少 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 未执行静态镜像部署。",
+      "evidence": "https://github.com/MY-moss/moyang_Reader/actions/runs/35361595825"
     },
     "staticWorkflow": {
       "status": "blocked",

@@ -31,7 +31,7 @@ v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优
 
 ```text
 A07–A13 DONE
-  → A14 v0.11 Release / Publish Candidate
+  → A14 v0.11.0 Release / Publish DONE
   → B01–B04 DONE
   → B05–B06 reliability proof
   → v0.12 Exit Gate

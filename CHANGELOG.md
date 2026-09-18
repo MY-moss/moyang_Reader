@@ -50,7 +50,7 @@
 - 增加工作区会话恢复、稳健阅读位置、大文件源文本降级和 Tauri 权限负向测试。
 - 稳定错误码、GitHub Release 优先的更新器 metadata 顺序与发布状态检查进入主线。
 
-> 本节是 `v0.11.0` 发布候选说明；GitHub tag、安装包、签名、`latest.json` 和公开 Release 需在候选提交合并且质量门禁通过后由发布流程生成。
+> `v0.11.0` 已通过 Release workflow 发布；安装包、updater 签名和 `latest.json` 已在线核验。Cloudflare 静态镜像、旧版本自动更新实机和 NSIS Authenticode 仍按发布状态记录为外部阻塞。
 
 ## [0.10.14] - 2026-09-02
 

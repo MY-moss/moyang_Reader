@@ -1,6 +1,13 @@
 # Moyang Reader 版本与发布政策
 
-当前稳定基线：`v0.10.14`。该版本的 tag、Windows x64 安装包、签名和 manifest 已在线核验；公开 Pages 镜像的 v0.10.14 资产也已核验，但 Release workflow 的自动镜像 job `33555344560` 未执行部署步骤，仓库 Cloudflare Secrets 尚未对该工作流生效，不得误判为自动同步全绿。
+当前稳定基线：`v0.11.0`。该版本的 tag、Windows x64 安装包、签名和 manifest 已在线核验；Release workflow 的自动镜像 job 因 Cloudflare Secrets 缺失未执行部署步骤，不得误判为自动同步全绿。
+
+## v0.11.0 已发布（2026-09-18）
+
+- 发布代码：`main@286b1f597102881e577ddae3a7359ad15df422f7`；tag 为 `v0.11.0`；Release run `35361595825` 的质量门禁、Windows 构建、签名和 GitHub Release 发布成功。
+- Windows x64 安装包：5,270,278 字节，SHA-256 `836957cc37eab63f48e9b26ac8a5d467472b72549c6797dd28c515a2a3b6186a`。
+- updater 签名文件：428 字节，SHA-256 `373dd40af07007f16e7492a74987f94b073f4b022e7bce12aec1526356dcaab9`；`latest.json` 1,411 字节，SHA-256 `7d98662ead7bb9088c7b5e7767a1b1f56c1bbc2cd09a769dfc77088d6dc85a46`。
+- GitHub Release 为非 Draft、非 Pre-release；Cloudflare 静态镜像因 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 缺失保持 `BLOCKED_EXTERNAL`，旧版本自动更新实机和 NSIS Authenticode 继续按 `docs/release-status.json` 记录。
 
 ## v0.10.14 已发布（2026-09-02）
 

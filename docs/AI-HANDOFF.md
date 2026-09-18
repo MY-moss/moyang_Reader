@@ -4,12 +4,12 @@
 
 ## 稳定基线
 
-- 当前稳定版本：`v0.10.14`。
-- 当前发布候选：`v0.11.0`（`planned`；尚未创建 tag 或 GitHub Release）。
+- 当前稳定版本：`v0.11.0`。
+- `v0.11.0` 已创建 tag 并发布 GitHub Release；安装包、updater 签名和 `latest.json` 的在线事实见 [`docs/release-status.json`](release-status.json)。
 - 产品边界：Windows x64、本地优先；浏览器版仅用于开发预览和 UI 测试。
 - 技术栈：Tauri 2 + Rust + React + TypeScript。
 - `main` 以 GitHub `Quality checks` 作为代码合并门禁；真实 Windows 安装、升级、签名和发布证据不能由 CI 代替。
-- 当前工程主线是：A14 v0.11 发布候选/正式发布 → B05/B06 收口 v0.12 可靠性/真实使用 → v0.13 Freeze/Compatibility/RC → v1.0；A07–A13 的仓库内收口和 B01–B04 可靠性切片已完成，但不能把现有 v0.10.14 Release 当成这批改动的用户可安装版本。
+- 当前工程主线是：A14 v0.11.0 已发布 → B05/B06 收口 v0.12 可靠性/真实使用 → v0.13 Freeze/Compatibility/RC → v1.0；A07–A13 的仓库内收口和 B01–B04 可靠性切片已完成。
 - Reading Inbox、Knowledge、AI、RAG、MCP、RSS、第三方插件等均为 v1.x GATED 候选，不属于当前可执行队列。
 
 ## AI 接手方式
