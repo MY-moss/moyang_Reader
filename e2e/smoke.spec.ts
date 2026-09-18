@@ -30,6 +30,41 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
+test("exports a local diagnostic summary without document content or paths", async ({ page }) => {
+  await page.goto("/");
+  await openSettingsMenu(page);
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出诊断摘要", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("moyang-reader-diagnostics.json");
+
+  const stream = await download.createReadStream();
+  if (!stream) throw new Error("诊断摘要下载没有可读内容。");
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const report = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+    app: { version: string; runtime: string };
+    errors: unknown[];
+    privacy: {
+      documentContentIncluded: boolean;
+      fullPathsIncluded: boolean;
+      secretsIncluded: boolean;
+      telemetrySent: boolean;
+    };
+  };
+
+  expect(report.app.version).toBe("0.11.0");
+  expect(report.app.runtime).toBe("browser-preview");
+  expect(report.errors).toEqual([]);
+  expect(report.privacy).toEqual({
+    documentContentIncluded: false,
+    fullPathsIncluded: false,
+    secretsIncluded: false,
+    telemetrySent: false,
+  });
+});
+
 test("stacks setting feedback without shifting the reading layout", async ({ page }) => {
   await page.goto("/");
   await openSettingsMenu(page);

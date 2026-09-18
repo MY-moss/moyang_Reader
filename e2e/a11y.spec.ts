@@ -175,6 +175,7 @@ test("keeps the settings panel free of serious accessibility violations", async 
   await openSettings(page);
   await expect(page.getByRole("button", { name: "导出设置" })).toBeVisible();
   await expect(page.getByRole("button", { name: "导入设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "导出诊断摘要" })).toBeVisible();
   await expectNoSeriousA11yViolations(page, "settings");
 });
 

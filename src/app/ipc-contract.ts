@@ -1,5 +1,6 @@
 import { invoke as tauriInvoke, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import type { TextAnnotation } from "./annotations";
+import { recordDiagnosticError } from "./diagnostics";
 import { AppError, ERROR_CODES, errorCodeForIpcCommand, normalizeAppError } from "./error-contract";
 import type {
   DocumentKind,
@@ -181,7 +182,10 @@ export async function invokeCommand<C extends IpcCommand>(
     if (args.length === 0) return await tauriInvoke<IpcResult<C>>(command);
     return await tauriInvoke<IpcResult<C>>(command, args[0] as InvokeArgs);
   } catch (cause) {
-    throw normalizeAppError(cause, errorCodeForIpcCommand(command));
+    const fallbackCode = errorCodeForIpcCommand(command);
+    const error = normalizeAppError(cause, fallbackCode);
+    recordDiagnosticError(error, fallbackCode, `ipc:${command}`);
+    throw error;
   }
 }
 
