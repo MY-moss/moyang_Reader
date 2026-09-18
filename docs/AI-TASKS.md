@@ -267,17 +267,18 @@
 
 ### C04 — v1.0 RC 稳定化
 
-**状态：IN_PROGRESS — PR #503**
+**状态：IN_PROGRESS — PR #503（仓库内已合并，剩余外部验证）**
 
 - 目标：只接受阻断发布的缺陷修复，停止大型产品功能和非必要重构。
 - 验收：至少一个 RC 完成完整前端、Rust、浏览器、desktop、a11y、performance、release 和真实 Windows 核验矩阵；结果可追溯。
 - 当前结果：修复独立 Windows desktop performance workflow 的 Rust 报告路径。Cargo 单元测试在 `src-tauri` 工作目录运行，原相对路径会把报告写到 `src-tauri/artifacts`，导致上传步骤错误失败；现在使用 `${{ github.workspace }}` 绝对路径，并加入工作流回归测试。
 - 性能证据：GitHub Actions [`Desktop benchmark`](https://github.com/MY-moss/moyang_Reader/actions/runs/35393264851) 在 PR #503 分支通过；工作区 5,000 / 20,000 文档、1MB / 10MB 大文档测试和两份报告上传均成功，原始报告留在 Actions artifacts。
-- 当前边界：仓库内 RC 证据继续沿用 C01–C03 的前端、Rust、浏览器、desktop、a11y 和 release 检查；真实旧版 → 新版 Windows x64 升级仍受 #241 的实机环境限制，不能标记 C04 完成。
+- Windows x64 实机证据（2026-09-19）：在隔离临时目录先安装 v0.10.14，再用 v0.11.0 安装包覆盖升级；应用文件版本和卸载注册信息均从 `0.10.14` 更新为 `0.11.0`，升级后应用可启动并保持响应，带 PDF 文件参数启动的入口 smoke 也通过。复现记录见 [`docs/handoff/c04-rc-stabilization-2026-09-19.md`](handoff/c04-rc-stabilization-2026-09-19.md)。
+- 当前边界：仓库内 RC 证据继续沿用 C01–C03 的前端、Rust、浏览器、desktop、a11y 和 release 检查；真实安装器覆盖升级已补齐，但应用内 updater 的检查 → 下载 → 重启闭环和 PDF 内容的可视化读取仍受 #241 的实机交互条件限制，不能标记 C04 完成。
 
 ### 外部条件项
 
-- **Windows 安装/升级实机闭环 — BLOCKED_EXTERNAL**：#241，需要真实 Windows x64 旧安装环境；v1.0 前至少成功跑通一次完整旧版 → 新版升级链路。
+- **Windows 安装/升级实机闭环 — BLOCKED_EXTERNAL**：#241。已在真实 Windows x64 环境完成隔离的 `v0.10.14 → v0.11.0` 安装覆盖升级、版本/卸载注册信息和应用/PDF 入口 smoke；仍需应用内 updater 的检查、下载、重启及 PDF 内容读取闭环，v1.0 前继续保留该外部子项。
 - **Windows Authenticode — BLOCKED_EXTERNAL / NON-FATAL IF DISCLOSED**：#51；有证书时接入，没有时明确披露和哈希核验，不无限期阻塞 1.0。
 - **Private Vulnerability Reporting 开关 — BLOCKED_EXTERNAL**：#227；只有 GitHub 仓库设置中的“开启私密报告入口”依赖维护者操作。`SECURITY.md`、披露文案和不引导公开 Issue 提交敏感细节的仓库内部分不得因此挂起。
 

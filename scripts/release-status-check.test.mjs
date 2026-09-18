@@ -24,6 +24,7 @@ function copyStatusFixture() {
     "docs/handoff/v0.11.md",
     "docs/handoff/v0.11-rc.md",
     "docs/handoff/v0.11-release-prep.md",
+    "docs/handoff/c04-rc-stabilization-2026-09-19.md",
     "src-tauri/Cargo.toml",
     "src-tauri/tauri.conf.json",
   ]) {

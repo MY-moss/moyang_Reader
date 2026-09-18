@@ -51,8 +51,8 @@
   "externalChecks": {
     "oldVersionUpdate": {
       "status": "blocked",
-      "reason": "缺少可重复使用的旧版本 Windows 安装环境，暂不能把自动更新闭环记为通过。",
-      "evidence": "docs/RELEASE-POLICY.md"
+      "reason": "已在隔离 Windows x64 环境验证 v0.10.14 → v0.11.0 安装器覆盖升级、版本/卸载注册信息和应用/PDF 入口 smoke；应用内 updater 的检查、下载、重启及 PDF 内容读取闭环尚未完成。",
+      "evidence": "docs/handoff/c04-rc-stabilization-2026-09-19.md"
     },
     "authenticode": {
       "status": "blocked",

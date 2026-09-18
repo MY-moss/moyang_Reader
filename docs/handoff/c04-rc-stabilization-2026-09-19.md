@@ -26,11 +26,19 @@ C04 只处理 RC 验证矩阵中的阻断缺陷和证据缺口，不新增产品
 - 浏览器 / a11y / desktop：C02/C03 的相关 Playwright、a11y、Windows desktop smoke 和 PR Quality checks 已通过。
 - release：v0.11.0 的 release/status 校验、资产 URL/tag 一致性和文档门禁已通过；本阶段不升版本、不创建 Release。
 - performance：run `35393264851` 完成独立工作区及大文档报告上传。
-- 真实 Windows 安装/升级：仍未完成，受 #241 的旧安装环境和发布条件限制。
+- 真实 Windows 安装/升级：已在 Windows x64 隔离临时目录完成 v0.10.14 安装后覆盖升级到 v0.11.0；两次安装退出码均为 0，应用文件版本和卸载注册信息均与目标版本一致。
+
+## Windows x64 隔离升级证据
+
+- 旧版安装包：GitHub Release `v0.10.14` 的 `Moyang.Reader_0.10.14_x64-setup.exe`，SHA-256 `293b3884f2e66659e7ce2ab4f333dc01dcd0bf0a48ddd0ed8bbff42d661cce59`。
+- 新版安装包：GitHub Release `v0.11.0` 的 `Moyang.Reader_0.11.0_x64-setup.exe`，SHA-256 `836957cc37eab63f48e9b26ac8a5d467472b72549c6797dd28c515a2a3b6186a`，与 [`docs/release-status.json`](../release-status.json) 一致。
+- 在 `%TEMP%\\moyang-c04-old-upgrade-20260919\\old-install` 先执行 v0.10.14 安装，再使用 v0.11.0 安装包覆盖同一目录；两次安装退出码均为 `0`。
+- 覆盖后 `moyang-reader.exe` 的 `FileVersion` / `ProductVersion` 和卸载注册信息均为 `0.11.0`；应用启动后窗口保持响应。
+- 以临时 PDF 文件作为命令行打开入口启动 v0.11.0，应用进程保持响应；临时 PDF 和测试进程已清理。当前仍缺少应用内 updater 的检查 → 下载 → 重启交互，以及 PDF 内容的可视化读取确认，因此不把该 smoke 扩大解释为完整 updater/PDF 验证。
 
 ## 外部边界
 
-- #241：需要真实 Windows x64 旧版安装环境，完成至少一次 `v0.10.14 → v0.11.0` 或后续 RC 的完整升级闭环；CI 不能替代实机证据。
+- #241：安装器覆盖升级的 Windows x64 smoke 已完成；仍需要真实桌面交互完成应用内 updater 的检查、下载、重启和 PDF 内容读取闭环，CI 不能替代这项实机证据。
 - #51：当前无 Authenticode 证书；updater `.sig` 与 SHA-256 可核验，但不等于 Windows 代码签名。这不应在已披露限制的前提下无限期冻结 v1.0。
 - #227：Private Vulnerability Reporting 的仓库设置开关仍需维护者在 GitHub UI 中确认；仓库内文案和安全边界已独立完成。
 
@@ -42,4 +50,4 @@ C04 只处理 RC 验证矩阵中的阻断缺陷和证据缺口，不新增产品
 
 ## 结论
 
-C04 的仓库内性能证据缺口已收口，但 C04 不能仅凭 CI 通过标记 DONE；在 #241 的真实 Windows 旧版升级闭环完成前，任务保持 `IN_PROGRESS`，不生成新版本或 Release。
+C04 的仓库内性能证据和安装器覆盖升级 smoke 已收口，但 C04 不能仅凭 CI 或启动 smoke 标记 DONE；在 #241 的应用内 updater / PDF 真实交互闭环完成前，任务保持 `IN_PROGRESS`，不生成新版本或 Release。
