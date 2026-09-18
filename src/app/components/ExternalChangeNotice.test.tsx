@@ -42,4 +42,32 @@ describe("ExternalChangeNotice", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("explains external deletion without offering a misleading overwrite action", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <ExternalChangeNotice
+          fileName="missing.md"
+          changeKind="deleted"
+          onReload={vi.fn()}
+          onOverwrite={vi.fn()}
+          onSaveAs={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("已被删除或移走");
+    expect(Array.from(container.querySelectorAll("button")).map((button) => button.textContent)).toEqual([
+      "另存为",
+      "稍后处理",
+    ]);
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });

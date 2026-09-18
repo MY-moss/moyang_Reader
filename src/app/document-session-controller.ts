@@ -6,6 +6,7 @@ import {
   shouldConfirmWorkspaceSwitch,
 } from "./document-transition";
 import { normalizePathKey } from "./path-key";
+import { classifySaveFailure, formatSaveFailure, type SaveFailureKind } from "./save-failure";
 import { isEditableDocument } from "../lib/document-adapters";
 import type { OpenDocument, RenderedMarkdown } from "./types";
 
@@ -18,6 +19,12 @@ export type DocumentSaveCommit = {
   draft: string;
   rendered: RenderedMarkdown;
   snapshots: DraftSnapshot[];
+};
+
+export type DocumentSaveFailure = {
+  kind: SaveFailureKind;
+  draftSaved: boolean;
+  snapshot: DraftSnapshot | null;
 };
 
 export type DocumentSessionControllerOptions = {
@@ -35,6 +42,7 @@ export type DocumentSessionControllerOptions = {
   onDraftSaved?: (result: DraftSaveResult) => boolean;
   onSaveCommitted: (commit: DocumentSaveCommit) => void;
   onSaveConflict: (path: string) => void;
+  onSaveFailure?: (failure: DocumentSaveFailure) => void;
   onExternalChangePath: (path: string | null) => void;
   onError: (message: string) => void;
   invalidateCache?: (path: string) => void;
@@ -93,6 +101,40 @@ export function createDocumentSessionController(options: DocumentSessionControll
       baseSource: current.source,
       savedAt: now(),
     });
+  };
+
+  const preserveDraftAfterSaveFailure = (): { draftSaved: boolean; snapshot: DraftSnapshot | null } => {
+    const current = options.getCurrentDocument();
+    const snapshot =
+      current?.modified && isEditableDocument(current.kind)
+        ? {
+            path: current.path,
+            draft: options.getSourceDraft(),
+            baseSource: current.source,
+            savedAt: now(),
+          }
+        : null;
+    if (!snapshot) return { draftSaved: false, snapshot: null };
+
+    try {
+      const result = saveDraft(snapshot);
+      return {
+        draftSaved: result.ok && onDraftSaved(result),
+        snapshot: result.ok ? snapshot : null,
+      };
+    } catch {
+      return { draftSaved: false, snapshot: null };
+    }
+  };
+
+  const reportSaveFailure = (cause: unknown): void => {
+    const recovery = preserveDraftAfterSaveFailure();
+    options.onSaveFailure?.({
+      kind: classifySaveFailure(cause),
+      draftSaved: recovery.draftSaved,
+      snapshot: recovery.snapshot,
+    });
+    options.onError(formatSaveFailure(cause, recovery.draftSaved));
   };
 
   const flushDraft = (): DraftFlushOutcome => {
@@ -169,7 +211,7 @@ export function createDocumentSessionController(options: DocumentSessionControll
 
     if (current.externallyModified && !allowExternalOverwrite) {
       options.onExternalChangePath(current.path);
-      options.onError("文件已被其他程序修改，请先选择重新载入、覆盖保存或另存为。");
+      reportSaveFailure({ code: "FILE_CONFLICT", message: "文件已被其他程序修改" });
       return false;
     }
 
@@ -185,7 +227,7 @@ export function createDocumentSessionController(options: DocumentSessionControll
           if (diskSource !== current.source) {
             options.onSaveConflict(path);
             options.onExternalChangePath(path);
-            options.onError("文件在保存前已被其他程序修改，请先选择处理方式。");
+            reportSaveFailure({ code: "FILE_CONFLICT", message: "文件在保存前已被其他程序修改" });
             return false;
           }
         }
@@ -211,7 +253,7 @@ export function createDocumentSessionController(options: DocumentSessionControll
     } catch (cause) {
       selfWritingPaths.delete(pathKey);
       if (!writeCompleted) selfWrittenPaths.delete(pathKey);
-      options.onError(errorMessage(cause, "保存失败。"));
+      reportSaveFailure(cause);
       return false;
     }
   };

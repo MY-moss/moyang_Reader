@@ -1783,6 +1783,38 @@ describe("Moyang Reader desktop runtime", () => {
     assert.match(await browser.$(".document-title").getText(), /desktop-e2e\.md/);
   });
 
+  it("keeps the open document and offers save-as after the source file is deleted", async () => {
+    const preservedText = "外部删除前仍可见的内容。";
+    fs.appendFileSync(documentPath, `\n${preservedText}\n`, "utf8");
+    await browser.pause(2_000);
+
+    try {
+      fs.rmSync(documentPath, { force: true });
+
+      const notice = await browser.$(".external-change-notice");
+      await notice.waitForDisplayed();
+      await browser.waitUntil(() => notice.getText().then((text) => text.includes("已被删除或移走")), {
+        timeout: 15_000,
+        timeoutMsg: "the external deletion was not surfaced as a recoverable state",
+      });
+      assert.match(await browser.$(".reader-content").getText(), new RegExp(preservedText));
+      assert.equal(await notice.$("button=另存为").isDisplayed(), true);
+      assert.equal(await notice.$("button=覆盖保存").isExisting(), false);
+    } finally {
+      fs.writeFileSync(documentPath, `# Desktop E2E\n\n${preservedText}\n`, "utf8");
+      await browser.waitUntil(
+        async () => {
+          const reader = await browser.$(".reader-content");
+          return (await reader.isDisplayed()) && (await reader.getText()).includes(preservedText);
+        },
+        {
+          timeout: 15_000,
+          timeoutMsg: "the deleted desktop E2E fixture was not restored",
+        },
+      );
+    }
+  });
+
   it("refreshes the file tree after external files and directories are added and removed", async () => {
     const directoryName = "watch-added";
     const fileName = "nested-note.md";
