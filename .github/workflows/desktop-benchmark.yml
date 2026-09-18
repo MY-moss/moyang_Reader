@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org
-      MOYANG_WORKSPACE_BENCHMARK_REPORT: artifacts/workspace-benchmark.json
+      MOYANG_WORKSPACE_BENCHMARK_REPORT: ${{ github.workspace }}/artifacts/workspace-benchmark.json
       MOYANG_WORKSPACE_BENCHMARK_SIZES: 5000,20000
       MOYANG_WORKSPACE_BENCHMARK_ROUNDS: 3
       MOYANG_WORKSPACE_BENCHMARK_WARM_SAMPLES: 10
@@ -56,7 +56,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: workspace-benchmark-report
-          path: artifacts/workspace-benchmark.json
+          path: ${{ github.workspace }}/artifacts/workspace-benchmark.json
           if-no-files-found: error
 
       - name: Upload large document benchmark report
