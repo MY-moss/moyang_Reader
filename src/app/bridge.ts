@@ -26,6 +26,27 @@ export function isTauriRuntime(): boolean {
   return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 }
 
+const ALLOWED_EXTERNAL_URL_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+const UNSUPPORTED_EXTERNAL_URL_MESSAGE = "已阻止不受支持的外部链接协议。";
+
+function normalizeExternalUrl(url: string): string {
+  const trimmed = url.trim();
+  const candidate = trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("无法解析这个外部链接。");
+  }
+
+  if (!ALLOWED_EXTERNAL_URL_PROTOCOLS.has(parsed.protocol)) {
+    throw new Error(UNSUPPORTED_EXTERNAL_URL_MESSAGE);
+  }
+
+  return parsed.toString();
+}
+
 export async function readAppSettings(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   return invokeValidatedCommand(IPC_COMMANDS.readAppSettings, isStringOrNullResponse);
@@ -49,7 +70,7 @@ export async function writeAnnotations(root: string, annotations: readonly TextA
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
-  const normalized = url.startsWith("//") ? `${window.location.protocol}${url}` : url;
+  const normalized = normalizeExternalUrl(url);
   if (isTauriRuntime()) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(normalized);

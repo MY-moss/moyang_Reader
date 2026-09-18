@@ -1,5 +1,23 @@
-import { describe, expect, it } from "vitest";
-import { describeUpdateError, updateActionForStatus } from "./updater";
+import { describe, expect, it, vi } from "vitest";
+
+const { isTauriRuntime, check, relaunch } = vi.hoisted(() => ({
+  isTauriRuntime: vi.fn(),
+  check: vi.fn(),
+  relaunch: vi.fn(),
+}));
+
+vi.mock("./bridge", () => ({ isTauriRuntime }));
+vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
+vi.mock("@tauri-apps/plugin-process", () => ({ relaunch }));
+
+import type { Update } from "@tauri-apps/plugin-updater";
+import {
+  checkForAppUpdate,
+  describeUpdateError,
+  installAppUpdate,
+  relaunchApp,
+  updateActionForStatus,
+} from "./updater";
 
 describe("update toolbar actions", () => {
   it("reopens an existing update instead of discarding it", () => {
@@ -13,6 +31,43 @@ describe("update toolbar actions", () => {
     expect(updateActionForStatus("checking")).toBe("check");
     expect(updateActionForStatus("error")).toBe("check");
     expect(updateActionForStatus("up-to-date")).toBe("check");
+  });
+});
+
+describe("native update bridge", () => {
+  beforeEach(() => {
+    isTauriRuntime.mockReset();
+    check.mockReset();
+    relaunch.mockReset();
+    isTauriRuntime.mockReturnValue(true);
+    check.mockResolvedValue(null);
+    relaunch.mockResolvedValue(undefined);
+  });
+
+  it("keeps check, download-and-install, and relaunch wired to the supported plugin APIs", async () => {
+    const onEvent = vi.fn();
+    const update = {
+      downloadAndInstall: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Update;
+    check.mockResolvedValue(update);
+
+    await expect(checkForAppUpdate()).resolves.toBe(update);
+    await installAppUpdate(update, onEvent);
+    await relaunchApp();
+
+    expect(check).toHaveBeenCalledWith({ timeout: 8_000 });
+    expect(update.downloadAndInstall).toHaveBeenCalledWith(onEvent, { timeout: 10 * 60_000 });
+    expect(relaunch).toHaveBeenCalledOnce();
+  });
+
+  it("does not invoke updater or process capabilities in browser preview mode", async () => {
+    isTauriRuntime.mockReturnValue(false);
+
+    await expect(checkForAppUpdate()).resolves.toBeNull();
+    await relaunchApp();
+
+    expect(check).not.toHaveBeenCalled();
+    expect(relaunch).not.toHaveBeenCalled();
   });
 });
 

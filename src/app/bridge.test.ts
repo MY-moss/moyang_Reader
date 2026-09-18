@@ -1,21 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { invoke, listen, getCurrentWebview, onDragDropEvent } = vi.hoisted(() => ({
+const { invoke, listen, getCurrentWebview, onDragDropEvent, openUrl } = vi.hoisted(() => ({
   invoke: vi.fn(),
   listen: vi.fn(),
   getCurrentWebview: vi.fn(),
   onDragDropEvent: vi.fn(),
+  openUrl: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
 import {
   commitBinaryFile,
   discardBinaryFile,
   fileMetadata,
   listWorkspaceEntries,
+  openExternalUrl,
   readAnnotations,
   readAppSettings,
   readPreviousVersion,
@@ -274,5 +277,51 @@ describe("binary bridge", () => {
       append: true,
       destinationPath: "C:\\Notes\\阅读库.docx",
     });
+  });
+});
+
+describe("external opener boundary", () => {
+  beforeEach(() => {
+    openUrl.mockReset();
+    openUrl.mockResolvedValue(undefined);
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+  });
+
+  it.each(["http://example.com/docs", "https://example.com/docs", "mailto:reader@example.com", "tel:+8613800138000"])(
+    "keeps the supported %s URL schemes available to the native opener",
+    async (url) => {
+      await openExternalUrl(url);
+
+      expect(openUrl).toHaveBeenCalledWith(url);
+    },
+  );
+
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "file:///C:/secret.txt",
+    "moyang-wiki:Next",
+  ])("rejects unsafe or unknown URL schemes before invoking the native opener: %s", async (url) => {
+    await expect(openExternalUrl(url)).rejects.toThrow("已阻止不受支持的外部链接协议。");
+
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
+  it("applies the same scheme boundary to the browser fallback", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: undefined,
+    });
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    try {
+      await expect(openExternalUrl("vbscript:msgbox(1)")).rejects.toThrow("已阻止不受支持的外部链接协议。");
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
   });
 });
