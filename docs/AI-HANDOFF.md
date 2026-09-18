@@ -5,6 +5,7 @@
 ## 稳定基线
 
 - 当前稳定版本：`v0.10.14`。
+- 当前发布候选：`v0.11.0`（`planned`；尚未创建 tag 或 GitHub Release）。
 - 产品边界：Windows x64、本地优先；浏览器版仅用于开发预览和 UI 测试。
 - 技术栈：Tauri 2 + Rust + React + TypeScript。
 - `main` 以 GitHub `Quality checks` 作为代码合并门禁；真实 Windows 安装、升级、签名和发布证据不能由 CI 代替。

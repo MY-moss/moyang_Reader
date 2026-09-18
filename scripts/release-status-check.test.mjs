@@ -22,6 +22,8 @@ function copyStatusFixture() {
     "docs/RELEASE-POLICY.md",
     "docs/release-status.json",
     "docs/handoff/v0.11.md",
+    "docs/handoff/v0.11-rc.md",
+    "docs/handoff/v0.11-release-prep.md",
     "src-tauri/Cargo.toml",
     "src-tauri/tauri.conf.json",
   ]) {
@@ -45,6 +47,21 @@ test("accepts the checked-in release and handoff status", () => {
   assert.deepEqual(validateReleaseStatus(sourceRoot), []);
 });
 
+test("allows planned pending assets to omit not-yet-generated size and hash", () => {
+  const root = copyStatusFixture();
+  try {
+    const status = readStatus(root);
+    for (const asset of status.release.assets) {
+      asset.size = null;
+      asset.sha256 = null;
+    }
+    writeStatus(root, status);
+    assert.deepEqual(validateReleaseStatus(root), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("rejects release status when versions, assets, or changelog drift", () => {
   const root = copyStatusFixture();
   try {
@@ -54,7 +71,7 @@ test("rejects release status when versions, assets, or changelog drift", () => {
     writeStatus(root, status);
     fs.writeFileSync(
       path.join(root, "CHANGELOG.md"),
-      fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8").replace("## [0.10.14]", "## [0.10.13]"),
+      fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8").replace("## [0.11.0]", "## [0.10.13]"),
       "utf8",
     );
 
