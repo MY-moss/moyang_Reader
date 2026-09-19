@@ -83,6 +83,7 @@ const requiredFragments = new Map([
       "v1.3",
       "不为未来先造空接口",
       "D00 v1.0 truth-source / onboarding freeze",
+      "D02 development doctor",
     ],
   ],
   [
@@ -92,6 +93,7 @@ const requiredFragments = new Map([
       "## v1.0 Freeze / 接手收口（当前阶段）",
       "D00",
       "D01",
+      "D02",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "A13",
@@ -104,7 +106,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D01`",
+      "当前最早可执行任务是 `D02`",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
@@ -139,6 +141,7 @@ const requiredFragments = new Map([
       "Microsoft C++ Build Tools",
       "WebView2",
       "npm ci",
+      "npm run doctor",
       "npm run agent:bootstrap",
       "npm run desktop",
       "npm run test:e2e:desktop",
