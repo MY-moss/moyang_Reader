@@ -7,6 +7,8 @@
 
 如果你在本地仓库工作，第一步先运行：npm run agent:bootstrap。
 
+Windows x64 开发前置、依赖恢复、worktree 和验证命令见 docs/DEVELOPMENT-SETUP.md；不要在这段提示词里复制另一套安装规则。
+
 然后读取 AGENTS.md、docs/AI-TASKS.md、docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md；本地还要读取 .codex-cache/agent-context.md，如存在再读取 .codex-cache/agent-handoff.md。检查最新 origin/main、开放 Issue/PR 和目标 CI，旧聊天/旧审计不能替代当前 GitHub 状态。
 
 当前 v1.0 主线固定为：v0.11 收口 → v0.12 可靠性/性能/真实使用 → v0.13 Freeze/Compatibility/RC → v1.0。v1.0 后只有满足 Gate 才继续：v1.1 Reader+、v1.2 Metadata/Knowledge、v1.3 AI、v1.4+ RAG/MCP/RSS/声明式扩展等；不得提前实现。

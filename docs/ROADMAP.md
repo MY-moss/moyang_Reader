@@ -34,12 +34,13 @@ A07–A13 DONE
   → A14 v0.11.0 Release / Publish DONE
   → B01–B06 DONE
   → C01–C04 DONE
-  → D00 v1.0 truth-source / onboarding freeze
+  → D00 v1.0 truth-source / onboarding freeze DONE
+  → D01 reproducible Windows development setup
   → v1.0 final RC
   → v1.0
 ```
 
-当前最早可执行任务是 `D00`，具体任务以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+当前最早可执行任务是 `D01`，具体任务以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 

@@ -34,6 +34,8 @@ git status --short --branch
 git fetch origin --prune
 ```
 
+Windows x64 的安装前置、`npm ci`、独立 worktree、浏览器/桌面测试和受管 Cargo 缓存只以 [`DEVELOPMENT-SETUP.md`](DEVELOPMENT-SETUP.md) 为准；本文件只定义 Agent 的接手顺序和边界。
+
 并读取 `AGENTS.md`、`docs/AI-TASKS.md`、架构契约和本机 context/handoff。
 
 如果远程查询失败或 `REMOTE_STATUS=UNKNOWN`：

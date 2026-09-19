@@ -6,10 +6,12 @@
 
 AI 先遵循 [`AGENTS.md`](AGENTS.md)，再阅读 [`docs/AI-TASKS.md`](docs/AI-TASKS.md)。根目录已有未提交改动时不要直接覆盖；新切片可以放在项目内 `.codex-worktrees/`，通过 `npm run worktree:prepare -- <worktree-path>` 在目标工作树执行独立的 `npm ci --prefer-offline`。流程和路线分别见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md) 与 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
 
+Windows x64 的完整前置条件、首次 checkout、依赖恢复、测试分层和构建缓存规则统一见 [`docs/DEVELOPMENT-SETUP.md`](docs/DEVELOPMENT-SETUP.md)。日常开发按 lockfile 使用 `npm ci`；只有明确修改依赖并准备审阅 lockfile 时才使用 `npm install`。
+
 开始新任务前必须先检查最新 `main`、当前最早未完成任务和开放 PR。只有**对应当前最早任务、修改同一范围或形成真实合并依赖**的开放 PR 才阻塞产品队列；Dependabot、机器人依赖更新、纯维护或明显无关 PR 只需要检查冲突，不得被误判成“整个开发冻结”。
 
 ```powershell
-npm install
+npm ci
 npm run test
 npm run build
 npm run desktop

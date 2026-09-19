@@ -35,6 +35,20 @@ export function parseGitHubRepositoryUrl(remoteUrl) {
   return sshMatch ? `${sshMatch[1]}/${sshMatch[2]}` : null;
 }
 
+export function isBlockingPullRequest(pullRequest) {
+  const login = String(pullRequest?.user?.login ?? "").toLowerCase();
+  const title = String(pullRequest?.title ?? "").toLowerCase();
+  const labels = Array.isArray(pullRequest?.labels)
+    ? pullRequest.labels.map((label) => String(label?.name ?? "").toLowerCase()).join(" ")
+    : "";
+
+  if (login === "dependabot[bot]" || login === "dependabot") return false;
+
+  const isBot = login.endsWith("[bot]");
+  const maintenanceSignal = /depend|dependabot|maintenance|chore/.test(`${title} ${labels}`);
+  return !(isBot && maintenanceSignal);
+}
+
 export function findFirstActiveTask(taskMarkdown) {
   const sections = taskMarkdown.split(/^###\s+/m).slice(1);
   for (const section of sections) {
@@ -117,6 +131,7 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
 
   let remoteStatus = fetchResult.ok && repoFullName ? "OK" : "UNKNOWN";
   let openPrs = [];
+  let blockingOpenPrs = [];
   let openIssues = [];
   if (remoteStatus === "OK") {
     try {
@@ -129,6 +144,12 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
         (pr) =>
           `#${pr.number} ${pr.title} [${pr.head?.ref ?? "?"} → ${pr.base?.ref ?? "?"}]${pr.draft ? " DRAFT" : ""}`,
       );
+      blockingOpenPrs = prs
+        .filter(isBlockingPullRequest)
+        .map(
+          (pr) =>
+            `#${pr.number} ${pr.title} [${pr.head?.ref ?? "?"} → ${pr.base?.ref ?? "?"}]${pr.draft ? " DRAFT" : ""}`,
+        );
       openIssues = issues
         .filter((issue) => !issue.pull_request)
         .slice(0, 20)
@@ -136,6 +157,7 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
     } catch {
       remoteStatus = "UNKNOWN";
       openPrs = [];
+      blockingOpenPrs = [];
       openIssues = [];
     }
   }
@@ -162,14 +184,14 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
     remoteStatus === "OK" &&
     fetchResult.ok &&
     onLatestMain &&
-    openPrs.length === 0 &&
+    blockingOpenPrs.length === 0 &&
     !workingTreeDirty &&
     activeTask?.status === "TODO";
 
   const reasons = [];
   if (remoteStatus !== "OK") reasons.push("remote/GitHub 状态无法确认");
   if (!onLatestMain) reasons.push("当前不在与 origin/main 完全一致的 clean main 起点");
-  if (openPrs.length > 0) reasons.push("存在 Open PR，必须先处理它");
+  if (blockingOpenPrs.length > 0) reasons.push("存在与当前任务可能冲突的 Open PR，必须先处理它");
   if (workingTreeDirty) reasons.push("当前 worktree 有未提交改动");
   if (activeTask && activeTask.status !== "TODO") reasons.push(`最早任务状态为 ${activeTask.status}`);
 
@@ -192,6 +214,7 @@ export async function buildAgentContext(projectRoot = process.cwd()) {
     `## First unfinished AI task\n\n` +
     (activeTask ? `- ${activeTask.id} — ${activeTask.title}\n- status: ${activeTask.status}\n` : `- none detected\n`) +
     `\n## Open PRs\n\n${remoteStatus === "OK" ? formatList(openPrs, "none") : "- UNKNOWN — do not assume none"}\n` +
+    `\n## Blocking Open PRs\n\n${remoteStatus === "OK" ? formatList(blockingOpenPrs, "none; Dependabot/maintenance PRs do not block a product task") : "- UNKNOWN"}\n` +
     `\n## Open Issues (first 20)\n\n${remoteStatus === "OK" ? formatList(openIssues, "none") : "- UNKNOWN"}\n` +
     `\n## Local worktrees\n\n${formatList(
       worktrees.map((item) => `${item.branch}: ${item.path}`),
