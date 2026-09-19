@@ -322,7 +322,7 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D03 — 标准首次运行验证路径
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #511**
 
 - 目标：把独立 worktree 的首次运行收敛为 `npm ci → verify:dev → desktop`，让维护者先得到可解释的开发验证结果，再进入真实 Tauri 桌面调试。
 - 范围：新增 `npm run verify:dev`，依次执行只读 `doctor`、workflow helper tests、Vitest、Lint、架构边界检查和生产构建；setup 文档明确通过后再运行 `npm run desktop`。

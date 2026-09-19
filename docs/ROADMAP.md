@@ -37,12 +37,13 @@ A07–A13 DONE
   → D00 v1.0 truth-source / onboarding freeze DONE
   → D01 reproducible Windows development setup DONE
   → D02 development doctor DONE
-  → D03 standard developer verification path
+  → D03 standard developer verification path DONE
+  → D04 re-audit and definition
   → v1.0 final RC
   → v1.0
 ```
 
-当前最早可执行任务是 `D03`，具体任务以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D03` 已完成；下一项是 `D04`，但必须先根据最新 `main`、开放 PR 和真实开发反馈重新核对并定义。具体任务以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
