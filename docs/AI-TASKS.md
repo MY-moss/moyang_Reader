@@ -320,6 +320,16 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：缺失前置条件有明确可执行提示；非 Windows 主机明确失败并跳过 Windows 专属检查；工作树改动只产生警告；脚本有隔离单测并接入 workflow 检查；setup 文档给出标准首次运行路径。
 - 下一项：D02 完成后先根据最新 main、开放 PR 和真实开发反馈重新定义唯一的 D03；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
 
+### D03 — 标准首次运行验证路径
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把独立 worktree 的首次运行收敛为 `npm ci → verify:dev → desktop`，让维护者先得到可解释的开发验证结果，再进入真实 Tauri 桌面调试。
+- 范围：新增 `npm run verify:dev`，依次执行只读 `doctor`、workflow helper tests、Vitest、Lint、架构边界检查和生产构建；setup 文档明确通过后再运行 `npm run desktop`。
+- 非目标：不自动安装依赖，不启动交互式桌面进程，不跑 Playwright/desktop smoke 或 benchmark，不把完整 Release 流程塞进日常验证，不改产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release。
+- 验收：验证阶段顺序稳定且首个失败即停止；测试覆盖不包含 desktop、E2E、benchmark、Release；独立 worktree 可按文档完成首次路径；脚本、文档、格式、Lint 和 Build 门禁通过。
+- 下一项：D03 完成后先根据最新 main、开放 PR 和真实开发反馈重新定义唯一的 D04；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）

@@ -28,6 +28,7 @@ test("requires the canonical Windows development setup guide", () => {
 
   assert.match(setupGuide, /npm ci/);
   assert.match(setupGuide, /npm run doctor/);
+  assert.match(setupGuide, /npm run verify:dev/);
   assert.match(setupGuide, /npm run agent:bootstrap/);
   assert.match(setupGuide, /npm run test:e2e:desktop/);
 });
