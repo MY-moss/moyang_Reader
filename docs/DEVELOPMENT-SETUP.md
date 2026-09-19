@@ -33,12 +33,12 @@ rustup show active-toolchain
 git fetch origin --prune
 npm run agent:bootstrap
 npm ci
-npm run doctor
+npm run verify:dev
 ```
 
 `agent:bootstrap` 只读取 Git/远程状态并生成被忽略的 `.codex-cache/agent-context.md`，不会自动 pull、rebase、reset 或 merge。阅读输出中的 `REMOTE_STATUS`、最早未完成任务和阻塞 PR；Dependabot/机器人维护 PR 不等同于产品任务阻塞。
 
-`doctor` 只读检查当前机器和工作树：Windows x64、Node/npm、Rust/Cargo、MSVC、Windows SDK、WebView2、依赖和 Git 状态。它不会安装工具、修改系统设置、执行 `npm install` 或覆盖未提交改动。失败项表示当前不能可靠进行对应的桌面开发；Git 未提交改动只显示为警告。
+`verify:dev` 先运行只读的 `doctor`，再执行工作流测试、Vitest、Lint、架构边界检查和生产构建。它不会安装工具、修改系统设置、执行 `npm install`、启动交互式桌面窗口或运行昂贵 benchmark；失败项表示当前不能可靠进行对应的桌面开发，Git 未提交改动只显示为警告。
 
 如果在项目内创建独立 worktree，先从最新 `origin/main` 创建目录，再从仓库根目录为该目录恢复独立依赖：
 
@@ -61,6 +61,9 @@ npm run dev
 
 # 检查当前机器是否具备桌面开发前置条件；只读，不会自动修复
 npm run doctor
+
+# 运行轻量首次开发验证（包含 doctor、测试、Lint、架构检查和 Build）
+npm run verify:dev
 
 # 真实 Windows 桌面调试
 npm run desktop
@@ -114,7 +117,7 @@ npm run cleanup:workspace -- --dry-run
 ## 常见问题
 
 - `npm` 或 `node` 找不到：安装 Node.js 22 LTS，重启 PowerShell 后再次检查 `node --version` 和 `npm --version`。
-- `npm run doctor` 报错：按失败项补齐对应工具后重新运行；doctor 不会替你安装或修改系统配置。
+- `npm run doctor` 或 `npm run verify:dev` 报错：按失败项补齐对应工具后重新运行；这些命令不会替你安装或修改系统配置。
 - `cargo` 找不到或 linker 报错：确认 rustup 使用 `stable-msvc`，并安装 C++ Build Tools 的“Desktop development with C++”工作负载。
 - 浏览器预览正常但桌面启动失败：先检查 WebView2、C++ Build Tools 和 Windows SDK；`npm run dev` 不能证明 Tauri 桌面可用。
 - 依赖缺失或 lockfile 不一致：删除仅限当前工作树的 `node_modules` 后重新执行 `npm ci`；不要覆盖其他 worktree。
