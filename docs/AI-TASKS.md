@@ -302,7 +302,7 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D01 — 可复现 Windows 开发环境与接手入口
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #508**
 
 - 目标：让新 Agent 或维护者在 Windows x64 上用一套可复现步骤恢复依赖、识别真实前置条件、区分浏览器预览与 Tauri 桌面验证，并判断开放 PR 是否真的阻塞当前任务。
 - 范围：新增 `docs/DEVELOPMENT-SETUP.md` 作为开发环境事实源；README、CONTRIBUTING、AI 工作流和接手提示统一链接并使用 `npm ci`；补齐 Node.js 22、Rust 1.88/MSVC、C++ Build Tools、WebView2、worktree、测试分层和 Cargo 缓存说明；修复 `agent:bootstrap` 把 Dependabot/维护 PR 误判为产品队列阻塞的问题。
