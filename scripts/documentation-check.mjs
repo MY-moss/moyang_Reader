@@ -86,7 +86,8 @@ const requiredFragments = new Map([
       "D00 v1.0 truth-source / onboarding freeze",
       "D02 development doctor DONE",
       "D03 standard developer verification path DONE",
-      "D04 v1.0 Freeze execution contract",
+      "D04 v1.0 Freeze execution contract DONE",
+      "D05 architecture complexity budget",
     ],
   ],
   [
@@ -102,7 +103,7 @@ const requiredFragments = new Map([
       "DONE — PR #511",
       "冻结契约：当前唯一可执行范围是本节的 `D00–Dxx` 任务；v1.x 候选、Future Issues 和 Future Development Plan 中的条目全部保持 `GATED`",
       "D04",
-      "IN_PROGRESS — 当前分支",
+      "DONE — PR #513",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "A13",
@@ -115,7 +116,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D04`（v1.0 Freeze 执行契约）",
+      "当前最早可执行任务是待重新核对并定义的 `D05`（架构复杂度预算）",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",

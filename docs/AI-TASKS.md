@@ -334,7 +334,7 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D04 — v1.0 Freeze 执行契约
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #513**
 
 - 目标：把 v1.0 前的范围冻结规则变成所有 Agent 都能直接执行、文档检查能够阻止漂移的明确契约。
 - 范围：在 AI 任务队列中声明唯一可执行范围为 `D00–Dxx`；把 `v1.x` 与 `FUTURE-DEVELOPMENT-PLAN.md` 的候选统一标为 `GATED`；README、AI 工作流和长期计划明确不能提前实现 Reader+、Knowledge、AI、RAG、MCP、RSS 或插件候选；补充文档一致性测试。

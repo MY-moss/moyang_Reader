@@ -38,12 +38,13 @@ A07–A13 DONE
   → D01 reproducible Windows development setup DONE
   → D02 development doctor DONE
   → D03 standard developer verification path DONE
-  → D04 v1.0 Freeze execution contract
+  → D04 v1.0 Freeze execution contract DONE
+  → D05 architecture complexity budget
   → v1.0 final RC
   → v1.0
 ```
 
-`D04` 是当前最早可执行任务，具体范围是把 v1.0 Freeze 执行契约落实到任务队列、接手文档和一致性检查。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D04` 已完成；下一项是 `D05`，但必须先根据最新 `main`、开放 PR/Issue 和真实复杂度证据重新核对并定义。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
