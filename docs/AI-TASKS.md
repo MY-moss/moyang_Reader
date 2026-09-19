@@ -374,6 +374,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：阅读位置 controller 测试覆盖锚点恢复、滚动保存和卸载 flush；完整 Vitest 469 个测试通过；workflow、Release、Lint、Build、格式、文档、架构和 type-aware 检查通过；浏览器相关回归 2 个通过；Windows desktop smoke 18 个通过；远程 Quality checks 通过后合入 PR #519。
 - 下一项：D07 已完成；根据最新 `main`、预算变化和稳定职责边界重新核对并定义 D08，不自动推进长期 v1.x 候选。
 
+### D08 — App.tsx 阅读进度栏与标题观察编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把阅读进度、当前标题状态、标题缓存、IntersectionObserver 和滚动合帧编排从 `App.tsx` 收敛到独立 controller，继续降低页面组合层的领域生命周期负担。
+- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有阅读进度/标题三组状态、标题列表与 observer refs、阅读栏回调及三段相关 effect；Issue #16 仍开放；Issue #168 的性能问题已有 rAF/IntersectionObserver 基础修正但结构性编排仍在 App；当前没有修改同一范围的开放产品 PR，也没有新的架构预算超限证据。
+- 范围：新增 `reading-rail-controller` 与定向测试；迁移阅读标题缓存、当前标题/进度状态、IntersectionObserver 生命周期、滚动 rAF 合帧和非阅读面重置；保留阅读位置 controller、标题导航、阅读缩放、批注、阅读库搜索、IPC、索引算法和 Rust 行为不变。
+- 非目标：不一次性重写 `App.tsx`，不改变标题定位算法、IntersectionObserver 语义、阅读位置存储、产品运行时、IPC、Rust 文件行为、版本号或 Release。
+- 验收：controller 测试覆盖标题缓存/回退、IntersectionObserver 当前标题、滚动进度和非阅读面重置；现有阅读栏、阅读位置、主流程、a11y 与 Windows desktop smoke 保持通过；workflow、Vitest、Lint、Build、格式、文档、架构检查和远程 Quality checks 通过。
+- 下一项：完成 D08 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D09；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）
