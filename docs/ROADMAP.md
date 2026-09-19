@@ -43,12 +43,12 @@ A07–A13 DONE
   → D06 App.tsx document-search orchestration DONE
   → D07 App.tsx reading-position orchestration DONE
   → D08 App.tsx reading-rail orchestration DONE
-  → D09 App.tsx update orchestration IN PROGRESS
+  → D09 App.tsx update orchestration DONE
   → v1.0 final RC
   → v1.0
 ```
 
-`D09` 当前正在提取 `App.tsx` 的应用更新生命周期编排；具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D09` 已完成 `App.tsx` 应用更新生命周期编排提取；下一步根据最新 `main`、预算变化和稳定职责边界重新核对并定义 D10。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
