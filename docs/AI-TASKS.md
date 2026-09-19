@@ -340,7 +340,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 范围：在 AI 任务队列中声明唯一可执行范围为 `D00–Dxx`；把 `v1.x` 与 `FUTURE-DEVELOPMENT-PLAN.md` 的候选统一标为 `GATED`；README、AI 工作流和长期计划明确不能提前实现 Reader+、Knowledge、AI、RAG、MCP、RSS 或插件候选；补充文档一致性测试。
 - 非目标：不实现任何 v1.x 产品功能，不新增 provider/plugin/RAG/MCP 接口，不改产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release，不批量修改无关 Issue。
 - 验收：新 Agent 只读 README、AI-TASKS、AI-HANDOFF、AI-WORKFLOW 和 Future Development Plan 时，不能合理推导出当前可以直接开始 v1.1 功能；`check:docs` 和相关测试在冻结契约缺失时失败。
-- 下一项：D04 完成后根据最新 `main`、开放 PR/Issue 和真实复杂度证据重新定义 D05“架构复杂度预算”；在 D00–Dxx 收口前继续保持 v1.x GATED。
+- 下一项：D04 完成后进入 D05“架构复杂度预算”；在 D00–Dxx 收口前继续保持 v1.x GATED。
+
+### D05 — 架构复杂度预算
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：让大型编排点的继续增长变得可见、可解释，并在显著超出预算时阻止继续堆叠领域逻辑。
+- 范围：新增 `scripts/architecture-budget.json`，为 `App.tsx`、`commands.rs`、`export.ts` 和 `styles.css` 记录规范化字节/行数基线与允许增长；扩展 `architecture-guard` 在超出增量预算时失败，并补充超预算 fixture 测试；把预算检查保留在现有 `check:architecture` / `verify:dev` 路径。
+- 非目标：不按总行数机械重构，不拆分文件、不改变产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release，不把一次正常的小修复误判成必须架构迁移。
+- 验收：当前 main 的四个大型编排点通过预算；超出字节或行数增量的隔离 fixture 被 guard 拒绝；预算字段、职责所有者和“只在架构任务中调整基线”的规则有文档说明；workflow、Lint、Build、格式和远程 Quality checks 通过。
+- 下一项：D05 完成后根据最新 `main`、真实超预算证据和稳定职责边界重新定义 D06“App.tsx 单职责提取”；不进行一次性大重写。
 
 ---
 
