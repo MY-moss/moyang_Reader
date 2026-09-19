@@ -289,6 +289,8 @@
 
 C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、开发环境和架构防膨胀问题；v1.x 产品候选继续保持 `GATED`，不得提前实现。
 
+**冻结契约：当前唯一可执行范围是本节的 `D00–Dxx` 任务；v1.x 候选、Future Issues 和 Future Development Plan 中的条目全部保持 `GATED`。如果没有已定义的 Dxx 任务，必须先重新核对最新 `main`、开放 PR/Issue 和真实开发反馈，再定义下一项；不得直接实现 Reader+、Knowledge、AI、RAG、MCP、RSS 或插件候选。**
+
 ### D00 — 修复 v1.0 事实源与接手文档
 
 **状态：DONE — PR #507**
@@ -328,7 +330,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 范围：新增 `npm run verify:dev`，依次执行只读 `doctor`、workflow helper tests、Vitest、Lint、架构边界检查和生产构建；setup 文档明确通过后再运行 `npm run desktop`。
 - 非目标：不自动安装依赖，不启动交互式桌面进程，不跑 Playwright/desktop smoke 或 benchmark，不把完整 Release 流程塞进日常验证，不改产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release。
 - 验收：验证阶段顺序稳定且首个失败即停止；测试覆盖不包含 desktop、E2E、benchmark、Release；独立 worktree 可按文档完成首次路径；脚本、文档、格式、Lint 和 Build 门禁通过。
-- 下一项：D03 完成后先根据最新 main、开放 PR 和真实开发反馈重新定义唯一的 D04；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
+- 下一项：D03 完成后进入 D04“v1.0 Freeze 执行契约”；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
+
+### D04 — v1.0 Freeze 执行契约
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把 v1.0 前的范围冻结规则变成所有 Agent 都能直接执行、文档检查能够阻止漂移的明确契约。
+- 范围：在 AI 任务队列中声明唯一可执行范围为 `D00–Dxx`；把 `v1.x` 与 `FUTURE-DEVELOPMENT-PLAN.md` 的候选统一标为 `GATED`；README、AI 工作流和长期计划明确不能提前实现 Reader+、Knowledge、AI、RAG、MCP、RSS 或插件候选；补充文档一致性测试。
+- 非目标：不实现任何 v1.x 产品功能，不新增 provider/plugin/RAG/MCP 接口，不改产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release，不批量修改无关 Issue。
+- 验收：新 Agent 只读 README、AI-TASKS、AI-HANDOFF、AI-WORKFLOW 和 Future Development Plan 时，不能合理推导出当前可以直接开始 v1.1 功能；`check:docs` 和相关测试在冻结契约缺失时失败。
+- 下一项：D04 完成后根据最新 `main`、开放 PR/Issue 和真实复杂度证据重新定义 D05“架构复杂度预算”；在 D00–Dxx 收口前继续保持 v1.x GATED。
 
 ---
 
