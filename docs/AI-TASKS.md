@@ -385,6 +385,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：controller 测试覆盖标题缓存/回退、IntersectionObserver 当前标题、滚动进度和非阅读面重置；完整 Vitest 109 文件 / 472 项、coverage、workflow 46 项、Release 27 项、a11y 11 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；阅读栏 Playwright 2 项通过；Windows desktop smoke 18 项通过；远程 Quality checks 通过后合入 PR #521。
 - 下一项：D08 已完成；根据最新 `main`、预算变化和稳定职责边界重新核对并定义 D09，不自动推进长期 v1.x 候选。
 
+### D09 — App.tsx 更新生命周期编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把应用更新检查、安装、重启、恢复提示和清理生命周期从 `App.tsx` 收敛到独立 controller，让页面组合层只负责连接顶栏与通知视图。
+- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有当前版本、更新状态、待处理更新、检查锁和启动检查偏好三组 ref，以及检查/安装/重启/关闭回调和启动恢复 effect；Issue #16 仍开放；`updater.ts` 与 `update-recovery.ts` 已提供稳定桥接和持久化边界；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 范围：新增 `update-controller` 与定向测试；迁移更新状态、待处理更新清理、手动/启动检查、下载安装、重启、恢复提示和顶栏更新动作；保留现有 updater bridge、错误码/本地化、恢复 key/格式、设置中的启动检查偏好和通知语义不变。
+- 非目标：不修改更新源、IPC、Rust 文件行为、权限、版本号、tag、Release、安装包或 `latest.json`；不重做更新 UI，不提前建立 Provider/插件接口。
+- 验收：controller 测试覆盖浏览器预览保护、启动恢复提示、检查无更新/有更新、下载进度、失败恢复和资源清理；现有 TopBar/UpdateNotice、a11y、workflow、Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright、Windows desktop smoke 与远程 Quality checks 保持通过。
+- 下一项：完成 D09 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D10；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）
