@@ -40,11 +40,12 @@ A07–A13 DONE
   → D03 standard developer verification path DONE
   → D04 v1.0 Freeze execution contract DONE
   → D05 architecture complexity budget DONE
+  → D06 App.tsx document-search orchestration
   → v1.0 final RC
   → v1.0
 ```
 
-`D05` 已完成；下一项 `D06` 需先根据最新 `main`、真实超预算证据和稳定职责边界重新核对并定义。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D05` 已完成；当前按重新核对后的边界执行 `D06`：只提取 `App.tsx` 的文内查找编排，不迁移阅读库搜索或全局快捷键注册。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
