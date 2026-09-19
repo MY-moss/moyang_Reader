@@ -106,6 +106,9 @@ const requiredFragments = new Map([
       "DONE — PR #513",
       "D05",
       "DONE — PR #515",
+      "D06",
+      "IN_PROGRESS — 当前分支",
+      "文内查找编排提取",
       "architecture-budget.json",
       "check:architecture",
       "Dependabot",
@@ -120,7 +123,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是待重新核对并定义的 `D06`（App.tsx 单职责提取）",
+      "当前最早可执行任务是 `D06`（App.tsx 文内查找编排提取）",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
