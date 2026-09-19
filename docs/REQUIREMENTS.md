@@ -1,6 +1,6 @@
 # v0.9.0 功能需求与验收
 
-> 本文保留多个版本的验收记录。历史段落中的“当前”“开放”只代表当时快照；实时 Issue/PR 状态以 GitHub 为准，批准队列与运行状态分别以 [`ai/plan-v1.json`](ai/plan-v1.json) 和 [`ai/state.json`](ai/state.json) 为准，[`NEXT.md`](NEXT.md) 只是生成摘要。
+> 本文保留多个版本的验收记录。历史段落中的“当前”“开放”只代表当时快照；实时 Issue/PR 状态以 GitHub 为准，当前开发任务和顺序以根目录 `AGENTS.md` 与 [`docs/AI-TASKS.md`](AI-TASKS.md) 为准。历史治理文件名不再作为实时状态来源。
 
 ## 产品边界
 

@@ -6,7 +6,9 @@
 
 ## 当前状态
 
-当前稳定版本：`v0.10.14`。
+当前稳定版本：`v0.11.0`，已发布 Windows x64 安装包和 updater metadata。
+
+当前开发阶段是 v1.0 Freeze / 接手收口：先修正事实源、开发环境和架构边界，再进行最终 RC；v1.x 功能候选继续保持 GATED。
 
 正式产品边界：只发布和维护 Windows x64 桌面版。浏览器构建仅用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端、云同步、实时协作和任意第三方脚本插件不在 v1.0 范围。
 
@@ -114,11 +116,10 @@ v1.0 不等待轻量知识库、AI provider、RAG、MCP 或插件内核完成。
 
 ## 路线图
 
-1. **v0.10.14**：当前稳定 Windows x64 版本。
-2. **v0.11**：桌面体验和职责边界收口——上下文 Tab/a11y、顶栏/DPI、CSS/视觉基线、Workspace Session、稳定错误码、RC/发布预检。
-3. **v0.12**：可靠性证明——5k/20k 工作区 benchmark、1MB/10MB Markdown 降级、Resilient Reading Anchor、Tauri 权限库存与负向测试、真实主流程、本地诊断。
-4. **v0.13**：Freeze / Compatibility / RC，只处理兼容、恢复、发布和真实 blocker，不承载大型新功能。
-5. **v1.0**：可靠 Windows x64 核心基线与长期维护起点。
+1. **v0.11.0**：当前稳定 Windows x64 版本，已完成桌面体验、职责边界、RC 预检和发布。
+2. **v0.12**：可靠性证明——5k/20k 工作区 benchmark、1MB/10MB Markdown 降级、Resilient Reading Anchor、Tauri 权限库存与负向测试、真实主流程、本地诊断。
+3. **v0.13**：Freeze / Compatibility / RC——兼容、恢复、发布、安全披露和真实 Windows 验证已完成，不承载大型新功能。
+4. **v1.0**：当前收口目标；先完成 D00 起的接手/运行防跑偏工作，再制作最终 RC 和正式发布。
 
 v1.0 后的候选顺序：
 
