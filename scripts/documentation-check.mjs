@@ -87,7 +87,7 @@ const requiredFragments = new Map([
       "D02 development doctor DONE",
       "D03 standard developer verification path DONE",
       "D04 v1.0 Freeze execution contract DONE",
-      "D05 architecture complexity budget",
+      "D05 architecture complexity budget DONE",
     ],
   ],
   [
@@ -105,7 +105,7 @@ const requiredFragments = new Map([
       "D04",
       "DONE — PR #513",
       "D05",
-      "IN_PROGRESS — 当前分支",
+      "DONE — PR #515",
       "architecture-budget.json",
       "check:architecture",
       "Dependabot",
@@ -120,7 +120,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D05`（架构复杂度预算）",
+      "当前最早可执行任务是待重新核对并定义的 `D06`（App.tsx 单职责提取）",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
