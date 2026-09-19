@@ -49,12 +49,6 @@ import { UpdateNotice } from "./components/UpdateNotice";
 import { NotificationViewport } from "./components/NotificationViewport";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import {
-  captureReadingPosition,
-  createReadingPositionTracker,
-  resolveReadingPositionTop,
-  type ReadingPositionAnchor,
-} from "./reading-position";
-import {
   clearReadingHistory,
   createReadingHistoryTracker,
   loadReadingHistory,
@@ -63,6 +57,7 @@ import {
 } from "./reading-history";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
 import { useDocumentSearchController } from "./document-search-controller";
+import { useReadingPositionController } from "./reading-position-controller";
 import {
   createAnnotationHighlightController,
   type AnnotationHighlightController,
@@ -208,7 +203,6 @@ import {
   loadWorkspaceSessions,
   loadLastDocumentPath,
   loadOpenTabs,
-  loadReadingPositionAnchor,
   loadReadingPositions,
   loadWorkspacePath,
   rememberRecentFile,
@@ -217,7 +211,6 @@ import {
   saveRecentFiles,
   saveLastDocumentPath,
   saveOpenTabs,
-  saveReadingPosition,
   saveReadingPositions,
   saveSidebarCollapsed,
   saveContextPanelOpen,
@@ -228,7 +221,6 @@ import {
   saveWorkspaceSessions,
   forgetWorkspaceSession,
   saveWorkspacePath,
-  type ReadingPosition,
 } from "./storage";
 import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
 import { relativeMarkdownAssetPath } from "./markdown-path";
@@ -293,7 +285,7 @@ import {
 } from "./bookmarks";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
 import type { PaneWidths } from "./pane-layout";
-import { findHeadingInArticle, scrollHeadingInContainer } from "./heading-navigation";
+import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
 import { formatTransitionConfirmation, isSameDocumentPath, shouldConfirmWorkspaceSwitch } from "./document-transition";
@@ -719,7 +711,6 @@ export function App() {
   const readingHeadingsRef = useRef<HTMLElement[]>([]);
   const readingHeadingObserverRef = useRef<IntersectionObserver | null>(null);
   const readingHeadingCandidatesRef = useRef(new Set<HTMLElement>());
-  const readingPositionRef = useRef<ReadingPosition | null>(null);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
@@ -1467,96 +1458,15 @@ export function App() {
     setWorkspaceExportNotice(null);
   }, [selectedFileKind, selectedTag, workspacePath, workspaceQuery]);
 
-  useEffect(() => {
-    const path = documentState?.path;
-    if (!path || path.startsWith("browser://") || mode !== "rendered") return;
-
-    const storedPosition = loadReadingPositionAnchor(path);
-    let frame: number | null = null;
-    let attempts = 0;
-    const maxRestoreAttempts = 60;
-    const retryRestore = () => {
-      if (attempts >= maxRestoreAttempts) return;
-      attempts += 1;
-      frame = window.requestAnimationFrame(() => {
-        frame = null;
-        restorePosition();
-      });
-    };
-    const restorePosition = () => {
-      const contentArea = contentAreaRef.current;
-      if (!contentArea) return;
-      const heading = storedPosition?.headingId
-        ? findHeadingInArticle(articleRef.current, storedPosition.headingId)
-        : null;
-      const maxScrollTop = Math.max(0, contentArea.scrollHeight - contentArea.clientHeight);
-      const hasPositiveFallback = Boolean(
-        storedPosition && (storedPosition.top > 0 || (storedPosition.progressRatio ?? 0) > 0),
-      );
-      if (
-        (storedPosition?.headingId && !heading && !progressiveReaderReady) ||
-        (hasPositiveFallback && maxScrollTop === 0)
-      ) {
-        retryRestore();
-        return;
-      }
-
-      const restoredTop = storedPosition ? resolveReadingPositionTop(contentArea, heading, storedPosition) : 0;
-      contentArea.scrollTop = Math.min(restoredTop, maxScrollTop);
-      readingPositionRef.current = storedPosition
-        ? { ...storedPosition, path, top: contentArea.scrollTop }
-        : { path, top: contentArea.scrollTop };
-      if (hasPositiveFallback && contentArea.scrollTop === 0) retryRestore();
-    };
-    const timer = window.setTimeout(restorePosition, 0);
-    return () => {
-      window.clearTimeout(timer);
-      if (frame !== null) window.cancelAnimationFrame(frame);
-    };
-  }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady]);
-
-  useEffect(() => {
-    const path = documentState?.path;
-    const contentArea = contentAreaRef.current;
-    if (!path || path.startsWith("browser://") || !contentArea) return;
-
-    let timer: number | null = null;
-    const initialPosition = readingPositionRef.current?.path === path ? readingPositionRef.current : null;
-    const initialTop = initialPosition?.top ?? contentArea.scrollTop;
-    const tracker = createReadingPositionTracker(path, initialTop, (trackedPath, top, anchor) => {
-      readingPositionRef.current = { path: trackedPath, top, ...(anchor ?? {}) };
-      saveReadingPosition(trackedPath, top, anchor);
-    });
-    const persistPosition = () => {
-      const snapshot = captureReadingPosition(contentArea, readingHeadingsRef.current);
-      const anchor: ReadingPositionAnchor = {
-        ...(snapshot.headingId ? { headingId: snapshot.headingId } : {}),
-        ...(snapshot.relativeOffset !== undefined ? { relativeOffset: snapshot.relativeOffset } : {}),
-        ...(snapshot.progressRatio !== undefined ? { progressRatio: snapshot.progressRatio } : {}),
-      };
-      tracker.update(snapshot.top, anchor);
-      readingPositionRef.current = { path, top: tracker.current(), ...anchor };
-      if (timer !== null) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = null;
-        tracker.flush();
-      }, 180);
-    };
-
-    contentArea.addEventListener("scroll", persistPosition, { passive: true });
-    return () => {
-      contentArea.removeEventListener("scroll", persistPosition);
-      if (timer !== null) window.clearTimeout(timer);
-      const latestPosition = readingPositionRef.current?.path === path ? readingPositionRef.current : null;
-      const latestAnchor: ReadingPositionAnchor = {
-        ...(latestPosition?.headingId ? { headingId: latestPosition.headingId } : {}),
-        ...(latestPosition?.relativeOffset !== undefined ? { relativeOffset: latestPosition.relativeOffset } : {}),
-        ...(latestPosition?.progressRatio !== undefined ? { progressRatio: latestPosition.progressRatio } : {}),
-      };
-      tracker.update(latestPosition?.top ?? tracker.current(), latestAnchor);
-      tracker.flush();
-    };
-  }, [documentState?.path]);
+  useReadingPositionController({
+    articleRef,
+    contentAreaRef,
+    mode,
+    path: documentState?.path,
+    progressiveReaderReady,
+    readingHeadingsRef,
+    renderedHtml,
+  });
 
   useEffect(() => {
     const article = articleRef.current;
