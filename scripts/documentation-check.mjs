@@ -84,7 +84,8 @@ const requiredFragments = new Map([
       "不为未来先造空接口",
       "D00 v1.0 truth-source / onboarding freeze",
       "D02 development doctor DONE",
-      "D03 standard developer verification path",
+      "D03 standard developer verification path DONE",
+      "D04 re-audit and definition",
     ],
   ],
   [
@@ -97,6 +98,7 @@ const requiredFragments = new Map([
       "D02",
       "DONE — PR #509",
       "D03",
+      "DONE — PR #511",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "A13",
@@ -109,7 +111,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D03`",
+      "当前最早可执行任务是待重新核对并定义的 `D04`",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
