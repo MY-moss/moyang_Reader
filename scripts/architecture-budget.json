@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "targets": {
+    "src/app/App.tsx": {
+      "baselineBytes": 242772,
+      "baselineLines": 6416,
+      "maxGrowthBytes": 12288,
+      "maxGrowthLines": 240
+    },
+    "src-tauri/src/commands.rs": {
+      "baselineBytes": 207860,
+      "baselineLines": 5838,
+      "maxGrowthBytes": 12288,
+      "maxGrowthLines": 240
+    },
+    "src/app/export.ts": {
+      "baselineBytes": 75850,
+      "baselineLines": 1897,
+      "maxGrowthBytes": 8192,
+      "maxGrowthLines": 160
+    },
+    "src/app/styles.css": {
+      "baselineBytes": 143442,
+      "baselineLines": 6066,
+      "maxGrowthBytes": 8192,
+      "maxGrowthLines": 160
+    }
+  }
+}

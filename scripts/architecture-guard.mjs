@@ -1,9 +1,11 @@
 import fs from "node:fs";
+import { Buffer } from "node:buffer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveWorkingTreeRoot } from "./working-tree-root.mjs";
 
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]);
+const architectureBudgetRelativePath = "scripts/architecture-budget.json";
 
 function walkFiles(directory) {
   if (!fs.existsSync(directory)) return [];
@@ -22,6 +24,86 @@ function relative(root, file) {
 
 function isTestSource(relativePath) {
   return /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(relativePath);
+}
+
+function normalizedMetrics(text) {
+  const normalized = text.replaceAll("\r\n", "\n");
+  return {
+    bytes: Buffer.byteLength(normalized, "utf8"),
+    lines: (normalized.match(/\n/g)?.length ?? 0) + 1,
+  };
+}
+
+function readArchitectureBudget(root) {
+  const budgetPath = path.join(root, architectureBudgetRelativePath);
+  if (!fs.existsSync(budgetPath)) return { targets: {}, errors: [] };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(budgetPath, "utf8"));
+  } catch (cause) {
+    return {
+      targets: {},
+      errors: [
+        `${architectureBudgetRelativePath}: invalid JSON (${cause instanceof Error ? cause.message : String(cause)})`,
+      ],
+    };
+  }
+
+  const errors = [];
+  if (parsed?.version !== 1) {
+    errors.push(`${architectureBudgetRelativePath}: version must be 1`);
+  }
+  if (!parsed?.targets || typeof parsed.targets !== "object" || Array.isArray(parsed.targets)) {
+    errors.push(`${architectureBudgetRelativePath}: targets must be an object`);
+    return { targets: {}, errors };
+  }
+
+  const targets = {};
+  for (const [relativePath, rule] of Object.entries(parsed.targets)) {
+    if (path.isAbsolute(relativePath) || relativePath.split(/[\\/]/).includes("..")) {
+      errors.push(`${architectureBudgetRelativePath}: target path must stay inside the repository: ${relativePath}`);
+      continue;
+    }
+
+    const numericFields = ["baselineBytes", "baselineLines", "maxGrowthBytes", "maxGrowthLines"];
+    if (
+      !rule ||
+      typeof rule !== "object" ||
+      numericFields.some((field) => !Number.isInteger(rule[field]) || rule[field] < 0)
+    ) {
+      errors.push(`${architectureBudgetRelativePath}: invalid numeric budget for ${relativePath}`);
+      continue;
+    }
+
+    targets[relativePath] = rule;
+  }
+
+  return { targets, errors };
+}
+
+export function scanArchitectureBudgetAtRoot(root) {
+  const { targets, errors } = readArchitectureBudget(root);
+  const violations = [...errors];
+
+  for (const [relativePath, rule] of Object.entries(targets)) {
+    const filePath = path.join(root, relativePath);
+    if (!fs.existsSync(filePath)) {
+      violations.push(`${relativePath}: architecture budget target is missing`);
+      continue;
+    }
+
+    const metrics = normalizedMetrics(fs.readFileSync(filePath, "utf8"));
+    const allowedBytes = rule.baselineBytes + rule.maxGrowthBytes;
+    const allowedLines = rule.baselineLines + rule.maxGrowthLines;
+    if (metrics.bytes > allowedBytes || metrics.lines > allowedLines) {
+      violations.push(
+        `${relativePath}: architecture budget exceeded (bytes ${metrics.bytes}/${allowedBytes}, lines ${metrics.lines}/${allowedLines}); extract a stable responsibility or update the budget only in an architecture-scoped task`,
+      );
+    }
+  }
+
+  return violations;
 }
 
 export function scanArchitectureAtRoot(root) {
@@ -67,6 +149,8 @@ export function scanArchitectureAtRoot(root) {
       violations.push(`${rel}: neutral lib/domain modules must not depend on app/components`);
     }
   }
+
+  violations.push(...scanArchitectureBudgetAtRoot(root));
 
   return violations;
 }

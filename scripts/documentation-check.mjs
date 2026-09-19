@@ -104,6 +104,10 @@ const requiredFragments = new Map([
       "冻结契约：当前唯一可执行范围是本节的 `D00–Dxx` 任务；v1.x 候选、Future Issues 和 Future Development Plan 中的条目全部保持 `GATED`",
       "D04",
       "DONE — PR #513",
+      "D05",
+      "IN_PROGRESS — 当前分支",
+      "architecture-budget.json",
+      "check:architecture",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "A13",
@@ -116,7 +120,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是待重新核对并定义的 `D05`（架构复杂度预算）",
+      "当前最早可执行任务是 `D05`（架构复杂度预算）",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
@@ -150,7 +154,17 @@ const requiredFragments = new Map([
   ],
   [
     "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
-    ["真实内置用户动作", "B04", "v0.13", "v1.3", "provider-first", "SECURITY.md"],
+    [
+      "真实内置用户动作",
+      "B04",
+      "v0.13",
+      "v1.3",
+      "provider-first",
+      "SECURITY.md",
+      "architecture-budget.json",
+      "check:architecture",
+      "超出增量预算",
+    ],
   ],
   [
     "docs/DEVELOPMENT-SETUP.md",
