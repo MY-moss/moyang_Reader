@@ -344,7 +344,7 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D05 — 架构复杂度预算
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #515**
 
 - 目标：让大型编排点的继续增长变得可见、可解释，并在显著超出预算时阻止继续堆叠领域逻辑。
 - 范围：新增 `scripts/architecture-budget.json`，为 `App.tsx`、`commands.rs`、`export.ts` 和 `styles.css` 记录规范化字节/行数基线与允许增长；扩展 `architecture-guard` 在超出增量预算时失败，并补充超预算 fixture 测试；把预算检查保留在现有 `check:architecture` / `verify:dev` 路径。
