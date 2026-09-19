@@ -55,6 +55,12 @@ Moyang Reader v1.0 的正式目标是 **Windows x64、本地优先、阅读器�
 
 v0.11 的 A11 明确负责继续提取 Workspace Session / 工作区生命周期，不以“把 App.tsx 减到某行数”为目标。
 
+### 3.1 复杂度增长预算
+
+`scripts/architecture-budget.json` 记录 `App.tsx`、`commands.rs`、`export.ts` 和 `styles.css` 的规范化 UTF-8 字节/行数基线与允许增长。`check:architecture` 只阻止超出增量预算的显著增长，不把总行数当作质量目标，也不要求为了过检查机械拆文件。
+
+调整基线必须属于明确的架构切片，并同时说明职责提取、行为等价测试或确实新增的领域边界；普通产品 PR 不得只为容纳新增代码而放宽预算。超预算时，优先提取稳定职责或拆分独立任务，再更新基线。
+
 ## 4. 目标依赖方向
 
 ```text
