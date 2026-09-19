@@ -10,6 +10,8 @@
 
 当前开发阶段是 v1.0 Freeze / 接手收口：先修正事实源、开发环境和架构边界，再进行最终 RC；v1.x 功能候选继续保持 GATED。
 
+当前唯一可执行范围是 `docs/AI-TASKS.md` 的 `D00–Dxx`；没有已定义的 Dxx 任务时，必须先复核最新 `main`、开放 PR/Issue 和真实开发反馈，再定义下一项。v1.1 Reader+、Knowledge、AI、RAG、MCP、RSS 和插件候选不得提前实现。
+
 正式产品边界：只发布和维护 Windows x64 桌面版。浏览器构建仅用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端、云同步、实时协作和任意第三方脚本插件不在 v1.0 范围。
 
 当前开发主线已经收敛为：

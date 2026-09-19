@@ -32,3 +32,14 @@ test("requires the canonical Windows development setup guide", () => {
   assert.match(setupGuide, /npm run agent:bootstrap/);
   assert.match(setupGuide, /npm run test:e2e:desktop/);
 });
+
+test("requires an explicit v1.0 freeze contract", () => {
+  const taskQueue = fs.readFileSync(path.join(sourceRoot, "docs", "AI-TASKS.md"), "utf8");
+  const readme = fs.readFileSync(path.join(sourceRoot, "README.md"), "utf8");
+  const futurePlan = fs.readFileSync(path.join(sourceRoot, "docs", "FUTURE-DEVELOPMENT-PLAN.md"), "utf8");
+
+  assert.match(taskQueue, /当前唯一可执行范围是本节的 `D00–Dxx` 任务/);
+  assert.match(taskQueue, /v1\.x 候选、Future Issues 和 Future Development Plan 中的条目全部保持 `GATED`/);
+  assert.match(readme, /当前唯一可执行范围是 `docs\/AI-TASKS\.md` 的 `D00–Dxx`/);
+  assert.match(futurePlan, /当前状态：`GATED`/);
+});

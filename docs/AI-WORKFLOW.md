@@ -182,6 +182,10 @@ v1.0 后按 Gate 再评估：
 
 长期候选不是开工许可。
 
+## v1.0 Freeze 执行契约
+
+当前唯一可执行范围是 `docs/AI-TASKS.md` 的 `D00–Dxx`。`FUTURE-DEVELOPMENT-PLAN.md`、v1.x 候选和 Future Issues 全部保持 `GATED`；没有已定义的 Dxx 任务时，先复核最新 `main`、开放 PR/Issue 和真实开发反馈，再定义下一项，不得直接实现 Reader+、Knowledge、AI、RAG、MCP、RSS 或插件候选。
+
 ## 12. 更新与发布稳定事实
 
 - GitHub Release `latest.json` 是 updater metadata 权威源；Cloudflare Pages 仅作备用镜像/分发源。
