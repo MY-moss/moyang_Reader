@@ -350,7 +350,18 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 范围：新增 `scripts/architecture-budget.json`，为 `App.tsx`、`commands.rs`、`export.ts` 和 `styles.css` 记录规范化字节/行数基线与允许增长；扩展 `architecture-guard` 在超出增量预算时失败，并补充超预算 fixture 测试；把预算检查保留在现有 `check:architecture` / `verify:dev` 路径。
 - 非目标：不按总行数机械重构，不拆分文件、不改变产品运行时、IPC、索引算法、Rust 文件行为、版本号或 Release，不把一次正常的小修复误判成必须架构迁移。
 - 验收：当前 main 的四个大型编排点通过预算；超出字节或行数增量的隔离 fixture 被 guard 拒绝；预算字段、职责所有者和“只在架构任务中调整基线”的规则有文档说明；workflow、Lint、Build、格式和远程 Quality checks 通过。
-- 下一项：D05 完成后根据最新 `main`、真实超预算证据和稳定职责边界重新定义 D06“App.tsx 单职责提取”；不进行一次性大重写。
+- 下一项：D05 完成后进入 D06“App.tsx 文内查找编排提取”；不进行一次性大重写。
+
+### D06 — App.tsx 文内查找编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把文内查找的状态、焦点恢复、输入防抖、正文高亮和结果导航收敛到独立的 controller，让 `App.tsx` 继续负责页面装配而不是持有整段查找生命周期。
+- 当前证据：最新 `main` 的 `App.tsx` 仍包含文内查找的 4 组状态、3 个焦点/高亮 ref、搜索生命周期 effect 和入口回调；Issue #16 仍开放。开放 PR 只有无关 Dependabot，未发现新的预算超限代码证据。
+- 范围：新增文内查找 controller 与定向测试；迁移 `App.tsx` 的文内查找状态、`Ctrl+F` 文本入口、搜索按钮/编辑器/正文焦点归还、正文高亮和上一条/下一条结果导航；阅读库搜索、快速打开、CodeMirror 原生 `Ctrl+F`、IPC、索引算法和数据格式保持不变。
+- 非目标：不一次性重写 `App.tsx`，不迁移当前阅读库搜索或全局快捷键注册，不新增 Provider/插件/RAG 接口，不改变产品运行时、IPC、Rust 文件行为、版本号或 Release。
+- 验收：文内查找现有 Playwright/组件行为等价；新增 controller 测试覆盖焦点归还、防抖结果和结果导航；App 只保留入口装配；workflow、Vitest、Lint、Build、格式和远程 Quality checks 通过。
+- 下一项：D06 完成后根据最新 `main`、预算变化和稳定职责边界重新定义 D07；不自动推进长期 v1.x 候选。
 
 ---
 
