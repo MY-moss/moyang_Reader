@@ -90,6 +90,7 @@ const requiredFragments = new Map([
       "D05 architecture complexity budget DONE",
       "D06 App.tsx document-search orchestration DONE",
       "D07 App.tsx reading-position orchestration DONE",
+      "D08 App.tsx reading-rail orchestration IN PROGRESS",
     ],
   ],
   [
@@ -115,6 +116,10 @@ const requiredFragments = new Map([
       "DONE — PR #519",
       "阅读位置恢复与保存编排提取",
       "reading-position-controller",
+      "D08",
+      "IN_PROGRESS — 当前分支",
+      "阅读进度栏与标题观察编排提取",
+      "reading-rail-controller",
       "architecture-budget.json",
       "check:architecture",
       "Dependabot",
@@ -129,7 +134,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是待重新核对并定义的 `D08`",
+      "当前最早可执行任务是 `D08` 阅读进度栏与标题观察编排提取",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
