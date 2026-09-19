@@ -42,11 +42,12 @@ A07–A13 DONE
   → D05 architecture complexity budget DONE
   → D06 App.tsx document-search orchestration DONE
   → D07 App.tsx reading-position orchestration DONE
+  → D08 App.tsx reading-rail orchestration IN PROGRESS
   → v1.0 final RC
   → v1.0
 ```
 
-`D07` 已完成；下一项 `D08` 需根据最新 `main`、预算变化和稳定职责边界重新核对并定义。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D08` 当前正在提取 `App.tsx` 的阅读进度栏与标题观察编排；完成后再根据最新 `main`、预算变化和稳定职责边界定义下一项。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
