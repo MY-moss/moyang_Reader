@@ -312,13 +312,13 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D02 — 开发环境自检 `doctor`
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #509**
 
 - 目标：让新 Agent 或维护者运行一次 `npm run doctor` 就能知道当前机器是否具备 Windows x64 桌面开发的关键前置条件。
 - 范围：检查 Windows/x64、Node.js/npm、Rust/Cargo、`x86_64-pc-windows-msvc` target、MSVC C++ Build Tools、Windows SDK、WebView2、`node_modules` 核心依赖和 Git 工作树状态；输出通过、警告、失败和跳过。
 - 非目标：不自动安装依赖或工具，不修改系统设置，不创建环境变量，不覆盖未提交改动，不改索引算法、IPC、Rust 文件行为、版本号或 Release。
 - 验收：缺失前置条件有明确可执行提示；非 Windows 主机明确失败并跳过 Windows 专属检查；工作树改动只产生警告；脚本有隔离单测并接入 workflow 检查；setup 文档给出标准首次运行路径。
-- 下一项：D02 完成后再根据当前 main 重新定义唯一的 D03；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
+- 下一项：D02 完成后先根据最新 main、开放 PR 和真实开发反馈重新定义唯一的 D03；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
 
 ---
 
