@@ -13,7 +13,7 @@ Moyang Reader 使用 Tauri 官方 updater 插件、GitHub Releases 和 Cloudflar
 
 更新入口固定在顶部“更多”操作栏。状态为“有更新”时再次点击只打开当前更新提示，不会重新检查或销毁更新对象；状态为“下载中…”或“已更新”时同样只恢复当前进度或重启提示。下载中的更新提示可以隐藏，下载会继续在后台运行；隐藏不等于取消，也不会重新开始下载。当前 Tauri updater API 没有可靠的取消信号，因此界面不提供虚假的“取消下载”操作。
 
-下载完成后不会强制退出或自动重启应用。用户可以继续阅读或编辑，确认工作已保存后再点击“重启应用”；如果把完成提示隐藏，可从“更多 → 已更新”重新打开。真实旧版本的下载、签名校验、替换和重启闭环仍由 #241 的 Windows 实机矩阵跟踪。
+下载完成后不会强制退出或自动重启应用。用户可以继续阅读或编辑，确认工作已保存后再点击“重启应用”；如果把完成提示隐藏，可从“更多 → 已更新”重新打开。`v0.10.14 → v0.11.0` 真实旧版本的下载、签名校验、替换、重启和 PDF 页面读取已由 #241 的 Windows 实机矩阵验证，记录见 [`docs/handoff/c04-rc-stabilization-2026-09-19.md`](handoff/c04-rc-stabilization-2026-09-19.md)。
 
 “启动时检查更新”只在应用启动时读取一次。运行期间修改该偏好只保存设置，不立即触发检查；需要重新启动应用后才按新设置执行。
 
@@ -32,7 +32,7 @@ https://moyang-reader-mirror.pages.dev/latest.json
 - GitHub Release：[v0.11.0](https://github.com/MY-moss/moyang_Reader/releases/tag/v0.11.0) 已公开，发布代码为 `main@286b1f597102881e577ddae3a7359ad15df422f7`；Release run `35361595825` 的质量门禁、Windows 构建、updater 签名和 GitHub Release 发布成功。
 - Windows x64 安装包、`.sig` 和 `latest.json` 的版本、大小与 SHA-256 已在线核验，精确记录见 [`docs/release-status.json`](release-status.json)。
 - GitHub Release 是 updater metadata 权威源，Cloudflare Pages 仍为备用源；本次 Cloudflare 静态镜像因缺少 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 保持 `BLOCKED_EXTERNAL`。
-- `v0.10.14 → v0.11.0` 旧版本自动更新实机闭环和 NSIS Authenticode 仍保持 `BLOCKED_EXTERNAL`；updater `.sig` 不等同于 Windows Authenticode，不能用 CI 绿灯替代真实 Windows 证据。
+- `v0.10.14 → v0.11.0` 旧版本自动更新实机闭环已验证完成；NSIS Authenticode 仍保持 `BLOCKED_EXTERNAL`。updater `.sig` 不等同于 Windows Authenticode，不能用 CI 绿灯替代真实 Windows 证据。
 
 ## 用户侧更新与打开器排查
 

@@ -16,7 +16,7 @@ v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优
 
 ## 2026-09-17 路线决策
 
-项目主方向正确，但此前把知识库、AI 与扩展基础塞进 v1.0 前置链，范围过大。正式 Release 仍是 0.10.x，而 `main` 已积累多轮架构、UI 和测试改动；同时 `App.tsx`、Rust command 层与导出系统仍有大型编排点。
+项目主方向正确，但此前把知识库、AI 与扩展基础塞进 v1.0 前置链，范围过大。正式 `v0.11.0` Release 已发布；`main` 已完成 C01–C04 的兼容、恢复、发布安全与 RC 验证，同时 `App.tsx`、Rust command 层与导出系统仍有大型编排点，需要在 v1.0 前冻结继续膨胀。
 
 因此执行：
 
@@ -32,15 +32,14 @@ v1.0 的目标不是“功能最多”，而是一个可靠、离线、本地优
 ```text
 A07–A13 DONE
   → A14 v0.11.0 Release / Publish DONE
-  → B01–B04 DONE
-  → B05 DONE
-  → B06 DONE
-  → v0.12 Exit Gate
-  → v0.13 Freeze / Compatibility / RC
+  → B01–B06 DONE
+  → C01–C04 DONE
+  → D00 v1.0 truth-source / onboarding freeze
+  → v1.0 final RC
   → v1.0
 ```
 
-在主线完成前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+当前最早可执行任务是 `D00`，具体任务以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
@@ -94,13 +93,13 @@ A07–A13 DONE
 - 无未处理的高严重度文件安全问题；
 - 阻断级产品问题已修复或有明确延期理由。
 
-## v0.13：Freeze / Compatibility / RC
+## v0.13：Freeze / Compatibility / RC（已完成）
 
 v0.13 不承担知识库或 AI 大功能。
 
 重点：
 
-- C01 设置 / IPC / 快捷键兼容矩阵已完成；下一项是 C02 文件异常恢复矩阵。
+- C01 设置 / IPC / 快捷键兼容矩阵、C02 文件异常恢复矩阵、C03 发布链路与安全披露、C04 v1.0 RC 稳定化均已完成；交接证据和外部状态见 [`docs/AI-TASKS.md`](AI-TASKS.md) 与 `docs/handoff/`。
 - 冻结设置 key/schema、关键 IPC 名称、核心快捷键、command ids 和主要保存行为；
 - 覆盖旧配置、损坏配置、异常退出、磁盘满、只读文件、外部删除/修改、临时文件残留与恢复；
 - 验证安装、卸载、重装、旧版本升级、恢复和更新清单一致性；
