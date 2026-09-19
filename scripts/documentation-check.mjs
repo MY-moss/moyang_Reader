@@ -19,6 +19,7 @@ const documentationFiles = [
   "docs/AI-WORKFLOW.md",
   "docs/AI-TAKEOVER-PROMPT.md",
   "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
+  "docs/DEVELOPMENT-SETUP.md",
 ];
 
 const requiredFragments = new Map([
@@ -34,9 +35,14 @@ const requiredFragments = new Map([
       "SECURITY.md",
       "v0.13 Freeze / Compatibility / RC",
       "v1.3 AI",
+      "docs/DEVELOPMENT-SETUP.md",
+      "npm ci",
     ],
   ],
-  ["CONTRIBUTING.md", ["SECURITY.md", "不要在公开 Issue", "BLOCKED_EXTERNAL", "Dependabot"]],
+  [
+    "CONTRIBUTING.md",
+    ["SECURITY.md", "不要在公开 Issue", "BLOCKED_EXTERNAL", "Dependabot", "docs/DEVELOPMENT-SETUP.md", "npm ci"],
+  ],
   [
     "SECURITY.md",
     [
@@ -85,6 +91,7 @@ const requiredFragments = new Map([
       "# Moyang Reader — AI 任务队列",
       "## v1.0 Freeze / 接手收口（当前阶段）",
       "D00",
+      "D01",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "A13",
@@ -97,7 +104,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D00`",
+      "当前最早可执行任务是 `D01`",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
@@ -110,11 +117,33 @@ const requiredFragments = new Map([
   ],
   [
     "docs/AI-TAKEOVER-PROMPT.md",
-    ["Dependabot", "BLOCKED_EXTERNAL", "v0.13 Freeze/Compatibility/RC", "v1.3 AI", "provider/mock-first"],
+    [
+      "Dependabot",
+      "BLOCKED_EXTERNAL",
+      "v0.13 Freeze/Compatibility/RC",
+      "v1.3 AI",
+      "provider/mock-first",
+      "docs/DEVELOPMENT-SETUP.md",
+    ],
   ],
   [
     "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
     ["真实内置用户动作", "B04", "v0.13", "v1.3", "provider-first", "SECURITY.md"],
+  ],
+  [
+    "docs/DEVELOPMENT-SETUP.md",
+    [
+      "# Windows 开发环境",
+      "Node.js 22",
+      "Rust 1.88",
+      "Microsoft C++ Build Tools",
+      "WebView2",
+      "npm ci",
+      "npm run agent:bootstrap",
+      "npm run desktop",
+      "npm run test:e2e:desktop",
+      "WORKSPACE-CLEANUP.md",
+    ],
   ],
 ]);
 
@@ -124,6 +153,8 @@ const staleClaims = [
   ["README.md", /v0\.13[–-]v0\.14[^\n]*轻量知识库/],
   ["README.md", /当前稳定版本：`v0\.10\.14`/],
   ["README.md", /\*\*v0\.10\.14\*\*：当前稳定 Windows x64 版本/],
+  ["README.md", /^npm install\s*$/m],
+  ["CONTRIBUTING.md", /^npm install\s*$/m],
   ["docs/ROADMAP.md", /正式 Release 仍是 0\.10\.x/],
   ["docs/ROADMAP.md", /下一项是 C02/],
   ["docs/AI-HANDOFF.md", /当前最早可执行任务是 `C04`/],

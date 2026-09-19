@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { findFirstActiveTask, parseGitHubRepositoryUrl } from "./agent-bootstrap.mjs";
+import { findFirstActiveTask, isBlockingPullRequest, parseGitHubRepositoryUrl } from "./agent-bootstrap.mjs";
 import { resolveWorkingTreeRoot } from "./working-tree-root.mjs";
 
 test("parseGitHubRepositoryUrl accepts HTTPS and SSH origins", () => {
@@ -28,6 +28,26 @@ test("findFirstActiveTask returns first TODO when previous tasks are complete", 
     title: "next",
     status: "TODO",
   });
+});
+
+test("does not treat Dependabot updates as a product queue blocker", () => {
+  assert.equal(
+    isBlockingPullRequest({
+      title: "chore(deps): bump a dependency",
+      user: { login: "dependabot[bot]" },
+    }),
+    false,
+  );
+});
+
+test("keeps a product pull request as a queue blocker", () => {
+  assert.equal(
+    isBlockingPullRequest({
+      title: "feat: change the reader workflow",
+      user: { login: "moyang-maintainer" },
+    }),
+    true,
+  );
 });
 
 test("resolveWorkingTreeRoot keeps checks inside the active checkout", () => {

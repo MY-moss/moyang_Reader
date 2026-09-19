@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,4 +21,12 @@ test("rejects mirror-first updater claims in user-facing documentation", () => {
   const errors = validateUpdaterAuthorityClaims(documents);
 
   assert.equal(errors.length, 2);
+});
+
+test("requires the canonical Windows development setup guide", () => {
+  const setupGuide = fs.readFileSync(path.join(sourceRoot, "docs", "DEVELOPMENT-SETUP.md"), "utf8");
+
+  assert.match(setupGuide, /npm ci/);
+  assert.match(setupGuide, /npm run agent:bootstrap/);
+  assert.match(setupGuide, /npm run test:e2e:desktop/);
 });

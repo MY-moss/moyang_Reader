@@ -132,8 +132,10 @@ v1.0 后的候选顺序：
 
 ## 开发
 
+完整的 Windows x64 前置条件、依赖恢复、浏览器/桌面边界、测试分层和构建缓存规则见 [`docs/DEVELOPMENT-SETUP.md`](docs/DEVELOPMENT-SETUP.md)。日常开发按 lockfile 使用 `npm ci`，不要用 `npm install` 代替可复现安装。
+
 ```powershell
-npm install
+npm ci
 npm run test
 npm run test:coverage
 npm run lint

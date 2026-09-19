@@ -39,6 +39,8 @@ v0.11 收口
 npm run agent:bootstrap
 ```
 
+Windows x64 的 Node.js、Rust/MSVC、WebView2、worktree、测试和 Cargo 缓存前置条件统一见 [`docs/DEVELOPMENT-SETUP.md`](docs/DEVELOPMENT-SETUP.md)。
+
 然后必须：
 
 1. `git status --short --branch`，不要覆盖已有未提交改动；读取 `.codex-cache/agent-context.md`，如存在再读 `.codex-cache/agent-handoff.md`。
