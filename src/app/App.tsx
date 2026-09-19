@@ -62,7 +62,7 @@ import {
   type ReadingHistoryEntry,
 } from "./reading-history";
 import { readingHeadingFromElement, readingProgressPercent, type ReadingHeading } from "./reading-rail";
-import { createSearchHighlightController, type SearchHighlightController } from "./search-highlighter";
+import { useDocumentSearchController } from "./document-search-controller";
 import {
   createAnnotationHighlightController,
   type AnnotationHighlightController,
@@ -593,11 +593,6 @@ export function App() {
   const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [searchResultCount, setSearchResultCount] = useState(0);
-  const [searchResultIndex, setSearchResultIndex] = useState(0);
   const [theme, setTheme] = useState<ThemeMode>(() => initialAppSettings.theme);
   const [locale, setLocale] = useState(() => initialAppSettings.locale);
   const [focusMode, setFocusMode] = useState(false);
@@ -690,21 +685,14 @@ export function App() {
   const [readingZoomNotice, setReadingZoomNotice] = useState<number | null>(null);
   const [tabSessionReady, setTabSessionReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const contextToggleRef = useRef<HTMLButtonElement>(null);
   const workspaceSearchInputRef = useRef<HTMLInputElement>(null);
-  const searchRestoreFocusRef = useRef<HTMLElement | null>(null);
   const contextPanelRestoreFocusRef = useRef<HTMLElement | null>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLElement>(null);
   const focusExitRef = useRef<HTMLButtonElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const progressiveReaderRef = useRef<ProgressiveReaderContentHandle>(null);
-  const searchHighlightRef = useRef<{
-    root: HTMLElement;
-    contentKey: string;
-    controller: SearchHighlightController;
-  } | null>(null);
   const annotationHighlightRef = useRef<{
     root: HTMLElement;
     contentKey: string;
@@ -1019,6 +1007,27 @@ export function App() {
   const handleProgressiveReaderReady = useCallback((html: string) => {
     setProgressiveReaderReadyHtml(html);
   }, []);
+
+  const {
+    searchButtonRef,
+    searchOpen,
+    searchQuery,
+    searchResultCount,
+    searchResultIndex,
+    setSearchQuery: setDocumentSearchQuery,
+    resetSearch: resetDocumentSearch,
+    openSearch: openDocumentSearch,
+    closeSearch: closeDocumentSearch,
+    findText: handleFindEditorText,
+    moveResult: moveSearchResult,
+  } = useDocumentSearchController({
+    articleRef,
+    mode,
+    renderedHtml,
+    progressiveReaderReady,
+    revealProgressiveReader,
+    restoreFocusTarget: focusSearchRestoreTarget,
+  });
 
   const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
     const next = { ...preferencesRef.current, ...changes };
@@ -2334,7 +2343,7 @@ export function App() {
       setDraftRecovery(null);
       setExternalChangePath(null);
       setMode("rendered");
-      setSearchQuery("");
+      resetDocumentSearch();
       saveLastDocumentPath(null);
     }
 
@@ -2350,7 +2359,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [openPath, releaseDocumentResources, workspacePath, workspaceSessionController]);
+  }, [openPath, releaseDocumentResources, resetDocumentSearch, workspacePath, workspaceSessionController]);
 
   const handleOpenPaths = useCallback(
     async (paths: OpenPath[]): Promise<OpenPathsOutcome> => {
@@ -3302,31 +3311,6 @@ export function App() {
     });
   }, [notify]);
 
-  const openDocumentSearch = useCallback((restoreFocusTarget?: HTMLElement | null) => {
-    if (!searchRestoreFocusRef.current?.isConnected) {
-      const activeElement =
-        restoreFocusTarget ??
-        (document.activeElement instanceof HTMLElement &&
-        document.activeElement !== document.body &&
-        document.activeElement !== document.documentElement
-          ? document.activeElement
-          : null);
-      searchRestoreFocusRef.current = activeElement;
-    }
-    setSearchOpen(true);
-  }, []);
-
-  const closeDocumentSearch = useCallback(() => {
-    const restoreFocusTarget = searchRestoreFocusRef.current;
-    searchRestoreFocusRef.current = null;
-    setSearchOpen(false);
-    setSearchQuery("");
-
-    if (!focusSearchRestoreTarget(restoreFocusTarget)) {
-      focusSearchRestoreTarget(searchButtonRef.current);
-    }
-  }, []);
-
   const closeContextPanel = useCallback(() => {
     const restoreFocusTarget = contextPanelRestoreFocusRef.current;
     contextPanelRestoreFocusRef.current = null;
@@ -3366,17 +3350,6 @@ export function App() {
     setSidebarCollapsed(false);
     window.requestAnimationFrame(() => workspaceSearchInputRef.current?.focus());
   }, [notify, workspacePath]);
-
-  const handleFindEditorText = useCallback(
-    (text: string, restoreFocusTarget?: HTMLElement | null) => {
-      const query = text.trim();
-      if (!query) return;
-      openDocumentSearch(restoreFocusTarget);
-      setSearchQuery(query);
-      setSearchResultIndex(0);
-    },
-    [openDocumentSearch],
-  );
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -4595,7 +4568,7 @@ export function App() {
         commitNavigationHistory(createNavigationHistory());
         setSourceDraft("");
         setMode("rendered");
-        setSearchQuery("");
+        resetDocumentSearch();
         setError(null);
         saveLastDocumentPath(null);
         if (workspacePath) {
@@ -4608,6 +4581,7 @@ export function App() {
       flushCurrentDraft,
       openPath,
       releaseDocumentResources,
+      resetDocumentSearch,
       workspacePath,
       workspaceSessionController,
     ],
@@ -4873,56 +4847,6 @@ export function App() {
   }, [selectedTag, workspaceIndex, workspacePath]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 160);
-    return () => window.clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    const root = articleRef.current;
-    const contentKey = renderedHtml;
-    if (!root || mode !== "rendered") {
-      searchHighlightRef.current?.controller.dispose();
-      searchHighlightRef.current = null;
-      setSearchResultCount(0);
-      setSearchResultIndex(0);
-      return;
-    }
-
-    if (!progressiveReaderReady) {
-      if (debouncedSearchQuery.trim()) revealProgressiveReader();
-      searchHighlightRef.current?.controller.dispose();
-      searchHighlightRef.current = null;
-      setSearchResultCount(0);
-      setSearchResultIndex(0);
-      return;
-    }
-
-    if (
-      !searchHighlightRef.current ||
-      searchHighlightRef.current.root !== root ||
-      searchHighlightRef.current.contentKey !== contentKey
-    ) {
-      searchHighlightRef.current?.controller.dispose();
-      searchHighlightRef.current = {
-        root,
-        contentKey,
-        controller: createSearchHighlightController(root),
-      };
-    }
-
-    const count = searchHighlightRef.current.controller.update(debouncedSearchQuery);
-    setSearchResultCount(count);
-    setSearchResultIndex((current) => (count ? Math.min(current, count - 1) : 0));
-  }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, revealProgressiveReader]);
-
-  useEffect(() => {
-    if (mode !== "rendered") return;
-    if (!progressiveReaderReady) return;
-    const target = searchHighlightRef.current?.controller.setActive(searchResultIndex);
-    target?.scrollIntoView({ behavior: resolveProgrammaticScrollBehavior("auto"), block: "center" });
-  }, [debouncedSearchQuery, mode, progressiveReaderReady, renderedHtml, searchResultIndex]);
-
-  useEffect(() => {
     const root = readerBodyRef.current;
     const currentPath = documentState?.path;
     const currentAnnotationPath = currentPath?.startsWith("browser://")
@@ -4977,8 +4901,6 @@ export function App() {
 
   useEffect(() => {
     return () => {
-      searchHighlightRef.current?.controller.dispose();
-      searchHighlightRef.current = null;
       annotationHighlightRef.current?.controller.dispose();
       annotationHighlightRef.current = null;
     };
@@ -5022,14 +4944,6 @@ export function App() {
       objectUrls.clear();
     };
   }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady]);
-
-  const moveSearchResult = useCallback(
-    (step: number) => {
-      if (!searchResultCount) return;
-      setSearchResultIndex((current) => (current + step + searchResultCount) % searchResultCount);
-    },
-    [searchResultCount],
-  );
 
   const cycleTheme = useCallback(() => {
     setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));
@@ -5888,10 +5802,7 @@ export function App() {
           if (updateActionForStatus(updateStatus) === "open") setUpdateNoticeVisible(true);
           else void checkForUpdates(true);
         }}
-        onSearchQueryChange={(query) => {
-          setSearchQuery(query);
-          setSearchResultIndex(0);
-        }}
+        onSearchQueryChange={setDocumentSearchQuery}
         onSearchPrevious={() => moveSearchResult(-1)}
         onSearchNext={() => moveSearchResult(1)}
         onCloseSearch={closeDocumentSearch}
