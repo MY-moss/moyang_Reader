@@ -365,14 +365,14 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D07 — App.tsx 阅读位置恢复与保存编排提取
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #519**
 
 - 目标：把阅读位置恢复、滚动位置采集、锚点计算和延迟保存从 `App.tsx` 收敛到独立 controller，保留阅读位置在文档切换和渐进式渲染下的稳定行为。
 - 当前证据：最新 `main` 的 `App.tsx` 仍直接持有阅读位置 ref、恢复 effect 和滚动保存 effect；D06 已先收敛文内查找，Issue #16 仍开放；当前没有修改同一范围的开放产品 PR，也没有新的架构预算超限证据。
 - 范围：新增 `reading-position-controller` 与定向测试；迁移阅读位置恢复、标题锚点/比例回退、滚动位置防抖保存和卸载 flush；保留阅读标题观察器、阅读进度栏、缩放、批注、阅读库搜索、IPC、索引算法和 Rust 行为不变。
 - 非目标：不一次性重写 `App.tsx`，不迁移阅读标题观察器或其他阅读面编排，不改变阅读位置存储格式、产品运行时、IPC、Rust 文件行为、版本号或 Release。
-- 验收：阅读位置 controller 测试覆盖锚点恢复、滚动保存和卸载 flush；现有阅读位置/主流程回归保持通过；workflow、Vitest、Lint、Build、格式、文档、架构检查和远程 Quality checks 通过。
-- 下一项：完成 D07 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D08；不自动推进长期 v1.x 候选。
+- 验收：阅读位置 controller 测试覆盖锚点恢复、滚动保存和卸载 flush；完整 Vitest 469 个测试通过；workflow、Release、Lint、Build、格式、文档、架构和 type-aware 检查通过；浏览器相关回归 2 个通过；Windows desktop smoke 18 个通过；远程 Quality checks 通过后合入 PR #519。
+- 下一项：D07 已完成；根据最新 `main`、预算变化和稳定职责边界重新核对并定义 D08，不自动推进长期 v1.x 候选。
 
 ---
 
