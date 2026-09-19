@@ -291,7 +291,7 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D00 — 修复 v1.0 事实源与接手文档
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #507**
 
 - 目标：让 README、ROADMAP、AI 任务队列、AI 交接摘要和需求文档对当前 `v0.11.0`、C01–C04 完成状态及 v1.0 收口阶段给出一致事实。
 - 范围：修正文档版本/阶段漂移，恢复被错误编码破坏的中文文档，移除已废弃的 `plan-v1.json` / `state.json` / `NEXT.md` 实时状态引用；核对 `CHANGELOG.md` 与 `docs/release-status.json`，不改产品代码、版本号或 Release。
