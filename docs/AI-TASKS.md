@@ -308,7 +308,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 范围：新增 `docs/DEVELOPMENT-SETUP.md` 作为开发环境事实源；README、CONTRIBUTING、AI 工作流和接手提示统一链接并使用 `npm ci`；补齐 Node.js 22、Rust 1.88/MSVC、C++ Build Tools、WebView2、worktree、测试分层和 Cargo 缓存说明；修复 `agent:bootstrap` 把 Dependabot/维护 PR 误判为产品队列阻塞的问题。
 - 非目标：不改变产品运行时、IPC、Rust 文件行为、索引算法、拼音匹配、版本号或 Release；不为未来 AI、插件、RAG、MCP 创建接口。
 - 验收：全新或独立 worktree 可按文档完成 `agent:bootstrap`、`npm ci` 和最小验证；bootstrap 明确列出全部开放 PR 与真正阻塞 PR；文档检查能阻止重新出现 `npm install` 初始化和缺失前置条件；相关脚本测试、文档检查、格式检查和远程 Quality checks 通过。
-- 下一项：D01 完成后重新核对 v1.0 架构防膨胀问题，再定义唯一的 D02；在此之前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
+- 下一项：D01 完成后进入 D02“开发环境自检”；架构防膨胀与 App/commands 收口另行定义为后续独立任务。
+
+### D02 — 开发环境自检 `doctor`
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：让新 Agent 或维护者运行一次 `npm run doctor` 就能知道当前机器是否具备 Windows x64 桌面开发的关键前置条件。
+- 范围：检查 Windows/x64、Node.js/npm、Rust/Cargo、`x86_64-pc-windows-msvc` target、MSVC C++ Build Tools、Windows SDK、WebView2、`node_modules` 核心依赖和 Git 工作树状态；输出通过、警告、失败和跳过。
+- 非目标：不自动安装依赖或工具，不修改系统设置，不创建环境变量，不覆盖未提交改动，不改索引算法、IPC、Rust 文件行为、版本号或 Release。
+- 验收：缺失前置条件有明确可执行提示；非 Windows 主机明确失败并跳过 Windows 专属检查；工作树改动只产生警告；脚本有隔离单测并接入 workflow 检查；setup 文档给出标准首次运行路径。
+- 下一项：D02 完成后再根据当前 main 重新定义唯一的 D03；在 D00–Dxx 收口前不开始 Reader+、Knowledge、AI、RAG、MCP 或插件候选。
 
 ---
 
