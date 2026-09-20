@@ -106,7 +106,6 @@ import {
 import { useUpdateController } from "./update-controller";
 import type {
   DocumentKind,
-  ContextPanelTab,
   ExportMargin,
   ExportOrientation,
   ExportPaper,
@@ -116,7 +115,6 @@ import type {
   ReaderMode,
   RecentFile,
   RecentWorkspace,
-  ThemeMode,
   TocItem,
   WorkspaceExportFailure,
   WorkspaceDirectory,
@@ -193,10 +191,6 @@ import {
   saveLastDocumentPath,
   saveOpenTabs,
   saveReadingPositions,
-  saveSidebarCollapsed,
-  saveContextPanelOpen,
-  saveContextPanelTab,
-  savePaneWidths,
   saveMountedWorkspaces,
   saveWorkspaceSession,
   saveWorkspaceSessions,
@@ -221,12 +215,7 @@ import {
   type AnnotationSelection,
   type TextAnnotation,
 } from "./annotations";
-import {
-  createSettingsController,
-  loadInitialAppSettings,
-  type SettingsController,
-  type SettingsPersistenceStatus,
-} from "./settings-controller";
+import { useSettingsLifecycle } from "./settings-lifecycle";
 import {
   createDocumentSessionController,
   type DocumentOpenNavigation,
@@ -265,7 +254,6 @@ import {
   type DocumentBookmark,
 } from "./bookmarks";
 import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide } from "./pane-layout";
-import type { PaneWidths } from "./pane-layout";
 import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
@@ -538,8 +526,26 @@ function headingIdFromTarget(target: EventTarget | null): string | null {
 }
 
 export function App() {
-  const [initialAppSettings] = useState(loadInitialAppSettings);
-  const storedAppSettings = initialAppSettings.storedSnapshot;
+  const {
+    preferences,
+    setPreferences,
+    theme,
+    setTheme,
+    locale,
+    setLocale,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    rightPanelOpen,
+    setRightPanelOpen,
+    activeContextTab,
+    setActiveContextTab,
+    paneWidths,
+    setPaneWidths,
+    preferencesRef,
+    paneWidthsRef,
+    settingsPersistenceStatus,
+    flushAppSettings,
+  } = useSettingsLifecycle();
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
   const [progressiveReaderReadyHtml, setProgressiveReaderReadyHtml] = useState<string | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
@@ -547,14 +553,7 @@ export function App() {
   const [editorHistory, setEditorHistory] = useState<EditorHistoryState>(() => createEditorHistory("", ""));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<ThemeMode>(() => initialAppSettings.theme);
-  const [locale, setLocale] = useState(() => initialAppSettings.locale);
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => initialAppSettings.sidebarCollapsed);
-  const [rightPanelOpen, setRightPanelOpen] = useState(() => initialAppSettings.rightPanelOpen);
-  const [activeContextTab, setActiveContextTab] = useState<ContextPanelTab>(() => initialAppSettings.activeContextTab);
-  const [paneWidths, setPaneWidths] = useState(() => initialAppSettings.paneWidths);
-  const [preferences, setPreferences] = useState<ReaderPreferences>(() => initialAppSettings.preferences);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceDirectory[]>([]);
@@ -577,15 +576,6 @@ export function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [fileDropState, setFileDropState] = useState<FileDropState>(idleFileDropState);
   const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
-  const [settingsPersistenceStatus, setSettingsPersistenceStatus] = useState<SettingsPersistenceStatus>("idle");
-  const [settingsController] = useState<SettingsController>(() =>
-    createSettingsController({
-      isNative: isTauriRuntime(),
-      onStatus: setSettingsPersistenceStatus,
-    }),
-  );
-  const flushAppSettings = useCallback(() => settingsController.flush(), [settingsController]);
-  const [nativeSettingsReady, setNativeSettingsReady] = useState(() => !isTauriRuntime());
   const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
   const [copyFeedback, setCopyFeedback] = useState(false);
   const workspaceExportAbortRef = useRef<AbortController | null>(null);
@@ -678,8 +668,6 @@ export function App() {
   const closeConfirmationOpenRef = useRef(false);
   const sourceDraftRef = useRef(sourceDraft);
   const editorHistoryRef = useRef(editorHistory);
-  const preferencesRef = useRef<ReaderPreferences>(preferences);
-  const paneWidthsRef = useRef<PaneWidths>(paneWidths);
   const workspacePathRef = useRef<string | null>(workspacePath);
   const openTabsRef = useRef<RecentFile[]>(openTabs);
   const readingZoomNoticeTimerRef = useRef<number | null>(null);
@@ -1269,10 +1257,6 @@ export function App() {
   }, [sourceDraft]);
 
   useEffect(() => {
-    preferencesRef.current = preferences;
-  }, [preferences]);
-
-  useEffect(() => {
     const root = workspacePath;
     if (!root || !preferences.annotationEnabled || !isTauriRuntime()) {
       setAnnotations([]);
@@ -1296,63 +1280,6 @@ export function App() {
   }, [notify, preferences.annotationEnabled, workspacePath]);
 
   useEffect(() => {
-    if (!isTauriRuntime()) return;
-
-    let active = true;
-    void settingsController
-      .readNativeSettings(storedAppSettings)
-      .then(({ snapshot: nativeSnapshot }) => {
-        if (!active) return;
-        if (nativeSnapshot) {
-          preferencesRef.current = nativeSnapshot.preferences;
-          setPreferences(nativeSnapshot.preferences);
-          setTheme(nativeSnapshot.theme);
-          setLocale(nativeSnapshot.locale);
-          setSidebarCollapsed(nativeSnapshot.sidebarCollapsed);
-          setRightPanelOpen(nativeSnapshot.rightPanelOpen);
-          setActiveContextTab(nativeSnapshot.activeContextTab);
-          paneWidthsRef.current = nativeSnapshot.paneWidths;
-          setPaneWidths(nativeSnapshot.paneWidths);
-        }
-        setNativeSettingsReady(true);
-      })
-      .catch(() => {
-        // Older installations may not have a native settings file yet. Legacy local storage remains usable.
-        if (active) setNativeSettingsReady(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [settingsController, storedAppSettings]);
-
-  useEffect(() => {
-    if (!nativeSettingsReady) return;
-
-    settingsController.persist({
-      preferences,
-      theme,
-      locale,
-      sidebarCollapsed,
-      rightPanelOpen,
-      activeContextTab,
-      paneWidths,
-    });
-  }, [
-    activeContextTab,
-    locale,
-    nativeSettingsReady,
-    paneWidths,
-    preferences,
-    rightPanelOpen,
-    settingsController,
-    sidebarCollapsed,
-    theme,
-  ]);
-
-  useEffect(() => () => settingsController.dispose(), [settingsController]);
-
-  useEffect(() => {
     documentCacheRef.current.clear();
   }, [preferences.allowRemoteResources]);
 
@@ -1364,22 +1291,6 @@ export function App() {
   useEffect(() => {
     if (tabSessionReady) saveOpenTabs(openTabs);
   }, [openTabs, tabSessionReady]);
-
-  useEffect(() => {
-    saveSidebarCollapsed(sidebarCollapsed);
-  }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    saveContextPanelOpen(rightPanelOpen);
-  }, [rightPanelOpen]);
-
-  useEffect(() => {
-    saveContextPanelTab(activeContextTab);
-  }, [activeContextTab]);
-
-  useEffect(() => {
-    savePaneWidths(paneWidths);
-  }, [paneWidths]);
 
   useEffect(() => {
     setWorkspaceExportFailures([]);
