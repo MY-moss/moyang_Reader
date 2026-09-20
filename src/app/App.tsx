@@ -58,11 +58,7 @@ import {
 import { useDocumentSearchController } from "./document-search-controller";
 import { useReadingPositionController } from "./reading-position-controller";
 import { useReadingRailController } from "./reading-rail-controller";
-import {
-  createAnnotationHighlightController,
-  type AnnotationHighlightController,
-  type AnnotationLocation,
-} from "./annotation-highlighter";
+import { useAnnotationController } from "./annotation-controller";
 import {
   chooseDocumentPaths,
   chooseImagePaths,
@@ -624,7 +620,6 @@ export function App() {
     relativePath: string;
     selection: AnnotationSelection;
   } | null>(null);
-  const [annotationLocations, setAnnotationLocations] = useState<AnnotationLocation[]>([]);
   const [printPreview, setPrintPreview] = useState<PrintPreviewState | null>(null);
   const [openTabs, setOpenTabs] = useState<RecentFile[]>([]);
   const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryState>(() => createNavigationHistory());
@@ -639,11 +634,6 @@ export function App() {
   const focusExitRef = useRef<HTMLButtonElement>(null);
   const articleRef = useRef<HTMLElement>(null);
   const progressiveReaderRef = useRef<ProgressiveReaderContentHandle>(null);
-  const annotationHighlightRef = useRef<{
-    root: HTMLElement;
-    contentKey: string;
-    controller: AnnotationHighlightController;
-  } | null>(null);
 
   const {
     currentVersion,
@@ -678,7 +668,6 @@ export function App() {
     [clearExternalChange, markExternalChange],
   );
   const readerBodyRef = useRef<HTMLDivElement>(null);
-  const pendingAnnotationIdRef = useRef<string | null>(null);
   const readingHeadingsRef = useRef<HTMLElement[]>([]);
   const browserDocumentsRef = useRef(new Map<string, BrowserDocument>());
   const browserDocumentSequenceRef = useRef(0);
@@ -4439,65 +4428,18 @@ export function App() {
     setSelectedTag(null);
   }, [selectedTag, workspaceIndex, workspacePath]);
 
-  useEffect(() => {
-    const root = readerBodyRef.current;
-    const currentPath = documentState?.path;
-    const currentAnnotationPath = currentPath?.startsWith("browser://")
-      ? currentPath
-      : currentPath && workspacePath
-        ? workspaceRelativePath(workspacePath, currentPath)
-        : null;
-    if (
-      !root ||
-      mode !== "rendered" ||
-      !progressiveReaderReady ||
-      !currentAnnotationPath ||
-      !preferences.annotationEnabled
-    ) {
-      annotationHighlightRef.current?.controller.dispose();
-      annotationHighlightRef.current = null;
-      setAnnotationLocations([]);
-      return;
-    }
-
-    if (
-      !annotationHighlightRef.current ||
-      annotationHighlightRef.current.root !== root ||
-      annotationHighlightRef.current.contentKey !== renderedHtml
-    ) {
-      annotationHighlightRef.current?.controller.dispose();
-      annotationHighlightRef.current = {
-        root,
-        contentKey: renderedHtml,
-        controller: createAnnotationHighlightController(root),
-      };
-    }
-
-    const current = annotations.filter(
-      (annotation) => normalizePathKey(annotation.path) === normalizePathKey(currentAnnotationPath),
-    );
-    const locations = annotationHighlightRef.current.controller.update(current);
-    setAnnotationLocations(locations);
-    const pending = pendingAnnotationIdRef.current;
-    if (pending && annotationHighlightRef.current.controller.scrollTo(pending)) {
-      pendingAnnotationIdRef.current = null;
-    }
-  }, [
-    annotations,
-    documentState?.path,
-    mode,
-    preferences.annotationEnabled,
-    progressiveReaderReady,
-    renderedHtml,
-    workspacePath,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      annotationHighlightRef.current?.controller.dispose();
-      annotationHighlightRef.current = null;
-    };
-  }, []);
+  const { annotationLocations, queueAnnotationFocus, scrollAnnotation, clearAnnotationFocus } = useAnnotationController(
+    {
+      readerBodyRef,
+      documentPath: documentState?.path,
+      workspacePath,
+      mode,
+      progressiveReaderReady,
+      annotationEnabled: preferences.annotationEnabled,
+      renderedHtml,
+      annotations,
+    },
+  );
 
   useEffect(() => {
     const root = articleRef.current;
@@ -4700,7 +4642,7 @@ export function App() {
       try {
         const annotation = createAnnotation(annotationDialog.relativePath, annotationDialog.selection, note);
         const next = addAnnotation(annotations, annotation);
-        pendingAnnotationIdRef.current = annotation.id;
+        queueAnnotationFocus(annotation.id);
         void persistAnnotations(next).then((saved) => {
           if (!saved) return;
           setAnnotationDialog(null);
@@ -4710,7 +4652,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "无法创建阅读批注。");
       }
     },
-    [annotationDialog, annotations, notify, persistAnnotations],
+    [annotationDialog, annotations, notify, persistAnnotations, queueAnnotationFocus],
   );
   const handleDeleteAnnotation = useCallback(
     (annotation: TextAnnotation) => {
@@ -4735,24 +4677,22 @@ export function App() {
         return;
       }
 
-      pendingAnnotationIdRef.current = annotation.id;
+      queueAnnotationFocus(annotation.id);
       if (current && isSameDocumentPath(targetPath, current.path)) {
         if (mode !== "rendered") {
           setMode("rendered");
           return;
         }
         window.requestAnimationFrame(() => {
-          if (annotationHighlightRef.current?.controller.scrollTo(annotation.id)) {
-            pendingAnnotationIdRef.current = null;
-          }
+          scrollAnnotation(annotation.id);
         });
         return;
       }
 
       const opened = await handleSelectTab(targetPath);
-      if (!opened) pendingAnnotationIdRef.current = null;
+      if (!opened) clearAnnotationFocus(annotation.id);
     },
-    [handleSelectTab, mode],
+    [clearAnnotationFocus, handleSelectTab, mode, queueAnnotationFocus, scrollAnnotation],
   );
   const availableTags = useMemo(
     () => Array.from(new Set(workspaceIndex.flatMap((entry) => entry.tags))).sort((a, b) => a.localeCompare(b)),
