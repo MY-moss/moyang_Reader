@@ -418,6 +418,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：生命周期测试覆盖本地初始值、原生快照恢复、持久化状态、显式 flush 和卸载 flush；完整 Vitest 112 文件 / 486 项、coverage 50.51% statements / 45.45% branches / 57.27% functions / 52.26% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 105/106 后渐进渲染场景单 worker 重跑 5/5、Windows desktop smoke 18 项通过；远程 Quality checks 通过（14m50s）后合入 PR #527。
 - 下一项：D11 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D12；不自动推进长期 v1.x 候选。
 
+### D12 — App.tsx 命令编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把命令目录的 label/shortcut/enabled 状态和 command id 分发从 `App.tsx` 收敛到独立命令控制器，让页面组合层只绑定当前状态与既有动作。
+- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有 15 项命令目录和 `executeCommand` switch；Issue #16 阶段 2 明确要求逐步抽离 command id、enabled/visible/execute；`compatibility-contract` 已提供稳定命令 ID 与快捷键边界；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 范围：新增 `reader-command-controller` 与定向测试；迁移命令目录生成、可用性判断和动作分发；保留命令面板、顶栏、全局快捷键、CodeMirror 原生快捷键、IPC、索引算法和 Rust 行为不变。
+- 非目标：不修改命令 ID、快捷键协议、命令文案语义、命令面板视觉、工作区搜索、版本号、tag、Release 或未来 Provider/插件接口。
+- 验收：命令控制器测试覆盖完整目录、disabled 状态和每个 command id 的动作映射；现有命令面板、快捷键、搜索入口、编辑器操作和 Windows desktop smoke 行为保持通过；Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright 与远程 Quality checks 通过。
+- 下一项：完成 D12 后重新核对最新 `main`、预算变化和稳定职责边界，再定义 D13；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）
