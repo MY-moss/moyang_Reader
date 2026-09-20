@@ -420,14 +420,14 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D12 — App.tsx 命令编排提取
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #529**
 
 - 目标：把命令目录的 label/shortcut/enabled 状态和 command id 分发从 `App.tsx` 收敛到独立命令控制器，让页面组合层只绑定当前状态与既有动作。
-- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有 15 项命令目录和 `executeCommand` switch；Issue #16 阶段 2 明确要求逐步抽离 command id、enabled/visible/execute；`compatibility-contract` 已提供稳定命令 ID 与快捷键边界；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 当前证据：PR #529 已合入最新 `main`；Issue #16 阶段 2 仍开放；`compatibility-contract` 的命令 ID 与快捷键边界保持不变；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
 - 范围：新增 `reader-command-controller` 与定向测试；迁移命令目录生成、可用性判断和动作分发；保留命令面板、顶栏、全局快捷键、CodeMirror 原生快捷键、IPC、索引算法和 Rust 行为不变。
 - 非目标：不修改命令 ID、快捷键协议、命令文案语义、命令面板视觉、工作区搜索、版本号、tag、Release 或未来 Provider/插件接口。
-- 验收：命令控制器测试覆盖完整目录、disabled 状态和每个 command id 的动作映射；现有命令面板、快捷键、搜索入口、编辑器操作和 Windows desktop smoke 行为保持通过；Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright 与远程 Quality checks 通过。
-- 下一项：完成 D12 后重新核对最新 `main`、预算变化和稳定职责边界，再定义 D13；不自动推进长期 v1.x 候选。
+- 验收：命令控制器测试覆盖完整目录、disabled 状态、每个 command id 的动作映射和 React hook 装配；完整 Vitest 113 文件 / 490 项、coverage 50.85% statements / 45.71% branches / 57.42% functions / 52.65% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 105/106 后渐进渲染场景单独运行 1/1、Windows desktop smoke 18 项通过；远程 Quality checks 通过（16m03s）后合入 PR #529。
+- 下一项：D12 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D13；不自动推进长期 v1.x 候选。
 
 ---
 
