@@ -398,14 +398,14 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D10 — App.tsx 批注高亮生命周期编排提取
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #525**
 
 - 目标：把阅读正文批注高亮 controller 的创建、更新、定位和清理从 `App.tsx` 收敛到独立 controller，让页面组合层只连接批注面板和编辑/阅读上下文。
-- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有批注高亮 ref、待聚焦批注 ref、位置列表状态，以及按正文渲染生命周期更新/销毁高亮的两段 effect；Issue #16 仍开放；底层 `annotation-highlighter` 已有稳定 controller 和测试；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 当前证据：PR #525 已合入最新 `main`；Issue #16 仍开放；底层 `annotation-highlighter` 已有稳定 controller 和测试；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
 - 范围：新增 `annotation-controller` 与定向测试；迁移高亮 controller 生命周期、当前文档批注过滤、位置列表更新、待聚焦批注滚动和卸载清理；保留批注保存/删除、数据格式、文本定位算法、批注面板、IPC、索引算法和 Rust 行为不变。
 - 非目标：不修改批注持久化协议或高亮算法，不重做批注 UI，不改变阅读/编辑模式切换、版本号、tag、Release 或未来 Provider/插件接口。
-- 验收：controller 测试覆盖无效阅读面清理、按文档过滤、批注位置更新、待聚焦批注定位和卸载 dispose；现有批注面板、阅读主流程、a11y、workflow、Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright、Windows desktop smoke 与远程 Quality checks 保持通过。
-- 下一项：完成 D10 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D11；不自动推进长期 v1.x 候选。
+- 验收：controller 定向测试覆盖无效阅读面清理、按文档过滤、批注位置更新、待聚焦批注定位和卸载 dispose；完整 Vitest 111 文件 / 482 项、coverage 49.82% statements、45.18% branches、56.22% functions、51.64% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 104/106 后两个时序用例单 worker 重跑 5/5、Windows desktop smoke 18 项通过；远程 Quality checks 全部通过后合入 PR #525。
+- 下一项：D10 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D11；不自动推进长期 v1.x 候选。
 
 ---
 
