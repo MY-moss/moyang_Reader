@@ -93,7 +93,7 @@ const requiredFragments = new Map([
       "D08 App.tsx reading-rail orchestration DONE",
       "D09 App.tsx update orchestration DONE",
       "D10 App.tsx annotation orchestration DONE",
-      "D11 App.tsx settings orchestration IN PROGRESS",
+      "D11 App.tsx settings orchestration DONE",
     ],
   ],
   [
@@ -132,7 +132,7 @@ const requiredFragments = new Map([
       "批注高亮生命周期编排提取",
       "annotation-controller",
       "D11",
-      "IN_PROGRESS — 当前分支",
+      "DONE — PR #527",
       "设置与偏好生命周期编排提取",
       "settings-lifecycle",
       "architecture-budget.json",
@@ -149,7 +149,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D11` 设置与偏好生命周期编排提取",
+      "当前最早动作是重新核对最新 `main`、预算变化和稳定职责边界，再定义 `D12`",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
