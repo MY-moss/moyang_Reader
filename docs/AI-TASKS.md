@@ -396,6 +396,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：controller 测试覆盖浏览器预览保护、启动恢复提示、检查无更新/有更新、下载进度、失败恢复和资源清理；完整 Vitest 110 文件 / 478 项、coverage 49.53% statements、44.90% branches、55.98% functions、51.30% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项（并行首轮 3 个浏览器启动抖动用例单 worker 重跑通过）；Windows desktop smoke 18 项通过；远程 Quality checks 通过后合入 PR #523。
 - 下一项：D09 已完成；根据最新 `main`、预算变化和稳定职责边界重新核对并定义 D10，不自动推进长期 v1.x 候选。
 
+### D10 — App.tsx 批注高亮生命周期编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把阅读正文批注高亮 controller 的创建、更新、定位和清理从 `App.tsx` 收敛到独立 controller，让页面组合层只连接批注面板和编辑/阅读上下文。
+- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有批注高亮 ref、待聚焦批注 ref、位置列表状态，以及按正文渲染生命周期更新/销毁高亮的两段 effect；Issue #16 仍开放；底层 `annotation-highlighter` 已有稳定 controller 和测试；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 范围：新增 `annotation-controller` 与定向测试；迁移高亮 controller 生命周期、当前文档批注过滤、位置列表更新、待聚焦批注滚动和卸载清理；保留批注保存/删除、数据格式、文本定位算法、批注面板、IPC、索引算法和 Rust 行为不变。
+- 非目标：不修改批注持久化协议或高亮算法，不重做批注 UI，不改变阅读/编辑模式切换、版本号、tag、Release 或未来 Provider/插件接口。
+- 验收：controller 测试覆盖无效阅读面清理、按文档过滤、批注位置更新、待聚焦批注定位和卸载 dispose；现有批注面板、阅读主流程、a11y、workflow、Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright、Windows desktop smoke 与远程 Quality checks 保持通过。
+- 下一项：完成 D10 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D11；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）
