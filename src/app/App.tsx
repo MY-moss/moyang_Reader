@@ -13,7 +13,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { EmptyState } from "./components/EmptyState";
-import { CommandPalette, type ReaderCommand } from "./components/CommandPalette";
+import { CommandPalette } from "./components/CommandPalette";
 import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
 import { AnnotationDialog } from "./components/AnnotationDialog";
@@ -59,6 +59,7 @@ import { useDocumentSearchController } from "./document-search-controller";
 import { useReadingPositionController } from "./reading-position-controller";
 import { useReadingRailController } from "./reading-rail-controller";
 import { useAnnotationController } from "./annotation-controller";
+import { useReaderCommandController } from "./reader-command-controller";
 import {
   chooseDocumentPaths,
   chooseImagePaths,
@@ -203,7 +204,7 @@ import { saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
 import { saveLocale } from "./i18n";
 import { buildDiagnosticReport, recordDiagnosticError, serializeDiagnosticReport } from "./diagnostics";
-import { CORE_SHORTCUTS, matchesPrimaryShortcut, READER_COMMAND_IDS } from "./compatibility-contract";
+import { CORE_SHORTCUTS, matchesPrimaryShortcut } from "./compatibility-contract";
 import { ERROR_CODES } from "./error-contract";
 import {
   addAnnotation,
@@ -4635,175 +4636,41 @@ export function App() {
     () => buildWikiLinkCandidates(workspaceFiles, documentState?.path),
     [workspaceFiles, documentState?.path],
   );
-  const executeCommand = useCallback(
-    (commandId: string) => {
-      switch (commandId) {
-        case READER_COMMAND_IDS.open:
-          void openSelectedFile();
-          break;
-        case READER_COMMAND_IDS.workspace:
-          void handleChooseWorkspace();
-          break;
-        case READER_COMMAND_IDS.quickOpen:
-          setQuickOpen(true);
-          break;
-        case READER_COMMAND_IDS.documentSearch:
-          openDocumentSearch();
-          break;
-        case READER_COMMAND_IDS.workspaceSearch:
-          focusWorkspaceSearch();
-          break;
-        case READER_COMMAND_IDS.exportDiagnostics:
-          void exportDiagnosticSummary();
-          break;
-        case READER_COMMAND_IDS.toggleSidebar:
-          setSidebarCollapsed((current) => !current);
-          break;
-        case READER_COMMAND_IDS.navigateBack:
-          void handleNavigateBack();
-          break;
-        case READER_COMMAND_IDS.toggleMode:
-          toggleReadingEditing();
-          break;
-        case READER_COMMAND_IDS.save:
-          void saveDocument();
-          break;
-        case READER_COMMAND_IDS.undo:
-          undoEditor();
-          break;
-        case READER_COMMAND_IDS.redo:
-          redoEditor();
-          break;
-        case READER_COMMAND_IDS.link:
-          requestEditorInsert("link");
-          break;
-        case READER_COMMAND_IDS.context:
-          toggleContextPanel();
-          break;
-        case READER_COMMAND_IDS.focus:
-          setFocusMode((current) => !current);
-          break;
-      }
-    },
-    [
-      focusWorkspaceSearch,
-      exportDiagnosticSummary,
-      handleChooseWorkspace,
-      handleNavigateBack,
-      openSelectedFile,
-      openDocumentSearch,
-      requestEditorInsert,
-      redoEditor,
-      saveDocument,
-      toggleContextPanel,
-      toggleReadingEditing,
-      undoEditor,
-    ],
-  );
   const canEditHistory = canEdit && mode !== "rendered";
   const canUndo = canEditHistory && canUndoEditorChange(editorHistory);
   const canRedo = canEditHistory && canRedoEditorChange(editorHistory);
-  const commandItems = useMemo<ReaderCommand[]>(
-    () => [
-      {
-        id: READER_COMMAND_IDS.open,
-        label: "打开文档",
-        shortcut: CORE_SHORTCUTS.open.label,
-      },
-      {
-        id: READER_COMMAND_IDS.workspace,
-        label: "添加整个文件夹",
-        shortcut: CORE_SHORTCUTS.workspace.label,
-      },
-      {
-        id: READER_COMMAND_IDS.quickOpen,
-        label: "快速打开",
-        shortcut: CORE_SHORTCUTS.quickOpen.label,
-      },
-      {
-        id: READER_COMMAND_IDS.documentSearch,
-        label: "查找当前文档文字",
-        shortcut: CORE_SHORTCUTS.documentSearch.label,
-        disabled: !documentState,
-      },
-      {
-        id: READER_COMMAND_IDS.workspaceSearch,
-        label: "搜索当前阅读库",
-        shortcut: CORE_SHORTCUTS.workspaceSearch.label,
-        disabled: !workspacePath,
-      },
-      {
-        id: READER_COMMAND_IDS.exportDiagnostics,
-        label: "导出本地诊断摘要",
-      },
-      {
-        id: READER_COMMAND_IDS.toggleSidebar,
-        label: sidebarCollapsed ? "显示工作区侧栏" : "隐藏工作区侧栏",
-        shortcut: CORE_SHORTCUTS.toggleSidebar.label,
-        disabled: focusMode,
-      },
-      {
-        id: READER_COMMAND_IDS.navigateBack,
-        label: "返回上一文档",
-        shortcut: CORE_SHORTCUTS.navigateBack.label,
-        disabled: !canGoBack(navigationHistory),
-      },
-      {
-        id: READER_COMMAND_IDS.toggleMode,
-        label: mode === "rendered" ? "进入编辑模式" : "切换到阅读模式",
-        shortcut: CORE_SHORTCUTS.toggleMode.label,
-        disabled: !canEdit,
-      },
-      {
-        id: READER_COMMAND_IDS.save,
-        label: "保存当前文档",
-        shortcut: CORE_SHORTCUTS.save.label,
-        disabled: !documentState?.modified,
-      },
-      {
-        id: READER_COMMAND_IDS.undo,
-        label: "撤销上一次编辑",
-        shortcut: CORE_SHORTCUTS.undo.label,
-        disabled: !canUndo,
-      },
-      {
-        id: READER_COMMAND_IDS.redo,
-        label: "重做上一次编辑",
-        shortcut: CORE_SHORTCUTS.redo.label,
-        disabled: !canRedo,
-      },
-      {
-        id: READER_COMMAND_IDS.link,
-        label: "插入 Markdown 链接",
-        shortcut: CORE_SHORTCUTS.insertLink.label,
-        disabled: !canEditHistory,
-      },
-      {
-        id: READER_COMMAND_IDS.context,
-        label: rightPanelOpen ? "隐藏上下文面板" : "显示上下文面板",
-        shortcut: CORE_SHORTCUTS.toggleContext.label,
-        disabled: focusMode,
-      },
-      {
-        id: READER_COMMAND_IDS.focus,
-        label: focusMode ? "退出专注阅读" : "进入专注阅读",
-        shortcut: CORE_SHORTCUTS.focusMode.label,
-        disabled: !documentState,
-      },
-    ],
-    [
-      canEdit,
-      canEditHistory,
-      canRedo,
-      canUndo,
-      focusMode,
-      mode,
-      navigationHistory,
-      rightPanelOpen,
+  const { commandItems, executeCommand } = useReaderCommandController(
+    {
+      documentOpen: Boolean(documentState),
+      workspaceOpen: Boolean(workspacePath),
       sidebarCollapsed,
-      workspacePath,
-      documentState,
-    ],
+      focusMode,
+      canNavigateBack: canGoBack(navigationHistory),
+      mode,
+      canEdit,
+      documentModified: Boolean(documentState?.modified),
+      canUndo,
+      canRedo,
+      canEditHistory,
+      rightPanelOpen,
+    },
+    {
+      openSelectedFile,
+      handleChooseWorkspace,
+      openDocumentSearch,
+      focusWorkspaceSearch,
+      exportDiagnosticSummary,
+      handleNavigateBack,
+      toggleReadingEditing,
+      saveDocument,
+      undoEditor,
+      redoEditor,
+      requestEditorInsert,
+      toggleContextPanel,
+      setQuickOpen,
+      setSidebarCollapsed,
+      setFocusMode,
+    },
   );
   const quickOpenItems = useMemo<QuickOpenCandidate[]>(() => {
     const items = new Map<string, QuickOpenCandidate>();
