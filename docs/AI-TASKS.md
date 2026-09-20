@@ -407,6 +407,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：controller 定向测试覆盖无效阅读面清理、按文档过滤、批注位置更新、待聚焦批注定位和卸载 dispose；完整 Vitest 111 文件 / 482 项、coverage 49.82% statements、45.18% branches、56.22% functions、51.64% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 104/106 后两个时序用例单 worker 重跑 5/5、Windows desktop smoke 18 项通过；远程 Quality checks 全部通过后合入 PR #525。
 - 下一项：D10 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D11；不自动推进长期 v1.x 候选。
 
+### D11 — App.tsx 设置与偏好生命周期编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把设置初始读取、原生设置恢复、持久化调度、卸载清理和兼容性存储同步从 `App.tsx` 收敛到独立生命周期 hook，让页面组合层只连接设置值、控件动作和保存结果。
+- 当前证据：最新 `main` 的 `App.tsx` 仍直接持有设置初始快照、7 组设置状态、原生恢复 effect、持久化 effect、controller dispose 和多组旧版本地存储同步 effect；Issue #16 仍开放；现有 `settings-controller` 已提供稳定的读/写/debounce/flush 边界；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 范围：新增 `settings-lifecycle` 与定向测试；迁移设置状态初始化、原生快照恢复、持久化/flush/dispose、设置保存状态和兼容性布局存储同步；保留设置 UI、portable settings 导入导出、文档会话、更新器、IPC、索引算法和 Rust 行为不变。
+- 非目标：不修改设置数据格式、原生读写协议、设置控件视觉/文案、portable settings 兼容逻辑、版本号、tag、Release 或未来 Provider/插件接口。
+- 验收：生命周期测试覆盖本地初始值、原生快照恢复、持久化状态和卸载 flush；现有设置面板、文档关闭/切换保存、a11y、workflow、Vitest、Lint、Build、格式、文档、架构、type-aware、Playwright、Windows desktop smoke 与远程 Quality checks 保持通过。
+- 下一项：完成 D11 验证并重新核对最新 `main`、预算变化和稳定职责边界，再定义 D12；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）
