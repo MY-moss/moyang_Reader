@@ -431,14 +431,14 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D13 — App.tsx 工作区搜索生命周期编排提取
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #531**
 
 - 目标：把当前阅读库搜索的查询状态、结果状态、加载状态、防抖和异步过期保护从 `App.tsx` 收敛到独立控制器，让页面组合层继续只连接工作区会话、筛选和搜索面板。
-- 当前证据：最新 `main` 为 `56d7cd1`（D12 代码 PR #529 与状态 PR #530 均已合入）；Issue #16 阶段 2 仍开放；`App.tsx` 仍直接持有工作区搜索状态和搜索生命周期 effect；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 当前证据：PR #531 已合入最新 `main`；Issue #16 阶段 2 仍开放；工作区搜索生命周期已由 `workspace-search-controller` 持有；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
 - 范围：新增 `workspace-search-controller` 与定向测试；迁移工作区查询、搜索结果/加载状态、180ms 防抖、工作区 revision 触发重搜、过期结果忽略和错误提示；接入既有 `WorkspaceSessionController` 的查询/清空结果视图；保留 `WorkspacePanel` 搜索输入 ref、筛选与结果展示、`searchWorkspace` IPC、索引算法和 Rust 行为不变。
 - 非目标：不修改搜索语义、匹配算法、拼音匹配、IPC 协议、工作区筛选规则、快速打开、文内查找、版本号、tag、Release 或未来 Provider/插件接口。
-- 验收：controller 测试覆盖查询防抖与 trim、无阅读库/短查询清空、revision 重搜、过期结果保护、错误与 loading 状态；完整 Vitest、coverage、workflow、Release、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y、Playwright 与 Windows desktop smoke 中现有工作区搜索路径保持通过；远程 Quality checks 通过后合入代码 PR。
-- 下一项：完成 D13 后重新核对最新 `main`、预算变化和稳定职责边界，再定义下一项 Dxx；不自动推进长期 v1.x 候选。
+- 验收：controller 测试覆盖查询防抖与 trim、无阅读库/短查询清空、revision 重搜、过期结果保护、错误与 loading 状态；完整 Vitest 114 文件 / 494 项、coverage 51.08% statements / 45.86% branches / 57.73% functions / 52.89% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 105/106 后既有渐进渲染场景单 worker 复跑 1/1、Windows desktop smoke 18 项通过；远程 Quality checks 重跑通过（15m40s）后合入 PR #531。
+- 下一项：D13 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D14；不自动推进长期 v1.x 候选。
 
 ---
 

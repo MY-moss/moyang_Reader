@@ -95,7 +95,7 @@ const requiredFragments = new Map([
       "D10 App.tsx annotation orchestration DONE",
       "D11 App.tsx settings orchestration DONE",
       "D12 App.tsx command orchestration DONE",
-      "D13 App.tsx workspace-search orchestration IN PROGRESS",
+      "D13 App.tsx workspace-search orchestration DONE",
     ],
   ],
   [
@@ -142,7 +142,7 @@ const requiredFragments = new Map([
       "命令编排提取",
       "reader-command-controller",
       "D13",
-      "IN_PROGRESS — 当前分支",
+      "DONE — PR #531",
       "工作区搜索生命周期编排提取",
       "workspace-search-controller",
       "architecture-budget.json",
@@ -159,7 +159,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D13` 工作区搜索生命周期编排提取",
+      "当前最早动作是重新核对最新 `main`、预算变化和稳定职责边界，再定义 `D14`",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
