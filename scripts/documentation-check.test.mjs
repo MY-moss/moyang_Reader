@@ -14,13 +14,18 @@ test("keeps security, updater authority, roadmap gates, opener, association, and
 
 test("rejects mirror-first updater claims in user-facing documentation", () => {
   const documents = new Map([
+    ["README.md", ""],
+    ["SECURITY.md", ""],
+    ["PRIVACY.md", "应用先从公开 Cloudflare Pages 镜像检查更新，镜像不可用时回退到 GitHub Releases。"],
     ["docs/RELEASE-POLICY.md", "更新端点按配置顺序先尝试公开 Cloudflare Pages 动态镜像，再回退到 GitHub Release。"],
     ["docs/USER-GUIDE.md", "更新器先尝试公开 Cloudflare Pages 镜像，镜像不可用时回退 GitHub Release。"],
+    ["docs/UPDATE.md", ""],
+    ["docs/UI-INTERACTION.md", ""],
   ]);
 
   const errors = validateUpdaterAuthorityClaims(documents);
 
-  assert.equal(errors.length, 2);
+  assert.equal(errors.length, 3);
 });
 
 test("requires the canonical Windows development setup guide", () => {

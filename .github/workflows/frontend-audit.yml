@@ -7,6 +7,10 @@ on:
       - "package-lock.json"
       - "scripts/check-action-pins.mjs"
       - "scripts/check-action-pins.test.mjs"
+      - "scripts/dev-dependency-audit.mjs"
+      - "scripts/dev-dependency-audit.test.mjs"
+      - "scripts/dev-audit-exceptions.json"
+      - "docs/security/DEV-DEPENDENCY-RISK-ACCEPTANCE.md"
       - ".github/workflows/**"
   push:
     branches: [main]
@@ -15,6 +19,10 @@ on:
       - "package-lock.json"
       - "scripts/check-action-pins.mjs"
       - "scripts/check-action-pins.test.mjs"
+      - "scripts/dev-dependency-audit.mjs"
+      - "scripts/dev-dependency-audit.test.mjs"
+      - "scripts/dev-audit-exceptions.json"
+      - "docs/security/DEV-DEPENDENCY-RISK-ACCEPTANCE.md"
       - ".github/workflows/**"
   schedule:
     - cron: "17 4 * * 1"
@@ -47,3 +55,6 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit development dependencies against expiring exceptions
+        run: npm run audit:dev

@@ -83,7 +83,7 @@ export function useReadingRailController({
     } else if (!readingHeadingObserverRef.current) {
       setReadingHeading(currentHeadingFromElements(headings, contentArea));
     }
-  }, [contentAreaRef, setReadingHeading]);
+  }, [contentAreaRef, readingHeadingsRef, setReadingHeading]);
 
   useEffect(() => {
     const article = articleRef.current;
@@ -160,6 +160,7 @@ export function useReadingRailController({
     documentPath,
     mode,
     progressiveReaderReady,
+    readingHeadingsRef,
     renderedHtml,
     setReadingHeading,
   ]);

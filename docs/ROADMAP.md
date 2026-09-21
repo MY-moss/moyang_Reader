@@ -48,12 +48,15 @@ A07–A13 DONE
   → D11 App.tsx settings orchestration DONE
   → D12 App.tsx command orchestration DONE
   → D13 App.tsx workspace-search orchestration DONE
-  → D14 App.tsx open-paths orchestration IN PROGRESS
+  → D14 App.tsx open-paths orchestration DONE
+  → D15 v1.0 redesign P1 quality baseline IN PROGRESS
+  → v1.0 Figma design source of truth
+  → v1.0 staged production UI migration
   → v1.0 final RC
   → v1.0
 ```
 
-`D14` 正在提取 `App.tsx` 路径入口编排；具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D14` 已完成 `App.tsx` 路径入口编排提取；当前执行 `D15` 质量清障，随后进入 #534 的 Figma 设计真源与分片生产迁移。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。Reader+、Knowledge、AI、RAG、MCP、RSS 和插件候选继续保持 GATED。
 
 ## 已具备的 0.10.x 基线
 

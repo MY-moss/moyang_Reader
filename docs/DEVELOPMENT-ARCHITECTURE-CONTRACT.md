@@ -308,7 +308,7 @@ AI 属于 **v1.3 GATED 候选**，不是 v1.0 前置条件。
 - **v0.11**：A08–A13，完成上下文 Tab/a11y、顶栏/DPI、CSS/视觉基线、Workspace Session、稳定错误码、RC/发布预检；不做 AI/plugin/RAG/MCP。
 - **v0.12**：性能/大文件降级、Resilient Reading Anchor、B04 权限库存与负向测试、真实主流程 UX、本地诊断；不做大型产品扩张。
 - **v0.13**：Freeze / Compatibility / RC，只修兼容、恢复、发布和真实 blocker，不承载大型新功能。
-- **v1.0**：可靠 Windows x64 核心基线。
+- **v1.0**：可靠 Windows x64 核心基线 + 完整核心体验重设计；新视觉是发布门槛，但不得重写文件安全、恢复、IPC、三栏信息架构或现有快捷键契约。
 - **v1.1**：Reader+ 候选。
 - **v1.2**：Metadata / Knowledge 候选；Properties 写回前必须先通过 frontmatter round-trip safety spike。
 - **v1.3**：AI 候选，从真实选区解释/翻译等动作开始。
