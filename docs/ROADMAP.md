@@ -47,12 +47,12 @@ A07–A13 DONE
   → D10 App.tsx annotation orchestration DONE
   → D11 App.tsx settings orchestration DONE
   → D12 App.tsx command orchestration DONE
-  → D13 App.tsx workspace-search orchestration IN PROGRESS
+  → D13 App.tsx workspace-search orchestration DONE
   → v1.0 final RC
   → v1.0
 ```
 
-`D13` 正在提取 `App.tsx` 工作区搜索生命周期编排；具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
+`D13` 已完成 `App.tsx` 工作区搜索生命周期编排提取；下一步重新核对最新 `main`、预算变化和稳定职责边界，再定义 D14。具体范围以 [`AI-TASKS.md`](AI-TASKS.md) 为准。在 D00–Dxx 收口前，新产品想法可以记录到 Issue/长期计划，但默认只分析，不编码、不创建实现 PR。
 
 ## 已具备的 0.10.x 基线
 
