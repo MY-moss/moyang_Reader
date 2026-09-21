@@ -454,14 +454,27 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D15 — v1.0 重设计 P1 质量清障
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #535**
 
 - 关联：#534 / #16 / #171 / #111 / #194
 - 目标：在视觉替换前建立可信、可重复的工程基线，消除已确认的 E2E 服务串线、更新源文档冲突、测试配置漂移与零警告门禁缺口。
 - 范围：Playwright 工作树独立端口和 app/commit 身份健康检查；GitHub-first 更新源文档守卫；WebdriverIO/Tauri 测试链升级及有负责人/到期日的开发依赖风险例外；Vitest 单一配置；React Hook 零警告；D14 后架构预算收紧；`PRODUCT.md` 与治理/ADR 事实对齐。
 - 非目标：不替换生产 UI，不修改 Tauri command/IPC/文档格式/设置 key/快捷键，不提前实现 Reader+、AI、插件、RAG 或 MCP。
 - 验收：本地和远程完整门禁通过；在 4173 被其他项目占用时浏览器测试仍启动并验证自己的 Moyang commit；生产依赖审计为 0；新增/过期/已修复开发 advisory 均阻断例外检查；Lint 零警告。
-- 下一项：D15 完成后进入 v1.0 Figma Foundations / Components / Core Experiences 设计切片，审核通过后才迁移生产 UI。
+- 结果：本地 500 项单测、106 项浏览器场景、18 项桌面 smoke 及远程完整 CI 通过；浏览器测试在 4173 被其他项目占用时使用独立端口和 app/commit 身份验证；生产依赖审计为 0，开发 advisory 使用带负责人和到期日的精确例外；Lint 零警告。
+- 下一项：D16 v1.0 Figma 设计真源；审核通过后才迁移生产 UI。
+
+### D16 — v1.0 Figma 设计真源
+
+**状态：WAITING — Figma connection requires reauthentication**
+
+- 关联：#534
+- 目标：创建单一 `Moyang Reader — v1.0 Redesign` 文件，按 Foundations、Components、Core Experiences、Prototype、QA 建立变量、组件、核心流程和验收帧。
+- 已确认：公共图书馆导视语言；冷静瓷白、温润纸色、夜间墨黑三套用户可选外观；三套共享语义、组件、交互与无障碍规则。
+- 范围：设计输入见 [`design/V1-REDESIGN-BRIEF.md`](design/V1-REDESIGN-BRIEF.md)；先变量与样式，后组件和页面；覆盖 1240、900、720、浅色/暗色、专注阅读、复杂工作区、编辑器和关键弹层。
+- 阻塞：Figma connector `whoami` 返回 `TRIGGER_REAUTHENTICATION`；完成重新认证后继续，不以本地截图或生产代码绕过设计审核。
+- 非目标：不在本任务修改生产 UI、IPC、文档格式、设置存储 key、command ID 或快捷键。
+- 下一项：D16 审核通过后开始生产切片 1（tokens、图标/Logo、primitives、i18n keys）。
 
 ---
 
