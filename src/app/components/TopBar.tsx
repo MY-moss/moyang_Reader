@@ -5,6 +5,8 @@ import type {
   ExportMargin,
   ExportOrientation,
   ExportPaper,
+  ReadingLineSpacing,
+  ReadingTypeface,
   ReadingWidth,
   ReaderMode,
   ThemeMode,
@@ -31,11 +33,15 @@ type TopBarProps = {
   locale: Locale;
   readingZoom: number;
   readingWidth: ReadingWidth;
+  readingTypeface: ReadingTypeface;
+  readingLineSpacing: ReadingLineSpacing;
   exportPaper: ExportPaper;
   exportOrientation: ExportOrientation;
   exportMargin: ExportMargin;
   onReadingZoomChange: (zoom: number) => void;
   onReadingWidthChange: (width: ReadingWidth) => void;
+  onReadingTypefaceChange: (typeface: ReadingTypeface) => void;
+  onReadingLineSpacingChange: (spacing: ReadingLineSpacing) => void;
   onExportPaperChange: (paper: ExportPaper) => void;
   onExportOrientationChange: (orientation: ExportOrientation) => void;
   onExportMarginChange: (margin: ExportMargin) => void;
@@ -93,6 +99,7 @@ type TopBarProps = {
   onSearchNext: () => void;
   onCloseSearch: () => void;
   onCycleTheme: () => void;
+  onThemeChange: (theme: ThemeMode) => void;
   onLocaleChange: (locale: Locale) => void;
 };
 
@@ -112,11 +119,15 @@ export function TopBar({
   locale,
   readingZoom,
   readingWidth,
+  readingTypeface,
+  readingLineSpacing,
   exportPaper,
   exportOrientation,
   exportMargin,
   onReadingZoomChange,
   onReadingWidthChange,
+  onReadingTypefaceChange,
+  onReadingLineSpacingChange,
   onExportPaperChange,
   onExportOrientationChange,
   onExportMarginChange,
@@ -174,14 +185,16 @@ export function TopBar({
   onSearchNext,
   onCloseSearch,
   onCycleTheme,
+  onThemeChange,
   onLocaleChange,
 }: TopBarProps) {
   const exportMenuRef = useRef<HTMLDetailsElement>(null);
   const settingsMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const readingMenuRef = useRef<HTMLDetailsElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const menuRefs = [moreMenuRef, settingsMenuRef, exportMenuRef];
+    const menuRefs = [readingMenuRef, moreMenuRef, settingsMenuRef, exportMenuRef];
     const closeMenus = () => {
       for (const menuRef of menuRefs) {
         menuRef.current?.removeAttribute("open");
@@ -216,12 +229,20 @@ export function TopBar({
     const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
   }, [searchOpen]);
-  const themeLabel = theme === "system" ? "系统" : theme === "light" ? "浅色" : "深色";
   const t = (key: MessageKey) => translate(locale, key);
+  const themeLabel =
+    theme === "system"
+      ? t("action.theme.system")
+      : theme === "porcelain"
+        ? t("action.theme.porcelain")
+        : theme === "paper"
+          ? t("action.theme.paper")
+          : t("action.theme.ink");
   const closeDropdownMenus = () => {
     settingsMenuRef.current?.removeAttribute("open");
     exportMenuRef.current?.removeAttribute("open");
     moreMenuRef.current?.removeAttribute("open");
+    readingMenuRef.current?.removeAttribute("open");
   };
   const closeNestedMenusWhenClosed = () => {
     if (!moreMenuRef.current?.open) {
@@ -443,6 +464,76 @@ export function TopBar({
           <Icon name="maximize" size={15} />
           <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
         </button>
+        <details ref={readingMenuRef} className="reading-controls-menu">
+          <summary className="toolbar-button" title={t("action.readingAppearance")}>
+            <Icon name="book-open" size={15} />
+            <span className="toolbar-button-label">{t("action.readingAppearance")}</span>
+          </summary>
+          <div className="reading-controls-panel">
+            <div className="reading-controls-heading">
+              <strong>{t("action.readingAppearance")}</strong>
+              <span>{readingZoom}%</span>
+            </div>
+            <div className="theme-choice-grid" role="group" aria-label={t("settings.theme")}>
+              {(["porcelain", "paper", "ink"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`theme-choice theme-choice-${option}`}
+                  aria-pressed={theme === option}
+                  onClick={() => onThemeChange(option)}
+                >
+                  <span className="theme-choice-swatch" aria-hidden="true" />
+                  <span>{t(`action.theme.${option}`)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="reading-zoom-controls" role="group" aria-label={t("settings.fontSize")}>
+              <button type="button" onClick={() => onReadingZoomChange(Math.max(75, readingZoom - 5))}>
+                −
+              </button>
+              <button type="button" onClick={() => onReadingZoomChange(100)}>
+                100%
+              </button>
+              <button type="button" onClick={() => onReadingZoomChange(Math.min(150, readingZoom + 5))}>
+                +
+              </button>
+            </div>
+            <label className="settings-select-option">
+              <span>{t("settings.width")}</span>
+              <select
+                value={readingWidth}
+                onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+              >
+                <option value="narrow">{t("settings.width.narrow")}</option>
+                <option value="standard">{t("settings.width.standard")}</option>
+                <option value="wide">{t("settings.width.wide")}</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>{t("settings.typeface")}</span>
+              <select
+                value={readingTypeface}
+                onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
+              >
+                <option value="system">{t("settings.typeface.system")}</option>
+                <option value="serif">{t("settings.typeface.serif")}</option>
+                <option value="sans">{t("settings.typeface.sans")}</option>
+              </select>
+            </label>
+            <label className="settings-select-option">
+              <span>{t("settings.lineSpacing")}</span>
+              <select
+                value={readingLineSpacing}
+                onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
+              >
+                <option value="compact">{t("settings.lineSpacing.compact")}</option>
+                <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
+                <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
+              </select>
+            </label>
+          </div>
+        </details>
         <button
           ref={searchButtonRef}
           type="button"
@@ -558,15 +649,7 @@ export function TopBar({
               <div className="toolbar-overflow-actions">
                 <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
                   <Icon name="sun" size={15} />
-                  <span className="toolbar-button-label">
-                    {locale === "en-US"
-                      ? theme === "system"
-                        ? t("action.theme.system")
-                        : theme === "light"
-                          ? t("action.theme.light")
-                          : t("action.theme.dark")
-                      : themeLabel}
-                  </span>
+                  <span className="toolbar-button-label">{themeLabel}</span>
                 </button>
                 <button
                   type="button"
@@ -655,6 +738,19 @@ export function TopBar({
                     </span>
                   </label>
                   <div className="settings-divider">{t("settings.reading")}</div>
+                  <label className="settings-select-option">
+                    <span>{t("settings.theme")}</span>
+                    <select
+                      aria-label={t("settings.theme")}
+                      value={theme}
+                      onChange={(event) => onThemeChange(event.target.value as ThemeMode)}
+                    >
+                      <option value="system">{t("action.theme.system")}</option>
+                      <option value="porcelain">{t("action.theme.porcelain")}</option>
+                      <option value="paper">{t("action.theme.paper")}</option>
+                      <option value="ink">{t("action.theme.ink")}</option>
+                    </select>
+                  </label>
                   <div className="settings-range-option">
                     <div className="settings-range-heading">
                       <span>{t("settings.fontSize")}</span>
@@ -686,6 +782,30 @@ export function TopBar({
                       <option value="narrow">{t("settings.width.narrow")}</option>
                       <option value="standard">{t("settings.width.standard")}</option>
                       <option value="wide">{t("settings.width.wide")}</option>
+                    </select>
+                  </label>
+                  <label className="settings-select-option">
+                    <span>{t("settings.typeface")}</span>
+                    <select
+                      aria-label={t("settings.typeface")}
+                      value={readingTypeface}
+                      onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
+                    >
+                      <option value="system">{t("settings.typeface.system")}</option>
+                      <option value="serif">{t("settings.typeface.serif")}</option>
+                      <option value="sans">{t("settings.typeface.sans")}</option>
+                    </select>
+                  </label>
+                  <label className="settings-select-option">
+                    <span>{t("settings.lineSpacing")}</span>
+                    <select
+                      aria-label={t("settings.lineSpacing")}
+                      value={readingLineSpacing}
+                      onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
+                    >
+                      <option value="compact">{t("settings.lineSpacing.compact")}</option>
+                      <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
+                      <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
                     </select>
                   </label>
                   <div className="settings-divider">{t("settings.export")}</div>

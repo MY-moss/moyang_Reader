@@ -9,7 +9,7 @@ import { defaultReaderPreferences } from "./preferences";
 
 const input: AppSettingsInput = {
   preferences: { ...defaultReaderPreferences, readingScale: "large" },
-  theme: "dark",
+  theme: "ink",
   locale: "en-US",
   sidebarCollapsed: true,
   rightPanelOpen: false,
@@ -30,7 +30,7 @@ describe("settings controller", () => {
 
     expect(loadInitialAppSettings()).toMatchObject({
       storedSnapshot: snapshot,
-      theme: "dark",
+      theme: "ink",
       locale: "en-US",
       preferences: input.preferences,
     });
@@ -43,7 +43,7 @@ describe("settings controller", () => {
     const initial = loadInitialAppSettings();
 
     expect(initial.storedSnapshot).toBeNull();
-    expect(initial.theme).toBe("light");
+    expect(initial.theme).toBe("porcelain");
     expect(initial.preferences).toEqual(defaultReaderPreferences);
   });
 
@@ -61,7 +61,7 @@ describe("settings controller", () => {
 
   it("accepts a newer native snapshot over the local copy", async () => {
     const localSnapshot = createAppSettingsSnapshot(input, 123);
-    const nativeSnapshot = createAppSettingsSnapshot({ ...input, theme: "light" }, 456);
+    const nativeSnapshot = createAppSettingsSnapshot({ ...input, theme: "porcelain" }, 456);
     const controller = createSettingsController({
       isNative: true,
       readNative: vi.fn().mockResolvedValue(serializeAppSettings(nativeSnapshot)),

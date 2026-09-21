@@ -6,7 +6,7 @@ import { MAX_READING_POSITIONS } from "./storage";
 const input = {
   preferences: { ...defaultReaderPreferences, readingScale: "large" as const },
   locale: "en-US" as const,
-  theme: "dark" as const,
+  theme: "ink" as const,
   workspacePath: "C:/Notes",
   lastDocumentPath: "C:/Notes/today.md",
   mountedWorkspaces: [
@@ -39,7 +39,7 @@ describe("portable settings", () => {
 
     expect(parsed.preferences.readingScale).toBe("large");
     expect(parsed.locale).toBe("en-US");
-    expect(parsed.theme).toBe("dark");
+    expect(parsed.theme).toBe("ink");
     expect(parsed.mountedWorkspaces).toEqual([{ path: "C:/Notes", name: "Notes" }]);
     expect(parsed.workspaceSessions[0]?.tabs).toEqual([{ path: "C:/Notes/today.md", name: "today.md" }]);
     expect(parsed.openTabs).toEqual([{ path: "C:/Notes/today.md", name: "today.md", lastOpenedAt: 42 }]);

@@ -1,4 +1,12 @@
-import type { ExportMargin, ExportOrientation, ExportPaper, ReadingScale, ReadingWidth } from "./types";
+import type {
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
+  ReadingLineSpacing,
+  ReadingScale,
+  ReadingTypeface,
+  ReadingWidth,
+} from "./types";
 import { PERSISTED_STORAGE_KEYS } from "./compatibility-contract";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 
@@ -9,6 +17,8 @@ export type ReaderPreferences = {
   readingScale: ReadingScale;
   readingZoom: number;
   readingWidth: ReadingWidth;
+  readingTypeface: ReadingTypeface;
+  readingLineSpacing: ReadingLineSpacing;
   exportPaper: ExportPaper;
   exportOrientation: ExportOrientation;
   exportMargin: ExportMargin;
@@ -21,6 +31,8 @@ export const defaultReaderPreferences: ReaderPreferences = {
   readingScale: "medium",
   readingZoom: 100,
   readingWidth: "standard",
+  readingTypeface: "serif",
+  readingLineSpacing: "comfortable",
   exportPaper: "a4",
   exportOrientation: "portrait",
   exportMargin: "standard",
@@ -64,6 +76,16 @@ export function loadReaderPreferences(): ReaderPreferences {
         parsed.readingWidth === "narrow" || parsed.readingWidth === "wide" || parsed.readingWidth === "standard"
           ? parsed.readingWidth
           : defaultReaderPreferences.readingWidth,
+      readingTypeface:
+        parsed.readingTypeface === "system" || parsed.readingTypeface === "sans" || parsed.readingTypeface === "serif"
+          ? parsed.readingTypeface
+          : defaultReaderPreferences.readingTypeface,
+      readingLineSpacing:
+        parsed.readingLineSpacing === "compact" ||
+        parsed.readingLineSpacing === "relaxed" ||
+        parsed.readingLineSpacing === "comfortable"
+          ? parsed.readingLineSpacing
+          : defaultReaderPreferences.readingLineSpacing,
       exportPaper:
         parsed.exportPaper === "letter" || parsed.exportPaper === "a4"
           ? parsed.exportPaper

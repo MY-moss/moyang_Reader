@@ -4327,7 +4327,9 @@ export function App() {
   }, [documentState?.path, documentState?.rendered.html, mode, progressiveReaderReady]);
 
   const cycleTheme = useCallback(() => {
-    setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));
+    setTheme((current) =>
+      current === "system" ? "porcelain" : current === "porcelain" ? "paper" : current === "paper" ? "ink" : "system",
+    );
   }, [setTheme]);
 
   const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
@@ -4924,7 +4926,7 @@ export function App() {
   return (
     <div
       ref={appShellRef}
-      className={`app-shell reading-width-${preferences.readingWidth}${
+      className={`app-shell reading-width-${preferences.readingWidth} reading-typeface-${preferences.readingTypeface} reading-spacing-${preferences.readingLineSpacing}${
         focusMode ? " focus-mode" : ""
       }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
       style={
@@ -4958,6 +4960,8 @@ export function App() {
         locale={locale}
         readingZoom={preferences.readingZoom}
         readingWidth={preferences.readingWidth}
+        readingTypeface={preferences.readingTypeface}
+        readingLineSpacing={preferences.readingLineSpacing}
         exportPaper={preferences.exportPaper}
         exportOrientation={preferences.exportOrientation}
         exportMargin={preferences.exportMargin}
@@ -4965,6 +4969,14 @@ export function App() {
         onReadingWidthChange={(width) => {
           setReaderPreferences({ readingWidth: width });
           notify("正文宽度已更新。");
+        }}
+        onReadingTypefaceChange={(readingTypeface) => {
+          setReaderPreferences({ readingTypeface });
+          notify("正文字体已更新。");
+        }}
+        onReadingLineSpacingChange={(readingLineSpacing) => {
+          setReaderPreferences({ readingLineSpacing });
+          notify("正文行距已更新。");
         }}
         onExportPaperChange={(paper) => {
           setReaderPreferences({ exportPaper: paper });
@@ -5053,6 +5065,10 @@ export function App() {
         onCloseSearch={closeDocumentSearch}
         onCycleTheme={() => {
           cycleTheme();
+          notify("阅读主题已更新。");
+        }}
+        onThemeChange={(nextTheme) => {
+          setTheme(nextTheme);
           notify("阅读主题已更新。");
         }}
         onLocaleChange={(nextLocale) => {

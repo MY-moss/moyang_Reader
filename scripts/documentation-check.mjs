@@ -104,7 +104,7 @@ const requiredFragments = new Map([
       "D13 App.tsx workspace-search orchestration DONE",
       "D14 App.tsx open-paths orchestration DONE",
       "D15 v1.0 redesign P1 quality baseline DONE",
-      "D16 v1.0 Figma design source of truth WAITING (reauthentication)",
+      "D16 v1.0 redesign foundations and production slice 1 IN PROGRESS",
     ],
   ],
   [
@@ -174,7 +174,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D16` v1.0 Figma 设计真源",
+      "当前最早可执行任务是 `D16` 三主题与阅读外观生产切片",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",

@@ -462,19 +462,20 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 非目标：不替换生产 UI，不修改 Tauri command/IPC/文档格式/设置 key/快捷键，不提前实现 Reader+、AI、插件、RAG 或 MCP。
 - 验收：本地和远程完整门禁通过；在 4173 被其他项目占用时浏览器测试仍启动并验证自己的 Moyang commit；生产依赖审计为 0；新增/过期/已修复开发 advisory 均阻断例外检查；Lint 零警告。
 - 结果：本地 500 项单测、106 项浏览器场景、18 项桌面 smoke 及远程完整 CI 通过；浏览器测试在 4173 被其他项目占用时使用独立端口和 app/commit 身份验证；生产依赖审计为 0，开发 advisory 使用带负责人和到期日的精确例外；Lint 零警告。
-- 下一项：D16 v1.0 Figma 设计真源；审核通过后才迁移生产 UI。
+- 下一项：D16 v1.0 重设计基础与生产切片 1。
 
-### D16 — v1.0 Figma 设计真源
+### D16 — v1.0 重设计基础与生产切片 1
 
-**状态：WAITING — Figma connection requires reauthentication**
+**状态：IN PROGRESS — PR #536**
 
 - 关联：#534
-- 目标：创建单一 `Moyang Reader — v1.0 Redesign` 文件，按 Foundations、Components、Core Experiences、Prototype、QA 建立变量、组件、核心流程和验收帧。
+- 目标：建立三套共享语义的用户可选主题、阅读排版偏好和一级可达的阅读外观入口，并继续维护 `Moyang Reader — v1.0 Redesign` 设计文件。
 - 已确认：公共图书馆导视语言；冷静瓷白、温润纸色、夜间墨黑三套用户可选外观；三套共享语义、组件、交互与无障碍规则。
 - 范围：设计输入见 [`design/V1-REDESIGN-BRIEF.md`](design/V1-REDESIGN-BRIEF.md)；先变量与样式，后组件和页面；覆盖 1240、900、720、浅色/暗色、专注阅读、复杂工作区、编辑器和关键弹层。
-- 阻塞：Figma connector `whoami` 返回 `TRIGGER_REAUTHENTICATION`；完成重新认证后继续，不以本地截图或生产代码绕过设计审核。
-- 非目标：不在本任务修改生产 UI、IPC、文档格式、设置存储 key、command ID 或快捷键。
-- 下一项：D16 审核通过后开始生产切片 1（tokens、图标/Logo、primitives、i18n keys）。
+- 实施决策：用户明确选择直接修改正式 UI；Figma Starter 调用额度不再阻塞可在仓库内完成和验证的切片，已完成的 Figma 变量和排版样式继续保留为设计参考。
+- 范围：向后兼容旧浅色/深色设置；新增瓷白、纸色、墨黑主题与字体/行距偏好；提取 redesign 样式层；不修改 IPC、文档格式、设置存储 key、command ID 或快捷键。
+- 验收：单测、工作流、架构预算和生产构建通过；完成 1240、900、720 三档真实浏览器与无障碍检查后再将 PR 标记为可评审。
+- 下一项：完成生产切片 1 的浏览器视觉验收，再继续应用壳、左右栏和上下文导航迁移。
 
 ---
 
