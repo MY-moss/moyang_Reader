@@ -56,6 +56,7 @@ import {
   type ReadingHistoryEntry,
 } from "./reading-history";
 import { useDocumentSearchController } from "./document-search-controller";
+import { useWorkspaceSearchController } from "./workspace-search-controller";
 import { useReadingPositionController } from "./reading-position-controller";
 import { useReadingRailController } from "./reading-rail-controller";
 import { useAnnotationController } from "./annotation-controller";
@@ -123,7 +124,6 @@ import type {
   WorkspaceFile,
   WorkspaceIndexEntry,
   WorkspaceListingStatus,
-  WorkspaceSearchResult,
 } from "./types";
 import { DocumentCache } from "./document-cache";
 import {
@@ -567,9 +567,6 @@ export function App() {
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryEntry[]>(loadReadingHistory);
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>(loadRecentWorkspaces);
   const [mountedWorkspaces, setMountedWorkspaces] = useState<RecentWorkspace[]>(loadMountedWorkspaces);
-  const [workspaceQuery, setWorkspaceQuery] = useState("");
-  const [workspaceResults, setWorkspaceResults] = useState<WorkspaceSearchResult[]>([]);
-  const [workspaceSearchLoading, setWorkspaceSearchLoading] = useState(false);
   const [workspaceExporting, setWorkspaceExporting] = useState(false);
   const [workspaceExportProgress, setWorkspaceExportProgress] = useState<WorkspaceExportProgress | null>(null);
   const [workspaceExportFailures, setWorkspaceExportFailures] = useState<WorkspaceExportFailure[]>([]);
@@ -584,6 +581,14 @@ export function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceIndexLoading, setWorkspaceIndexLoading] = useState(false);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const { workspaceQuery, workspaceResults, workspaceSearchLoading, setWorkspaceQuery, clearWorkspaceResults } =
+    useWorkspaceSearchController({
+      workspacePath,
+      workspaceRevision,
+      isNative: isTauriRuntime(),
+      searchWorkspace,
+      setError,
+    });
   const [workspaceWatchError, setWorkspaceWatchError] = useState<string | null>(null);
   const [externalChangePath, setExternalChangePath] = useState<string | null>(null);
   const [externalChangeKind, setExternalChangeKind] = useState<ExternalChangeKind>("modified");
@@ -717,7 +722,7 @@ export function App() {
         setSelectedTag,
         setSelectedFileKind,
         setOpenTabs,
-        clearWorkspaceResults: () => setWorkspaceResults([]),
+        clearWorkspaceResults,
         setError,
       },
       runtime: {
@@ -2716,40 +2721,6 @@ export function App() {
         });
     });
   }, [markExternalChange, openPath, workspacePath, workspaceSessionController]);
-
-  useEffect(() => {
-    const query = workspaceQuery.trim();
-    if (!workspacePath || !isTauriRuntime() || query.length < 2) {
-      setWorkspaceResults([]);
-      setWorkspaceSearchLoading(false);
-      return;
-    }
-
-    let active = true;
-    setWorkspaceSearchLoading(true);
-    const timer = window.setTimeout(() => {
-      void searchWorkspace(workspacePath, query)
-        .then((results) => {
-          if (active) setWorkspaceResults(results);
-        })
-        .catch((cause) => {
-          if (active) {
-            setWorkspaceResults([]);
-            setError(
-              cause instanceof Error ? `当前阅读库搜索失败：${cause.message}` : "当前阅读库搜索失败，请稍后重试。",
-            );
-          }
-        })
-        .finally(() => {
-          if (active) setWorkspaceSearchLoading(false);
-        });
-    }, 180);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [workspacePath, workspaceQuery, workspaceRevision]);
 
   const requestEditorInsert = useCallback(
     (kind: EditorInsertKind) => {
