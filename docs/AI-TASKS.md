@@ -440,6 +440,17 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 - 验收：controller 测试覆盖查询防抖与 trim、无阅读库/短查询清空、revision 重搜、过期结果保护、错误与 loading 状态；完整 Vitest 114 文件 / 494 项、coverage 51.08% statements / 45.86% branches / 57.73% functions / 52.89% lines、workflow 46 项、Release 27 项、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y 11 项、Playwright 首轮 105/106 后既有渐进渲染场景单 worker 复跑 1/1、Windows desktop smoke 18 项通过；远程 Quality checks 重跑通过（15m40s）后合入 PR #531。
 - 下一项：D13 已完成；重新核对最新 `main`、预算变化和稳定职责边界，再定义 D14；不自动推进长期 v1.x 候选。
 
+### D14 — App.tsx 路径入口编排提取
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 目标：把路径入口的工作区切换确认、文档替换确认、原生路径授权、重复路径去重和工作区/文档分发从 `App.tsx` 收敛到独立控制器，让页面组合层只连接既有会话动作和入口订阅。
+- 当前证据：最新 `main` 为 `b21aaa7`（D13 代码与状态 PR #531/#532 均已合入）；Issue #16 阶段 2 仍开放；`App.tsx` 仍直接持有 `handleOpenPaths` 的路径编排；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
+- 范围：新增 `open-paths-controller` 与定向测试；迁移 `handleOpenPaths` 的确认顺序、当前修改文档过滤、规范化路径去重、原生授权、工作区加载、文档打开和失败计数；保留启动恢复、文件拖放、文件选择、文档会话、工作区会话、IPC、索引算法和 Rust 行为不变。
+- 非目标：不修改打开确认文案、路径授权协议、文档/工作区会话状态机、拖放提示、阅读库搜索、文内查找、版本号、tag、Release 或未来 Provider/插件接口。
+- 验收：controller 测试覆盖确认取消、修改文档过滤、授权与去重、浏览器原始路径和逐路径失败；完整 Vitest、coverage、workflow、Release、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y、Playwright 与 Windows desktop smoke 中现有路径入口保持通过；远程 Quality checks 通过后合入代码 PR。
+- 下一项：完成 D14 后重新核对最新 `main`、预算变化和稳定职责边界，再定义下一项 Dxx；不自动推进长期 v1.x 候选。
+
 ---
 
 ## v1.x 候选池（当前不可直接开发）

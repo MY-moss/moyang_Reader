@@ -243,6 +243,7 @@ import {
 } from "./workspace-index";
 import type { QuickOpenCandidate } from "./quick-open";
 import { createWorkspaceSessionController, type WorkspaceSessionController } from "./workspace-session-controller";
+import { createOpenPathsController, type OpenPathsOutcome } from "./open-paths-controller";
 import { resolveExternalChangeAction } from "./external-change";
 import { isPathWithin, normalizePathKey } from "./path-key";
 import {
@@ -258,7 +259,7 @@ import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide }
 import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
-import { formatTransitionConfirmation, isSameDocumentPath, shouldConfirmWorkspaceSwitch } from "./document-transition";
+import { formatTransitionConfirmation, isSameDocumentPath } from "./document-transition";
 import {
   clipboardAssetFileName,
   clipboardAssetPath,
@@ -508,13 +509,6 @@ type DraftComparisonRequest = {
   isCurrentDocument: boolean;
   sourceChangedSinceDraft: boolean;
   recoveryKind: RecoveryKind;
-};
-
-type OpenPathsOutcome = {
-  openedCount: number;
-  failedCount: number;
-  duplicateCount: number;
-  cancelled: boolean;
 };
 
 function isContextMenuKeyboardEvent(event: ReactKeyboardEvent<HTMLElement>): boolean {
@@ -1861,62 +1855,26 @@ export function App() {
   }, [openPath, releaseDocumentResources, resetDocumentSearch, workspacePath, workspaceSessionController]);
 
   const handleOpenPaths = useCallback(
-    async (paths: OpenPath[]): Promise<OpenPathsOutcome> => {
-      const cancelledOutcome = (): OpenPathsOutcome => ({
-        openedCount: 0,
-        failedCount: 0,
-        duplicateCount: 0,
-        cancelled: true,
-      });
-      const workspacePaths = paths.filter((entry) => entry.kind === "workspace").map((entry) => entry.path);
-      const workspacePathToConfirm = workspacePaths.find((path) =>
-        shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
-      );
-      if (workspacePathToConfirm && !confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {
-        return cancelledOutcome();
-      }
-
-      const currentModifiedPath = documentStateRef.current?.modified ? documentStateRef.current.path : null;
-      const pathsToProcess = currentModifiedPath
-        ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(currentModifiedPath, entry.path))
-        : paths;
-      const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
-      if (!confirmDocumentReplacement(documentPaths, "打开新文档")) {
-        return cancelledOutcome();
-      }
-
-      const seen = new Set<string>();
-      let openedCount = 0;
-      let failedCount = 0;
-      let duplicateCount = 0;
-      for (const entry of pathsToProcess) {
-        const key = `${entry.kind}:${normalizePathKey(entry.path)}`;
-        if (seen.has(key)) {
-          duplicateCount += 1;
-          continue;
-        }
-        seen.add(key);
-
-        try {
-          const authorizedPath = isTauriRuntime()
-            ? await authorizeStoredPath(entry.path, entry.kind === "workspace")
-            : entry.path;
-          if (entry.kind === "workspace") {
-            await loadWorkspace(authorizedPath);
-            openedCount += 1;
-          } else {
-            if (await openPath(authorizedPath)) openedCount += 1;
-            else failedCount += 1;
-          }
-        } catch (cause) {
-          failedCount += 1;
-          setError(cause instanceof Error ? cause.message : "无法打开传入的路径。");
-        }
-      }
-
-      return { openedCount, failedCount, duplicateCount, cancelled: false };
-    },
-    [confirmDocumentReplacement, confirmWorkspaceSwitch, loadWorkspace, openPath],
+    (paths: OpenPath[]): Promise<OpenPathsOutcome> =>
+      createOpenPathsController({
+        getCurrentDocument: getCurrentDocumentValue,
+        getWorkspacePath: getWorkspacePathValue,
+        isNative: isTauriRuntime,
+        authorizeStoredPath,
+        confirmWorkspaceSwitch,
+        confirmDocumentReplacement,
+        loadWorkspace,
+        openPath,
+        setError,
+      }).handleOpenPaths(paths),
+    [
+      confirmDocumentReplacement,
+      confirmWorkspaceSwitch,
+      getCurrentDocumentValue,
+      getWorkspacePathValue,
+      loadWorkspace,
+      openPath,
+    ],
   );
 
   const handleNavigateBack = useCallback(async () => {
