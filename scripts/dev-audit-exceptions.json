@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "owner": "@MY-moss",
+  "trackingIssue": "https://github.com/MY-moss/moyang_Reader/issues/534",
+  "reviewBy": "2026-10-19",
+  "advisories": {
+    "GHSA-jmr9-qjv8-65gv": {
+      "dependency": "extract-zip",
+      "reason": "Only reached by the local WebdriverIO browser/driver tooling. Moyang does not pass user-controlled archives to this package; installs use the committed lockfile and the public npm registry."
+    },
+    "GHSA-7pqw-9j4j-h8q3": {
+      "dependency": "extract-zip",
+      "reason": "Only reached by the local WebdriverIO browser/driver tooling. Moyang does not pass user-controlled archives to this package; installs use the committed lockfile and the public npm registry."
+    },
+    "GHSA-ggr8-5vv4-36mx": {
+      "dependency": "deepmerge-ts",
+      "reason": "Used only to merge checked-in WebdriverIO test configuration. No document, workspace, network response, or other untrusted recursive object is supplied to it."
+    },
+    "GHSA-5j98-mcp5-4vw2": {
+      "dependency": "glob",
+      "reason": "Transitive development tooling only. Moyang never invokes the vulnerable glob CLI --cmd path and does not construct shell commands from matches."
+    },
+    "GHSA-2883-xcg3-v3hh": {
+      "dependency": "js-yaml",
+      "reason": "Transitive development tooling only. Desktop tests use checked-in JavaScript configuration and do not parse user-controlled YAML."
+    },
+    "GHSA-5c6j-r48x-rmvq": {
+      "dependency": "serialize-javascript",
+      "reason": "Transitive Mocha/WebdriverIO test-runner code only. It is not bundled into the app and receives no user document objects or network-derived values."
+    },
+    "GHSA-qj8w-gfj5-8c6v": {
+      "dependency": "serialize-javascript",
+      "reason": "Transitive Mocha/WebdriverIO test-runner code only. It is not bundled into the app and receives no user document objects or network-derived values."
+    }
+  }
+}

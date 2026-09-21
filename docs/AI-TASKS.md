@@ -442,14 +442,26 @@ C04 已完成。正式 v1.0 之前，当前可执行队列先处理事实源、�
 
 ### D14 — App.tsx 路径入口编排提取
 
-**状态：IN_PROGRESS — 当前分支**
+**状态：DONE — PR #533**
 
 - 目标：把路径入口的工作区切换确认、文档替换确认、原生路径授权、重复路径去重和工作区/文档分发从 `App.tsx` 收敛到独立控制器，让页面组合层只连接既有会话动作和入口订阅。
 - 当前证据：最新 `main` 为 `b21aaa7`（D13 代码与状态 PR #531/#532 均已合入）；Issue #16 阶段 2 仍开放；`App.tsx` 仍直接持有 `handleOpenPaths` 的路径编排；当前没有修改同一范围的开放产品 PR，开放 PR 仅为无关 Dependabot。
 - 范围：新增 `open-paths-controller` 与定向测试；迁移 `handleOpenPaths` 的确认顺序、当前修改文档过滤、规范化路径去重、原生授权、工作区加载、文档打开和失败计数；保留启动恢复、文件拖放、文件选择、文档会话、工作区会话、IPC、索引算法和 Rust 行为不变。
 - 非目标：不修改打开确认文案、路径授权协议、文档/工作区会话状态机、拖放提示、阅读库搜索、文内查找、版本号、tag、Release 或未来 Provider/插件接口。
 - 验收：controller 测试覆盖确认取消、修改文档过滤、授权与去重、浏览器原始路径和逐路径失败；完整 Vitest、coverage、workflow、Release、Lint、Build、格式、文档、架构和 type-aware 检查通过；a11y、Playwright 与 Windows desktop smoke 中现有路径入口保持通过；远程 Quality checks 通过后合入代码 PR。
-- 下一项：完成 D14 后重新核对最新 `main`、预算变化和稳定职责边界，再定义下一项 Dxx；不自动推进长期 v1.x 候选。
+- 结果：路径入口确认、原生授权、去重与分发已进入 `open-paths-controller`；完整远程 Quality checks（含 106 项浏览器场景、18 项桌面 smoke、Rust 与发布检查）通过后合入。
+- 下一项：D15“v1.0 重设计 P1 质量清障”；不自动推进长期 v1.x 候选。
+
+### D15 — v1.0 重设计 P1 质量清障
+
+**状态：IN_PROGRESS — 当前分支**
+
+- 关联：#534 / #16 / #171 / #111 / #194
+- 目标：在视觉替换前建立可信、可重复的工程基线，消除已确认的 E2E 服务串线、更新源文档冲突、测试配置漂移与零警告门禁缺口。
+- 范围：Playwright 工作树独立端口和 app/commit 身份健康检查；GitHub-first 更新源文档守卫；WebdriverIO/Tauri 测试链升级及有负责人/到期日的开发依赖风险例外；Vitest 单一配置；React Hook 零警告；D14 后架构预算收紧；`PRODUCT.md` 与治理/ADR 事实对齐。
+- 非目标：不替换生产 UI，不修改 Tauri command/IPC/文档格式/设置 key/快捷键，不提前实现 Reader+、AI、插件、RAG 或 MCP。
+- 验收：本地和远程完整门禁通过；在 4173 被其他项目占用时浏览器测试仍启动并验证自己的 Moyang commit；生产依赖审计为 0；新增/过期/已修复开发 advisory 均阻断例外检查；Lint 零警告。
+- 下一项：D15 完成后进入 v1.0 Figma Foundations / Components / Core Experiences 设计切片，审核通过后才迁移生产 UI。
 
 ---
 

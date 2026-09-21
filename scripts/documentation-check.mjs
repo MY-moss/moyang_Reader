@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const documentationFiles = [
+  "PRODUCT.md",
   "README.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
@@ -21,9 +22,14 @@ const documentationFiles = [
   "docs/AI-TAKEOVER-PROMPT.md",
   "docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md",
   "docs/DEVELOPMENT-SETUP.md",
+  "docs/security/DEV-DEPENDENCY-RISK-ACCEPTANCE.md",
 ];
 
 const requiredFragments = new Map([
+  [
+    "PRODUCT.md",
+    ["<!-- impeccable:product-schema 1 -->", "Windows x64", "普通文件为真源", "公共图书馆导视", "WCAG AA"],
+  ],
   [
     "README.md",
     [
@@ -96,7 +102,8 @@ const requiredFragments = new Map([
       "D11 App.tsx settings orchestration DONE",
       "D12 App.tsx command orchestration DONE",
       "D13 App.tsx workspace-search orchestration DONE",
-      "D14 App.tsx open-paths orchestration IN PROGRESS",
+      "D14 App.tsx open-paths orchestration DONE",
+      "D15 v1.0 redesign P1 quality baseline IN PROGRESS",
     ],
   ],
   [
@@ -147,9 +154,11 @@ const requiredFragments = new Map([
       "工作区搜索生命周期编排提取",
       "workspace-search-controller",
       "D14",
-      "IN_PROGRESS — 当前分支",
+      "DONE — PR #533",
       "路径入口编排提取",
       "open-paths-controller",
+      "D15",
+      "v1.0 重设计 P1 质量清障",
       "architecture-budget.json",
       "check:architecture",
       "Dependabot",
@@ -164,7 +173,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D14` 路径入口编排提取",
+      "当前最早可执行任务是 `D15` v1.0 重设计 P1 质量清障",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
@@ -227,6 +236,10 @@ const requiredFragments = new Map([
       "WORKSPACE-CLEANUP.md",
     ],
   ],
+  [
+    "docs/security/DEV-DEPENDENCY-RISK-ACCEPTANCE.md",
+    ["@MY-moss", "2026-10-19", "production dependency", "npm audit fix --force", "dev-audit-exceptions.json"],
+  ],
 ]);
 
 const staleClaims = [
@@ -252,8 +265,13 @@ const staleClaims = [
 ];
 
 const updaterAuthorityClaims = [
+  ["README.md", /先(?:从|尝试)[^\n]*Cloudflare Pages[^\n]*(?:回退|再尝试)[^\n]*GitHub Release/],
+  ["SECURITY.md", /先(?:从|尝试)[^\n]*Cloudflare Pages[^\n]*(?:回退|再尝试)[^\n]*GitHub Release/],
+  ["PRIVACY.md", /先(?:从|尝试)[^\n]*Cloudflare Pages[^\n]*(?:回退|再尝试)[^\n]*GitHub Release/],
   ["docs/RELEASE-POLICY.md", /更新端点按配置顺序先尝试公开 Cloudflare Pages 动态镜像，再回退到 GitHub Release/],
   ["docs/USER-GUIDE.md", /更新器先尝试公开 Cloudflare Pages 镜像，镜像不可用时回退 GitHub Release/],
+  ["docs/UPDATE.md", /先(?:从|尝试)[^\n]*Cloudflare Pages[^\n]*(?:回退|再尝试)[^\n]*GitHub Release/],
+  ["docs/UI-INTERACTION.md", /先(?:从|尝试)[^\n]*Cloudflare Pages[^\n]*(?:回退|再尝试)[^\n]*GitHub Release/],
 ];
 
 export function validateUpdaterAuthorityClaims(documents) {

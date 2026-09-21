@@ -47,6 +47,26 @@ test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
 });
 
 test("mounts large reader content incrementally and eventually exposes every heading", async ({ page }) => {
+  await page.addInitScript(() => {
+    const scheduledFrames = new Map<number, ReturnType<typeof setTimeout>>();
+    let nextFrame = 0;
+    window.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      const frame = ++nextFrame;
+      scheduledFrames.set(
+        frame,
+        setTimeout(() => {
+          scheduledFrames.delete(frame);
+          callback(performance.now());
+        }, 50),
+      );
+      return frame;
+    };
+    window.cancelAnimationFrame = (frame) => {
+      const timer = scheduledFrames.get(frame);
+      if (timer !== undefined) clearTimeout(timer);
+      scheduledFrames.delete(frame);
+    };
+  });
   await page.goto("/");
   // Keep the source below the large-document source-mode cutoff so this test
   // exercises progressive reading instead of the protected source-only path.

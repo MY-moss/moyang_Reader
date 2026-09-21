@@ -73,11 +73,12 @@ test("promotes the visible save action when the document has unsaved edits", asy
   await expect(saveButton).toHaveClass(/primary/);
 });
 
-test("keeps primary topbar controls inside the viewport at Windows DPI scales", async ({ browser }) => {
+test("keeps primary topbar controls inside the viewport at Windows DPI scales", async ({ browser, baseURL }) => {
+  if (!baseURL) throw new Error("Playwright baseURL is required for isolated preview testing.");
   for (const deviceScaleFactor of WINDOWS_DPI_SCALES) {
     for (const width of WINDOWS_WIDTHS) {
       const context = await browser.newContext({
-        baseURL: "http://127.0.0.1:4173",
+        baseURL,
         deviceScaleFactor,
         viewport: { width, height: 820 },
       });

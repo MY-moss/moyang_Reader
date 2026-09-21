@@ -2,8 +2,8 @@
   "version": 1,
   "targets": {
     "src/app/App.tsx": {
-      "baselineBytes": 242772,
-      "baselineLines": 6416,
+      "baselineBytes": 217137,
+      "baselineLines": 5563,
       "maxGrowthBytes": 12288,
       "maxGrowthLines": 240
     },

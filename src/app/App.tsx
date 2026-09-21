@@ -859,7 +859,7 @@ export function App() {
       setPaneWidthCss(side, nextWidth);
       setPaneWidths(next);
     },
-    [setPaneWidthCss],
+    [paneWidthsRef, setPaneWidthCss, setPaneWidths],
   );
 
   const previewPaneResize = useCallback(
@@ -870,12 +870,12 @@ export function App() {
       paneWidthsRef.current = { ...current, [side]: nextWidth };
       setPaneWidthCss(side, nextWidth);
     },
-    [setPaneWidthCss],
+    [paneWidthsRef, setPaneWidthCss],
   );
 
   const commitPaneResize = useCallback(() => {
     setPaneWidths(paneWidthsRef.current);
-  }, []);
+  }, [paneWidthsRef, setPaneWidths]);
 
   const resetPane = useCallback(
     (side: PaneSide) => {
@@ -885,7 +885,7 @@ export function App() {
       setPaneWidthCss(side, next[side]);
       setPaneWidths(next);
     },
-    [setPaneWidthCss],
+    [paneWidthsRef, setPaneWidthCss, setPaneWidths],
   );
 
   const navigateToHeading = useCallback(
@@ -936,12 +936,15 @@ export function App() {
     restoreFocusTarget: focusSearchRestoreTarget,
   });
 
-  const setReaderPreferences = useCallback((changes: Partial<ReaderPreferences>) => {
-    const next = { ...preferencesRef.current, ...changes };
-    preferencesRef.current = next;
-    saveReaderPreferences(next);
-    setPreferences(next);
-  }, []);
+  const setReaderPreferences = useCallback(
+    (changes: Partial<ReaderPreferences>) => {
+      const next = { ...preferencesRef.current, ...changes };
+      preferencesRef.current = next;
+      saveReaderPreferences(next);
+      setPreferences(next);
+    },
+    [preferencesRef, setPreferences],
+  );
 
   const announceReadingZoom = useCallback((zoom: number) => {
     setReadingZoomNotice(zoom);
@@ -974,7 +977,7 @@ export function App() {
       event.preventDefault();
       setReadingZoom(preferencesRef.current.readingZoom + (event.deltaY < 0 ? READING_ZOOM_STEP : -READING_ZOOM_STEP));
     },
-    [mode, setReadingZoom],
+    [mode, preferencesRef, setReadingZoom],
   );
 
   useEffect(
@@ -1216,7 +1219,7 @@ export function App() {
         });
     };
     input.click();
-  }, [notify]);
+  }, [notify, preferencesRef, setLocale, setPreferences, setTheme]);
 
   useEffect(() => {
     documentStateRef.current = documentState;
@@ -1559,7 +1562,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [notify, releaseDocumentResources, resetEditorHistory],
+    [notify, preferencesRef, releaseDocumentResources, resetEditorHistory],
   );
 
   const openBinary = useCallback(
@@ -1644,7 +1647,7 @@ export function App() {
         setLoading(false);
       }
     },
-    [releaseDocumentResources, resetEditorHistory],
+    [preferencesRef, releaseDocumentResources, resetEditorHistory],
   );
 
   const commitNavigationHistory = useCallback((next: NavigationHistoryState) => {
@@ -1690,7 +1693,7 @@ export function App() {
       renderSource(path, source, {
         allowRemoteResources: preferencesRef.current.allowRemoteResources,
       }),
-    [],
+    [preferencesRef],
   );
   const shouldRenderDocumentOnSave = useCallback(
     (document: OpenDocument) => !isLargeMarkdownOpenDocument(document),
@@ -2741,7 +2744,7 @@ export function App() {
     window.requestAnimationFrame(() => {
       if (!focusElementWithoutScroll(restoreFocusTarget)) focusElementWithoutScroll(contextToggleRef.current);
     });
-  }, []);
+  }, [setRightPanelOpen]);
 
   const toggleContextPanel = useCallback(
     (restoreFocusTarget?: HTMLElement | null) => {
@@ -2760,7 +2763,7 @@ export function App() {
           : null);
       setRightPanelOpen(true);
     },
-    [closeContextPanel, rightPanelOpen],
+    [closeContextPanel, rightPanelOpen, setRightPanelOpen],
   );
 
   const focusWorkspaceSearch = useCallback(() => {
@@ -2772,7 +2775,7 @@ export function App() {
     setFocusMode(false);
     setSidebarCollapsed(false);
     window.requestAnimationFrame(() => workspaceSearchInputRef.current?.focus());
-  }, [notify, workspacePath]);
+  }, [notify, setSidebarCollapsed, workspacePath]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -2914,10 +2917,12 @@ export function App() {
     mode,
     openSelectedFile,
     openDocumentSearch,
+    preferencesRef,
     requestEditorInsert,
     rightPanelOpen,
     saveDocument,
     setReadingZoom,
+    setSidebarCollapsed,
     toggleContextPanel,
     toggleReadingEditing,
   ]);
@@ -3492,7 +3497,7 @@ export function App() {
     return renderSource(documentState.path, sourceDraft, {
       allowRemoteResources: preferencesRef.current.allowRemoteResources,
     });
-  }, [documentState, sourceDraft]);
+  }, [documentState, preferencesRef, sourceDraft]);
 
   const buildCurrentExportHtml = useCallback(async (): Promise<string | null> => {
     if (!documentState || documentState.kind === "pdf" || documentState.kind === "image") return null;
@@ -3687,7 +3692,7 @@ export function App() {
     setWorkspaceExportNotice(`第 ${batch.volumeNumber} 卷已准备，打印后自动继续。`);
     setWorkspaceExporting(false);
     setWorkspaceExportProgress(null);
-  }, [finishPdfBatch]);
+  }, [finishPdfBatch, preferencesRef]);
 
   const handlePrintPreview = useCallback(async () => {
     if (!printPreview) return;
@@ -4323,7 +4328,7 @@ export function App() {
 
   const cycleTheme = useCallback(() => {
     setTheme((current) => (current === "system" ? "light" : current === "light" ? "dark" : "system"));
-  }, []);
+  }, [setTheme]);
 
   const canEdit = documentState ? isEditableDocument(documentState.kind) : false;
   const documentPath = documentState?.path;
@@ -4367,29 +4372,32 @@ export function App() {
     if (documentState.path.startsWith("browser://")) return documentState.path;
     return workspacePath ? workspaceRelativePath(workspacePath, documentState.path) : null;
   }, [documentState, workspacePath]);
-  const persistAnnotations = useCallback(async (next: TextAnnotation[]): Promise<boolean> => {
-    if (!preferencesRef.current.annotationEnabled) return false;
+  const persistAnnotations = useCallback(
+    async (next: TextAnnotation[]): Promise<boolean> => {
+      if (!preferencesRef.current.annotationEnabled) return false;
 
-    const root = workspacePathRef.current;
-    if (!isTauriRuntime()) {
-      setAnnotations(next);
-      return true;
-    }
-    if (!root) {
-      setError("请先打开工作区，再保存阅读批注。");
-      return false;
-    }
+      const root = workspacePathRef.current;
+      if (!isTauriRuntime()) {
+        setAnnotations(next);
+        return true;
+      }
+      if (!root) {
+        setError("请先打开工作区，再保存阅读批注。");
+        return false;
+      }
 
-    try {
-      await writeAnnotations(root, next);
-      setAnnotations(next);
-      setError(null);
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "阅读批注保存失败。");
-      return false;
-    }
-  }, []);
+      try {
+        await writeAnnotations(root, next);
+        setAnnotations(next);
+        setError(null);
+        return true;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "阅读批注保存失败。");
+        return false;
+      }
+    },
+    [preferencesRef],
+  );
   const readerBookmarkTarget = useMemo(
     () =>
       documentState && readerContextMenu
