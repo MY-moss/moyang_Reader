@@ -71,11 +71,14 @@ describe("ContextPanel", () => {
     expect(tabList?.getAttribute("aria-orientation")).toBe("horizontal");
     expect(Array.from(tabs).map((tab) => tab.id)).toEqual([
       "context-panel-tab-outline",
+      "context-panel-tab-bookmarks",
       "context-panel-tab-backlinks",
       "context-panel-tab-properties",
-      "context-panel-tab-bookmarks",
       "context-panel-tab-annotations",
     ]);
+    expect(
+      Array.from(container.querySelectorAll(".context-tab-group-label")).map((label) => label.textContent),
+    ).toEqual(["导航", "理解"]);
     expect(Array.from(tabs).map((tab) => tab.tabIndex)).toEqual([0, -1, -1, -1, -1]);
     expect(Array.from(tabs).map((tab) => tab.getAttribute("aria-controls"))).toEqual(
       Array.from({ length: 5 }, () => "context-panel-panel"),
@@ -98,7 +101,7 @@ describe("ContextPanel", () => {
     expect(document.activeElement).toBe(tabs[1]);
     expect(Array.from(tabs).map((tab) => tab.tabIndex)).toEqual([-1, 0, -1, -1, -1]);
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
-    expect(panel?.getAttribute("aria-labelledby")).toBe("context-panel-tab-backlinks");
+    expect(panel?.getAttribute("aria-labelledby")).toBe("context-panel-tab-bookmarks");
 
     await act(async () => {
       tabs[1]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
