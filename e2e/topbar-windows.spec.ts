@@ -73,6 +73,54 @@ test("promotes the visible save action when the document has unsaved edits", asy
   await expect(saveButton).toHaveClass(/primary/);
 });
 
+test("keeps document tabs and status hierarchy usable at Windows widths", async ({ page }) => {
+  for (const width of WINDOWS_WIDTHS) {
+    await page.setViewportSize({ width, height: 820 });
+    await page.goto("/");
+    await page.locator('input[type="file"]').setInputFiles([
+      {
+        name: "first-reference-with-a-long-name.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# First reference\n\nA stable document tab."),
+      },
+      {
+        name: "second-reference.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Second reference\n\nThe active document tab."),
+      },
+    ]);
+
+    const tabStrip = page.getByRole("toolbar", { name: "已打开文档" });
+    const statusbar = page.getByRole("contentinfo", { name: "文档状态" });
+    await expect(tabStrip.locator(".tab-item")).toHaveCount(2);
+    await expect(statusbar).toBeVisible();
+
+    const metrics = await page.evaluate(() => {
+      const tabStripElement = document.querySelector<HTMLElement>(".tab-strip");
+      const statusbarElement = document.querySelector<HTMLElement>(".statusbar");
+      const tabItems = Array.from(document.querySelectorAll<HTMLElement>(".tab-item")).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { height: rect.height, width: rect.width };
+      });
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        tabStripRight: tabStripElement?.getBoundingClientRect().right ?? 0,
+        statusbarRight: statusbarElement?.getBoundingClientRect().right ?? 0,
+        tabItems,
+      };
+    });
+
+    expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+    expect(metrics.tabStripRight).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+    expect(metrics.statusbarRight).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+    expect(metrics.tabItems.every(({ height, width: tabWidth }) => height >= 40 && tabWidth > 0)).toBe(true);
+
+    if (width <= 720) await expect(statusbar.locator(".statusbar-kind")).toBeHidden();
+    else await expect(statusbar.locator(".statusbar-kind")).toBeVisible();
+  }
+});
+
 test("keeps primary topbar controls inside the viewport at Windows DPI scales", async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error("Playwright baseURL is required for isolated preview testing.");
   for (const deviceScaleFactor of WINDOWS_DPI_SCALES) {

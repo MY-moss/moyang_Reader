@@ -146,6 +146,14 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   await page.reload();
   await openSettingsMenu(page, "Settings");
   await expect(page.getByLabel("Interface language")).toHaveValue("en-US");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "english-shell.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# English shell\n\nLocalized navigation and document status."),
+  });
+  await expect(page.getByRole("toolbar", { name: "Open documents" })).toBeVisible();
+  await expect(page.getByRole("contentinfo", { name: "Document status" })).toContainText("characters");
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {

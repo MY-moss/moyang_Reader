@@ -39,6 +39,23 @@ export type MessageKey =
   | "action.viewTools"
   | "action.documentTools"
   | "action.appearance"
+  | "tabs.openDocuments"
+  | "tabs.externalModified"
+  | "tabs.close"
+  | "tabs.manage"
+  | "tabs.manageTitle"
+  | "tabs.group"
+  | "tabs.closeTab"
+  | "tabs.closeOthers"
+  | "tabs.closeRight"
+  | "tabs.closeAll"
+  | "tabs.middleClick"
+  | "status.label"
+  | "status.waiting"
+  | "status.pdf"
+  | "status.image"
+  | "status.characters"
+  | "status.externalChange"
   | "settings.title"
   | "settings.localFirst"
   | "settings.allowRemoteImages"
@@ -138,6 +155,23 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.viewTools": "搜索与面板",
     "action.documentTools": "文档操作",
     "action.appearance": "外观与更新",
+    "tabs.openDocuments": "已打开文档",
+    "tabs.externalModified": "文件已被外部修改",
+    "tabs.close": "关闭",
+    "tabs.manage": "标签页管理菜单",
+    "tabs.manageTitle": "标签页",
+    "tabs.group": "标签管理",
+    "tabs.closeTab": "关闭标签",
+    "tabs.closeOthers": "关闭其他标签",
+    "tabs.closeRight": "关闭右侧标签",
+    "tabs.closeAll": "关闭全部标签",
+    "tabs.middleClick": "中键",
+    "status.label": "文档状态",
+    "status.waiting": "等待打开文件",
+    "status.pdf": "PDF",
+    "status.image": "图片",
+    "status.characters": "字符",
+    "status.externalChange": "外部修改待处理",
     "settings.title": "设置",
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
@@ -236,6 +270,23 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.viewTools": "Search and panels",
     "action.documentTools": "Document actions",
     "action.appearance": "Appearance & updates",
+    "tabs.openDocuments": "Open documents",
+    "tabs.externalModified": "File changed externally",
+    "tabs.close": "Close",
+    "tabs.manage": "Tab management menu",
+    "tabs.manageTitle": "Tab",
+    "tabs.group": "Tab management",
+    "tabs.closeTab": "Close tab",
+    "tabs.closeOthers": "Close other tabs",
+    "tabs.closeRight": "Close tabs to the right",
+    "tabs.closeAll": "Close all tabs",
+    "tabs.middleClick": "Middle click",
+    "status.label": "Document status",
+    "status.waiting": "Waiting for a document",
+    "status.pdf": "PDF",
+    "status.image": "Image",
+    "status.characters": "characters",
+    "status.externalChange": "External change needs attention",
     "settings.title": "Settings",
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",

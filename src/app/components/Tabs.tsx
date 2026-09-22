@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent } from "react";
+import { translate, type Locale } from "../i18n";
 import type { RecentFile } from "../types";
 import { ContextMenu } from "./ContextMenu";
+import { Icon } from "./Icon";
 
 type TabsProps = {
   tabs: RecentFile[];
+  locale: Locale;
   activePath: string | null;
   externallyModified: boolean;
   onShowExternalChange: () => void;
@@ -15,6 +18,7 @@ type TabsProps = {
 
 export function Tabs({
   tabs,
+  locale,
   activePath,
   externallyModified,
   onShowExternalChange,
@@ -23,6 +27,7 @@ export function Tabs({
   onCloseMany,
   onReorder,
 }: TabsProps) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [rovingPath, setRovingPath] = useState<string | null>(activePath);
@@ -84,7 +89,13 @@ export function Tabs({
   };
 
   return (
-    <div className="tab-strip" role="toolbar" aria-label="已打开文档" aria-orientation="horizontal" tabIndex={-1}>
+    <div
+      className="tab-strip"
+      role="toolbar"
+      aria-label={t("tabs.openDocuments")}
+      aria-orientation="horizontal"
+      tabIndex={-1}
+    >
       {tabs.map((tab, index) => {
         const active = tab.path === activePath;
         const isDragging = draggedPath === tab.path;
@@ -134,6 +145,7 @@ export function Tabs({
             <button
               type="button"
               aria-pressed={active}
+              aria-current={active ? "page" : undefined}
               tabIndex={index === rovingTabIndex ? 0 : -1}
               className="tab-label"
               title={tab.path}
@@ -167,9 +179,9 @@ export function Tabs({
                 focusTabAt(nextIndex);
               }}
             >
-              {tab.name}
+              <span className="tab-name">{tab.name}</span>
               {active && externallyModified && (
-                <span className="tab-external-indicator" aria-label="文件已被外部修改">
+                <span className="tab-external-indicator" aria-label={t("tabs.externalModified")}>
                   !
                 </span>
               )}
@@ -177,10 +189,10 @@ export function Tabs({
             <button
               type="button"
               className="tab-close"
-              aria-label={`关闭 ${tab.name}`}
+              aria-label={`${t("tabs.close")} ${tab.name}`}
               onClick={() => onClose(tab.path)}
             >
-              ×
+              <Icon name="close" size={14} />
             </button>
           </div>
         );
@@ -189,33 +201,33 @@ export function Tabs({
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          title={`标签页“${contextTab.name}”`}
-          ariaLabel="标签页管理菜单"
+          title={`${t("tabs.manageTitle")} “${contextTab.name}”`}
+          ariaLabel={t("tabs.manage")}
           groups={[
             {
-              label: "标签管理",
+              label: t("tabs.group"),
               items: [
                 {
                   id: "close-tab",
-                  label: "关闭标签",
-                  shortcut: "中键",
+                  label: t("tabs.closeTab"),
+                  shortcut: t("tabs.middleClick"),
                   onSelect: () => onClose(contextTab.path),
                 },
                 {
                   id: "close-other-tabs",
-                  label: "关闭其他标签",
+                  label: t("tabs.closeOthers"),
                   disabled: otherPaths.length === 0,
                   onSelect: () => onCloseMany(otherPaths),
                 },
                 {
                   id: "close-right-tabs",
-                  label: "关闭右侧标签",
+                  label: t("tabs.closeRight"),
                   disabled: rightPaths.length === 0,
                   onSelect: () => onCloseMany(rightPaths),
                 },
                 {
                   id: "close-all-tabs",
-                  label: "关闭全部标签",
+                  label: t("tabs.closeAll"),
                   onSelect: () => onCloseMany(tabs.map((item) => item.path)),
                 },
               ],

@@ -107,6 +107,11 @@ for (const theme of THEMES) {
     await expectStateScreenshot(page.locator(".reader-content"), "reader-content", theme);
   });
 
+  test(`captures the application shell baseline (${theme})`, async ({ page }) => {
+    await loadDocument(page, theme, "reader");
+    await expectStateScreenshot(page.locator(".app-shell"), "application-shell", theme, { maxDiffPixelRatio: 0.01 });
+  });
+
   test(`captures the editor state baseline (${theme})`, async ({ page }) => {
     await loadDocument(page, theme, "editor");
     await expectStateScreenshot(page.locator(".wysiwyg-editor"), "editor-content", theme);
