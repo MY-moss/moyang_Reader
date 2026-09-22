@@ -15,6 +15,7 @@ import { loadLocale } from "./i18n";
 import { loadReaderPreferences, type ReaderPreferences } from "./preferences";
 import { loadContextPanelOpen, loadContextPanelTab, loadPaneWidths, loadSidebarCollapsed } from "./storage";
 import type { ThemeMode } from "./types";
+import { normalizeThemeMode } from "./theme";
 
 export type { SettingsPersistenceStatus } from "./app-settings";
 
@@ -58,7 +59,7 @@ type PendingNativeWrite = {
 function readSavedTheme(): ThemeMode {
   try {
     const saved = localStorage.getItem(PERSISTED_STORAGE_KEYS.theme);
-    return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+    return normalizeThemeMode(saved);
   } catch {
     return "system";
   }

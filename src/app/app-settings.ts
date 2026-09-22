@@ -4,6 +4,7 @@ import { DEFAULT_PANE_WIDTHS, normalizePaneWidths, type PaneWidths } from "./pan
 import { defaultReaderPreferences, type ReaderPreferences } from "./preferences";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 import type { ContextPanelTab, ThemeMode } from "./types";
+import { normalizeThemeMode } from "./theme";
 
 const { storageKey: appSettingsKey, format: appSettingsFormat, version: appSettingsVersion } = APP_SETTINGS_SCHEMA;
 
@@ -58,6 +59,16 @@ function parsePreferences(value: unknown): ReaderPreferences {
       value.readingWidth === "narrow" || value.readingWidth === "standard" || value.readingWidth === "wide"
         ? value.readingWidth
         : defaultReaderPreferences.readingWidth,
+    readingTypeface:
+      value.readingTypeface === "system" || value.readingTypeface === "sans" || value.readingTypeface === "serif"
+        ? value.readingTypeface
+        : defaultReaderPreferences.readingTypeface,
+    readingLineSpacing:
+      value.readingLineSpacing === "compact" ||
+      value.readingLineSpacing === "relaxed" ||
+      value.readingLineSpacing === "comfortable"
+        ? value.readingLineSpacing
+        : defaultReaderPreferences.readingLineSpacing,
     exportPaper: value.exportPaper === "letter" || value.exportPaper === "a4" ? value.exportPaper : "a4",
     exportOrientation:
       value.exportOrientation === "landscape" || value.exportOrientation === "portrait"
@@ -81,7 +92,7 @@ function parseSnapshot(value: unknown): AppSettingsSnapshot | null {
     value.activeContextTab === "annotations"
       ? value.activeContextTab
       : "outline";
-  const theme = value.theme === "light" || value.theme === "dark" ? value.theme : "system";
+  const theme = normalizeThemeMode(value.theme);
   const locale = value.locale === "en-US" ? value.locale : "zh-CN";
 
   return {

@@ -7,6 +7,7 @@ import { normalizePathKey } from "./path-key";
 import { normalizeReadingZoom, readingZoomFromScale } from "./reading-zoom";
 import { normalizeBookmarks, type DocumentBookmark } from "./bookmarks";
 import { normalizeReadingPositions, type ReadingPosition } from "./storage";
+import { normalizeThemeMode } from "./theme";
 
 const PORTABLE_SETTINGS_FORMAT = PORTABLE_SETTINGS_SCHEMA.format;
 const PORTABLE_SETTINGS_VERSION = PORTABLE_SETTINGS_SCHEMA.currentVersion;
@@ -71,6 +72,16 @@ function parsePreferences(value: unknown): ReaderPreferences {
       value.readingWidth === "narrow" || value.readingWidth === "wide" || value.readingWidth === "standard"
         ? value.readingWidth
         : defaultReaderPreferences.readingWidth,
+    readingTypeface:
+      value.readingTypeface === "system" || value.readingTypeface === "sans" || value.readingTypeface === "serif"
+        ? value.readingTypeface
+        : defaultReaderPreferences.readingTypeface,
+    readingLineSpacing:
+      value.readingLineSpacing === "compact" ||
+      value.readingLineSpacing === "relaxed" ||
+      value.readingLineSpacing === "comfortable"
+        ? value.readingLineSpacing
+        : defaultReaderPreferences.readingLineSpacing,
     exportPaper:
       value.exportPaper === "letter" || value.exportPaper === "a4"
         ? value.exportPaper
@@ -201,8 +212,7 @@ export function parsePortableSettings(serialized: string): PortableSettingsBundl
 
   const version = parsed.version === 1 ? 1 : PORTABLE_SETTINGS_VERSION;
 
-  const theme =
-    parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system" ? parsed.theme : "system";
+  const theme = normalizeThemeMode(parsed.theme);
   const locale = parsed.locale === "en-US" || parsed.locale === "zh-CN" ? parsed.locale : "zh-CN";
   return {
     format: PORTABLE_SETTINGS_FORMAT,

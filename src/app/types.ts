@@ -19,7 +19,11 @@ export type FileStamp = {
   modifiedMs: number | null;
 };
 
-export type ThemeMode = "system" | "light" | "dark";
+export type ThemeMode = "system" | "porcelain" | "paper" | "ink";
+
+export type ReadingTypeface = "system" | "serif" | "sans";
+
+export type ReadingLineSpacing = "compact" | "comfortable" | "relaxed";
 
 export type ReadingScale = "small" | "medium" | "large";
 

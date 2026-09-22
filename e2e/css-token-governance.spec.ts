@@ -122,10 +122,10 @@ test("keeps chrome and workspace typography on the semantic type scale", async (
       };
     });
 
-    expect(metrics.tokens["--type-kicker"]).toBe("9px");
-    expect(metrics.tokens["--type-caption"]).toBe("10px");
-    expect(metrics.tokens["--type-control"]).toBe("11px");
-    expect(metrics.tokens["--type-body"]).toBe("12px");
+    expect(metrics.tokens["--type-kicker"]).toBe("12px");
+    expect(metrics.tokens["--type-caption"]).toBe("12px");
+    expect(metrics.tokens["--type-control"]).toBe("12px");
+    expect(metrics.tokens["--type-body"]).toBe("13px");
     expect(metrics.tokens["--type-emphasis"]).toBe("13px");
     expect(metrics.tokens["--type-icon"]).toBe("15px");
     expect(metrics.tokens["--type-brand"]).toBe("16px");
@@ -133,10 +133,10 @@ test("keeps chrome and workspace typography on the semantic type scale", async (
     expect(metrics.tokens["--type-heading"]).toBe("19px");
     expect(metrics.fontSizes).toEqual({
       brand: "16px",
-      toolbar: "11px",
+      toolbar: "12px",
       workspaceHeading: "19px",
-      workspaceHelp: "11px",
-      statusbar: "10px",
+      workspaceHelp: "12px",
+      statusbar: "12px",
     });
     expect(metrics.viewport.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewport.clientWidth);
   }
@@ -221,12 +221,12 @@ test("keeps the page backdrop aligned with explicit and system dark themes", asy
     await page.goto("/");
 
     await page.evaluate(() => {
-      document.documentElement.dataset.theme = "light";
+      document.documentElement.dataset.theme = "porcelain";
     });
     const light = await readBackdrop();
 
     await page.evaluate(() => {
-      document.documentElement.dataset.theme = "dark";
+      document.documentElement.dataset.theme = "ink";
     });
     const explicitDark = await readBackdrop();
 
@@ -237,11 +237,10 @@ test("keeps the page backdrop aligned with explicit and system dark themes", asy
     const systemDark = await readBackdrop();
 
     expect(explicitDark).toEqual(systemDark);
-    expect(light.backgroundImage).toContain("rgb(242, 239, 231)");
-    expect(light.backgroundImage).toContain("rgb(232, 229, 220)");
-    expect(explicitDark.backgroundImage).not.toContain("rgb(242, 239, 231)");
-    expect(explicitDark.backgroundImage).not.toContain("rgb(232, 229, 220)");
-    expect(explicitDark.backgroundImage).not.toEqual(light.backgroundImage);
+    expect(light.backgroundImage).toBe("none");
+    expect(light.backgroundColor).toBe("rgb(244, 245, 247)");
+    expect(explicitDark.backgroundImage).toBe("none");
+    expect(explicitDark.backgroundColor).toBe("rgb(17, 25, 39)");
     expect(explicitDark.viewport.bodyScrollWidth).toBeLessThanOrEqual(explicitDark.viewport.clientWidth);
     expect(light.viewport.bodyScrollWidth).toBeLessThanOrEqual(light.viewport.clientWidth);
 
@@ -313,13 +312,13 @@ test("keeps annotation highlights legible across theme modes", async ({ page }) 
   await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
   await page.goto("/");
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "light";
+    document.documentElement.dataset.theme = "porcelain";
   });
   await mountAnnotationFixture();
   const light = await readAnnotationStyles();
 
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = "ink";
   });
   const explicitDark = await readAnnotationStyles();
 
@@ -332,9 +331,9 @@ test("keeps annotation highlights legible across theme modes", async ({ page }) 
   expect(light.tokens).toEqual({ border: "#ad7d2d", surface: "#e7c768" });
   expect(light.quoteBorder).toBe("rgb(173, 125, 45)");
   expect(light.markColor).toBe("rgb(173, 125, 45)");
-  expect(explicitDark.tokens).toEqual({ border: "#f0d79a", surface: "#e7c768" });
-  expect(explicitDark.quoteBorder).toBe("rgb(240, 215, 154)");
-  expect(explicitDark.markColor).toBe("rgb(240, 215, 154)");
+  expect(explicitDark.tokens).toEqual({ border: "#e1c27f", surface: "#d8b760" });
+  expect(explicitDark.quoteBorder).toBe("rgb(225, 194, 127)");
+  expect(explicitDark.markColor).toBe("rgb(225, 194, 127)");
   expect(systemDark).toEqual(explicitDark);
   expect(light.highlightBackground).not.toBe("rgba(0, 0, 0, 0)");
   expect(explicitDark.quoteBackground).not.toBe(light.quoteBackground);
@@ -394,13 +393,13 @@ test("keeps workspace section labels on a theme-aware semantic foreground", asyn
   await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
   await page.goto("/");
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "light";
+    document.documentElement.dataset.theme = "porcelain";
   });
   await mountSectionFixture();
   const light = await readSectionTheme();
 
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = "ink";
   });
   const explicitDark = await readSectionTheme();
 
@@ -409,11 +408,11 @@ test("keeps workspace section labels on a theme-aware semantic foreground", asyn
   await mountSectionFixture();
   const forcedColors = await readSectionTheme();
 
-  expect(light.token).toBe("#9a9285");
-  expect(light.workspaceColor).toBe("rgb(154, 146, 133)");
+  expect(light.token).toBe("#566273");
+  expect(light.workspaceColor).toBe("rgb(86, 98, 115)");
   expect(light.relatedColor).toBe(light.workspaceColor);
-  expect(explicitDark.token).toBe("#a3aaa3");
-  expect(explicitDark.workspaceColor).toBe("rgb(163, 170, 163)");
+  expect(explicitDark.token).toBe("#c0c5c2");
+  expect(explicitDark.workspaceColor).toBe("rgb(192, 197, 194)");
   expect(explicitDark.relatedColor).toBe(explicitDark.workspaceColor);
   expect(forcedColors.token).toBe("CanvasText");
   expect(forcedColors.workspaceColor).not.toBe(light.workspaceColor);
@@ -473,13 +472,13 @@ test("keeps document preview canvases legible across theme modes", async ({ page
   await page.emulateMedia({ colorScheme: "light", forcedColors: "none" });
   await page.goto("/");
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "light";
+    document.documentElement.dataset.theme = "porcelain";
   });
   await mountPreviewFixture();
   const light = await readPreviewStyles();
 
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = "ink";
   });
   const explicitDark = await readPreviewStyles();
 
@@ -500,11 +499,11 @@ test("keeps document preview canvases legible across theme modes", async ({ page
   expect(light.canvasBackground).toContain("rgb(226, 222, 214)");
 
   expect(explicitDark.tokens).toEqual({
-    surface: "#222826",
-    checkerLight: "#323a37",
-    checkerDark: "#252c2a",
+    surface: "#172231",
+    checkerLight: "#263448",
+    checkerDark: "#202d3e",
   });
-  expect(explicitDark.pdfBackground).toBe("rgb(34, 40, 38)");
+  expect(explicitDark.pdfBackground).toBe("rgb(23, 34, 49)");
   expect(explicitDark.imageBackground).toBe(explicitDark.pdfBackground);
   expect(explicitDark.canvasBackground).not.toContain("rgb(235, 232, 225)");
   expect(explicitDark.canvasBackground).not.toContain("rgb(226, 222, 214)");

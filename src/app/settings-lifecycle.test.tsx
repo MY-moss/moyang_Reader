@@ -67,7 +67,7 @@ describe("settings lifecycle", () => {
     const snapshot = createAppSettingsSnapshot(
       {
         preferences: { ...defaultReaderPreferences, readingScale: "small" },
-        theme: "dark",
+        theme: "ink",
         locale: "en-US",
         sidebarCollapsed: true,
         rightPanelOpen: false,
@@ -81,7 +81,7 @@ describe("settings lifecycle", () => {
     const { container, root } = renderHarness();
     const output = container.querySelector("output")!;
 
-    expect(output.dataset.theme).toBe("dark");
+    expect(output.dataset.theme).toBe("ink");
     expect(output.dataset.locale).toBe("en-US");
     expect(output.dataset.scale).toBe("small");
     expect(output.dataset.sidebarCollapsed).toBe("true");
@@ -100,7 +100,7 @@ describe("settings lifecycle", () => {
     const nativeSnapshot = createAppSettingsSnapshot(
       {
         preferences: { ...defaultReaderPreferences, readingScale: "large" },
-        theme: "light",
+        theme: "porcelain",
         locale: "zh-CN",
         sidebarCollapsed: true,
         rightPanelOpen: true,
@@ -119,7 +119,7 @@ describe("settings lifecycle", () => {
 
     const output = container.querySelector("output")!;
     expect(readNative).toHaveBeenCalledOnce();
-    expect(output.dataset.theme).toBe("light");
+    expect(output.dataset.theme).toBe("porcelain");
     expect(output.dataset.locale).toBe("zh-CN");
     expect(output.dataset.scale).toBe("large");
     expect(output.dataset.sidebarCollapsed).toBe("true");

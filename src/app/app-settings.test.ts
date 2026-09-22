@@ -12,7 +12,7 @@ import { defaultReaderPreferences } from "./preferences";
 
 const input = {
   preferences: { ...defaultReaderPreferences, readingScale: "large" as const },
-  theme: "dark" as const,
+  theme: "ink" as const,
   locale: "en-US" as const,
   sidebarCollapsed: true,
   rightPanelOpen: false,
@@ -33,6 +33,19 @@ describe("consolidated app settings", () => {
     const snapshot = createAppSettingsSnapshot({ ...input, activeContextTab: "bookmarks" }, 123);
 
     expect(parseAppSettings(serializeAppSettings(snapshot))?.activeContextTab).toBe("bookmarks");
+  });
+
+  it("migrates legacy light and dark themes without changing the settings schema", () => {
+    const legacy = (theme: "light" | "dark") =>
+      parseAppSettings(
+        JSON.stringify({
+          ...createAppSettingsSnapshot(input, 123),
+          theme,
+        }),
+      )?.theme;
+
+    expect(legacy("light")).toBe("porcelain");
+    expect(legacy("dark")).toBe("ink");
   });
 
   it("uses safe defaults for unsupported values", () => {

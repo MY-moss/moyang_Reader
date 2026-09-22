@@ -27,6 +27,10 @@ export type MessageKey =
   | "action.theme.system"
   | "action.theme.light"
   | "action.theme.dark"
+  | "action.theme.porcelain"
+  | "action.theme.paper"
+  | "action.theme.ink"
+  | "action.readingAppearance"
   | "action.more"
   | "action.moreTools"
   | "action.primaryTools"
@@ -51,6 +55,15 @@ export type MessageKey =
   | "settings.width.narrow"
   | "settings.width.standard"
   | "settings.width.wide"
+  | "settings.theme"
+  | "settings.typeface"
+  | "settings.typeface.system"
+  | "settings.typeface.serif"
+  | "settings.typeface.sans"
+  | "settings.lineSpacing"
+  | "settings.lineSpacing.compact"
+  | "settings.lineSpacing.comfortable"
+  | "settings.lineSpacing.relaxed"
   | "settings.export"
   | "settings.paper"
   | "settings.orientation"
@@ -110,6 +123,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.system": "系统",
     "action.theme.light": "浅色",
     "action.theme.dark": "深色",
+    "action.theme.porcelain": "瓷白",
+    "action.theme.paper": "纸色",
+    "action.theme.ink": "墨黑",
+    "action.readingAppearance": "阅读外观",
     "action.more": "更多",
     "action.moreTools": "更多文档工具",
     "action.primaryTools": "文档主要操作",
@@ -134,6 +151,15 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.width.narrow": "窄",
     "settings.width.standard": "标准",
     "settings.width.wide": "宽",
+    "settings.theme": "界面主题",
+    "settings.typeface": "正文字体",
+    "settings.typeface.system": "跟随系统",
+    "settings.typeface.serif": "衬线",
+    "settings.typeface.sans": "无衬线",
+    "settings.lineSpacing": "正文行距",
+    "settings.lineSpacing.compact": "紧凑",
+    "settings.lineSpacing.comfortable": "舒适",
+    "settings.lineSpacing.relaxed": "宽松",
     "settings.export": "导出排版",
     "settings.paper": "导出纸张",
     "settings.orientation": "导出方向",
@@ -192,6 +218,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.theme.system": "System",
     "action.theme.light": "Light",
     "action.theme.dark": "Dark",
+    "action.theme.porcelain": "Porcelain",
+    "action.theme.paper": "Paper",
+    "action.theme.ink": "Ink",
+    "action.readingAppearance": "Reading appearance",
     "action.more": "More",
     "action.moreTools": "More document tools",
     "action.primaryTools": "Primary document actions",
@@ -216,6 +246,15 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.width.narrow": "Narrow",
     "settings.width.standard": "Standard",
     "settings.width.wide": "Wide",
+    "settings.theme": "Interface theme",
+    "settings.typeface": "Reading typeface",
+    "settings.typeface.system": "System",
+    "settings.typeface.serif": "Serif",
+    "settings.typeface.sans": "Sans serif",
+    "settings.lineSpacing": "Line spacing",
+    "settings.lineSpacing.compact": "Compact",
+    "settings.lineSpacing.comfortable": "Comfortable",
+    "settings.lineSpacing.relaxed": "Relaxed",
     "settings.export": "Export layout",
     "settings.paper": "Paper",
     "settings.orientation": "Orientation",
