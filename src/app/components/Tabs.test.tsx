@@ -22,6 +22,7 @@ function mountTabs() {
     root.render(
       <Tabs
         tabs={tabs}
+        locale="zh-CN"
         activePath="C:/one.md"
         externallyModified={false}
         onShowExternalChange={vi.fn()}

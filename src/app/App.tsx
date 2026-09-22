@@ -41,6 +41,7 @@ import { QuickOpenPalette } from "./components/QuickOpenPalette";
 import { ReaderContextMenu, type ReaderContextTarget } from "./components/ReaderContextMenu";
 import { RelationGraph } from "./components/RelationGraph";
 import { SourceEditor, type SourceEditorPasteContext } from "./components/SourceEditor";
+import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { TopBar } from "./components/TopBar";
 import { WorkspacePanel } from "./components/WorkspacePanel";
@@ -5099,6 +5100,7 @@ export function App() {
       <div className="navigation-strip">
         <Tabs
           tabs={openTabs}
+          locale={locale}
           activePath={documentState?.path ?? null}
           externallyModified={documentState?.externallyModified ?? false}
           onShowExternalChange={() => {
@@ -5432,28 +5434,17 @@ export function App() {
         )}
       </div>
 
-      <footer className="statusbar">
-        <span>{documentState?.path ?? "等待打开文件"}</span>
-        {documentState && (
-          <span>
-            {documentState.kind === "pdf"
-              ? "PDF"
-              : documentState.kind === "image"
-                ? "图片"
-                : `${documentState.rendered.wordCount.toLocaleString("zh-CN")} 字符`}
-          </span>
-        )}
-        {documentState?.externallyModified && (
-          <button
-            type="button"
-            className="statusbar-external-change"
-            onClick={() => markExternalChange(documentState.path)}
-          >
-            外部修改待处理
-          </button>
-        )}
-        <span>{currentVersion ? "v" + currentVersion : "Moyang Reader"}</span>
-      </footer>
+      <StatusBar
+        locale={locale}
+        documentPath={documentState?.path ?? null}
+        documentKind={documentState?.kind ?? null}
+        characterCount={documentState?.rendered.wordCount ?? null}
+        externallyModified={documentState?.externallyModified ?? false}
+        currentVersion={currentVersion}
+        onShowExternalChange={() => {
+          if (documentState?.path) markExternalChange(documentState.path);
+        }}
+      />
 
       <input
         ref={inputRef}
