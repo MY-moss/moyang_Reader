@@ -20,7 +20,7 @@ test("keeps topbar primary actions ordered and labelled at Windows widths", asyn
 
     const toolbar = page.getByRole("navigation", { name: "文档主要操作" });
     const visibleLabels = await toolbar
-      .locator(":scope > button:visible")
+      .locator(":scope > .toolbar-group > button:visible")
       .evaluateAll((buttons) =>
         buttons.map((button) => button.getAttribute("aria-label") ?? button.textContent?.replace(/\s+/g, " ").trim()),
       );
@@ -89,7 +89,11 @@ test("keeps primary topbar controls inside the viewport at Windows DPI scales", 
         const geometry = await page.evaluate(() => {
           const toolbar = document.querySelector<HTMLElement>(".toolbar");
           const toolbarRect = toolbar?.getBoundingClientRect();
-          const controls = Array.from(document.querySelectorAll<HTMLElement>(".toolbar > button, .toolbar > details"))
+          const controls = Array.from(
+            document.querySelectorAll<HTMLElement>(
+              ".toolbar > .toolbar-group > button, .toolbar > .toolbar-group > details",
+            ),
+          )
             .filter((element) => getComputedStyle(element).display !== "none")
             .map((element) => {
               const rect = element.getBoundingClientRect();

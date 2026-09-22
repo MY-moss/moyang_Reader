@@ -346,8 +346,8 @@ test("keeps core actions visible and secondary actions in More at Windows widths
 
     const toolbar = page.locator(".toolbar");
     await expect(toolbar.locator(".toolbar-overflow-trigger")).toBeVisible();
-    await expect(toolbar.locator(":scope > .toolbar-optional")).toHaveCount(3);
-    await expect(toolbar.locator(":scope > .toolbar-optional").first()).toBeHidden();
+    await expect(toolbar.locator(":scope > .toolbar-group > .toolbar-optional")).toHaveCount(3);
+    await expect(toolbar.locator(":scope > .toolbar-group > .toolbar-optional").first()).toBeHidden();
 
     const metrics = await page.evaluate(() => ({
       viewportWidth: document.documentElement.clientWidth,

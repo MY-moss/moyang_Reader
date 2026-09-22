@@ -330,597 +330,605 @@ export function TopBar({
       </div>
 
       <nav className="toolbar" aria-label={t("action.primaryTools")}>
-        <button
-          type="button"
-          className="toolbar-button"
-          onClick={() => {
-            dismissTopbarOverlays();
-            onOpen();
-          }}
-          title={`打开文件 (${CORE_SHORTCUTS.open.title})`}
-        >
-          <Icon name="folder-open" size={15} />
-          <span className="toolbar-button-label">{t("action.open")}</span>
-        </button>
-        {sidebarCollapsed && (
+        <div className="toolbar-group toolbar-group-open" role="group" aria-label={t("action.openTools")}>
           <button
             type="button"
             className="toolbar-button"
             onClick={() => {
               dismissTopbarOverlays();
-              onAddWorkspace();
+              onOpen();
             }}
-            disabled={workspaceLimitReached}
-            title={
-              workspaceLimitReached
-                ? "已达到阅读库上限，请先移除一个已挂载阅读库"
-                : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (${CORE_SHORTCUTS.workspace.title})`
-            }
+            title={`打开文件 (${CORE_SHORTCUTS.open.title})`}
           >
-            <Icon name="folder-plus" size={15} />
-            <span className="toolbar-button-label">{workspaceOpen ? "添加阅读库" : t("action.folder")}</span>
+            <Icon name="folder-open" size={15} />
+            <span className="toolbar-button-label">{t("action.open")}</span>
           </button>
-        )}
-        <button
-          type="button"
-          className="toolbar-button toolbar-optional"
-          onClick={(event) => {
-            dismissTopbarOverlays();
-            onQuickOpen(event.currentTarget);
-          }}
-          aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
-          title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
-        >
-          <Icon name="search" size={15} />
-          <span className="toolbar-button-label">{t("action.quickOpen")}</span>
-        </button>
-        {fileName && canEdit && (
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => {
+                dismissTopbarOverlays();
+                onAddWorkspace();
+              }}
+              disabled={workspaceLimitReached}
+              title={
+                workspaceLimitReached
+                  ? "已达到阅读库上限，请先移除一个已挂载阅读库"
+                  : `${workspaceOpen ? "添加阅读库" : "添加整个文件夹"} (${CORE_SHORTCUTS.workspace.title})`
+              }
+            >
+              <Icon name="folder-plus" size={15} />
+              <span className="toolbar-button-label">{workspaceOpen ? "添加阅读库" : t("action.folder")}</span>
+            </button>
+          )}
           <button
             type="button"
-            className="toolbar-button editor-mode-button toolbar-optional"
+            className="toolbar-button toolbar-optional"
+            onClick={(event) => {
+              dismissTopbarOverlays();
+              onQuickOpen(event.currentTarget);
+            }}
+            aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
+            title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
+          >
+            <Icon name="search" size={15} />
+            <span className="toolbar-button-label">{t("action.quickOpen")}</span>
+          </button>
+        </div>
+        <div className="toolbar-group toolbar-group-reading" role="group" aria-label={t("action.readingTools")}>
+          {fileName && canEdit && (
+            <button
+              type="button"
+              className="toolbar-button editor-mode-button toolbar-optional"
+              onClick={() => {
+                dismissTopbarOverlays();
+                onToggleMode();
+              }}
+              aria-pressed={mode !== "rendered"}
+              aria-label={mode === "rendered" ? "直接进入编辑模式" : "直接返回阅读模式"}
+              aria-keyshortcuts={CORE_SHORTCUTS.toggleMode.aria}
+              title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (${CORE_SHORTCUTS.toggleMode.title})`}
+            >
+              <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
+              <span className="toolbar-button-label">{mode === "rendered" ? t("action.edit") : t("action.read")}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className={`toolbar-button save-button${modified ? " primary" : ""}`}
             onClick={() => {
               dismissTopbarOverlays();
-              onToggleMode();
+              onSave();
             }}
-            aria-pressed={mode !== "rendered"}
-            aria-label={mode === "rendered" ? "直接进入编辑模式" : "直接返回阅读模式"}
-            aria-keyshortcuts={CORE_SHORTCUTS.toggleMode.aria}
-            title={`${mode === "rendered" ? "进入编辑模式" : "返回阅读模式"} (${CORE_SHORTCUTS.toggleMode.title})`}
+            disabled={!modified}
+            aria-keyshortcuts={CORE_SHORTCUTS.save.aria}
+            aria-label={t("action.saveDocument")}
+            title={`${t("action.saveDocument")} (${CORE_SHORTCUTS.save.title})`}
           >
-            <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
-            <span className="toolbar-button-label">{mode === "rendered" ? t("action.edit") : t("action.read")}</span>
+            <Icon name="save" size={15} />
+            <span className="toolbar-button-label">{t("action.save")}</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={`toolbar-button save-button${modified ? " primary" : ""}`}
-          onClick={() => {
-            dismissTopbarOverlays();
-            onSave();
-          }}
-          disabled={!modified}
-          aria-keyshortcuts={CORE_SHORTCUTS.save.aria}
-          aria-label={t("action.saveDocument")}
-          title={`${t("action.saveDocument")} (${CORE_SHORTCUTS.save.title})`}
-        >
-          <Icon name="save" size={15} />
-          <span className="toolbar-button-label">{t("action.save")}</span>
-        </button>
-        {draftCount > 0 && (
+          {draftCount > 0 && (
+            <button
+              type="button"
+              className="toolbar-button recovery-button toolbar-optional"
+              onClick={onOpenRecovery}
+              title="查看未保存草稿"
+            >
+              <Icon name="history" size={15} />
+              <span className="toolbar-button-label">
+                {t("action.drafts")} {draftCount}
+              </span>
+            </button>
+          )}
+        </div>
+        <div className="toolbar-group toolbar-group-view" role="group" aria-label={t("action.viewTools")}>
           <button
             type="button"
-            className="toolbar-button recovery-button toolbar-optional"
-            onClick={onOpenRecovery}
-            title="查看未保存草稿"
+            className="toolbar-button sidebar-toggle"
+            onClick={onToggleSidebar}
+            aria-pressed={sidebarCollapsed}
+            aria-keyshortcuts={CORE_SHORTCUTS.toggleSidebar.aria}
+            title={
+              sidebarCollapsed
+                ? `显示侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
+                : `隐藏侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
+            }
           >
-            <Icon name="history" size={15} />
+            <Icon name="panel-left" size={15} />
             <span className="toolbar-button-label">
-              {t("action.drafts")} {draftCount}
+              {sidebarCollapsed ? t("action.showSidebar") : t("action.hideSidebar")}
             </span>
           </button>
-        )}
-        <button
-          type="button"
-          className="toolbar-button sidebar-toggle"
-          onClick={onToggleSidebar}
-          aria-pressed={sidebarCollapsed}
-          aria-keyshortcuts={CORE_SHORTCUTS.toggleSidebar.aria}
-          title={
-            sidebarCollapsed
-              ? `显示侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
-              : `隐藏侧栏 (${CORE_SHORTCUTS.toggleSidebar.title})`
-          }
-        >
-          <Icon name="panel-left" size={15} />
-          <span className="toolbar-button-label">
-            {sidebarCollapsed ? t("action.showSidebar") : t("action.hideSidebar")}
-          </span>
-        </button>
-        <button
-          ref={contextToggleRef}
-          type="button"
-          className="toolbar-button context-toggle"
-          onClick={(event) => onToggleRightPanel(event.currentTarget)}
-          aria-pressed={rightPanelOpen}
-          aria-keyshortcuts={CORE_SHORTCUTS.toggleContext.aria}
-          title={
-            rightPanelOpen
-              ? `隐藏上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
-              : `显示上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
-          }
-        >
-          <Icon name="panel-right" size={15} />
-          <span className="toolbar-button-label">
-            {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="toolbar-button focus-button toolbar-optional"
-          onClick={onToggleFocusMode}
-          disabled={!fileName}
-          title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
-        >
-          <Icon name="maximize" size={15} />
-          <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
-        </button>
-        <details ref={readingMenuRef} className="reading-controls-menu">
-          <summary className="toolbar-button" title={t("action.readingAppearance")}>
-            <Icon name="book-open" size={15} />
-            <span className="toolbar-button-label">{t("action.readingAppearance")}</span>
-          </summary>
-          <div className="reading-controls-panel">
-            <div className="reading-controls-heading">
-              <strong>{t("action.readingAppearance")}</strong>
-              <span>{readingZoom}%</span>
-            </div>
-            <div className="theme-choice-grid" role="group" aria-label={t("settings.theme")}>
-              {(["porcelain", "paper", "ink"] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`theme-choice theme-choice-${option}`}
-                  aria-pressed={theme === option}
-                  onClick={() => onThemeChange(option)}
-                >
-                  <span className="theme-choice-swatch" aria-hidden="true" />
-                  <span>{t(`action.theme.${option}`)}</span>
-                </button>
-              ))}
-            </div>
-            <div className="reading-zoom-controls" role="group" aria-label={t("settings.fontSize")}>
-              <button type="button" onClick={() => onReadingZoomChange(Math.max(75, readingZoom - 5))}>
-                −
-              </button>
-              <button type="button" onClick={() => onReadingZoomChange(100)}>
-                100%
-              </button>
-              <button type="button" onClick={() => onReadingZoomChange(Math.min(150, readingZoom + 5))}>
-                +
-              </button>
-            </div>
-            <label className="settings-select-option">
-              <span>{t("settings.width")}</span>
-              <select
-                value={readingWidth}
-                onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
-              >
-                <option value="narrow">{t("settings.width.narrow")}</option>
-                <option value="standard">{t("settings.width.standard")}</option>
-                <option value="wide">{t("settings.width.wide")}</option>
-              </select>
-            </label>
-            <label className="settings-select-option">
-              <span>{t("settings.typeface")}</span>
-              <select
-                value={readingTypeface}
-                onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
-              >
-                <option value="system">{t("settings.typeface.system")}</option>
-                <option value="serif">{t("settings.typeface.serif")}</option>
-                <option value="sans">{t("settings.typeface.sans")}</option>
-              </select>
-            </label>
-            <label className="settings-select-option">
-              <span>{t("settings.lineSpacing")}</span>
-              <select
-                value={readingLineSpacing}
-                onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
-              >
-                <option value="compact">{t("settings.lineSpacing.compact")}</option>
-                <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
-                <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
-              </select>
-            </label>
-          </div>
-        </details>
-        <button
-          ref={searchButtonRef}
-          type="button"
-          className="toolbar-button"
-          onClick={(event) => toggleSearch(event.currentTarget)}
-          aria-keyshortcuts={CORE_SHORTCUTS.documentSearch.aria}
-          title={`文内查找当前文档 (${CORE_SHORTCUTS.documentSearch.title})`}
-        >
-          <Icon name="search" size={15} />
-          <span className="toolbar-button-label">{t("action.search")}</span>
-        </button>
-        <details ref={moreMenuRef} className="toolbar-overflow" onToggle={closeNestedMenusWhenClosed}>
-          <summary className="toolbar-button toolbar-overflow-trigger" title={t("action.moreTools")}>
-            <Icon name="more-horizontal" size={16} />
-            <span className="toolbar-button-label">{t("action.more")}</span>
-          </summary>
-          <div className="toolbar-overflow-panel">
-            <div className="toolbar-overflow-group">
-              <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
-              <div className="toolbar-overflow-actions">
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={onOpenCommandPalette}
-                  aria-keyshortcuts={CORE_SHORTCUTS.commandPalette.aria}
-                  title={`打开命令面板 (${CORE_SHORTCUTS.commandPalette.title})`}
-                >
-                  <Icon name="command" size={15} />
-                  <span className="toolbar-button-label">{t("action.commands")}</span>
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={(event) => {
-                    dismissTopbarOverlays();
-                    onQuickOpen(event.currentTarget);
-                  }}
-                  aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
-                  title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
-                >
-                  <Icon name="search" size={15} />
-                  <span className="toolbar-button-label">{t("action.quickOpen")}</span>
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={() => {
-                    dismissTopbarOverlays();
-                    onCycleMode();
-                  }}
-                  disabled={!fileName || !canEdit}
-                >
-                  <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
-                  <span className="toolbar-button-label">
-                    {mode === "rendered"
-                      ? documentKind === "markdown"
-                        ? t("action.edit")
-                        : t("action.source")
-                      : mode === "wysiwyg"
-                        ? t("action.source")
-                        : t("action.read")}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={onCopy}
-                  disabled={!canCopy}
-                  title="复制当前文档内容"
-                >
-                  <Icon name="copy" size={15} />
-                  <span className="toolbar-button-label">{copyFeedback ? t("action.copied") : t("action.copy")}</span>
-                </button>
-                {draftCount > 0 && (
-                  <button type="button" className="toolbar-button recovery-button" onClick={onOpenRecovery}>
-                    <Icon name="history" size={15} />
-                    <span className="toolbar-button-label">
-                      {t("action.drafts")} {draftCount}
-                    </span>
+          <button
+            ref={contextToggleRef}
+            type="button"
+            className="toolbar-button context-toggle"
+            onClick={(event) => onToggleRightPanel(event.currentTarget)}
+            aria-pressed={rightPanelOpen}
+            aria-keyshortcuts={CORE_SHORTCUTS.toggleContext.aria}
+            title={
+              rightPanelOpen
+                ? `隐藏上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
+                : `显示上下文面板 (${CORE_SHORTCUTS.toggleContext.title})`
+            }
+          >
+            <Icon name="panel-right" size={15} />
+            <span className="toolbar-button-label">
+              {rightPanelOpen ? t("action.hideContext") : t("action.showContext")}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="toolbar-button focus-button toolbar-optional"
+            onClick={onToggleFocusMode}
+            disabled={!fileName}
+            title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
+          >
+            <Icon name="maximize" size={15} />
+            <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
+          </button>
+          <details ref={readingMenuRef} className="reading-controls-menu">
+            <summary className="toolbar-button" title={t("action.readingAppearance")}>
+              <Icon name="book-open" size={15} />
+              <span className="toolbar-button-label">{t("action.readingAppearance")}</span>
+            </summary>
+            <div className="reading-controls-panel">
+              <div className="reading-controls-heading">
+                <strong>{t("action.readingAppearance")}</strong>
+                <span>{readingZoom}%</span>
+              </div>
+              <div className="theme-choice-grid" role="group" aria-label={t("settings.theme")}>
+                {(["porcelain", "paper", "ink"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`theme-choice theme-choice-${option}`}
+                    aria-pressed={theme === option}
+                    onClick={() => onThemeChange(option)}
+                  >
+                    <span className="theme-choice-swatch" aria-hidden="true" />
+                    <span>{t(`action.theme.${option}`)}</span>
                   </button>
-                )}
-                {previousVersionAvailable && (
+                ))}
+              </div>
+              <div className="reading-zoom-controls" role="group" aria-label={t("settings.fontSize")}>
+                <button type="button" onClick={() => onReadingZoomChange(Math.max(75, readingZoom - 5))}>
+                  −
+                </button>
+                <button type="button" onClick={() => onReadingZoomChange(100)}>
+                  100%
+                </button>
+                <button type="button" onClick={() => onReadingZoomChange(Math.min(150, readingZoom + 5))}>
+                  +
+                </button>
+              </div>
+              <label className="settings-select-option">
+                <span>{t("settings.width")}</span>
+                <select
+                  value={readingWidth}
+                  onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+                >
+                  <option value="narrow">{t("settings.width.narrow")}</option>
+                  <option value="standard">{t("settings.width.standard")}</option>
+                  <option value="wide">{t("settings.width.wide")}</option>
+                </select>
+              </label>
+              <label className="settings-select-option">
+                <span>{t("settings.typeface")}</span>
+                <select
+                  value={readingTypeface}
+                  onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
+                >
+                  <option value="system">{t("settings.typeface.system")}</option>
+                  <option value="serif">{t("settings.typeface.serif")}</option>
+                  <option value="sans">{t("settings.typeface.sans")}</option>
+                </select>
+              </label>
+              <label className="settings-select-option">
+                <span>{t("settings.lineSpacing")}</span>
+                <select
+                  value={readingLineSpacing}
+                  onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
+                >
+                  <option value="compact">{t("settings.lineSpacing.compact")}</option>
+                  <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
+                  <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
+                </select>
+              </label>
+            </div>
+          </details>
+          <button
+            ref={searchButtonRef}
+            type="button"
+            className="toolbar-button"
+            onClick={(event) => toggleSearch(event.currentTarget)}
+            aria-keyshortcuts={CORE_SHORTCUTS.documentSearch.aria}
+            title={`文内查找当前文档 (${CORE_SHORTCUTS.documentSearch.title})`}
+          >
+            <Icon name="search" size={15} />
+            <span className="toolbar-button-label">{t("action.search")}</span>
+          </button>
+          <details ref={moreMenuRef} className="toolbar-overflow" onToggle={closeNestedMenusWhenClosed}>
+            <summary className="toolbar-button toolbar-overflow-trigger" title={t("action.moreTools")}>
+              <Icon name="more-horizontal" size={16} />
+              <span className="toolbar-button-label">{t("action.more")}</span>
+            </summary>
+            <div className="toolbar-overflow-panel">
+              <div className="toolbar-overflow-group">
+                <div className="toolbar-overflow-label">{t("action.documentTools")}</div>
+                <div className="toolbar-overflow-actions">
                   <button
                     type="button"
-                    className="toolbar-button recovery-button"
+                    className="toolbar-button"
+                    onClick={onOpenCommandPalette}
+                    aria-keyshortcuts={CORE_SHORTCUTS.commandPalette.aria}
+                    title={`打开命令面板 (${CORE_SHORTCUTS.commandPalette.title})`}
+                  >
+                    <Icon name="command" size={15} />
+                    <span className="toolbar-button-label">{t("action.commands")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    onClick={(event) => {
+                      dismissTopbarOverlays();
+                      onQuickOpen(event.currentTarget);
+                    }}
+                    aria-keyshortcuts={CORE_SHORTCUTS.quickOpen.aria}
+                    title={`快速打开文件 (${CORE_SHORTCUTS.quickOpen.title})`}
+                  >
+                    <Icon name="search" size={15} />
+                    <span className="toolbar-button-label">{t("action.quickOpen")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
                     onClick={() => {
                       dismissTopbarOverlays();
-                      onOpenPreviousVersion();
+                      onCycleMode();
                     }}
-                    title="查看并恢复上一保存版本"
+                    disabled={!fileName || !canEdit}
                   >
-                    <Icon name="history" size={15} />
-                    <span className="toolbar-button-label">恢复上一版</span>
+                    <Icon name={mode === "rendered" ? "edit" : "book-open"} size={15} />
+                    <span className="toolbar-button-label">
+                      {mode === "rendered"
+                        ? documentKind === "markdown"
+                          ? t("action.edit")
+                          : t("action.source")
+                        : mode === "wysiwyg"
+                          ? t("action.source")
+                          : t("action.read")}
+                    </span>
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="toolbar-button focus-button"
-                  onClick={() => {
-                    dismissTopbarOverlays();
-                    onToggleFocusMode();
-                  }}
-                  disabled={!fileName}
-                  title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
-                >
-                  <Icon name="maximize" size={15} />
-                  <span className="toolbar-button-label">{focusMode ? t("action.exitFocus") : t("action.focus")}</span>
-                </button>
-              </div>
-            </div>
-            <div className="toolbar-overflow-group">
-              <div className="toolbar-overflow-label">{t("action.appearance")}</div>
-              <div className="toolbar-overflow-actions">
-                <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
-                  <Icon name="sun" size={15} />
-                  <span className="toolbar-button-label">{themeLabel}</span>
-                </button>
-                <button
-                  type="button"
-                  className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
-                  onClick={() => {
-                    dismissTopbarOverlays();
-                    onCheckUpdates();
-                  }}
-                  disabled={updateStatus === "checking"}
-                  title={updateTitle}
-                >
-                  <Icon name="refresh-cw" size={15} />
-                  <span className="toolbar-button-label">{updateLabel}</span>
-                </button>
-              </div>
-            </div>
-            <div className="toolbar-overflow-group toolbar-overflow-settings">
-              <details
-                ref={settingsMenuRef}
-                className="settings-menu"
-                onClick={() => {
-                  closeSearchIfOpen();
-                  exportMenuRef.current?.removeAttribute("open");
-                }}
-              >
-                <summary className="toolbar-button" title="隐私与更新设置">
-                  <Icon name="settings" size={15} />
-                  <span className="toolbar-button-label">{t("settings.title")}</span>
-                </summary>
-                <div className="settings-menu-panel">
-                  <div className="settings-menu-title">{t("settings.localFirst")}</div>
-                  <div
-                    className={`settings-persistence-status settings-persistence-${settingsPersistenceStatus}`}
-                    role="status"
-                    aria-live="polite"
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    onClick={onCopy}
+                    disabled={!canCopy}
+                    title="复制当前文档内容"
                   >
-                    <span className="settings-persistence-dot" aria-hidden="true" />
-                    <span>{settingsStatusLabel}</span>
-                  </div>
-                  <button type="button" className="settings-guide-button" onClick={onOpenGuide}>
-                    <span>使用教程</span>
-                    <span aria-hidden="true">↗</span>
+                    <Icon name="copy" size={15} />
+                    <span className="toolbar-button-label">{copyFeedback ? t("action.copied") : t("action.copy")}</span>
                   </button>
-                  <label className="settings-select-option">
-                    <span>{t("settings.language")}</span>
-                    <select
-                      aria-label={t("settings.language")}
-                      value={locale}
-                      onChange={(event) => onLocaleChange(event.target.value as Locale)}
-                    >
-                      <option value="zh-CN">{t("settings.language.zh")}</option>
-                      <option value="en-US">{t("settings.language.en")}</option>
-                    </select>
-                  </label>
-                  <label className="settings-option">
-                    <input
-                      type="checkbox"
-                      checked={allowRemoteResources}
-                      onChange={(event) => onAllowRemoteResourcesChange(event.target.checked)}
-                    />
-                    <span>
-                      <strong>{t("settings.allowRemoteImages")}</strong>
-                      <small>{t("settings.remoteImagesNote")}</small>
-                    </span>
-                  </label>
-                  <label className="settings-option">
-                    <input
-                      type="checkbox"
-                      checked={startupUpdateCheck}
-                      onChange={(event) => onStartupUpdateCheckChange(event.target.checked)}
-                    />
-                    <span>
-                      <strong>{t("settings.startupUpdates")}</strong>
-                      <small>{t("settings.startupUpdatesNote")}</small>
-                    </span>
-                  </label>
-                  <label className="settings-option">
-                    <input
-                      type="checkbox"
-                      checked={annotationEnabled}
-                      onChange={(event) => onAnnotationEnabledChange(event.target.checked)}
-                    />
-                    <span>
-                      <strong>{t("settings.annotations")}</strong>
-                      <small>{t("settings.annotationsNote")}</small>
-                    </span>
-                  </label>
-                  <div className="settings-divider">{t("settings.reading")}</div>
-                  <label className="settings-select-option">
-                    <span>{t("settings.theme")}</span>
-                    <select
-                      aria-label={t("settings.theme")}
-                      value={theme}
-                      onChange={(event) => onThemeChange(event.target.value as ThemeMode)}
-                    >
-                      <option value="system">{t("action.theme.system")}</option>
-                      <option value="porcelain">{t("action.theme.porcelain")}</option>
-                      <option value="paper">{t("action.theme.paper")}</option>
-                      <option value="ink">{t("action.theme.ink")}</option>
-                    </select>
-                  </label>
-                  <div className="settings-range-option">
-                    <div className="settings-range-heading">
-                      <span>{t("settings.fontSize")}</span>
-                      <output aria-live="polite">{readingZoom}%</output>
-                    </div>
-                    <input
-                      aria-label="阅读缩放"
-                      type="range"
-                      min="75"
-                      max="150"
-                      step="5"
-                      value={readingZoom}
-                      onChange={(event) => onReadingZoomChange(Number(event.target.value))}
-                    />
-                    <div className="settings-range-footer">
-                      <small>{t("settings.zoomHint")}</small>
-                      <button type="button" className="quiet-button" onClick={() => onReadingZoomChange(100)}>
-                        {t("settings.zoomReset")}
-                      </button>
-                    </div>
-                  </div>
-                  <label className="settings-select-option">
-                    <span>{t("settings.width")}</span>
-                    <select
-                      aria-label="正文宽度"
-                      value={readingWidth}
-                      onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
-                    >
-                      <option value="narrow">{t("settings.width.narrow")}</option>
-                      <option value="standard">{t("settings.width.standard")}</option>
-                      <option value="wide">{t("settings.width.wide")}</option>
-                    </select>
-                  </label>
-                  <label className="settings-select-option">
-                    <span>{t("settings.typeface")}</span>
-                    <select
-                      aria-label={t("settings.typeface")}
-                      value={readingTypeface}
-                      onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
-                    >
-                      <option value="system">{t("settings.typeface.system")}</option>
-                      <option value="serif">{t("settings.typeface.serif")}</option>
-                      <option value="sans">{t("settings.typeface.sans")}</option>
-                    </select>
-                  </label>
-                  <label className="settings-select-option">
-                    <span>{t("settings.lineSpacing")}</span>
-                    <select
-                      aria-label={t("settings.lineSpacing")}
-                      value={readingLineSpacing}
-                      onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
-                    >
-                      <option value="compact">{t("settings.lineSpacing.compact")}</option>
-                      <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
-                      <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
-                    </select>
-                  </label>
-                  <div className="settings-divider">{t("settings.export")}</div>
-                  <label className="settings-select-option">
-                    <span>{t("settings.paper")}</span>
-                    <select
-                      aria-label="导出纸张"
-                      value={exportPaper}
-                      onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
-                    >
-                      <option value="a4">A4</option>
-                      <option value="letter">Letter</option>
-                    </select>
-                  </label>
-                  <label className="settings-select-option">
-                    <span>{t("settings.orientation")}</span>
-                    <select
-                      aria-label="导出方向"
-                      value={exportOrientation}
-                      onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
-                    >
-                      <option value="portrait">{t("settings.orientation.portrait")}</option>
-                      <option value="landscape">{t("settings.orientation.landscape")}</option>
-                    </select>
-                  </label>
-                  <label className="settings-select-option">
-                    <span>{t("settings.margin")}</span>
-                    <select
-                      aria-label="导出页边距"
-                      value={exportMargin}
-                      onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
-                    >
-                      <option value="compact">{t("settings.margin.compact")}</option>
-                      <option value="standard">{t("settings.margin.standard")}</option>
-                      <option value="wide">{t("settings.margin.wide")}</option>
-                    </select>
-                  </label>
-                  <small className="settings-note">{t("settings.exportNote")}</small>
-                  <div className="settings-divider">{t("settings.migration")}</div>
-                  <div className="settings-actions">
-                    <button type="button" className="quiet-button" onClick={onExportSettings}>
-                      {t("settings.exportSettings")}
+                  {draftCount > 0 && (
+                    <button type="button" className="toolbar-button recovery-button" onClick={onOpenRecovery}>
+                      <Icon name="history" size={15} />
+                      <span className="toolbar-button-label">
+                        {t("action.drafts")} {draftCount}
+                      </span>
                     </button>
-                    <button type="button" className="quiet-button" onClick={onImportSettings}>
-                      {t("settings.importSettings")}
+                  )}
+                  {previousVersionAvailable && (
+                    <button
+                      type="button"
+                      className="toolbar-button recovery-button"
+                      onClick={() => {
+                        dismissTopbarOverlays();
+                        onOpenPreviousVersion();
+                      }}
+                      title="查看并恢复上一保存版本"
+                    >
+                      <Icon name="history" size={15} />
+                      <span className="toolbar-button-label">恢复上一版</span>
                     </button>
-                  </div>
-                  <small className="settings-note">{t("settings.backupNote")}</small>
-                  <div className="settings-divider">{t("settings.diagnostics")}</div>
-                  <div className="settings-actions">
-                    <button type="button" className="quiet-button" onClick={onExportDiagnostics}>
-                      {t("settings.exportDiagnostics")}
-                    </button>
-                  </div>
-                  <small className="settings-note">{t("settings.diagnosticsNote")}</small>
+                  )}
+                  <button
+                    type="button"
+                    className="toolbar-button focus-button"
+                    onClick={() => {
+                      dismissTopbarOverlays();
+                      onToggleFocusMode();
+                    }}
+                    disabled={!fileName}
+                    title={focusMode ? "退出专注阅读 (Esc)" : `进入专注阅读 (${CORE_SHORTCUTS.focusMode.title})`}
+                  >
+                    <Icon name="maximize" size={15} />
+                    <span className="toolbar-button-label">
+                      {focusMode ? t("action.exitFocus") : t("action.focus")}
+                    </span>
+                  </button>
                 </div>
-              </details>
-            </div>
-            <div className="toolbar-overflow-group toolbar-overflow-settings">
-              <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
-                <Icon name="printer" size={15} />
-                <span className="toolbar-button-label">{exportLabel}</span>
-              </button>
-              {(canExportMarkdown || canExportHtml || canExportDocx) && (
+              </div>
+              <div className="toolbar-overflow-group">
+                <div className="toolbar-overflow-label">{t("action.appearance")}</div>
+                <div className="toolbar-overflow-actions">
+                  <button type="button" className="toolbar-button" onClick={onCycleTheme} title="切换阅读主题">
+                    <Icon name="sun" size={15} />
+                    <span className="toolbar-button-label">{themeLabel}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={"toolbar-button update-button" + (updateStatus === "available" ? " has-update" : "")}
+                    onClick={() => {
+                      dismissTopbarOverlays();
+                      onCheckUpdates();
+                    }}
+                    disabled={updateStatus === "checking"}
+                    title={updateTitle}
+                  >
+                    <Icon name="refresh-cw" size={15} />
+                    <span className="toolbar-button-label">{updateLabel}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="toolbar-overflow-group toolbar-overflow-settings">
                 <details
-                  ref={exportMenuRef}
-                  className="export-menu"
+                  ref={settingsMenuRef}
+                  className="settings-menu"
                   onClick={() => {
                     closeSearchIfOpen();
-                    settingsMenuRef.current?.removeAttribute("open");
+                    exportMenuRef.current?.removeAttribute("open");
                   }}
                 >
-                  <summary className="toolbar-button" title="导出文件">
-                    <Icon name="download" size={15} />
-                    <span className="toolbar-button-label">导出</span>
+                  <summary className="toolbar-button" title="隐私与更新设置">
+                    <Icon name="settings" size={15} />
+                    <span className="toolbar-button-label">{t("settings.title")}</span>
                   </summary>
-                  <div className="export-menu-panel">
-                    {canPreviewPrint && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          const menu = exportMenuRef.current;
-                          if (menu) {
-                            menu.open = false;
-                            menu.removeAttribute("open");
-                          }
-                          onPreviewPrint();
-                        }}
+                  <div className="settings-menu-panel">
+                    <div className="settings-menu-title">{t("settings.localFirst")}</div>
+                    <div
+                      className={`settings-persistence-status settings-persistence-${settingsPersistenceStatus}`}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="settings-persistence-dot" aria-hidden="true" />
+                      <span>{settingsStatusLabel}</span>
+                    </div>
+                    <button type="button" className="settings-guide-button" onClick={onOpenGuide}>
+                      <span>使用教程</span>
+                      <span aria-hidden="true">↗</span>
+                    </button>
+                    <label className="settings-select-option">
+                      <span>{t("settings.language")}</span>
+                      <select
+                        aria-label={t("settings.language")}
+                        value={locale}
+                        onChange={(event) => onLocaleChange(event.target.value as Locale)}
                       >
-                        预览打印版式
+                        <option value="zh-CN">{t("settings.language.zh")}</option>
+                        <option value="en-US">{t("settings.language.en")}</option>
+                      </select>
+                    </label>
+                    <label className="settings-option">
+                      <input
+                        type="checkbox"
+                        checked={allowRemoteResources}
+                        onChange={(event) => onAllowRemoteResourcesChange(event.target.checked)}
+                      />
+                      <span>
+                        <strong>{t("settings.allowRemoteImages")}</strong>
+                        <small>{t("settings.remoteImagesNote")}</small>
+                      </span>
+                    </label>
+                    <label className="settings-option">
+                      <input
+                        type="checkbox"
+                        checked={startupUpdateCheck}
+                        onChange={(event) => onStartupUpdateCheckChange(event.target.checked)}
+                      />
+                      <span>
+                        <strong>{t("settings.startupUpdates")}</strong>
+                        <small>{t("settings.startupUpdatesNote")}</small>
+                      </span>
+                    </label>
+                    <label className="settings-option">
+                      <input
+                        type="checkbox"
+                        checked={annotationEnabled}
+                        onChange={(event) => onAnnotationEnabledChange(event.target.checked)}
+                      />
+                      <span>
+                        <strong>{t("settings.annotations")}</strong>
+                        <small>{t("settings.annotationsNote")}</small>
+                      </span>
+                    </label>
+                    <div className="settings-divider">{t("settings.reading")}</div>
+                    <label className="settings-select-option">
+                      <span>{t("settings.theme")}</span>
+                      <select
+                        aria-label={t("settings.theme")}
+                        value={theme}
+                        onChange={(event) => onThemeChange(event.target.value as ThemeMode)}
+                      >
+                        <option value="system">{t("action.theme.system")}</option>
+                        <option value="porcelain">{t("action.theme.porcelain")}</option>
+                        <option value="paper">{t("action.theme.paper")}</option>
+                        <option value="ink">{t("action.theme.ink")}</option>
+                      </select>
+                    </label>
+                    <div className="settings-range-option">
+                      <div className="settings-range-heading">
+                        <span>{t("settings.fontSize")}</span>
+                        <output aria-live="polite">{readingZoom}%</output>
+                      </div>
+                      <input
+                        aria-label="阅读缩放"
+                        type="range"
+                        min="75"
+                        max="150"
+                        step="5"
+                        value={readingZoom}
+                        onChange={(event) => onReadingZoomChange(Number(event.target.value))}
+                      />
+                      <div className="settings-range-footer">
+                        <small>{t("settings.zoomHint")}</small>
+                        <button type="button" className="quiet-button" onClick={() => onReadingZoomChange(100)}>
+                          {t("settings.zoomReset")}
+                        </button>
+                      </div>
+                    </div>
+                    <label className="settings-select-option">
+                      <span>{t("settings.width")}</span>
+                      <select
+                        aria-label="正文宽度"
+                        value={readingWidth}
+                        onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
+                      >
+                        <option value="narrow">{t("settings.width.narrow")}</option>
+                        <option value="standard">{t("settings.width.standard")}</option>
+                        <option value="wide">{t("settings.width.wide")}</option>
+                      </select>
+                    </label>
+                    <label className="settings-select-option">
+                      <span>{t("settings.typeface")}</span>
+                      <select
+                        aria-label={t("settings.typeface")}
+                        value={readingTypeface}
+                        onChange={(event) => onReadingTypefaceChange(event.target.value as ReadingTypeface)}
+                      >
+                        <option value="system">{t("settings.typeface.system")}</option>
+                        <option value="serif">{t("settings.typeface.serif")}</option>
+                        <option value="sans">{t("settings.typeface.sans")}</option>
+                      </select>
+                    </label>
+                    <label className="settings-select-option">
+                      <span>{t("settings.lineSpacing")}</span>
+                      <select
+                        aria-label={t("settings.lineSpacing")}
+                        value={readingLineSpacing}
+                        onChange={(event) => onReadingLineSpacingChange(event.target.value as ReadingLineSpacing)}
+                      >
+                        <option value="compact">{t("settings.lineSpacing.compact")}</option>
+                        <option value="comfortable">{t("settings.lineSpacing.comfortable")}</option>
+                        <option value="relaxed">{t("settings.lineSpacing.relaxed")}</option>
+                      </select>
+                    </label>
+                    <div className="settings-divider">{t("settings.export")}</div>
+                    <label className="settings-select-option">
+                      <span>{t("settings.paper")}</span>
+                      <select
+                        aria-label="导出纸张"
+                        value={exportPaper}
+                        onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
+                      >
+                        <option value="a4">A4</option>
+                        <option value="letter">Letter</option>
+                      </select>
+                    </label>
+                    <label className="settings-select-option">
+                      <span>{t("settings.orientation")}</span>
+                      <select
+                        aria-label="导出方向"
+                        value={exportOrientation}
+                        onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
+                      >
+                        <option value="portrait">{t("settings.orientation.portrait")}</option>
+                        <option value="landscape">{t("settings.orientation.landscape")}</option>
+                      </select>
+                    </label>
+                    <label className="settings-select-option">
+                      <span>{t("settings.margin")}</span>
+                      <select
+                        aria-label="导出页边距"
+                        value={exportMargin}
+                        onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
+                      >
+                        <option value="compact">{t("settings.margin.compact")}</option>
+                        <option value="standard">{t("settings.margin.standard")}</option>
+                        <option value="wide">{t("settings.margin.wide")}</option>
+                      </select>
+                    </label>
+                    <small className="settings-note">{t("settings.exportNote")}</small>
+                    <div className="settings-divider">{t("settings.migration")}</div>
+                    <div className="settings-actions">
+                      <button type="button" className="quiet-button" onClick={onExportSettings}>
+                        {t("settings.exportSettings")}
                       </button>
-                    )}
-                    {canExportMarkdown && (
-                      <button type="button" onClick={onExportMarkdown}>
-                        导出 Markdown / 文本
+                      <button type="button" className="quiet-button" onClick={onImportSettings}>
+                        {t("settings.importSettings")}
                       </button>
-                    )}
-                    {canExportHtml && (
-                      <button type="button" onClick={onExportHtml}>
-                        导出 HTML（含图片）
+                    </div>
+                    <small className="settings-note">{t("settings.backupNote")}</small>
+                    <div className="settings-divider">{t("settings.diagnostics")}</div>
+                    <div className="settings-actions">
+                      <button type="button" className="quiet-button" onClick={onExportDiagnostics}>
+                        {t("settings.exportDiagnostics")}
                       </button>
-                    )}
-                    {canExportDocx && (
-                      <button type="button" onClick={onExportDocx}>
-                        导出 Word（DOCX）
-                      </button>
-                    )}
+                    </div>
+                    <small className="settings-note">{t("settings.diagnosticsNote")}</small>
                   </div>
                 </details>
-              )}
+              </div>
+              <div className="toolbar-overflow-group toolbar-overflow-settings">
+                <button type="button" className="toolbar-button primary" onClick={onExport} disabled={!fileName}>
+                  <Icon name="printer" size={15} />
+                  <span className="toolbar-button-label">{exportLabel}</span>
+                </button>
+                {(canExportMarkdown || canExportHtml || canExportDocx) && (
+                  <details
+                    ref={exportMenuRef}
+                    className="export-menu"
+                    onClick={() => {
+                      closeSearchIfOpen();
+                      settingsMenuRef.current?.removeAttribute("open");
+                    }}
+                  >
+                    <summary className="toolbar-button" title="导出文件">
+                      <Icon name="download" size={15} />
+                      <span className="toolbar-button-label">导出</span>
+                    </summary>
+                    <div className="export-menu-panel">
+                      {canPreviewPrint && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const menu = exportMenuRef.current;
+                            if (menu) {
+                              menu.open = false;
+                              menu.removeAttribute("open");
+                            }
+                            onPreviewPrint();
+                          }}
+                        >
+                          预览打印版式
+                        </button>
+                      )}
+                      {canExportMarkdown && (
+                        <button type="button" onClick={onExportMarkdown}>
+                          导出 Markdown / 文本
+                        </button>
+                      )}
+                      {canExportHtml && (
+                        <button type="button" onClick={onExportHtml}>
+                          导出 HTML（含图片）
+                        </button>
+                      )}
+                      {canExportDocx && (
+                        <button type="button" onClick={onExportDocx}>
+                          导出 Word（DOCX）
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </div>
             </div>
-          </div>
-        </details>
+          </details>
+        </div>
       </nav>
 
       {searchOpen && (

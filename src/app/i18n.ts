@@ -34,6 +34,9 @@ export type MessageKey =
   | "action.more"
   | "action.moreTools"
   | "action.primaryTools"
+  | "action.openTools"
+  | "action.readingTools"
+  | "action.viewTools"
   | "action.documentTools"
   | "action.appearance"
   | "settings.title"
@@ -130,6 +133,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.more": "更多",
     "action.moreTools": "更多文档工具",
     "action.primaryTools": "文档主要操作",
+    "action.openTools": "打开与定位",
+    "action.readingTools": "阅读与编辑",
+    "action.viewTools": "搜索与面板",
     "action.documentTools": "文档操作",
     "action.appearance": "外观与更新",
     "settings.title": "设置",
@@ -225,6 +231,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.more": "More",
     "action.moreTools": "More document tools",
     "action.primaryTools": "Primary document actions",
+    "action.openTools": "Open and locate",
+    "action.readingTools": "Read and edit",
+    "action.viewTools": "Search and panels",
     "action.documentTools": "Document actions",
     "action.appearance": "Appearance & updates",
     "settings.title": "Settings",
