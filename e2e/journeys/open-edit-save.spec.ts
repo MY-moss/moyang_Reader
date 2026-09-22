@@ -26,7 +26,7 @@ test("opens the quick-open palette from the keyboard", async ({ page }) => {
   await switchToRenderedMode(page);
   await expect(page.getByRole("heading", { name: "Quick note" })).toBeVisible();
 
-  const quickOpenTrigger = page.locator('.toolbar > button[title="快速打开文件 (Ctrl+P)"]');
+  const quickOpenTrigger = page.locator('.toolbar-group > button[title="快速打开文件 (Ctrl+P)"]');
   await quickOpenTrigger.click();
   await expect(page.getByRole("dialog", { name: "快速打开文件" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "快速打开文件" })).toBeFocused();
