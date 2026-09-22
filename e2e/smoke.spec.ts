@@ -16,7 +16,7 @@ test("persists reading layout preferences", async ({ page }) => {
   await readingZoom.press("ArrowRight");
   await readingZoom.press("ArrowRight");
   await readingZoom.press("ArrowRight");
-  await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.getByLabel("正文宽度", { exact: true }).selectOption("narrow");
   await page.getByLabel("导出纸张").selectOption("letter");
   await page.getByLabel("导出方向").selectOption("landscape");
   await page.getByLabel("导出页边距").selectOption("compact");
@@ -24,7 +24,7 @@ test("persists reading layout preferences", async ({ page }) => {
   await openSettingsMenu(page);
 
   await expect(page.getByLabel("阅读缩放")).toHaveValue("115");
-  await expect(page.getByLabel("正文宽度")).toHaveValue("narrow");
+  await expect(page.getByLabel("正文宽度", { exact: true })).toHaveValue("narrow");
   await expect(page.getByLabel("导出纸张")).toHaveValue("letter");
   await expect(page.getByLabel("导出方向")).toHaveValue("landscape");
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
@@ -75,7 +75,7 @@ test("stacks setting feedback without shifting the reading layout", async ({ pag
     return { top: rect.top, height: rect.height, scrollTop: element.scrollTop };
   });
 
-  await page.getByLabel("正文宽度").selectOption("narrow");
+  await page.getByLabel("正文宽度", { exact: true }).selectOption("narrow");
   await page.getByLabel("导出纸张").selectOption("letter");
   await page.getByLabel("导出方向").selectOption("landscape");
   await page.getByLabel("导出页边距").selectOption("compact");
@@ -113,7 +113,7 @@ test("dismisses setting feedback with the keyboard in a narrow window", async ({
 
   const contentArea = page.locator(".content-area");
   const before = await contentArea.evaluate((element) => element.getBoundingClientRect().top);
-  await page.getByLabel("正文宽度").selectOption("wide");
+  await page.getByLabel("正文宽度", { exact: true }).selectOption("wide");
 
   const dismissButton = page.locator(".app-notification-dismiss").first();
   await dismissButton.focus();
@@ -286,7 +286,15 @@ test("keeps toolbar icons consistent and readable at 900px", async ({ page }) =>
   const visibleIconNames = await page
     .locator(".topbar .toolbar .moyang-icon:visible")
     .evaluateAll((icons) => icons.map((icon) => icon.getAttribute("data-icon")));
-  expect(visibleIconNames).toEqual(["folder-open", "save", "panel-left", "panel-right", "search", "more-horizontal"]);
+  expect(visibleIconNames).toEqual([
+    "folder-open",
+    "save",
+    "panel-left",
+    "panel-right",
+    "book-open",
+    "search",
+    "more-horizontal",
+  ]);
 
   const metrics = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,

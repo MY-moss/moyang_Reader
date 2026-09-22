@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const THEME_TOKENS = ["--ink", "--muted", "--accent-deep", "--accent-warm", "--danger", "--surface"] as const;
 
-type ThemeName = "light" | "dark";
+type ThemeName = "porcelain" | "paper" | "ink";
 type ThemeTokens = Record<(typeof THEME_TOKENS)[number], string>;
 
 const CONTRAST_PAIRS = [
@@ -181,7 +181,7 @@ test("keeps the settings panel free of serious accessibility violations", async 
 
 test("keeps light and dark theme tokens at WCAG AA contrast", async ({ page }) => {
   await page.goto("/");
-  const themes: ThemeName[] = ["light", "dark"];
+  const themes: ThemeName[] = ["porcelain", "paper", "ink"];
 
   for (const theme of themes) {
     await page.evaluate((themeName) => {
@@ -213,7 +213,7 @@ test("keeps solid accent controls readable in explicit and system dark themes", 
   for (const theme of ["explicit", "system"] as const) {
     if (theme === "explicit") {
       await page.evaluate(() => {
-        document.documentElement.dataset.theme = "dark";
+        document.documentElement.dataset.theme = "ink";
       });
     } else {
       await page.emulateMedia({ colorScheme: "dark" });
@@ -332,7 +332,7 @@ test("keeps search focus and context tabs visibly distinct across themes", async
   expect(hoverBackground).not.toBe(tokenState.inactive.background);
 
   await page.evaluate(() => {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = "ink";
   });
   const darkState = await page.evaluate(() => {
     const active = document.querySelector<HTMLElement>('.context-tab[aria-selected="true"]');
@@ -426,16 +426,16 @@ test("keeps governed palette values symmetric across explicit and system dark th
       return { rawTokens, resolved };
     }, semanticTokens);
 
-  const setExplicitTheme = async (theme: "light" | "dark") => {
-    await page.emulateMedia({ colorScheme: theme });
+  const setExplicitTheme = async (theme: "porcelain" | "ink") => {
+    await page.emulateMedia({ colorScheme: theme === "ink" ? "dark" : "light" });
     await page.evaluate((themeName) => {
       document.documentElement.dataset.theme = themeName;
     }, theme);
   };
 
-  await setExplicitTheme("light");
+  await setExplicitTheme("porcelain");
   const light = await readPalette();
-  await setExplicitTheme("dark");
+  await setExplicitTheme("ink");
   const explicitDark = await readPalette();
   await page.evaluate(() => {
     document.documentElement.removeAttribute("data-theme");
