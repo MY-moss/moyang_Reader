@@ -298,6 +298,54 @@
   box-shadow: none;
 }
 
+.context-tab-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 16px 0 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.context-tab-group {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.context-tab-group-label {
+  color: var(--section-muted-foreground);
+  font-size: var(--type-caption);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.context-tab-group-buttons {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+}
+
+.context-tab-group-navigation .context-tab-group-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.context-tab-group-understanding .context-tab-group-buttons {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.context-tab {
+  min-height: 34px;
+  padding: 7px 6px;
+  font-size: var(--type-control);
+}
+
 .toolbar-button,
 .find-button,
 .settings-select-option select {
@@ -308,6 +356,13 @@
 @media (max-width: 900px) {
   .reading-controls-menu .toolbar-button-label {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .context-tab-list {
+    padding-block: 8px;
+    background: var(--chrome-sidebar-surface);
   }
 }
 

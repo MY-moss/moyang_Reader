@@ -144,6 +144,8 @@ test("navigates context tabs with roving focus and restores the toggle focus", a
   const tabs = contextPanel.getByRole("tab");
   await expect(contextPanel).toBeVisible();
   await expect(tabs).toHaveCount(5);
+  await expect(contextPanel.locator(".context-tab-group-label")).toHaveText(["导航", "理解"]);
+  await expect(tabs).toHaveText(["目录", "书签", "关联", "属性", "批注"]);
   await expect(tabs.nth(0)).toHaveAttribute("tabindex", "0");
   await expect(tabs.nth(1)).toHaveAttribute("tabindex", "-1");
 

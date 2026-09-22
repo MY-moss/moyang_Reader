@@ -43,13 +43,27 @@ type ContextPanelProps = {
   onNavigateHeading: (item: TocItem) => void;
 };
 
-const tabs: Array<{ id: ContextPanelTab; label: string }> = [
-  { id: "outline", label: "目录" },
-  { id: "backlinks", label: "关联" },
-  { id: "properties", label: "属性" },
-  { id: "bookmarks", label: "书签" },
-  { id: "annotations", label: "批注" },
+const tabGroups: Array<{ id: string; label: string; tabs: Array<{ id: ContextPanelTab; label: string }> }> = [
+  {
+    id: "navigation",
+    label: "导航",
+    tabs: [
+      { id: "outline", label: "目录" },
+      { id: "bookmarks", label: "书签" },
+    ],
+  },
+  {
+    id: "understanding",
+    label: "理解",
+    tabs: [
+      { id: "backlinks", label: "关联" },
+      { id: "properties", label: "属性" },
+      { id: "annotations", label: "批注" },
+    ],
+  },
 ];
+
+const tabs = tabGroups.flatMap((group) => group.tabs);
 
 const contextPanelId = "context-panel-panel";
 
@@ -134,7 +148,6 @@ export function ContextPanel({
     <aside className="context-sidebar" aria-label="当前文档上下文">
       <div className="context-panel-header">
         <div>
-          <div className="panel-kicker">CONTEXT</div>
           <h2>文档上下文</h2>
         </div>
         <button type="button" className="panel-close-button" onClick={onClose} aria-label="隐藏上下文面板">
@@ -165,25 +178,37 @@ export function ContextPanel({
       )}
 
       <nav className="context-tab-list" aria-label="文档上下文视图" aria-orientation="horizontal" role="tablist">
-        {tabs.map((tab, index) => (
-          <button
-            type="button"
-            key={tab.id}
-            id={contextTabId(tab.id)}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            aria-controls={contextPanelId}
-            tabIndex={activeTab === tab.id ? 0 : -1}
-            className={`context-tab ${activeTab === tab.id ? "active" : ""}`}
-            ref={(element) => {
-              if (element) tabButtonRefs.current.set(tab.id, element);
-              else tabButtonRefs.current.delete(tab.id);
-            }}
-            onClick={() => onTabChange(tab.id)}
-            onKeyDown={(event) => handleTabKeyDown(event, index)}
-          >
-            {tab.label}
-          </button>
+        {tabGroups.map((group) => (
+          <div className={`context-tab-group context-tab-group-${group.id}`} role="presentation" key={group.id}>
+            <span className="context-tab-group-label" aria-hidden="true">
+              {group.label}
+            </span>
+            <div className="context-tab-group-buttons" role="presentation">
+              {group.tabs.map((tab) => {
+                const index = tabs.findIndex((candidate) => candidate.id === tab.id);
+                return (
+                  <button
+                    type="button"
+                    key={tab.id}
+                    id={contextTabId(tab.id)}
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={contextPanelId}
+                    tabIndex={activeTab === tab.id ? 0 : -1}
+                    className={`context-tab ${activeTab === tab.id ? "active" : ""}`}
+                    ref={(element) => {
+                      if (element) tabButtonRefs.current.set(tab.id, element);
+                      else tabButtonRefs.current.delete(tab.id);
+                    }}
+                    onClick={() => onTabChange(tab.id)}
+                    onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </nav>
 
