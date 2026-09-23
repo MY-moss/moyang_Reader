@@ -17,6 +17,8 @@ React UI
 应用控制与服务
   ├─ settings-controller.ts：设置读取、写入、损坏恢复和保存状态
   ├─ document-session-controller.ts：打开、草稿、保存、冲突、切换、关闭、恢复
+  ├─ workspace-session-controller.ts：工作区载入、切换、缓存与监听
+  ├─ workspace-entry-operations-controller.ts：文件树重命名、删除、移动和复制后的会话状态协调
   ├─ bridge.ts + ipc-contract.ts：Tauri 调用与前后端契约边界
   ├─ workspace-index.ts：工作区索引、搜索和标签关系
   ├─ markdown.ts / document-adapters.ts：阅读与文档格式适配
@@ -60,9 +62,7 @@ Tauri/Rust
 
 ### 1. `App.tsx` 仍是大型编排中心
 
-设置和文档会话已经提取，但工作区载入/切换/session restore、watcher、搜索、导出、弹层和大量顶层 UI 状态仍汇聚在 App。
-
-下一步只按稳定职责提取 **Workspace Session / 工作区生命周期**。目标不是把文件拆到某个行数，而是让未来修改工作区行为时不必理解整个应用。
+设置、文档会话、工作区生命周期及文件树操作已经提取，但搜索、导出、弹层和大量顶层 UI 状态仍汇聚在 App。后续继续按真实用户动作提取稳定职责，不以文件行数为目标。
 
 ### 2. Rust `commands.rs` 仍很大
 

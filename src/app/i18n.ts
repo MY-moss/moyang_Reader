@@ -60,6 +60,33 @@ export type MessageKey =
   | "reader.progressRead"
   | "reader.documentStart"
   | "reader.exitFocus"
+  | "workspaceEntry.busy"
+  | "workspaceEntry.requireWorkspace"
+  | "workspaceEntry.actionRename"
+  | "workspaceEntry.actionDelete"
+  | "workspaceEntry.actionMove"
+  | "workspaceEntry.actionCopy"
+  | "workspaceEntry.kindFile"
+  | "workspaceEntry.kindFolder"
+  | "workspaceEntry.renameFile"
+  | "workspaceEntry.renameFolder"
+  | "workspaceEntry.confirmDirty"
+  | "workspaceEntry.confirmDeleteFile"
+  | "workspaceEntry.confirmDeleteFolder"
+  | "workspaceEntry.renamed"
+  | "workspaceEntry.deletedFile"
+  | "workspaceEntry.deletedFolder"
+  | "workspaceEntry.moved"
+  | "workspaceEntry.copied"
+  | "workspaceEntry.staleEdits"
+  | "workspaceEntry.refreshFailure"
+  | "workspaceEntry.copyRefreshFailure"
+  | "workspaceEntry.renameFailure"
+  | "workspaceEntry.deleteFailure"
+  | "workspaceEntry.transferFailure"
+  | "workspaceEntry.renameReopenFailure"
+  | "workspaceEntry.moveReopenFailure"
+  | "workspaceEntry.deleteReopenFailure"
   | "settings.title"
   | "settings.localFirst"
   | "settings.allowRemoteImages"
@@ -180,6 +207,33 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "reader.progressRead": "已读",
     "reader.documentStart": "文档开始",
     "reader.exitFocus": "退出专注",
+    "workspaceEntry.busy": "正在处理另一项工作区操作，请稍后重试。",
+    "workspaceEntry.requireWorkspace": "请先添加工作区，再{action}文件或文件夹。",
+    "workspaceEntry.actionRename": "重命名",
+    "workspaceEntry.actionDelete": "删除",
+    "workspaceEntry.actionMove": "移动",
+    "workspaceEntry.actionCopy": "复制",
+    "workspaceEntry.kindFile": "文件",
+    "workspaceEntry.kindFolder": "文件夹",
+    "workspaceEntry.renameFile": "重命名文件",
+    "workspaceEntry.renameFolder": "重命名文件夹",
+    "workspaceEntry.confirmDirty": "当前文档有未保存修改，是否先保存后{action}？",
+    "workspaceEntry.confirmDeleteFile": "确定将文件“{name}”移入 Windows 回收站吗？",
+    "workspaceEntry.confirmDeleteFolder": "确定将文件夹“{name}”及其中的全部内容移入 Windows 回收站吗？",
+    "workspaceEntry.renamed": "已重命名{kind}：{name}",
+    "workspaceEntry.deletedFile": "已移入 Windows 回收站：文件 {name}",
+    "workspaceEntry.deletedFolder": "已移入 Windows 回收站：文件夹及其内容 {name}",
+    "workspaceEntry.moved": "已移动{kind}：{name}",
+    "workspaceEntry.copied": "已复制{kind}：{name}",
+    "workspaceEntry.staleEdits": "内容位置已变更，当前编辑内容仍保留在内存中，请确认后另存。",
+    "workspaceEntry.refreshFailure": "操作已完成，但阅读库列表刷新失败，请手动刷新。",
+    "workspaceEntry.copyRefreshFailure": "复制已完成，但阅读库列表刷新失败，请手动刷新。",
+    "workspaceEntry.renameFailure": "无法重命名工作区内容。",
+    "workspaceEntry.deleteFailure": "无法删除工作区内容。",
+    "workspaceEntry.transferFailure": "{action}工作区内容失败。",
+    "workspaceEntry.renameReopenFailure": "文件已重命名，但重新打开失败，请从文件树中再次打开。",
+    "workspaceEntry.moveReopenFailure": "内容已移动，但重新打开当前文档失败，请从文件树中再次打开。",
+    "workspaceEntry.deleteReopenFailure": "内容已删除，但无法打开相邻标签页。",
     "settings.title": "设置",
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
@@ -299,6 +353,36 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "reader.progressRead": "read",
     "reader.documentStart": "Document start",
     "reader.exitFocus": "Exit focus",
+    "workspaceEntry.busy": "Another workspace operation is in progress. Try again shortly.",
+    "workspaceEntry.requireWorkspace": "Add a workspace before you {action} a file or folder.",
+    "workspaceEntry.actionRename": "rename",
+    "workspaceEntry.actionDelete": "delete",
+    "workspaceEntry.actionMove": "move",
+    "workspaceEntry.actionCopy": "copy",
+    "workspaceEntry.kindFile": "file",
+    "workspaceEntry.kindFolder": "folder",
+    "workspaceEntry.renameFile": "Rename file",
+    "workspaceEntry.renameFolder": "Rename folder",
+    "workspaceEntry.confirmDirty": "The current document has unsaved changes. Save before you {action} it?",
+    "workspaceEntry.confirmDeleteFile": "Move “{name}” to the Windows Recycle Bin?",
+    "workspaceEntry.confirmDeleteFolder": "Move “{name}” and everything inside it to the Windows Recycle Bin?",
+    "workspaceEntry.renamed": "Renamed {kind}: {name}",
+    "workspaceEntry.deletedFile": "Moved file to the Windows Recycle Bin: {name}",
+    "workspaceEntry.deletedFolder": "Moved folder and its contents to the Windows Recycle Bin: {name}",
+    "workspaceEntry.moved": "Moved {kind}: {name}",
+    "workspaceEntry.copied": "Copied {kind}: {name}",
+    "workspaceEntry.staleEdits":
+      "The location changed. Your current edits remain in memory; review them and save a copy.",
+    "workspaceEntry.refreshFailure": "The operation finished, but the library did not refresh. Refresh it manually.",
+    "workspaceEntry.copyRefreshFailure": "The copy finished, but the library did not refresh. Refresh it manually.",
+    "workspaceEntry.renameFailure": "Could not rename the workspace item.",
+    "workspaceEntry.deleteFailure": "Could not delete the workspace item.",
+    "workspaceEntry.transferFailure": "Could not {action} the workspace item.",
+    "workspaceEntry.renameReopenFailure":
+      "The file was renamed, but could not be reopened. Open it from the file tree.",
+    "workspaceEntry.moveReopenFailure":
+      "The item was moved, but the current document could not be reopened. Open it from the file tree.",
+    "workspaceEntry.deleteReopenFailure": "The item was deleted, but the adjacent tab could not be opened.",
     "settings.title": "Settings",
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",

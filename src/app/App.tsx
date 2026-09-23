@@ -201,7 +201,11 @@ import {
   forgetWorkspaceSession,
   saveWorkspacePath,
 } from "./storage";
-import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
+import { workspaceEntryAbsolutePath } from "./workspace-entry";
+import {
+  createWorkspaceEntryOperationsController,
+  type WorkspaceEntryOperationsController,
+} from "./workspace-entry-operations-controller";
 import { relativeMarkdownAssetPath } from "./markdown-path";
 import { saveReaderPreferences, type ReaderPreferences } from "./preferences";
 import { createPortableSettingsBundle, parsePortableSettings, serializePortableSettings } from "./portable-settings";
@@ -666,6 +670,7 @@ export function App() {
   const browserDocumentSequenceRef = useRef(0);
   const previewUrlsRef = useRef(new Map<string, string>());
   const documentStateRef = useRef<OpenDocument | null>(null);
+  const localeRef = useRef(locale);
   const documentSessionControllerRef = useRef<DocumentSessionController | null>(null);
   const navigationHistoryRef = useRef<NavigationHistoryState>(navigationHistory);
   const closeConfirmationOpenRef = useRef(false);
@@ -691,6 +696,9 @@ export function App() {
     workspacePathRef.current = path;
     setWorkspacePath(path);
   }, []);
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
   const getWorkspacePathValue = useCallback(() => workspacePathRef.current, []);
   const getOpenTabsValue = useCallback(() => openTabsRef.current, []);
   const getCurrentDocumentValue = useCallback(() => documentStateRef.current, []);
@@ -2022,273 +2030,83 @@ export function App() {
     [refreshWorkspaceChanges, workspacePath],
   );
 
+  const clearCurrentDocumentForWorkspaceEntry = useCallback(() => {
+    documentStateRef.current = null;
+    setDocumentState(null);
+    setSourceDraft("");
+    sourceDraftRef.current = "";
+    setDraftRecovery(null);
+    setExternalChangePath(null);
+    setMode("rendered");
+    resetEditorHistory("", "");
+    saveLastDocumentPath(null);
+  }, [resetEditorHistory]);
+
+  const workspaceEntryOperationsRef = useRef<WorkspaceEntryOperationsController | null>(null);
+  useEffect(() => {
+    const controller = createWorkspaceEntryOperationsController({
+      isNative: isTauriRuntime,
+      getLocale: () => localeRef.current,
+      getWorkspacePath: getWorkspacePathValue,
+      getCurrentDocument: getCurrentDocumentValue,
+      getOpenTabs: getOpenTabsValue,
+      prompt: (message, value) => window.prompt(message, value),
+      confirm: (message) => window.confirm(message),
+      saveDocument,
+      openPath,
+      renameEntry: renameWorkspaceEntry,
+      deleteEntry: deleteWorkspaceEntry,
+      moveEntry: moveWorkspaceEntry,
+      copyEntry: copyWorkspaceEntry,
+      replaceOpenTabs: (tabs) => {
+        openTabsRef.current = tabs;
+        setOpenTabs(tabs);
+        saveOpenTabs(tabs);
+      },
+      updateRecentFiles: (update) =>
+        setRecentFiles((files) => {
+          const nextFiles = update(files);
+          saveRecentFiles(nextFiles);
+          return nextFiles;
+        }),
+      invalidateDocumentCache: (paths) => documentCacheRef.current.invalidate(paths),
+      releaseDocumentResources,
+      clearCurrentDocument: clearCurrentDocumentForWorkspaceEntry,
+      refreshWorkspaceChanges,
+      session: workspaceSessionController,
+      setError,
+      notify,
+    });
+    workspaceEntryOperationsRef.current = controller;
+    return () => {
+      if (workspaceEntryOperationsRef.current === controller) workspaceEntryOperationsRef.current = null;
+    };
+  }, [
+    clearCurrentDocumentForWorkspaceEntry,
+    getCurrentDocumentValue,
+    getOpenTabsValue,
+    getWorkspacePathValue,
+    notify,
+    openPath,
+    refreshWorkspaceChanges,
+    releaseDocumentResources,
+    saveDocument,
+    workspaceSessionController,
+  ]);
+
   const handleRenameWorkspaceEntry = useCallback(
-    async (entryPath: string, kind: "file" | "folder") => {
-      const root = workspacePathRef.current;
-      if (!root || !isTauriRuntime() || !entryPath.trim()) {
-        setError("请先添加工作区，再重命名文件或文件夹。");
-        return;
-      }
-
-      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
-      const oldName = fileNameFromPath(entryPath);
-      const name = window.prompt(kind === "folder" ? "重命名文件夹" : "重命名文件", oldName)?.trim();
-      if (!name || name === oldName) return;
-
-      const current = documentStateRef.current;
-      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
-      if (currentIsAffected && current?.modified) {
-        if (!window.confirm("当前文档有未保存修改，是否先保存后重命名？")) return;
-        if (!(await saveDocument())) return;
-      }
-
-      try {
-        const renamedPath = await renameWorkspaceEntry(root, entryPath, name);
-        documentCacheRef.current.invalidate([oldAbsolutePath, renamedPath]);
-
-        const rebaseTab = (tab: RecentFile): RecentFile => {
-          const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, renamedPath);
-          return nextPath === tab.path ? tab : { ...tab, path: nextPath, name: fileNameFromPath(nextPath) };
-        };
-        const nextTabs = openTabsRef.current.map(rebaseTab);
-        openTabsRef.current = nextTabs;
-        setOpenTabs(nextTabs);
-        saveOpenTabs(nextTabs);
-        setRecentFiles((currentFiles) => {
-          const nextFiles = currentFiles.map(rebaseTab);
-          saveRecentFiles(nextFiles);
-          return nextFiles;
-        });
-
-        const cached = workspaceSessionController.getCachedWorkspace(root);
-        if (cached) {
-          const cachedTabs = nextTabs.filter(
-            (tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root),
-          );
-          workspaceSessionController.updateCachedWorkspace(root, {
-            tabs: cachedTabs,
-            activeDocumentPath: cached.activeDocumentPath
-              ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, renamedPath)
-              : null,
-          });
-          workspaceSessionController.persistWorkspaceSession(root);
-        }
-
-        let reopenFailed = false;
-        if (currentIsAffected && current) {
-          const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, renamedPath);
-          releaseDocumentResources(current.path);
-          documentStateRef.current = null;
-          setDocumentState(null);
-          setSourceDraft("");
-          sourceDraftRef.current = "";
-          setDraftRecovery(null);
-          setExternalChangePath(null);
-          setMode("rendered");
-          resetEditorHistory("", "");
-          reopenFailed = !(await openPath(nextCurrentPath, true));
-          if (reopenFailed) {
-            setError("文件已重命名，但重新打开失败，请从文件树中再次打开。");
-          }
-        }
-
-        await refreshWorkspaceChanges(root, [oldAbsolutePath, renamedPath]);
-        notify(`已重命名${kind === "folder" ? "文件夹" : "文件"}：${name}`);
-        if (!reopenFailed) setError(null);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "无法重命名工作区内容。");
-      }
-    },
-    [
-      notify,
-      openPath,
-      refreshWorkspaceChanges,
-      releaseDocumentResources,
-      resetEditorHistory,
-      saveDocument,
-      workspaceSessionController,
-    ],
+    (entryPath: string, kind: "file" | "folder") => workspaceEntryOperationsRef.current?.rename(entryPath, kind),
+    [],
   );
-
   const handleDeleteWorkspaceEntry = useCallback(
-    async (entryPath: string, kind: "file" | "folder") => {
-      const root = workspacePathRef.current;
-      if (!root || !isTauriRuntime() || !entryPath.trim()) {
-        setError("请先添加工作区，再删除文件或文件夹。");
-        return;
-      }
-
-      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
-      const label = fileNameFromPath(entryPath);
-      const message =
-        kind === "folder"
-          ? `确定将文件夹“${label}”及其中的全部内容移入 Windows 回收站吗？`
-          : `确定将文件“${label}”移入 Windows 回收站吗？`;
-      if (!window.confirm(message)) return;
-
-      const current = documentStateRef.current;
-      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
-      if (currentIsAffected && current?.modified) {
-        if (!window.confirm("当前文档有未保存修改，是否先保存后删除？")) return;
-        if (!(await saveDocument())) return;
-      }
-
-      try {
-        const currentIndex = current
-          ? openTabsRef.current.findIndex((tab) => isSameDocumentPath(tab.path, current.path))
-          : -1;
-        const nextTabs = openTabsRef.current.filter((tab) => !isPathWithinEntry(tab.path, oldAbsolutePath));
-        const affectedTabs = openTabsRef.current.filter((tab) => isPathWithinEntry(tab.path, oldAbsolutePath));
-        for (const tab of affectedTabs) releaseDocumentResources(tab.path);
-        documentCacheRef.current.invalidate([oldAbsolutePath]);
-        await deleteWorkspaceEntry(root, entryPath);
-
-        openTabsRef.current = nextTabs;
-        setOpenTabs(nextTabs);
-        saveOpenTabs(nextTabs);
-        setRecentFiles((currentFiles) => {
-          const nextFiles = currentFiles.filter((file) => !isPathWithinEntry(file.path, oldAbsolutePath));
-          saveRecentFiles(nextFiles);
-          return nextFiles;
-        });
-
-        const cached = workspaceSessionController.getCachedWorkspace(root);
-        if (cached) {
-          workspaceSessionController.updateCachedWorkspace(root, {
-            tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
-            activeDocumentPath: currentIsAffected ? null : cached.activeDocumentPath,
-          });
-          workspaceSessionController.persistWorkspaceSession(root);
-        }
-
-        let nextTabFailed = false;
-        if (currentIsAffected) {
-          setDocumentState(null);
-          documentStateRef.current = null;
-          setSourceDraft("");
-          sourceDraftRef.current = "";
-          setDraftRecovery(null);
-          setExternalChangePath(null);
-          setMode("rendered");
-          resetEditorHistory("", "");
-          saveLastDocumentPath(null);
-
-          const nextTab = nextTabs[currentIndex] ?? nextTabs[currentIndex - 1];
-          if (nextTab) nextTabFailed = !(await openPath(nextTab.path, true));
-        }
-
-        await refreshWorkspaceChanges(root, [oldAbsolutePath]);
-        notify(`已移入 Windows 回收站：${kind === "folder" ? "文件夹及其内容" : "文件"} ${label}`);
-        if (!nextTabFailed) setError(null);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "无法删除工作区内容。");
-      }
-    },
-    [
-      notify,
-      openPath,
-      refreshWorkspaceChanges,
-      releaseDocumentResources,
-      resetEditorHistory,
-      saveDocument,
-      workspaceSessionController,
-    ],
+    (entryPath: string, kind: "file" | "folder") => workspaceEntryOperationsRef.current?.remove(entryPath, kind),
+    [],
   );
-
   const handleTransferWorkspaceEntry = useCallback(
-    async (
-      entryPath: string,
-      destinationParentPath: string,
-      mode: "copy" | "move",
-      kind: "file" | "folder",
-    ): Promise<boolean> => {
-      const root = workspacePathRef.current;
-      if (!root || !isTauriRuntime() || !entryPath.trim()) {
-        setError(`请先添加工作区，再${mode === "move" ? "移动" : "复制"}文件或文件夹。`);
-        return false;
-      }
-
-      const oldAbsolutePath = workspaceEntryAbsolutePath(root, entryPath);
-      const current = documentStateRef.current;
-      const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
-      if (currentIsAffected && current?.modified) {
-        const actionLabel = mode === "move" ? "移动" : "复制";
-        if (!window.confirm(`当前文档有未保存修改，是否先保存后${actionLabel}？`)) return false;
-        if (!(await saveDocument())) return false;
-      }
-
-      try {
-        const transferredPath =
-          mode === "move"
-            ? await moveWorkspaceEntry(root, entryPath, destinationParentPath)
-            : await copyWorkspaceEntry(root, entryPath, destinationParentPath);
-        documentCacheRef.current.invalidate([oldAbsolutePath, transferredPath]);
-
-        let reopenFailed = false;
-        if (mode === "move") {
-          const rebaseTab = (tab: RecentFile): RecentFile => {
-            const nextPath = rebaseWorkspacePath(tab.path, oldAbsolutePath, transferredPath);
-            return nextPath === tab.path ? tab : { ...tab, path: nextPath, name: fileNameFromPath(nextPath) };
-          };
-          const nextTabs = openTabsRef.current.map(rebaseTab);
-          openTabsRef.current = nextTabs;
-          setOpenTabs(nextTabs);
-          saveOpenTabs(nextTabs);
-          setRecentFiles((currentFiles) => {
-            const nextFiles = currentFiles.map(rebaseTab);
-            saveRecentFiles(nextFiles);
-            return nextFiles;
-          });
-
-          const cached = workspaceSessionController.getCachedWorkspace(root);
-          if (cached) {
-            workspaceSessionController.updateCachedWorkspace(root, {
-              tabs: nextTabs.filter((tab) => !tab.path.startsWith("browser://") && isPathWithin(tab.path, root)),
-              activeDocumentPath: cached.activeDocumentPath
-                ? rebaseWorkspacePath(cached.activeDocumentPath, oldAbsolutePath, transferredPath)
-                : null,
-            });
-            workspaceSessionController.persistWorkspaceSession(root);
-          }
-
-          if (currentIsAffected && current) {
-            const nextCurrentPath = rebaseWorkspacePath(current.path, oldAbsolutePath, transferredPath);
-            releaseDocumentResources(current.path);
-            documentStateRef.current = null;
-            setDocumentState(null);
-            setSourceDraft("");
-            sourceDraftRef.current = "";
-            setDraftRecovery(null);
-            setExternalChangePath(null);
-            setMode("rendered");
-            resetEditorHistory("", "");
-            reopenFailed = !(await openPath(nextCurrentPath, true));
-            if (reopenFailed) {
-              setError("内容已移动，但重新打开当前文档失败，请从文件树中再次打开。");
-            }
-          }
-        }
-
-        await refreshWorkspaceChanges(root, [oldAbsolutePath, transferredPath]);
-        notify(
-          `${mode === "move" ? "已移动" : "已复制"}${kind === "folder" ? "文件夹" : "文件"}：${fileNameFromPath(transferredPath)}`,
-        );
-        if (!reopenFailed) setError(null);
-        return true;
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : `${mode === "move" ? "移动" : "复制"}工作区内容失败。`);
-        return false;
-      }
-    },
-    [
-      notify,
-      openPath,
-      refreshWorkspaceChanges,
-      releaseDocumentResources,
-      resetEditorHistory,
-      saveDocument,
-      workspaceSessionController,
-    ],
+    (entryPath: string, destinationParentPath: string, mode: "copy" | "move", kind: "file" | "folder") =>
+      workspaceEntryOperationsRef.current?.transfer(entryPath, destinationParentPath, mode, kind) ??
+      Promise.resolve(false),
+    [],
   );
 
   const handleCopyWorkspacePath = useCallback(
