@@ -1432,10 +1432,22 @@ test("enters and exits focus reading mode", async ({ page }) => {
   await page.getByRole("button", { name: "专注", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
   await expect(page.getByRole("button", { name: /退出专注/ })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "专注阅读进度" })).toHaveAttribute("aria-valuenow", "0");
   await expect(page.locator(".sidebar")).toBeHidden();
+
+  const focusCanvas = await page.locator(".reader-content").evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      borderWidth: styles.borderWidth,
+      borderRadius: styles.borderRadius,
+      backgroundColor: styles.backgroundColor,
+    };
+  });
+  expect(focusCanvas).toEqual({ borderWidth: "0px", borderRadius: "0px", backgroundColor: "rgba(0, 0, 0, 0)" });
 
   await page.keyboard.press("Escape");
   await expect(page.locator(".app-shell")).not.toHaveClass(/focus-mode/);
+  await expect(page.locator(".focus-reading-progress")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "专注", exact: true })).toBeVisible();
 });
 

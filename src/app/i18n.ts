@@ -56,6 +56,10 @@ export type MessageKey =
   | "status.image"
   | "status.characters"
   | "status.externalChange"
+  | "reader.focusProgress"
+  | "reader.progressRead"
+  | "reader.documentStart"
+  | "reader.exitFocus"
   | "settings.title"
   | "settings.localFirst"
   | "settings.allowRemoteImages"
@@ -172,6 +176,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "status.image": "图片",
     "status.characters": "字符",
     "status.externalChange": "外部修改待处理",
+    "reader.focusProgress": "专注阅读进度",
+    "reader.progressRead": "已读",
+    "reader.documentStart": "文档开始",
+    "reader.exitFocus": "退出专注",
     "settings.title": "设置",
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
@@ -287,6 +295,10 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "status.image": "Image",
     "status.characters": "characters",
     "status.externalChange": "External change needs attention",
+    "reader.focusProgress": "Focus reading progress",
+    "reader.progressRead": "read",
+    "reader.documentStart": "Document start",
+    "reader.exitFocus": "Exit focus",
     "settings.title": "Settings",
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",
