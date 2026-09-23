@@ -112,6 +112,13 @@ for (const theme of THEMES) {
     await expectStateScreenshot(page.locator(".app-shell"), "application-shell", theme, { maxDiffPixelRatio: 0.01 });
   });
 
+  test(`captures the focus reading baseline (${theme})`, async ({ page }) => {
+    await loadDocument(page, theme, "reader");
+    await page.getByRole("button", { name: "专注", exact: true }).click();
+    await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+    await expectStateScreenshot(page.locator(".app-shell"), "focus-reading", theme, { maxDiffPixelRatio: 0.01 });
+  });
+
   test(`captures the editor state baseline (${theme})`, async ({ page }) => {
     await loadDocument(page, theme, "editor");
     await expectStateScreenshot(page.locator(".wysiwyg-editor"), "editor-content", theme);
@@ -171,5 +178,25 @@ test("keeps reader anchors within the compact and wide Windows viewports", async
           left >= -1 && right <= metrics.viewportWidth + 1 && anchorWidth > 0 && height > 0,
       ),
     ).toBe(true);
+
+    await page.keyboard.press("Control+Shift+Enter");
+    await expect(page.locator(".app-shell")).toHaveClass(/focus-mode/);
+    const focusMetrics = await page.evaluate(() => {
+      const progress = document.querySelector<HTMLElement>(".focus-reading-progress-copy")?.getBoundingClientRect();
+      const exit = document.querySelector<HTMLElement>(".focus-exit")?.getBoundingClientRect();
+      const reader = document.querySelector<HTMLElement>(".reader-content")?.getBoundingClientRect();
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        progressRight: progress?.right,
+        exitLeft: exit?.left,
+        readerLeft: reader?.left,
+        readerRight: reader?.right,
+      };
+    });
+    expect(focusMetrics.bodyScrollWidth).toBeLessThanOrEqual(focusMetrics.viewportWidth);
+    expect(focusMetrics.progressRight).toBeLessThan(focusMetrics.exitLeft ?? 0);
+    expect(focusMetrics.readerLeft).toBeGreaterThanOrEqual(0);
+    expect(focusMetrics.readerRight).toBeLessThanOrEqual(focusMetrics.viewportWidth);
   }
 });

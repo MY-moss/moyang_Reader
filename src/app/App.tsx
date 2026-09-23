@@ -18,6 +18,7 @@ import { CloseConfirmationDialog } from "./components/CloseConfirmationDialog";
 import { ContextPanel } from "./components/ContextPanel";
 import { AnnotationDialog } from "./components/AnnotationDialog";
 import { FileDropOverlay } from "./components/FileDropOverlay";
+import { FocusReadingProgress } from "./components/FocusReadingProgress";
 import { DraftRecoveryNotice } from "./components/DraftRecoveryNotice";
 import { DraftRecoveryCenter } from "./components/DraftRecoveryCenter";
 import { DraftClearAllConfirmationDialog } from "./components/DraftClearAllConfirmationDialog";
@@ -48,6 +49,7 @@ import { WorkspacePanel } from "./components/WorkspacePanel";
 import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsDialog";
 import { UpdateNotice } from "./components/UpdateNotice";
 import { NotificationViewport } from "./components/NotificationViewport";
+import { translate } from "./i18n";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import {
   clearReadingHistory,
@@ -5218,9 +5220,16 @@ export function App() {
           )}
           {focusMode && (
             <button ref={focusExitRef} type="button" className="focus-exit" onClick={() => setFocusMode(false)}>
-              退出专注 <span>Esc</span>
+              {translate(locale, "reader.exitFocus")} <span>Esc</span>
             </button>
           )}
+          {focusMode &&
+            documentState &&
+            documentState.kind !== "pdf" &&
+            documentState.kind !== "image" &&
+            mode === "rendered" && (
+              <FocusReadingProgress locale={locale} progress={readingProgress} currentHeading={currentHeading} />
+            )}
           {loading && (
             <div className="loading-state" role="status" aria-live="polite">
               正在打开文档…
