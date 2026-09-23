@@ -105,6 +105,10 @@ Rust domain / filesystem / permission implementation
 
 禁止组件绕过它静默覆盖当前文档；禁止外部修改存在时静默保存；未来 AI/扩展也不能直接写用户文件。
 
+### 5.3.1 工作区条目操作边界
+
+`workspace-entry-operations-controller.ts` 协调文件树的重命名、删除、移动和复制。Rust/bridge 仍执行实际文件操作和路径授权；控制器只在文件操作成功后更新标签、最近文件、工作区会话和派生缓存。取消、保存失败或文件操作失败不得提前释放当前文档资源或改写会话；异步操作期间切换工作区时，不得覆盖新工作区的活动视图。
+
 ### 5.4 `bridge.ts` + `ipc-contract.ts`
 
 这是前端到 Tauri 的标准 IPC 边界。
