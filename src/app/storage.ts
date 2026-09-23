@@ -492,10 +492,21 @@ export function saveRecentFiles(files: RecentFile[]): void {
   }
 }
 
-export function formatRecentFileTime(lastOpenedAt?: number, now = Date.now()): string {
-  if (!validRecentFileTimestamp(lastOpenedAt)) return "打开时间未知";
+export function formatRecentFileTime(
+  lastOpenedAt?: number,
+  now = Date.now(),
+  locale: "zh-CN" | "en-US" = "zh-CN",
+): string {
+  if (!validRecentFileTimestamp(lastOpenedAt)) return locale === "zh-CN" ? "打开时间未知" : "Open time unknown";
 
   const elapsedMinutes = Math.max(0, Math.floor((now - lastOpenedAt) / 60_000));
+  if (locale === "en-US") {
+    if (elapsedMinutes < 1) return "Just now";
+    if (elapsedMinutes < 60) return `${elapsedMinutes} min ago`;
+    const elapsedHours = Math.floor(elapsedMinutes / 60);
+    if (elapsedHours < 24) return `${elapsedHours} hr ago`;
+    return `${Math.floor(elapsedHours / 24)} days ago`;
+  }
   if (elapsedMinutes < 1) return "刚刚";
   if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
   const elapsedHours = Math.floor(elapsedMinutes / 60);

@@ -1,37 +1,48 @@
 import type { CSSProperties } from "react";
 import { formatReadingDuration, summarizeReadingHistory, type ReadingHistoryEntry } from "../reading-history";
+import { translate, type Locale } from "../i18n";
 
 type ReadingHistoryPanelProps = {
   entries: readonly ReadingHistoryEntry[];
   onRequestClear: () => void;
+  locale?: Locale;
 };
 
-export function ReadingHistoryPanel({ entries, onRequestClear }: ReadingHistoryPanelProps) {
+export function ReadingHistoryPanel({ entries, onRequestClear, locale = "zh-CN" }: ReadingHistoryPanelProps) {
   const summary = summarizeReadingHistory(entries);
   const scale = Math.max(1, summary.maxDaySeconds);
   const hasHistory = entries.length > 0;
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  const duration = (seconds: number) => {
+    if (locale === "zh-CN") return formatReadingDuration(seconds);
+    const minutes = Math.floor(seconds / 60);
+    if (minutes <= 0) return seconds > 0 ? "<1 min" : "0 min";
+    const hours = Math.floor(minutes / 60);
+    return hours > 0 ? `${hours} hr${minutes % 60 ? ` ${minutes % 60} min` : ""}` : `${minutes} min`;
+  };
 
   return (
     <section className="reading-history-panel" aria-labelledby="reading-history-title">
       <div className="reading-history-heading">
         <div>
-          <div className="panel-kicker">THIS WEEK</div>
-          <h3 id="reading-history-title">本周阅读</h3>
+          <h3 id="reading-history-title">{t("workspace.history")}</h3>
         </div>
-        <span className="reading-history-range">周一—周日</span>
+        <span className="reading-history-range">{t("history.range")}</span>
       </div>
 
       <div
         className="reading-history-metrics"
-        aria-label={`本周阅读摘要：${summary.documentCount} 篇文档，累计 ${formatReadingDuration(summary.totalSeconds)}`}
+        aria-label={t("history.summary")
+          .replace("{count}", String(summary.documentCount))
+          .replace("{duration}", duration(summary.totalSeconds))}
       >
         <div className="reading-history-metric">
           <strong>{summary.documentCount}</strong>
-          <span>篇文档</span>
+          <span>{t("history.documents")}</span>
         </div>
         <div className="reading-history-metric">
-          <strong>{formatReadingDuration(summary.totalSeconds)}</strong>
-          <span>累计时长</span>
+          <strong>{duration(summary.totalSeconds)}</strong>
+          <span>{t("history.duration")}</span>
         </div>
       </div>
 
@@ -44,16 +55,18 @@ export function ReadingHistoryPanel({ entries, onRequestClear }: ReadingHistoryP
               <div
                 className="reading-history-bar-track"
                 role="progressbar"
-                aria-label={`${day.key} 阅读时长`}
+                aria-label={t("history.dailyDuration").replace("{day}", day.key)}
                 aria-valuemin={0}
                 aria-valuemax={summary.maxDaySeconds || 1}
                 aria-valuenow={day.seconds}
-                aria-valuetext={formatReadingDuration(day.seconds)}
+                aria-valuetext={duration(day.seconds)}
               >
                 <span className="reading-history-bar" style={barStyle} />
               </div>
-              <span className="reading-history-day-label">{day.label}</span>
-              <span className="reading-history-day-value">{formatReadingDuration(day.seconds)}</span>
+              <span className="reading-history-day-label">
+                {locale === "zh-CN" ? day.label : ["M", "T", "W", "T", "F", "S", "S"][summary.days.indexOf(day)]}
+              </span>
+              <span className="reading-history-day-value">{duration(day.seconds)}</span>
             </div>
           );
         })}
@@ -61,12 +74,12 @@ export function ReadingHistoryPanel({ entries, onRequestClear }: ReadingHistoryP
 
       {!hasHistory && (
         <p className="reading-history-empty" role="status">
-          还没有本机阅读记录。
+          {t("history.empty")}
         </p>
       )}
       {hasHistory && summary.totalSeconds <= 0 && (
         <p className="reading-history-empty" role="status">
-          本周还没有阅读时长。
+          {t("history.emptyWeek")}
         </p>
       )}
 
@@ -77,7 +90,7 @@ export function ReadingHistoryPanel({ entries, onRequestClear }: ReadingHistoryP
         onClick={onRequestClear}
         disabled={!hasHistory}
       >
-        清理本机记录
+        {t("history.clear")}
       </button>
     </section>
   );

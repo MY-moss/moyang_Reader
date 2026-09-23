@@ -75,6 +75,8 @@ describe("WorkspacePanel", () => {
       { path: "D:\\Archive", name: "Archive" },
     ]);
 
+    const manageMenu = container.querySelector<HTMLDetailsElement>(".workspace-manage-menu");
+    act(() => (manageMenu?.querySelector("summary") as HTMLElement | null)?.click());
     const addButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "添加阅读库",
     );
@@ -92,10 +94,9 @@ describe("WorkspacePanel", () => {
       { path: "D:\\Archive", name: "Archive" },
     ]);
 
+    const manageMenu = container.querySelector<HTMLDetailsElement>(".workspace-manage-menu");
+    act(() => (manageMenu?.querySelector("summary") as HTMLElement | null)?.click());
     expect(container.textContent).toContain("已挂载阅读库 · 2 / 5");
-    const switchButton = container.querySelector<HTMLElement>('summary[aria-label="切换阅读库"]');
-    expect(switchButton).toBeTruthy();
-    act(() => switchButton?.click());
 
     const archiveButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Archive") && button.getAttribute("role") === "menuitem",
@@ -128,34 +129,38 @@ describe("WorkspacePanel", () => {
     );
 
     const createMenu = container.querySelector<HTMLDetailsElement>(".workspace-create-menu");
-    const exportMenu = container.querySelector<HTMLDetailsElement>(".workspace-export-menu");
-    const switcherMenu = container.querySelector<HTMLDetailsElement>(".workspace-switcher");
+    const manageMenu = container.querySelector<HTMLDetailsElement>(".workspace-manage-menu");
     expect(container.querySelector(".workspace-actions")?.getAttribute("aria-label")).toBe("阅读库操作");
     expect(createMenu).toBeTruthy();
-    expect(exportMenu).toBeTruthy();
-    expect(switcherMenu).toBeTruthy();
+    expect(manageMenu).toBeTruthy();
 
     act(() => (createMenu?.querySelector("summary") as HTMLElement | null)?.click());
     expect(createMenu?.open).toBe(true);
-    expect(exportMenu?.open).toBe(false);
+    expect(manageMenu?.open).toBe(false);
 
-    act(() => (exportMenu?.querySelector("summary") as HTMLElement | null)?.click());
+    act(() => (manageMenu?.querySelector("summary") as HTMLElement | null)?.click());
     expect(createMenu?.open).toBe(false);
-    expect(exportMenu?.open).toBe(true);
+    expect(manageMenu?.open).toBe(true);
 
-    const htmlButton = Array.from(exportMenu?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((button) =>
+    const htmlButton = Array.from(manageMenu?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((button) =>
       button.textContent?.includes("HTML"),
     );
     act(() => htmlButton?.click());
     expect(onExportWorkspace).toHaveBeenCalledWith("html");
-    expect(exportMenu?.open).toBe(false);
+    expect(manageMenu?.open).toBe(false);
 
-    act(() => (switcherMenu?.querySelector("summary") as HTMLElement | null)?.click());
-    expect(switcherMenu?.open).toBe(true);
+    act(() => (manageMenu?.querySelector("summary") as HTMLElement | null)?.click());
+    expect(manageMenu?.open).toBe(true);
+    const manageTrigger = manageMenu?.querySelector<HTMLElement>("summary");
+    act(() => {
+      manageTrigger?.focus();
+      manageTrigger?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(manageMenu?.querySelector('[role="menuitem"]:not([disabled])'));
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     });
-    expect(switcherMenu?.open).toBe(false);
+    expect(manageMenu?.open).toBe(false);
     cleanup(container, root);
   });
 
@@ -165,6 +170,8 @@ describe("WorkspacePanel", () => {
       { workspaceLimitReached: true },
     );
 
+    const manageMenu = container.querySelector<HTMLDetailsElement>(".workspace-manage-menu");
+    act(() => (manageMenu?.querySelector("summary") as HTMLElement | null)?.click());
     const addButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "添加阅读库",
     );
@@ -186,16 +193,18 @@ describe("WorkspacePanel", () => {
     cleanup(container, root);
   });
 
-  it("labels the search as the current reading library and exposes a focus target", () => {
+  it("keeps search available to the shortcut while its controls are collapsed", () => {
     const searchInputRef = createRef<HTMLInputElement>();
     const { container, root } = renderPanel([], { searchInputRef });
     const searchInput = container.querySelector<HTMLInputElement>(".workspace-search");
 
     expect(searchInput?.getAttribute("aria-label")).toBe("当前阅读库搜索");
     expect(searchInput?.getAttribute("placeholder")).toBe("搜索当前阅读库内容");
+    expect(container.querySelector(".workspace-search-controls")?.classList.contains("is-open")).toBe(false);
 
     act(() => searchInputRef.current?.focus());
     expect(document.activeElement).toBe(searchInput);
+    expect(container.querySelector(".workspace-search-controls")?.classList.contains("is-open")).toBe(true);
     cleanup(container, root);
   });
 
@@ -207,6 +216,26 @@ describe("WorkspacePanel", () => {
     });
 
     expect(container.textContent).toContain("当前阅读库没有匹配文档。");
+    cleanup(container, root);
+  });
+
+  it("shows file navigation first and keeps reading history independently collapsible", () => {
+    const { container, root } = renderPanel([], { workspacePath: "C:\\Notes" });
+    expect(container.querySelector(".workspace-files")).toBeTruthy();
+    const history = container.querySelector<HTMLDetailsElement>(".workspace-history-disclosure");
+    expect(history?.open).toBe(false);
+    act(() => (history?.querySelector("summary") as HTMLElement | null)?.click());
+    expect(history?.open).toBe(true);
+    cleanup(container, root);
+  });
+
+  it("localizes the migrated sidebar controls in English", () => {
+    const { container, root } = renderPanel([], { locale: "en-US" });
+    expect(container.querySelector("#workspace-title")?.textContent).toBe("Library");
+    expect(container.querySelector(".workspace-search-toggle")?.textContent).toContain("Search");
+    expect(container.querySelector(".workspace-manage-menu summary")?.getAttribute("aria-label")).toBe(
+      "Manage library",
+    );
     cleanup(container, root);
   });
 });
