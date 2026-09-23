@@ -1987,7 +1987,7 @@ html.pane-resizing * {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-8);
+  gap: var(--space-10);
 }
 .workspace-heading-copy {
   min-width: 0;
