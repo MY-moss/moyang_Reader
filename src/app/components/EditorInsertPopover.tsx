@@ -10,6 +10,9 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "./Icon";
+import type { Locale } from "../i18n";
+import { editorText } from "../editor-i18n";
 import {
   buildMarkdownImage,
   buildMarkdownLink,
@@ -49,6 +52,7 @@ type EditorInsertForm = {
 };
 
 type EditorInsertPopoverProps = {
+  locale?: Locale;
   open: boolean;
   kind: EditorInsertKind;
   initialValues?: EditorInsertInitialValues;
@@ -59,11 +63,11 @@ type EditorInsertPopoverProps = {
   onPickImage?: () => Promise<string | null>;
 };
 
-const tabs: readonly { kind: EditorInsertKind; label: string }[] = [
-  { kind: "link", label: "链接" },
-  { kind: "wikilink", label: "双链" },
-  { kind: "image", label: "图片" },
-  { kind: "table", label: "表格" },
+const tabs: readonly { kind: EditorInsertKind; labelKey: Parameters<typeof editorText>[1] }[] = [
+  { kind: "link", labelKey: "link" },
+  { kind: "wikilink", labelKey: "wikilink" },
+  { kind: "image", labelKey: "image" },
+  { kind: "table", labelKey: "table" },
 ];
 
 function createForm(initialValues: EditorInsertInitialValues | undefined): EditorInsertForm {
@@ -80,16 +84,16 @@ function createForm(initialValues: EditorInsertInitialValues | undefined): Edito
   };
 }
 
-function invalidMessage(kind: EditorInsertKind): string {
+function invalidMessage(locale: Locale, kind: EditorInsertKind): string {
   switch (kind) {
     case "link":
-      return "请填写链接文字和地址。";
+      return editorText(locale, "invalidLink");
     case "wikilink":
-      return "请填写要连接的笔记名称。";
+      return editorText(locale, "invalidWiki");
     case "image":
-      return "请填写图片路径或 URL。";
+      return editorText(locale, "invalidImage");
     case "table":
-      return "表格至少需要 2 行和 2 列。";
+      return editorText(locale, "invalidTable");
   }
 }
 
@@ -103,6 +107,7 @@ function focusWithoutScroll(element: HTMLElement | null): void {
 }
 
 export function EditorInsertPopover({
+  locale = "zh-CN",
   open,
   kind,
   initialValues,
@@ -112,6 +117,7 @@ export function EditorInsertPopover({
   onSubmit,
   onPickImage,
 }: EditorInsertPopoverProps) {
+  const t = (key: Parameters<typeof editorText>[1]) => editorText(locale, key);
   const popoverRef = useRef<HTMLElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const skipInputFocusRef = useRef(false);
@@ -265,7 +271,7 @@ export function EditorInsertPopover({
     }
 
     if (!request) {
-      setError(invalidMessage(activeKind));
+      setError(invalidMessage(locale, activeKind));
       firstInputRef.current?.focus();
       return;
     }
@@ -316,7 +322,7 @@ export function EditorInsertPopover({
       setForm((current) => ({ ...current, src: source }));
       window.setTimeout(() => focusWithoutScroll(firstInputRef.current), 0);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法选择图片，请重试。");
+      setError(cause instanceof Error ? cause.message : t("pickError"));
     } finally {
       setIsPickingImage(false);
     }
@@ -339,15 +345,14 @@ export function EditorInsertPopover({
     >
       <div className="editor-insert-header">
         <div>
-          <span className="editor-insert-eyebrow">INSERT</span>
-          <h2 id={`${popoverId}-title`}>插入内容</h2>
+          <h2 id={`${popoverId}-title`}>{t("insertContent")}</h2>
         </div>
-        <button type="button" className="editor-insert-close" aria-label="关闭插入面板" onClick={onCancel}>
-          ×
+        <button type="button" className="editor-insert-close" aria-label={t("closeInsert")} onClick={onCancel}>
+          <Icon name="close" size={16} />
         </button>
       </div>
 
-      <div className="editor-insert-tabs" role="tablist" aria-label="插入类型" aria-orientation="horizontal">
+      <div className="editor-insert-tabs" role="tablist" aria-label={t("insertType")} aria-orientation="horizontal">
         {tabs.map((tab) => (
           <button
             key={tab.kind}
@@ -365,7 +370,7 @@ export function EditorInsertPopover({
             }}
             onKeyDown={handleTabKeyDown}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -381,18 +386,23 @@ export function EditorInsertPopover({
           {activeKind === "link" && (
             <div className="editor-insert-fields">
               <label className="editor-insert-field">
-                <span>链接文字</span>
-                <input ref={firstInputRef} value={form.label} onChange={update("label")} placeholder="例如：项目主页" />
+                <span>{t("linkLabel")}</span>
+                <input
+                  ref={firstInputRef}
+                  value={form.label}
+                  onChange={update("label")}
+                  placeholder={t("linkLabelPlaceholder")}
+                />
               </label>
               <label className="editor-insert-field">
-                <span>地址</span>
-                <input value={form.href} onChange={update("href")} placeholder="https://example.com 或相对路径" />
+                <span>{t("address")}</span>
+                <input value={form.href} onChange={update("href")} placeholder={t("addressPlaceholder")} />
               </label>
               <label className="editor-insert-field">
                 <span>
-                  提示文字 <em>可选</em>
+                  {t("title")} <em>{t("optional")}</em>
                 </span>
-                <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
+                <input value={form.title} onChange={update("title")} placeholder={t("titlePlaceholder")} />
               </label>
             </div>
           )}
@@ -400,21 +410,21 @@ export function EditorInsertPopover({
           {activeKind === "wikilink" && (
             <div className="editor-insert-fields">
               <label className="editor-insert-field">
-                <span>目标笔记</span>
+                <span>{t("targetNote")}</span>
                 <input
                   ref={firstInputRef}
                   value={form.target}
                   onChange={update("target")}
-                  placeholder="例如：项目计划"
+                  placeholder={t("targetPlaceholder")}
                 />
               </label>
               <label className="editor-insert-field">
                 <span>
-                  显示别名 <em>可选</em>
+                  {t("alias")} <em>{t("optional")}</em>
                 </span>
-                <input value={form.alias} onChange={update("alias")} placeholder="留空则显示笔记名称" />
+                <input value={form.alias} onChange={update("alias")} placeholder={t("aliasPlaceholder")} />
               </label>
-              <p className="editor-insert-hint">将生成 Obsidian 兼容的双链，例如：[[项目计划|查看计划]]</p>
+              <p className="editor-insert-hint">{t("wikiHint")}</p>
             </div>
           )}
 
@@ -422,40 +432,38 @@ export function EditorInsertPopover({
             <div className="editor-insert-fields">
               <div className="editor-insert-image-source-row">
                 <label className="editor-insert-field">
-                  <span>图片路径或 URL</span>
+                  <span>{t("imageSource")}</span>
                   <input
                     ref={firstInputRef}
                     value={form.src}
                     onChange={update("src")}
-                    placeholder="相对路径或 https://…"
+                    placeholder={t("imageSourcePlaceholder")}
                   />
                 </label>
                 <button
                   type="button"
                   className="editor-insert-browse"
-                  aria-label="浏览图片"
-                  title={onPickImage ? "从当前工作区选择图片" : "桌面版支持浏览工作区图片"}
+                  aria-label={t("browseImage")}
+                  title={onPickImage ? t("browseAvailable") : t("browseUnavailable")}
                   disabled={!onPickImage || isPickingImage}
                   onClick={() => void handlePickImage()}
                 >
-                  {isPickingImage ? "选择中…" : "浏览"}
+                  {isPickingImage ? t("picking") : t("browse")}
                 </button>
               </div>
               <label className="editor-insert-field">
                 <span>
-                  替代文字 <em>可选</em>
+                  {t("alt")} <em>{t("optional")}</em>
                 </span>
-                <input value={form.alt} onChange={update("alt")} placeholder="帮助读者理解图片内容" />
+                <input value={form.alt} onChange={update("alt")} placeholder={t("altPlaceholder")} />
               </label>
               <label className="editor-insert-field">
                 <span>
-                  提示文字 <em>可选</em>
+                  {t("title")} <em>{t("optional")}</em>
                 </span>
-                <input value={form.title} onChange={update("title")} placeholder="悬停时显示的说明" />
+                <input value={form.title} onChange={update("title")} placeholder={t("titlePlaceholder")} />
               </label>
-              <p className="editor-insert-hint">
-                也可以直接粘贴截图或把图片拖入编辑器；浏览选择会生成工作区内相对路径。
-              </p>
+              <p className="editor-insert-hint">{t("imageHint")}</p>
             </div>
           )}
 
@@ -463,7 +471,7 @@ export function EditorInsertPopover({
             <div className="editor-insert-fields editor-insert-table-fields">
               <div className="editor-insert-number-row">
                 <label className="editor-insert-field">
-                  <span>行数</span>
+                  <span>{t("rows")}</span>
                   <input
                     ref={firstInputRef}
                     type="number"
@@ -474,11 +482,11 @@ export function EditorInsertPopover({
                   />
                 </label>
                 <label className="editor-insert-field">
-                  <span>列数</span>
+                  <span>{t("columns")}</span>
                   <input type="number" min={2} max={8} value={form.columns} onChange={update("columns")} />
                 </label>
               </div>
-              <p className="editor-insert-hint">首行为表头，插入后可直接按 Tab 在单元格之间移动。</p>
+              <p className="editor-insert-hint">{t("tableHint")}</p>
             </div>
           )}
         </div>
@@ -491,10 +499,10 @@ export function EditorInsertPopover({
 
         <div className="editor-insert-actions">
           <button type="button" className="editor-insert-cancel" onClick={onCancel}>
-            取消
+            {t("cancel")}
           </button>
           <button type="submit" className="editor-insert-submit" disabled={isPickingImage}>
-            插入到正文
+            {t("submit")}
           </button>
         </div>
       </form>

@@ -10,7 +10,9 @@ import {
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
 import type { EditorInsertAnchor } from "../editor-insert-position";
 import { applySourceEditorAction } from "../editor-context-actions";
-import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import { localizedEditorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import type { Locale } from "../i18n";
+import { editorText } from "../editor-i18n";
 import { applyEditorInsert, type EditorInsertKind, type EditorInsertRequest } from "../editor-insertion";
 import { insertTextAtSelection } from "../clipboard-image";
 import { clipboardPayloadHasContent, dispatchClipboardPaste, readClipboardPayload } from "../clipboard-paste";
@@ -19,6 +21,7 @@ import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorIns
 import { EditorToolbar } from "./EditorToolbar";
 
 type SourceEditorProps = {
+  locale?: Locale;
   value: string;
   ariaLabel: string;
   onChange: (value: string) => void;
@@ -63,6 +66,7 @@ function focusWithoutScroll(element: HTMLElement | null): void {
 }
 
 export function SourceEditor({
+  locale = "zh-CN",
   value,
   ariaLabel,
   onChange,
@@ -200,7 +204,7 @@ export function SourceEditor({
       try {
         const payload = await readClipboardPayload();
         if (!clipboardPayloadHasContent(payload)) {
-          onStatusMessageRef.current?.("剪贴板中没有可粘贴的内容。");
+          onStatusMessageRef.current?.(editorText(locale, "clipboardEmpty"));
           return;
         }
 
@@ -214,15 +218,13 @@ export function SourceEditor({
 
         if (!payload.text) {
           onStatusMessageRef.current?.(
-            plainOnly
-              ? "剪贴板中没有可粘贴的文本；如需插入图片，请使用“粘贴”。"
-              : "剪贴板中没有可粘贴的文本；图片请使用 Ctrl+V 或切换到桌面版。",
+            plainOnly ? editorText(locale, "clipboardPlainEmpty") : editorText(locale, "clipboardImageSource"),
           );
           return;
         }
 
         if (valueRef.current !== initialValue) {
-          onStatusMessageRef.current?.("正文内容已经变化，请重新执行粘贴，避免覆盖最新修改。");
+          onStatusMessageRef.current?.(editorText(locale, "pasteStale"));
           return;
         }
 
@@ -232,10 +234,10 @@ export function SourceEditor({
         const caret = safeStart + payload.text.length;
         replaceSourceValue(nextValue, caret, caret);
       } catch {
-        onStatusMessageRef.current?.("无法读取剪贴板，请检查应用权限后重试。");
+        onStatusMessageRef.current?.(editorText(locale, "clipboardReadError"));
       }
     },
-    [replaceSourceValue],
+    [locale, replaceSourceValue],
   );
 
   const readCurrentSelection = useCallback(() => {
@@ -262,7 +264,7 @@ export function SourceEditor({
       const view = viewRef.current;
       const textarea = fallbackRef.current;
       if (!view && !textarea) {
-        onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
+        onStatusMessageRef.current?.(editorText(locale, "editorPreparing"));
         return;
       }
       const selection = readCurrentSelection();
@@ -283,7 +285,9 @@ export function SourceEditor({
       pendingInsertRef.current = selection;
       setInsertKind(kind);
       setInsertInitialValues({
-        label: selection.value.slice(selection.selectionStart, selection.selectionEnd).trim() || "链接文字",
+        label:
+          selection.value.slice(selection.selectionStart, selection.selectionEnd).trim() ||
+          editorText(locale, "linkTextDefault"),
         alt: "",
         rows: 3,
         columns: 3,
@@ -292,7 +296,7 @@ export function SourceEditor({
       setInsertOpen(true);
       setContextMenu(null);
     },
-    [readCurrentSelection],
+    [locale, readCurrentSelection],
   );
 
   const restorePendingInsertSelection = useCallback(() => {
@@ -335,21 +339,21 @@ export function SourceEditor({
 
       const current = readCurrentSelection();
       if (current.value !== pending.value) {
-        onStatusMessageRef.current?.("正文内容已经变化，请重新打开插入面板，避免覆盖最新修改。");
+        onStatusMessageRef.current?.(editorText(locale, "insertStale"));
         closeInsert();
         return;
       }
 
       const result = applyEditorInsert(pending.value, pending.selectionStart, pending.selectionEnd, request);
       if (!result) {
-        onStatusMessageRef.current?.("插入内容无效，请检查输入后重试。");
+        onStatusMessageRef.current?.(editorText(locale, "insertInvalid"));
         return;
       }
 
       replaceSourceValue(result.value, result.selectionStart, result.selectionEnd);
       closeInsert(false);
     },
-    [closeInsert, readCurrentSelection, replaceSourceValue],
+    [closeInsert, locale, readCurrentSelection, replaceSourceValue],
   );
 
   useEffect(() => {
@@ -381,7 +385,7 @@ export function SourceEditor({
 
     if (action === "copy" || action === "cut") {
       if (selectionStart === selectionEnd) {
-        onStatusMessageRef.current?.("请先选择要复制的文本。");
+        onStatusMessageRef.current?.(editorText(locale, "selectToCopy"));
         setContextMenu(null);
         return;
       }
@@ -389,7 +393,7 @@ export function SourceEditor({
       const selectedText = currentValue.slice(selectionStart, selectionEnd);
       const clipboard = navigator.clipboard;
       if (!clipboard?.writeText) {
-        onStatusMessageRef.current?.("当前环境不支持访问剪贴板。");
+        onStatusMessageRef.current?.(editorText(locale, "clipboardUnavailable"));
         setContextMenu(null);
         return;
       }
@@ -404,7 +408,7 @@ export function SourceEditor({
             );
           }
         })
-        .catch(() => onStatusMessageRef.current?.("无法访问剪贴板，请检查应用权限后重试。"));
+        .catch(() => onStatusMessageRef.current?.(editorText(locale, "clipboardWriteError")));
       setContextMenu(null);
       return;
     }
@@ -430,7 +434,7 @@ export function SourceEditor({
 
     if (action === "find-selection") {
       const selectedText = currentValue.slice(selectionStart, selectionEnd).trim();
-      if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
+      if (!selectedText) onStatusMessageRef.current?.(editorText(locale, "selectToFind"));
       else onFindTextRef.current?.(selectedText, target?.restoreFocusTarget ?? target?.fallbackFocusTarget);
       setContextMenu(null);
       return;
@@ -451,7 +455,7 @@ export function SourceEditor({
     setContextMenu(null);
   };
 
-  const editorContextGroups = editorContextMenuGroups.map((group) => ({
+  const editorContextGroups = localizedEditorContextMenuGroups(locale).map((group) => ({
     label: group.label,
     items: group.items.map((item) => {
       const hasSelection = Boolean(contextMenu && contextMenu.selectionStart !== contextMenu.selectionEnd);
@@ -684,8 +688,15 @@ export function SourceEditor({
   if (loadFailed) {
     return (
       <div ref={fallbackShellRef} className="editor-surface source-editor-fallback-shell" tabIndex={-1}>
-        <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+        <EditorToolbar
+          locale={locale}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onAction={applyContextAction}
+          onInsert={openInsert}
+        />
         <EditorInsertPopover
+          locale={locale}
           open={insertOpen}
           kind={insertKind}
           initialValues={insertInitialValues}
@@ -735,8 +746,8 @@ export function SourceEditor({
           <ContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
-            title="编辑操作"
-            ariaLabel="正文编辑菜单"
+            title={editorText(locale, "menuTitle")}
+            ariaLabel={editorText(locale, "menuLabel")}
             groups={editorContextGroups}
             restoreFocusTarget={contextMenu.restoreFocusTarget}
             fallbackFocusTarget={contextMenu.fallbackFocusTarget}
@@ -749,8 +760,15 @@ export function SourceEditor({
 
   return (
     <div ref={containerRef} className="source-editor code-mirror-editor" aria-busy={!ready} tabIndex={-1}>
-      <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+      <EditorToolbar
+        locale={locale}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onAction={applyContextAction}
+        onInsert={openInsert}
+      />
       <EditorInsertPopover
+        locale={locale}
         open={insertOpen}
         kind={insertKind}
         initialValues={insertInitialValues}
@@ -760,13 +778,13 @@ export function SourceEditor({
         onSubmit={handleInsertRequest}
         onPickImage={onPickImage}
       />
-      {!ready && <span className="source-editor-loading">正在加载编辑器…</span>}
+      {!ready && <span className="source-editor-loading">{editorText(locale, "sourceLoading")}</span>}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          title="编辑操作"
-          ariaLabel="正文编辑菜单"
+          title={editorText(locale, "menuTitle")}
+          ariaLabel={editorText(locale, "menuLabel")}
           groups={editorContextGroups}
           restoreFocusTarget={contextMenu.restoreFocusTarget}
           fallbackFocusTarget={contextMenu.fallbackFocusTarget}

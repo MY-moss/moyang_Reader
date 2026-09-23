@@ -50,6 +50,7 @@ import { WorkspaceEntryDetailsDialog } from "./components/WorkspaceEntryDetailsD
 import { UpdateNotice } from "./components/UpdateNotice";
 import { NotificationViewport } from "./components/NotificationViewport";
 import { translate } from "./i18n";
+import { editorText } from "./editor-i18n";
 import { scheduleSourceRender } from "./source-render-scheduler";
 import {
   clearReadingHistory,
@@ -5151,11 +5152,12 @@ export function App() {
               </div>
             )}
           {!loading && documentState && documentState.kind === "markdown" && mode === "wysiwyg" && (
-            <Suspense fallback={<div className="wysiwyg-loading-state">正在准备所见即所得编辑器…</div>}>
+            <Suspense fallback={<div className="wysiwyg-loading-state">{editorText(locale, "wysiwygLoading")}</div>}>
               <LazyMarkdownWysiwygEditor
+                locale={locale}
                 source={sourceDraft}
                 documentKey={documentState.path}
-                ariaLabel="Markdown 所见即所得编辑器"
+                ariaLabel={editorText(locale, "wysiwygLabel")}
                 onChange={(value) => void updateSource(value, { merge: true })}
                 requestedInsertKind={requestedInsertKind}
                 onInsertRequestHandled={handleEditorInsertRequestHandled}
@@ -5173,8 +5175,9 @@ export function App() {
           )}
           {!loading && documentState && canEdit && mode === "source" && (
             <SourceEditor
+              locale={locale}
               value={sourceDraft}
-              ariaLabel={documentState.kind === "text" ? "文本源内容" : "Markdown 源文本"}
+              ariaLabel={editorText(locale, documentState.kind === "text" ? "textSourceLabel" : "markdownSourceLabel")}
               onChange={(value) => void updateSource(value, { merge: true })}
               onPaste={handleSourcePaste}
               requestedInsertKind={requestedInsertKind}

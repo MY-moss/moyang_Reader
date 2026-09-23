@@ -179,6 +179,30 @@ test("keeps the settings panel free of serious accessibility violations", async 
   await expectNoSeriousA11yViolations(page, "settings");
 });
 
+test("keeps editor insertion and context menus accessible in both editing modes", async ({ page }) => {
+  await loadReaderFixture(page);
+  const toolbar = page.getByRole("toolbar", { name: "编辑工具栏" });
+  await toolbar.getByRole("button", { name: "插入" }).click();
+  const insertDialog = page.getByRole("dialog", { name: "插入内容" });
+  await expect(insertDialog.getByRole("tablist", { name: "插入类型" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "editor-insert");
+  await insertDialog.press("Escape");
+
+  const visualEditor = page.locator('.wysiwyg-editor [contenteditable="true"]');
+  await visualEditor.click({ button: "right" });
+  await expect(page.getByRole("menu", { name: "正文编辑菜单" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "visual-editor-menu");
+  await page.keyboard.press("Escape");
+
+  const overflow = page.locator(".toolbar-overflow");
+  if ((await overflow.getAttribute("open")) === null) await page.locator(".toolbar-overflow-trigger").click();
+  await page.getByRole("button", { name: "源文本", exact: true }).click();
+  const source = page.getByRole("textbox", { name: "Markdown 源文本" });
+  await source.click({ button: "right" });
+  await expect(page.getByRole("menu", { name: "正文编辑菜单" })).toBeVisible();
+  await expectNoSeriousA11yViolations(page, "source-editor-menu");
+});
+
 test("keeps light and dark theme tokens at WCAG AA contrast", async ({ page }) => {
   await page.goto("/");
   const themes: ThemeName[] = ["porcelain", "paper", "ink"];

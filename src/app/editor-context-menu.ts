@@ -90,3 +90,44 @@ export const editorContextMenuGroups: readonly EditorContextMenuGroup[] = [
     ],
   },
 ];
+
+const actionLabelKeys = {
+  undo: "undo",
+  redo: "redo",
+  cut: "cut",
+  copy: "copy",
+  paste: "paste",
+  "paste-plain": "pastePlain",
+  "select-all": "selectAll",
+  "find-selection": "findSelection",
+  bold: "bold",
+  italic: "italic",
+  strike: "strike",
+  "inline-code": "inlineCode",
+  paragraph: "paragraphText",
+  "heading-1": "heading1",
+  "heading-2": "heading2",
+  "heading-3": "heading3",
+  "bullet-list": "bulletList",
+  "ordered-list": "orderedList",
+  quote: "quote",
+  "code-block": "codeBlock",
+  "clear-format": "clear",
+  "task-list": "taskList",
+  "insert-date": "insertDate",
+  link: "link",
+  wikilink: "wikilink",
+  image: "image",
+  table: "table",
+  "horizontal-rule": "horizontalRule",
+} as const satisfies Record<EditorContextAction, Parameters<typeof editorText>[1]>;
+
+export function localizedEditorContextMenuGroups(locale: Locale): readonly EditorContextMenuGroup[] {
+  const groupKeys = ["edit", "format", "paragraph", "insertGroup"] as const;
+  return editorContextMenuGroups.map((group, index) => ({
+    label: editorText(locale, groupKeys[index]!),
+    items: group.items.map((item) => ({ ...item, label: editorText(locale, actionLabelKeys[item.action]) })),
+  }));
+}
+import type { Locale } from "./i18n";
+import { editorText } from "./editor-i18n";
