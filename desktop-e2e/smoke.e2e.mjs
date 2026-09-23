@@ -50,7 +50,7 @@ async function ensureRenderedMode() {
 }
 
 async function clickWorkspaceExportAction(name) {
-  const menu = await browser.$("details.workspace-export-menu");
+  const menu = await browser.$("details.workspace-manage-menu");
   if ((await menu.getAttribute("open")) === null) {
     await menu.$("summary").click();
   }
@@ -796,7 +796,7 @@ describe("Moyang Reader desktop runtime", () => {
     });
     await browser.$("h1=Desktop E2E").waitForDisplayed();
     assert.equal(await browser.$("button=打开列表").isExisting(), false);
-    assert.equal(await browser.$("summary=批量导出").isDisplayed(), true);
+    assert.equal(await browser.$('summary[aria-label="阅读库管理"]').isDisplayed(), true);
 
     await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
 
@@ -874,8 +874,14 @@ describe("Moyang Reader desktop runtime", () => {
     });
   });
 
-  it("keeps workspace actions visible and menus in flow at a narrow sidebar width", async () => {
+  it("keeps workspace actions and management menus within a narrow sidebar", async () => {
     await resetDesktopSession();
+    if (process.env.MOYANG_CAPTURE_WORKSPACE_UI === "1") {
+      const dismissGuide = await browser.$("button=知道了");
+      if (await dismissGuide.isDisplayed()) await dismissGuide.click();
+      fs.mkdirSync(path.join(process.cwd(), "test-results"), { recursive: true });
+      await browser.saveScreenshot(path.join(process.cwd(), "test-results", "workspace-desktop.png"));
+    }
     await browser.execute(() => {
       document.querySelector(".app-shell")?.style.setProperty("--sidebar-width", "216px");
     });
@@ -896,12 +902,12 @@ describe("Moyang Reader desktop runtime", () => {
           actions: rectOf(actions),
           children: Array.from(actions?.children ?? []).map(rectOf),
           createPanel: rectOf(document.querySelector(".workspace-create-menu-panel")),
-          exportPanel: rectOf(document.querySelector(".workspace-export-menu .export-menu-panel")),
+          managePanel: rectOf(document.querySelector(".workspace-manage-panel")),
           createPanelPosition: document.querySelector(".workspace-create-menu-panel")
             ? window.getComputedStyle(document.querySelector(".workspace-create-menu-panel")).position
             : null,
-          exportPanelPosition: document.querySelector(".workspace-export-menu .export-menu-panel")
-            ? window.getComputedStyle(document.querySelector(".workspace-export-menu .export-menu-panel")).position
+          managePanelPosition: document.querySelector(".workspace-manage-panel")
+            ? window.getComputedStyle(document.querySelector(".workspace-manage-panel")).position
             : null,
         };
       });
@@ -921,34 +927,37 @@ describe("Moyang Reader desktop runtime", () => {
     }
 
     const createMenu = await browser.$(".workspace-create-menu");
-    const exportMenu = await browser.$(".workspace-export-menu");
+    const manageMenu = await browser.$(".workspace-manage-menu");
     await createMenu.$("summary").click();
     assert.equal(await createMenu.getAttribute("open"), "");
     const createGeometry = await readActionGeometry();
-    assert.equal(createGeometry.createPanelPosition, "static");
+    assert.equal(createGeometry.createPanelPosition, "absolute");
     assert.ok(createGeometry.createPanel, "the create menu panel should be visible");
     assert.ok(
       createGeometry.createPanel.right <= createGeometry.sidebar.right,
       "the create menu should not be clipped by the sidebar",
     );
 
-    await exportMenu.$("summary").click();
+    await manageMenu.$("summary").click();
     assert.equal(await createMenu.getAttribute("open"), null);
-    assert.equal(await exportMenu.getAttribute("open"), "");
-    const exportGeometry = await readActionGeometry();
-    assert.equal(exportGeometry.exportPanelPosition, "static");
-    assert.ok(exportGeometry.exportPanel, "the export menu panel should be visible");
+    assert.equal(await manageMenu.getAttribute("open"), "");
+    const manageGeometry = await readActionGeometry();
+    assert.equal(manageGeometry.managePanelPosition, "absolute");
+    assert.ok(manageGeometry.managePanel, "the management menu panel should be visible");
     assert.ok(
-      exportGeometry.exportPanel.right <= exportGeometry.sidebar.right,
-      "the export menu should not be clipped by the sidebar",
+      manageGeometry.managePanel.right <= manageGeometry.sidebar.right,
+      "the management menu should not be clipped by the sidebar",
     );
+    if (process.env.MOYANG_CAPTURE_WORKSPACE_UI === "1") {
+      await browser.saveScreenshot(path.join(process.cwd(), "test-results", "workspace-narrow-menu.png"));
+    }
 
     await browser.execute(() => {
       document
         .querySelector(".workspace-location")
         ?.dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true }));
     });
-    assert.equal(await exportMenu.getAttribute("open"), null);
+    assert.equal(await manageMenu.getAttribute("open"), null);
   });
 
   it("shows native drag feedback and opens a dropped Markdown file", async () => {

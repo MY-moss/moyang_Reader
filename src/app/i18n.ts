@@ -60,6 +60,69 @@ export type MessageKey =
   | "reader.progressRead"
   | "reader.documentStart"
   | "reader.exitFocus"
+  | "workspace.title"
+  | "workspace.actions"
+  | "workspace.create"
+  | "workspace.root"
+  | "workspace.createNote"
+  | "workspace.createFolder"
+  | "workspace.search"
+  | "workspace.manage"
+  | "workspace.limitReached"
+  | "workspace.addTitle"
+  | "workspace.add"
+  | "workspace.mounted"
+  | "workspace.remove"
+  | "workspace.batchExport"
+  | "workspace.export.html"
+  | "workspace.export.docx"
+  | "workspace.export.pdf"
+  | "workspace.cancelExport"
+  | "workspace.counts"
+  | "workspace.help"
+  | "workspace.exportProgress"
+  | "workspace.exportProgressLabel"
+  | "workspace.exportFailures"
+  | "workspace.copyList"
+  | "workspace.saveList"
+  | "workspace.indexLoading"
+  | "workspace.truncated"
+  | "workspace.searchLoading"
+  | "workspace.matchCount"
+  | "workspace.visibleCount"
+  | "workspace.clearFilters"
+  | "workspace.searchLabel"
+  | "workspace.searchPlaceholder"
+  | "workspace.tags"
+  | "workspace.tagFilter"
+  | "workspace.allTags"
+  | "workspace.kind"
+  | "workspace.kindFilter"
+  | "workspace.kind.all"
+  | "workspace.kind.markdown"
+  | "workspace.kind.text"
+  | "workspace.kind.docx"
+  | "workspace.kind.pdf"
+  | "workspace.kind.image"
+  | "workspace.searchHint"
+  | "workspace.searching"
+  | "workspace.noMatches"
+  | "workspace.filesLabel"
+  | "workspace.files"
+  | "workspace.noFiles"
+  | "workspace.recentLibraries"
+  | "workspace.recentFiles"
+  | "workspace.lastOpened"
+  | "workspace.history"
+  | "workspace.historyToggle"
+  | "history.range"
+  | "history.summary"
+  | "history.documents"
+  | "history.duration"
+  | "history.dailyDuration"
+  | "history.empty"
+  | "history.emptyWeek"
+  | "history.clear"
   | "workspaceEntry.busy"
   | "workspaceEntry.requireWorkspace"
   | "workspaceEntry.actionRename"
@@ -186,6 +249,69 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.viewTools": "搜索与面板",
     "action.documentTools": "文档操作",
     "action.appearance": "外观与更新",
+    "workspace.title": "阅读库",
+    "workspace.actions": "阅读库操作",
+    "workspace.create": "新建",
+    "workspace.root": "阅读库根目录",
+    "workspace.createNote": "新建笔记",
+    "workspace.createFolder": "新建文件夹",
+    "workspace.search": "搜索",
+    "workspace.manage": "阅读库管理",
+    "workspace.limitReached": "已达到 {count} 个阅读库上限，请先移除一个已挂载阅读库。",
+    "workspace.addTitle": "添加另一个阅读库",
+    "workspace.add": "添加阅读库",
+    "workspace.mounted": "已挂载阅读库",
+    "workspace.remove": "从已挂载阅读库移除 {name}",
+    "workspace.batchExport": "批量导出",
+    "workspace.export.html": "单文件 HTML",
+    "workspace.export.docx": "单文件 Word",
+    "workspace.export.pdf": "批量打印 / PDF",
+    "workspace.cancelExport": "取消导出",
+    "workspace.counts": "{files} 项 · {libraries} 个阅读库",
+    "workspace.help": "添加一个文件夹，递归读取其中的文档并开启目录浏览和阅读库搜索。",
+    "workspace.exportProgress": "正在整理",
+    "workspace.exportProgressLabel": "批量导出进度",
+    "workspace.exportFailures": "查看 {count} 个未导出文件",
+    "workspace.copyList": "复制清单",
+    "workspace.saveList": "保存清单",
+    "workspace.indexLoading": "目录已打开，正在整理链接与标签…",
+    "workspace.truncated": "工作区较大，文件树和工作区索引只加载了安全范围内的内容；未加载部分需要缩小工作区后查看。",
+    "workspace.searchLoading": "正在整理当前阅读库搜索结果…",
+    "workspace.matchCount": "当前阅读库匹配 {count} 项",
+    "workspace.visibleCount": "显示 {visible} / {total} 项",
+    "workspace.clearFilters": "清除筛选",
+    "workspace.searchLabel": "当前阅读库搜索",
+    "workspace.searchPlaceholder": "搜索当前阅读库内容",
+    "workspace.tags": "标签",
+    "workspace.tagFilter": "按标签筛选工作区",
+    "workspace.allTags": "全部标签",
+    "workspace.kind": "类型",
+    "workspace.kindFilter": "按类型筛选工作区",
+    "workspace.kind.all": "全部类型",
+    "workspace.kind.markdown": "Markdown",
+    "workspace.kind.text": "纯文本",
+    "workspace.kind.docx": "Word",
+    "workspace.kind.pdf": "PDF",
+    "workspace.kind.image": "图片",
+    "workspace.searchHint": "至少输入 2 个字符后搜索当前阅读库。",
+    "workspace.searching": "正在搜索当前阅读库…",
+    "workspace.noMatches": "当前阅读库没有匹配文档。",
+    "workspace.filesLabel": "工作区文件",
+    "workspace.files": "文件",
+    "workspace.noFiles": "当前标签下没有文件。",
+    "workspace.recentLibraries": "最近阅读库",
+    "workspace.recentFiles": "最近打开",
+    "workspace.lastOpened": "最近打开",
+    "workspace.history": "本周阅读",
+    "workspace.historyToggle": "阅读历史",
+    "history.range": "周一—周日",
+    "history.summary": "本周阅读摘要：{count} 篇文档，累计 {duration}",
+    "history.documents": "篇文档",
+    "history.duration": "累计时长",
+    "history.dailyDuration": "{day} 阅读时长",
+    "history.empty": "还没有本机阅读记录。",
+    "history.emptyWeek": "本周还没有阅读时长。",
+    "history.clear": "清理本机记录",
     "tabs.openDocuments": "已打开文档",
     "tabs.externalModified": "文件已被外部修改",
     "tabs.close": "关闭",
@@ -332,6 +458,70 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "action.viewTools": "Search and panels",
     "action.documentTools": "Document actions",
     "action.appearance": "Appearance & updates",
+    "workspace.title": "Library",
+    "workspace.actions": "Library actions",
+    "workspace.create": "New",
+    "workspace.root": "Library root",
+    "workspace.createNote": "New note",
+    "workspace.createFolder": "New folder",
+    "workspace.search": "Search",
+    "workspace.manage": "Manage library",
+    "workspace.limitReached": "The limit of {count} libraries is reached. Remove one before adding another.",
+    "workspace.addTitle": "Add another library",
+    "workspace.add": "Add library",
+    "workspace.mounted": "Mounted libraries",
+    "workspace.remove": "Remove {name} from mounted libraries",
+    "workspace.batchExport": "Batch export",
+    "workspace.export.html": "Single HTML file",
+    "workspace.export.docx": "Single Word file",
+    "workspace.export.pdf": "Batch print / PDF",
+    "workspace.cancelExport": "Cancel export",
+    "workspace.counts": "{files} items · {libraries} libraries",
+    "workspace.help": "Add a folder to browse its documents and search the library.",
+    "workspace.exportProgress": "Preparing",
+    "workspace.exportProgressLabel": "Batch export progress",
+    "workspace.exportFailures": "View {count} files not exported",
+    "workspace.copyList": "Copy list",
+    "workspace.saveList": "Save list",
+    "workspace.indexLoading": "Folder opened. Indexing links and tags…",
+    "workspace.truncated":
+      "This library is large. The file tree and index show only the safe loading range; narrow the library to see the rest.",
+    "workspace.searchLoading": "Preparing library search results…",
+    "workspace.matchCount": "{count} matches in this library",
+    "workspace.visibleCount": "Showing {visible} / {total} items",
+    "workspace.clearFilters": "Clear filters",
+    "workspace.searchLabel": "Search this library",
+    "workspace.searchPlaceholder": "Search library contents",
+    "workspace.tags": "Tags",
+    "workspace.tagFilter": "Filter library by tag",
+    "workspace.allTags": "All tags",
+    "workspace.kind": "Type",
+    "workspace.kindFilter": "Filter library by type",
+    "workspace.kind.all": "All types",
+    "workspace.kind.markdown": "Markdown",
+    "workspace.kind.text": "Plain text",
+    "workspace.kind.docx": "Word",
+    "workspace.kind.pdf": "PDF",
+    "workspace.kind.image": "Image",
+    "workspace.searchHint": "Enter at least 2 characters to search this library.",
+    "workspace.searching": "Searching this library…",
+    "workspace.noMatches": "No matching documents in this library.",
+    "workspace.filesLabel": "Library files",
+    "workspace.files": "Files",
+    "workspace.noFiles": "No files with the selected tag.",
+    "workspace.recentLibraries": "Recent libraries",
+    "workspace.recentFiles": "Recently opened",
+    "workspace.lastOpened": "Last opened",
+    "workspace.history": "Reading this week",
+    "workspace.historyToggle": "Reading history",
+    "history.range": "Mon–Sun",
+    "history.summary": "Reading this week: {count} documents, {duration} total",
+    "history.documents": "documents",
+    "history.duration": "Total time",
+    "history.dailyDuration": "{day} reading time",
+    "history.empty": "No local reading history yet.",
+    "history.emptyWeek": "No reading time this week.",
+    "history.clear": "Clear local history",
     "tabs.openDocuments": "Open documents",
     "tabs.externalModified": "File changed externally",
     "tabs.close": "Close",

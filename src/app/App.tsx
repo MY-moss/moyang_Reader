@@ -4935,6 +4935,7 @@ export function App() {
       <div className="workspace-grid">
         <aside className="sidebar" tabIndex={0}>
           <WorkspacePanel
+            locale={locale}
             onExportWorkspace={(format) => void handleExportWorkspace(format)}
             onCancelWorkspaceExport={handleCancelWorkspaceExport}
             workspaceExporting={workspaceExporting}

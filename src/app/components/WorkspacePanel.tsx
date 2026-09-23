@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 
 import type {
   RecentFile,
@@ -16,17 +16,13 @@ import { filterSwitchableWorkspaces } from "../workspace-switcher";
 import { formatRecentFileTime, MAX_MOUNTED_WORKSPACES } from "../storage";
 import { ReadingHistoryPanel } from "./ReadingHistoryPanel";
 import type { ReadingHistoryEntry } from "../reading-history";
+import { translate, type Locale, type MessageKey } from "../i18n";
+import { Icon } from "./Icon";
 
-const workspaceKindOptions: Array<{ value: WorkspaceKindFilter; label: string }> = [
-  { value: "all", label: "全部类型" },
-  { value: "markdown", label: "Markdown" },
-  { value: "text", label: "纯文本" },
-  { value: "docx", label: "Word" },
-  { value: "pdf", label: "PDF" },
-  { value: "image", label: "图片" },
-];
+const workspaceKindOptions: WorkspaceKindFilter[] = ["all", "markdown", "text", "docx", "pdf", "image"];
 
 type WorkspacePanelProps = {
+  locale?: Locale;
   workspacePath: string | null;
   files: WorkspaceFile[];
   folders?: WorkspaceDirectory[];
@@ -95,6 +91,7 @@ function isBatchExportable(file: WorkspaceFile): boolean {
 }
 
 export function WorkspacePanel({
+  locale = "zh-CN",
   workspacePath,
   files,
   folders = [],
@@ -149,38 +146,85 @@ export function WorkspacePanel({
   onClearFilters,
 }: WorkspacePanelProps) {
   const createMenuRef = useRef<HTMLDetailsElement>(null);
-  const exportMenuRef = useRef<HTMLDetailsElement>(null);
-  const switcherMenuRef = useRef<HTMLDetailsElement>(null);
-  const workspaceMenuRefs = useMemo(() => [createMenuRef, exportMenuRef, switcherMenuRef], []);
-  const selectedKindLabel = workspaceKindOptions.find((option) => option.value === selectedKind)?.label ?? "全部类型";
+  const manageMenuRef = useRef<HTMLDetailsElement>(null);
+  const previousWorkspacePath = useRef(workspacePath);
+  const [searchExpanded, setSearchExpanded] = useState(
+    Boolean(searchQuery.trim() || selectedTag || selectedKind !== "all"),
+  );
+  const [historyOpen, setHistoryOpen] = useState(!workspacePath || readingHistory.length > 0);
+  const t = (key: MessageKey) => translate(locale, key);
+  const selectedKindLabel = t(`workspace.kind.${selectedKind}`);
   const hasFilters = Boolean(selectedTag) || selectedKind !== "all";
   const switchableWorkspaces = filterSwitchableWorkspaces(mountedWorkspaces, workspacePath);
   const canBatchExport = Boolean(workspacePath && exportableFiles.some(isBatchExportable));
   const treeFolders = hasFilters ? [] : folders;
 
   const closeOtherWorkspaceMenus = (activeMenu: HTMLDetailsElement | null) => {
-    for (const menuRef of workspaceMenuRefs) {
-      if (menuRef.current !== activeMenu) menuRef.current?.removeAttribute("open");
+    for (const menu of [createMenuRef.current, manageMenuRef.current]) {
+      if (menu !== activeMenu) menu?.removeAttribute("open");
     }
   };
 
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDetailsElement>) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const menu = event.currentTarget;
+    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'));
+    if (items.length === 0) return;
+    event.preventDefault();
+    menu.open = true;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : current < 0
+            ? event.key === "ArrowDown"
+              ? 0
+              : items.length - 1
+            : event.key === "ArrowDown"
+              ? (current + 1) % items.length
+              : (current + items.length - 1) % items.length;
+    items[next]?.focus();
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim() || hasFilters) setSearchExpanded(true);
+  }, [searchQuery, hasFilters]);
+
+  useEffect(() => {
+    if (previousWorkspacePath.current === workspacePath) return;
+    previousWorkspacePath.current = workspacePath;
+    setHistoryOpen(!workspacePath || readingHistory.length > 0);
+  }, [workspacePath, readingHistory.length]);
+
   useEffect(() => {
     const closeWorkspaceMenus = () => {
-      for (const menuRef of workspaceMenuRefs) {
-        menuRef.current?.removeAttribute("open");
-      }
+      createMenuRef.current?.removeAttribute("open");
+      manageMenuRef.current?.removeAttribute("open");
     };
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
-      if (!(target instanceof Node) || workspaceMenuRefs.some((menuRef) => menuRef.current?.contains(target))) return;
+      if (
+        !(target instanceof Node) ||
+        [createMenuRef.current, manageMenuRef.current].some((menu) => menu?.contains(target))
+      )
+        return;
       closeWorkspaceMenus();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !workspaceMenuRefs.some((menuRef) => menuRef.current?.open)) return;
+      if (event.key !== "Escape" || (!createMenuRef.current?.open && !manageMenuRef.current?.open)) return;
       const target = event.target;
+      const activeTrigger = [createMenuRef.current, manageMenuRef.current]
+        .find((menu) => menu?.open)
+        ?.querySelector<HTMLElement>("summary");
       closeWorkspaceMenus();
       event.preventDefault();
-      if (target instanceof Node && workspaceMenuRefs.some((menuRef) => menuRef.current?.contains(target))) {
+      activeTrigger?.focus();
+      if (
+        target instanceof Node &&
+        [createMenuRef.current, manageMenuRef.current].some((menu) => menu?.contains(target))
+      ) {
         event.stopPropagation();
       }
     };
@@ -191,29 +235,31 @@ export function WorkspacePanel({
       document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [workspaceMenuRefs]);
+  }, []);
 
   return (
     <section className="workspace-panel" aria-labelledby="workspace-title">
       <div className="workspace-heading">
         <div className="workspace-heading-copy">
-          <div className="panel-kicker">WORKSPACE</div>
-          <h2 id="workspace-title">阅读库</h2>
+          <h2 id="workspace-title">{t("workspace.title")}</h2>
         </div>
         {workspacePath && (
-          <div className="workspace-actions" aria-label="阅读库操作">
-            {workspacePath && onCreateNote && onCreateFolder && (
+          <div className="workspace-actions" aria-label={t("workspace.actions")}>
+            {onCreateNote && onCreateFolder && (
               <details
                 ref={createMenuRef}
                 className="workspace-create-menu workspace-action-menu"
+                onKeyDown={handleMenuKeyDown}
                 onClick={() => closeOtherWorkspaceMenus(createMenuRef.current)}
                 onToggle={() => {
                   if (createMenuRef.current?.open) closeOtherWorkspaceMenus(createMenuRef.current);
                 }}
               >
-                <summary className="quiet-button workspace-create-button workspace-action-trigger">新建</summary>
+                <summary className="quiet-button workspace-create-button workspace-action-trigger">
+                  {t("workspace.create")}
+                </summary>
                 <div className="workspace-create-menu-panel" role="menu">
-                  <div className="workspace-switcher-label">阅读库根目录</div>
+                  <div className="workspace-switcher-label">{t("workspace.root")}</div>
                   <button
                     type="button"
                     role="menuitem"
@@ -222,7 +268,7 @@ export function WorkspacePanel({
                       onCreateNote("");
                     }}
                   >
-                    新建笔记
+                    {t("workspace.createNote")}
                   </button>
                   <button
                     type="button"
@@ -232,125 +278,121 @@ export function WorkspacePanel({
                       onCreateFolder("");
                     }}
                   >
-                    新建文件夹
+                    {t("workspace.createFolder")}
                   </button>
                 </div>
               </details>
             )}
-            {(canBatchExport || workspaceExporting) && (
-              <details
-                ref={exportMenuRef}
-                className="export-menu workspace-export-menu workspace-action-menu"
-                onClick={() => closeOtherWorkspaceMenus(exportMenuRef.current)}
-                onToggle={() => {
-                  if (exportMenuRef.current?.open) closeOtherWorkspaceMenus(exportMenuRef.current);
-                }}
-              >
-                <summary className="quiet-button workspace-action-trigger">
-                  {workspaceExporting ? "导出中…" : "批量导出"}
-                </summary>
-                <div className="export-menu-panel">
-                  <button
-                    type="button"
-                    disabled={!canBatchExport || workspaceExporting}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      onExportWorkspace("html");
-                    }}
-                  >
-                    单文件 HTML
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canBatchExport || workspaceExporting}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      onExportWorkspace("docx");
-                    }}
-                  >
-                    单文件 Word
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canBatchExport || workspaceExporting}
-                    onClick={(event) => {
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                      onExportWorkspace("pdf");
-                    }}
-                  >
-                    批量打印 / PDF
-                  </button>
-                </div>
-              </details>
-            )}
-            {workspaceExporting && (
-              <button
-                type="button"
-                className="quiet-button workspace-export-cancel workspace-action-wide"
-                onClick={onCancelWorkspaceExport}
-              >
-                取消导出
-              </button>
-            )}
-            {workspacePath && (
-              <button
-                type="button"
-                className="quiet-button workspace-add-button workspace-action-wide"
-                onClick={onAddWorkspace}
-                disabled={workspaceLimitReached}
-                title={
-                  workspaceLimitReached
-                    ? `已达到 ${MAX_MOUNTED_WORKSPACES} 个阅读库上限，请先移除一个已挂载阅读库。`
-                    : "添加另一个阅读库"
-                }
-              >
-                添加阅读库
-              </button>
-            )}
-            {switchableWorkspaces.length > 0 && (
-              <details
-                ref={switcherMenuRef}
-                className="workspace-switcher workspace-action-menu workspace-action-wide"
-                onClick={() => closeOtherWorkspaceMenus(switcherMenuRef.current)}
-                onToggle={() => {
-                  if (switcherMenuRef.current?.open) closeOtherWorkspaceMenus(switcherMenuRef.current);
-                }}
-              >
-                <summary className="workspace-switcher-trigger workspace-action-trigger" aria-label="切换阅读库">
-                  切换阅读库
-                </summary>
-                <div className="workspace-switcher-menu" role="menu">
-                  <div className="workspace-switcher-label">
-                    已挂载阅读库 · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
-                  </div>
-                  {switchableWorkspaces.map((workspace) => (
-                    <div className="workspace-switcher-item" role="none" key={workspace.path}>
+            <button
+              type="button"
+              className="quiet-button workspace-search-toggle"
+              aria-expanded={searchExpanded}
+              aria-controls="workspace-search-controls"
+              onClick={() => {
+                setSearchExpanded((current) => !current);
+                if (!searchExpanded) requestAnimationFrame(() => searchInputRef?.current?.focus());
+              }}
+            >
+              <Icon name="search" size={15} />
+              {t("workspace.search")}
+              {hasFilters && <span className="workspace-active-dot" aria-hidden="true" />}
+            </button>
+            <details
+              ref={manageMenuRef}
+              className="workspace-manage-menu workspace-action-menu"
+              onKeyDown={handleMenuKeyDown}
+              onClick={() => closeOtherWorkspaceMenus(manageMenuRef.current)}
+              onToggle={() => {
+                if (manageMenuRef.current?.open) closeOtherWorkspaceMenus(manageMenuRef.current);
+              }}
+            >
+              <summary className="quiet-button workspace-action-trigger" aria-label={t("workspace.manage")}>
+                <Icon name="more-horizontal" size={18} />
+              </summary>
+              <div className="workspace-manage-panel" role="menu">
+                <div className="workspace-switcher-label">{t("workspace.manage")}</div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={workspaceLimitReached}
+                  title={
+                    workspaceLimitReached
+                      ? t("workspace.limitReached").replace("{count}", String(MAX_MOUNTED_WORKSPACES))
+                      : t("workspace.addTitle")
+                  }
+                  onClick={() => {
+                    manageMenuRef.current?.removeAttribute("open");
+                    onAddWorkspace();
+                  }}
+                >
+                  {t("workspace.add")}
+                </button>
+                {switchableWorkspaces.length > 0 && (
+                  <>
+                    <div className="workspace-switcher-label">
+                      {t("workspace.mounted")} · {mountedWorkspaces.length} / {MAX_MOUNTED_WORKSPACES}
+                    </div>
+                    {switchableWorkspaces.map((workspace) => (
+                      <div className="workspace-switcher-item" role="none" key={workspace.path}>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          title={workspace.path}
+                          onClick={() => {
+                            manageMenuRef.current?.removeAttribute("open");
+                            onOpenWorkspace(workspace.path);
+                          }}
+                        >
+                          <strong>{workspace.name}</strong>
+                          <span>{workspace.path}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="workspace-switcher-remove"
+                          title={t("workspace.remove").replace("{name}", workspace.name)}
+                          aria-label={t("workspace.remove").replace("{name}", workspace.name)}
+                          onClick={() => onRemoveWorkspace(workspace.path)}
+                        >
+                          <Icon name="close" size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {(canBatchExport || workspaceExporting) && (
+                  <>
+                    <div className="workspace-switcher-label">{t("workspace.batchExport")}</div>
+                    {(["html", "docx", "pdf"] as const).map((format) => (
                       <button
                         type="button"
                         role="menuitem"
-                        title={workspace.path}
-                        onClick={(event) => {
-                          event.currentTarget.closest("details")?.removeAttribute("open");
-                          onOpenWorkspace(workspace.path);
+                        key={format}
+                        disabled={!canBatchExport || workspaceExporting}
+                        onClick={() => {
+                          manageMenuRef.current?.removeAttribute("open");
+                          onExportWorkspace(format);
                         }}
                       >
-                        <strong>{workspace.name}</strong>
-                        <span>{workspace.path}</span>
+                        {t(`workspace.export.${format}`)}
                       </button>
+                    ))}
+                    {workspaceExporting && (
                       <button
                         type="button"
-                        className="workspace-switcher-remove"
-                        title={`移除 ${workspace.name}`}
-                        aria-label={`从已挂载阅读库移除 ${workspace.name}`}
-                        onClick={() => onRemoveWorkspace(workspace.path)}
+                        role="menuitem"
+                        className="workspace-export-cancel"
+                        onClick={() => {
+                          manageMenuRef.current?.removeAttribute("open");
+                          onCancelWorkspaceExport();
+                        }}
                       >
-                        ×
+                        {t("workspace.cancelExport")}
                       </button>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
+                    )}
+                  </>
+                )}
+              </div>
+            </details>
           </div>
         )}
       </div>
@@ -360,11 +402,13 @@ export function WorkspacePanel({
           <span className="workspace-dot" aria-hidden="true" />
           <span className="workspace-location-name">{pathName(workspacePath)}</span>
           <small>
-            {files.length} 项 · {mountedWorkspaces.length} 个阅读库
+            {t("workspace.counts")
+              .replace("{files}", String(files.length))
+              .replace("{libraries}", String(mountedWorkspaces.length))}
           </small>
         </div>
       ) : (
-        <p className="workspace-help">添加一个文件夹，递归读取其中的文档并开启目录浏览和阅读库搜索。</p>
+        <p className="workspace-help">{t("workspace.help")}</p>
       )}
       {workspaceExportNotice && (
         <div className="workspace-export-note" role="status">
@@ -375,14 +419,14 @@ export function WorkspacePanel({
         <div className="workspace-export-progress" role="status" aria-live="polite">
           <div className="workspace-export-progress-label">
             <span>
-              正在整理 {workspaceExportProgress.current} / {workspaceExportProgress.total}
+              {t("workspace.exportProgress")} {workspaceExportProgress.current} / {workspaceExportProgress.total}
             </span>
             <strong title={workspaceExportProgress.fileName}>{workspaceExportProgress.fileName}</strong>
           </div>
           <div
             className="workspace-export-progress-track"
             role="progressbar"
-            aria-label="批量导出进度"
+            aria-label={t("workspace.exportProgressLabel")}
             aria-valuemin={0}
             aria-valuemax={workspaceExportProgress.total}
             aria-valuenow={workspaceExportProgress.current}
@@ -397,13 +441,13 @@ export function WorkspacePanel({
       )}
       {workspaceExportFailures.length > 0 && (
         <details className="workspace-export-failures">
-          <summary>查看 {workspaceExportFailures.length} 个未导出文件</summary>
+          <summary>{t("workspace.exportFailures").replace("{count}", String(workspaceExportFailures.length))}</summary>
           <div className="workspace-export-failure-actions">
             <button type="button" className="quiet-button" onClick={onCopyExportFailures}>
-              复制清单
+              {t("workspace.copyList")}
             </button>
             <button type="button" className="quiet-button" onClick={onSaveExportFailures}>
-              保存清单
+              {t("workspace.saveList")}
             </button>
           </div>
           <ul>
@@ -418,87 +462,95 @@ export function WorkspacePanel({
       )}
       {workspaceIndexLoading && (
         <div className="workspace-index-note" role="status">
-          目录已打开，正在整理链接与标签…
+          {t("workspace.indexLoading")}
         </div>
       )}
       {workspaceListingStatus.truncated && (
         <div className="workspace-limit-note" role="status">
-          工作区较大，文件树和工作区索引只加载了安全范围内的内容；未加载部分需要缩小工作区后查看。
+          {t("workspace.truncated")}
         </div>
       )}
 
       {workspacePath && (
         <>
-          <div className="workspace-filter-summary" role="status">
-            <span>
-              {searchQuery.trim()
-                ? searchLoading
-                  ? "正在整理当前阅读库搜索结果…"
-                  : `当前阅读库匹配 ${visibleResultCount} 项`
-                : `显示 ${visibleFiles.length} / ${files.length} 项`}
-            </span>
-            {hasFilters && (
-              <>
-                <span className="workspace-filter-label">
-                  · {selectedKind !== "all" ? selectedKindLabel : ""}
-                  {selectedKind !== "all" && selectedTag ? " · " : ""}
-                  {selectedTag ? `#${selectedTag}` : ""}
-                </span>
-                <button type="button" className="workspace-clear-filter" onClick={onClearFilters}>
-                  清除筛选
-                </button>
-              </>
+          <div
+            id="workspace-search-controls"
+            className={`workspace-search-controls${searchExpanded ? " is-open" : ""}`}
+          >
+            <div className="workspace-filter-summary" role="status">
+              <span>
+                {searchQuery.trim()
+                  ? searchLoading
+                    ? t("workspace.searchLoading")
+                    : t("workspace.matchCount").replace("{count}", String(visibleResultCount))
+                  : t("workspace.visibleCount")
+                      .replace("{visible}", String(visibleFiles.length))
+                      .replace("{total}", String(files.length))}
+              </span>
+              {hasFilters && (
+                <>
+                  <span className="workspace-filter-label">
+                    · {selectedKind !== "all" ? selectedKindLabel : ""}
+                    {selectedKind !== "all" && selectedTag ? " · " : ""}
+                    {selectedTag ? `#${selectedTag}` : ""}
+                  </span>
+                  <button type="button" className="workspace-clear-filter" onClick={onClearFilters}>
+                    {t("workspace.clearFilters")}
+                  </button>
+                </>
+              )}
+            </div>
+            <input
+              ref={searchInputRef}
+              className={`workspace-search${searchExpanded ? "" : " is-collapsed"}`}
+              type="search"
+              aria-label={t("workspace.searchLabel")}
+              placeholder={t("workspace.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              onFocus={() => setSearchExpanded(true)}
+            />
+            {tagOptions.length > 0 && (
+              <label className="tag-filter">
+                <span>{t("workspace.tags")}</span>
+                <select
+                  aria-label={t("workspace.tagFilter")}
+                  value={selectedTag ?? ""}
+                  onChange={(event) => onTagChange(event.target.value || null)}
+                >
+                  <option value="">{t("workspace.allTags")}</option>
+                  {tagOptions.map((tag) => (
+                    <option key={tag} value={tag}>
+                      #{tag}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-          </div>
-          <input
-            ref={searchInputRef}
-            className="workspace-search"
-            type="search"
-            aria-label="当前阅读库搜索"
-            placeholder="搜索当前阅读库内容"
-            value={searchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-          />
-          {tagOptions.length > 0 && (
             <label className="tag-filter">
-              <span>标签</span>
+              <span>{t("workspace.kind")}</span>
               <select
-                aria-label="按标签筛选工作区"
-                value={selectedTag ?? ""}
-                onChange={(event) => onTagChange(event.target.value || null)}
+                aria-label={t("workspace.kindFilter")}
+                value={selectedKind}
+                onChange={(event) => onKindChange(event.target.value as WorkspaceKindFilter)}
               >
-                <option value="">全部标签</option>
-                {tagOptions.map((tag) => (
-                  <option key={tag} value={tag}>
-                    #{tag}
+                {workspaceKindOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`workspace.kind.${option}`)}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          <label className="tag-filter">
-            <span>类型</span>
-            <select
-              aria-label="按类型筛选工作区"
-              value={selectedKind}
-              onChange={(event) => onKindChange(event.target.value as WorkspaceKindFilter)}
-            >
-              {workspaceKindOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          </div>
         </>
       )}
 
       {searchQuery.trim() ? (
         <div className="workspace-results" aria-live="polite">
-          {searchQuery.trim().length < 2 && <p className="muted-copy">至少输入 2 个字符后搜索当前阅读库。</p>}
-          {searchLoading && <p className="muted-copy">正在搜索当前阅读库…</p>}
+          {searchQuery.trim().length < 2 && <p className="muted-copy">{t("workspace.searchHint")}</p>}
+          {searchLoading && <p className="muted-copy">{t("workspace.searching")}</p>}
           {searchQuery.trim().length >= 2 && !searchLoading && searchResults.length === 0 && (
-            <p className="muted-copy">当前阅读库没有匹配文档。</p>
+            <p className="muted-copy">{t("workspace.noMatches")}</p>
           )}
           {!searchLoading &&
             searchResults.map((result) => (
@@ -516,8 +568,8 @@ export function WorkspacePanel({
       ) : (
         <>
           {workspacePath && (visibleFiles.length > 0 || treeFolders.length > 0 || !hasFilters) && (
-            <div className="workspace-files" aria-label="工作区文件">
-              <div className="workspace-subheading">文件</div>
+            <div className="workspace-files" aria-label={t("workspace.filesLabel")}>
+              <div className="workspace-subheading">{t("workspace.files")}</div>
               <WorkspaceTreeView
                 files={visibleFiles}
                 folders={treeFolders}
@@ -541,11 +593,11 @@ export function WorkspacePanel({
             </div>
           )}
 
-          {workspacePath && visibleFiles.length === 0 && <p className="muted-copy">当前标签下没有文件。</p>}
+          {workspacePath && visibleFiles.length === 0 && <p className="muted-copy">{t("workspace.noFiles")}</p>}
 
           {!workspacePath && recentWorkspaces.length > 0 && (
-            <div className="workspace-files recent-files" aria-label="最近阅读库">
-              <div className="workspace-subheading">最近阅读库</div>
+            <div className="workspace-files recent-files" aria-label={t("workspace.recentLibraries")}>
+              <div className="workspace-subheading">{t("workspace.recentLibraries")}</div>
               {recentWorkspaces.map((workspace) => (
                 <button
                   type="button"
@@ -562,8 +614,8 @@ export function WorkspacePanel({
           )}
 
           {!workspacePath && recentFiles.length > 0 && (
-            <div className="workspace-files recent-files" aria-label="最近打开">
-              <div className="workspace-subheading">最近打开</div>
+            <div className="workspace-files recent-files" aria-label={t("workspace.recentFiles")}>
+              <div className="workspace-subheading">{t("workspace.recentFiles")}</div>
               {recentFiles.map((file) => (
                 <button
                   type="button"
@@ -574,13 +626,31 @@ export function WorkspacePanel({
                 >
                   <span>{file.name}</span>
                   <small>{file.path}</small>
-                  <small>最近打开：{formatRecentFileTime(file.lastOpenedAt)}</small>
+                  <small>
+                    {t("workspace.lastOpened")}
+                    {locale === "zh-CN" ? "：" : ": "}
+                    {formatRecentFileTime(file.lastOpenedAt, undefined, locale)}
+                  </small>
                 </button>
               ))}
             </div>
           )}
 
-          <ReadingHistoryPanel entries={readingHistory} onRequestClear={onRequestClearReadingHistory} />
+          <details
+            className="workspace-history-disclosure"
+            open={historyOpen}
+            onToggle={(event) => setHistoryOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <Icon name="history" size={16} />
+              {t("workspace.historyToggle")}
+            </summary>
+            <ReadingHistoryPanel
+              entries={readingHistory}
+              onRequestClear={onRequestClearReadingHistory}
+              locale={locale}
+            />
+          </details>
         </>
       )}
     </section>

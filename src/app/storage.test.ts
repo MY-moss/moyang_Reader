@@ -85,6 +85,8 @@ describe("reader storage", () => {
       lastOpenedAt: new Date("2026-09-02T12:00:00.000Z").getTime(),
     });
     expect(formatRecentFileTime(files[0].lastOpenedAt, Date.now())).toBe("刚刚");
+    expect(formatRecentFileTime(files[0].lastOpenedAt, Date.now(), "en-US")).toBe("Just now");
+    expect(formatRecentFileTime(undefined, Date.now(), "en-US")).toBe("Open time unknown");
   });
 
   it("persists a pruned recent-file list", () => {
