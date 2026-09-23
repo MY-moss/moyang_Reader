@@ -174,7 +174,7 @@ const requiredFragments = new Map([
     [
       "# Moyang Reader 当前交接摘要",
       "当前稳定版本：`v0.11.0`",
-      "当前最早可执行任务是 `D16` 三主题与阅读外观生产切片",
+      "当前任务以 [`AI-TASKS.md`](AI-TASKS.md) 的最早未完成项",
       "Dependabot",
       "BLOCKED_EXTERNAL",
       "GitHub Release",
@@ -254,6 +254,7 @@ const staleClaims = [
   ["docs/ROADMAP.md", /正式 Release 仍是 0\.10\.x/],
   ["docs/ROADMAP.md", /下一项是 C02/],
   ["docs/AI-HANDOFF.md", /当前最早可执行任务是 `C04`/],
+  ["docs/AI-HANDOFF.md", /当前最早可执行任务是 `D16`/],
   ["docs/REQUIREMENTS.md", /批准队列与运行状态分别以/],
   ["docs/USER-GUIDE.md", /校验通过后自动重启/],
   ["docs/UPDATE.md", /(?:本次|当前) `?v0\.10\.2`? (?:发布后|的静态)/],

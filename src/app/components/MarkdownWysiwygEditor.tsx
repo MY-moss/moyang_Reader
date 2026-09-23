@@ -34,7 +34,9 @@ import { buildWysiwygEditorPlugins } from "./wysiwyg-editor-setup";
 import { ContextMenu } from "./ContextMenu";
 import { EditorInsertPopover, type EditorInsertInitialValues } from "./EditorInsertPopover";
 import { EditorToolbar } from "./EditorToolbar";
-import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import { localizedEditorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
+import type { Locale } from "../i18n";
+import { editorText } from "../editor-i18n";
 import { findClipboardImage } from "../clipboard-image";
 import { clipboardPayloadHasContent, dispatchClipboardPaste, readClipboardPayload } from "../clipboard-paste";
 import {
@@ -53,6 +55,7 @@ import {
 } from "../wiki-link-completion";
 
 type MarkdownWysiwygEditorProps = {
+  locale?: Locale;
   source: string;
   documentKey: string;
   ariaLabel: string;
@@ -191,6 +194,7 @@ function slashCommandAction(command: SlashCommand) {
 }
 
 function MilkdownSurface({
+  locale = "zh-CN",
   source,
   documentKey,
   ariaLabel,
@@ -359,41 +363,44 @@ function MilkdownSurface({
     window.requestAnimationFrame(() => restoreEditorViewport(viewport));
   }, []);
 
-  const openInsert = useCallback((kind: EditorInsertKind) => {
-    const view = viewRef.current;
-    if (!view) {
-      onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
-      return;
-    }
+  const openInsert = useCallback(
+    (kind: EditorInsertKind) => {
+      const view = viewRef.current;
+      if (!view) {
+        onStatusMessageRef.current?.(editorText(locale, "editorPreparing"));
+        return;
+      }
 
-    const { from, to } = view.state.selection;
-    const selectedText = view.state.doc.textBetween(from, to, "\n").trim();
-    let anchor: EditorInsertAnchor | null = null;
-    try {
-      const coords = view.coordsAtPos(to);
-      if (coords) anchor = { left: coords.left, top: coords.top, bottom: coords.bottom };
-    } catch {
-      // A detached or not-yet-painted ProseMirror view has no usable caret rect.
-    }
-    if (!anchor) {
-      const bounds = containerRef.current?.getBoundingClientRect();
-      if (bounds) anchor = { left: bounds.left + 24, top: bounds.top + 24, bottom: bounds.top + 48 };
-    }
+      const { from, to } = view.state.selection;
+      const selectedText = view.state.doc.textBetween(from, to, "\n").trim();
+      let anchor: EditorInsertAnchor | null = null;
+      try {
+        const coords = view.coordsAtPos(to);
+        if (coords) anchor = { left: coords.left, top: coords.top, bottom: coords.bottom };
+      } catch {
+        // A detached or not-yet-painted ProseMirror view has no usable caret rect.
+      }
+      if (!anchor) {
+        const bounds = containerRef.current?.getBoundingClientRect();
+        if (bounds) anchor = { left: bounds.left + 24, top: bounds.top + 24, bottom: bounds.top + 48 };
+      }
 
-    pendingInsertSelectionRef.current = { from, to, selectedText };
-    setInsertKind(kind);
-    setInsertInitialValues({
-      label: selectedText || "链接文字",
-      alt: "",
-      rows: 3,
-      columns: 3,
-    });
-    setInsertAnchor(anchor);
-    setInsertOpen(true);
-    setContextMenu(null);
-    completionRef.current = null;
-    setCompletion(null);
-  }, []);
+      pendingInsertSelectionRef.current = { from, to, selectedText };
+      setInsertKind(kind);
+      setInsertInitialValues({
+        label: selectedText || editorText(locale, "linkTextDefault"),
+        alt: "",
+        rows: 3,
+        columns: 3,
+      });
+      setInsertAnchor(anchor);
+      setInsertOpen(true);
+      setContextMenu(null);
+      completionRef.current = null;
+      setCompletion(null);
+    },
+    [locale],
+  );
 
   const closeInsert = useCallback(
     (restoreSelection = true) => {
@@ -423,7 +430,7 @@ function MilkdownSurface({
         switch (request.kind) {
           case "link": {
             if (!buildMarkdownLink(request.label, request.href, request.title)) {
-              onStatusMessageRef.current?.("链接文字或地址无效，请检查后重试。");
+              onStatusMessageRef.current?.(editorText(locale, "invalidLinkValues"));
               return;
             }
             const keepSelectedText = pending.selectedText === request.label && from !== to;
@@ -449,7 +456,7 @@ function MilkdownSurface({
           case "wikilink": {
             const markdown = buildMarkdownWikiLink(request.target, request.alias);
             if (!markdown) {
-              onStatusMessageRef.current?.("双链目标不能为空，请检查后重试。");
+              onStatusMessageRef.current?.(editorText(locale, "invalidWikiTarget"));
               return;
             }
             restoreSelection();
@@ -458,7 +465,7 @@ function MilkdownSurface({
           }
           case "image": {
             if (!buildMarkdownImage(request.src, request.alt, request.title)) {
-              onStatusMessageRef.current?.("图片路径或 URL 无效，请检查后重试。");
+              onStatusMessageRef.current?.(editorText(locale, "invalidImageSource"));
               return;
             }
             restoreSelection();
@@ -479,10 +486,10 @@ function MilkdownSurface({
         focusEditorPreservingViewport();
         closeInsert(false);
       } catch {
-        onStatusMessageRef.current?.("插入失败，当前内容没有被覆盖，请切换源码模式继续操作。");
+        onStatusMessageRef.current?.(editorText(locale, "insertFailure"));
       }
     },
-    [closeInsert, focusEditorPreservingViewport],
+    [closeInsert, focusEditorPreservingViewport, locale],
   );
 
   useEffect(() => {
@@ -526,7 +533,7 @@ function MilkdownSurface({
     async (plainOnly: boolean) => {
       const view = viewRef.current;
       if (!view) {
-        onStatusMessageRef.current?.("编辑器还在准备，请稍后再试。");
+        onStatusMessageRef.current?.(editorText(locale, "editorPreparing"));
         return;
       }
 
@@ -536,7 +543,7 @@ function MilkdownSurface({
       try {
         const payload = await readClipboardPayload();
         if (!clipboardPayloadHasContent(payload)) {
-          onStatusMessageRef.current?.("剪贴板中没有可粘贴的内容。");
+          onStatusMessageRef.current?.(editorText(locale, "clipboardEmpty"));
           return;
         }
 
@@ -547,9 +554,7 @@ function MilkdownSurface({
 
         if (!payload.text) {
           onStatusMessageRef.current?.(
-            plainOnly
-              ? "剪贴板中没有可粘贴的文本；如需插入图片，请使用“粘贴”。"
-              : "剪贴板中没有可粘贴的文本；图片请使用 Ctrl+V 或切换源码模式。",
+            plainOnly ? editorText(locale, "clipboardPlainEmpty") : editorText(locale, "clipboardImageVisual"),
           );
           return;
         }
@@ -559,7 +564,7 @@ function MilkdownSurface({
           !currentView ||
           (initialMarkdown !== null && serializerRef.current?.(currentView.state.doc) !== initialMarkdown)
         ) {
-          onStatusMessageRef.current?.("正文内容已经变化，请重新执行粘贴，避免覆盖最新修改。");
+          onStatusMessageRef.current?.(editorText(locale, "pasteStale"));
           return;
         }
 
@@ -567,10 +572,10 @@ function MilkdownSurface({
         currentView.dispatch(currentView.state.tr.insertText(payload.text, from, to));
         focusEditorPreservingViewport();
       } catch {
-        onStatusMessageRef.current?.("无法读取剪贴板，请检查应用权限后重试。");
+        onStatusMessageRef.current?.(editorText(locale, "clipboardReadError"));
       }
     },
-    [focusEditorPreservingViewport],
+    [focusEditorPreservingViewport, locale],
   );
 
   const applyContextAction = useCallback(
@@ -587,13 +592,13 @@ function MilkdownSurface({
 
       if (action === "copy" || action === "cut") {
         if (!contextMenu?.hasSelection) {
-          onStatusMessageRef.current?.("请先选择要复制的文本。");
+          onStatusMessageRef.current?.(editorText(locale, "selectToCopy"));
           setContextMenu(null);
           return;
         }
         view.focus();
         if (!document.execCommand(action)) {
-          onStatusMessageRef.current?.("无法访问剪贴板，请使用 Ctrl+C 或检查应用权限。");
+          onStatusMessageRef.current?.(editorText(locale, "clipboardVisualUnavailable"));
         }
         setContextMenu(null);
         return;
@@ -616,7 +621,7 @@ function MilkdownSurface({
         const selectedText = view.state.doc
           .textBetween(view.state.selection.from, view.state.selection.to, "\n")
           .trim();
-        if (!selectedText) onStatusMessageRef.current?.("请先选择要查找的文本。");
+        if (!selectedText) onStatusMessageRef.current?.(editorText(locale, "selectToFind"));
         else onFindTextRef.current?.(selectedText, contextMenu?.restoreFocusTarget ?? contextMenu?.fallbackFocusTarget);
         setContextMenu(null);
         return;
@@ -624,7 +629,7 @@ function MilkdownSurface({
 
       if (action === "clear-format") {
         if (view.state.selection.empty) {
-          onStatusMessageRef.current?.("请先选择要清除格式的文本。");
+          onStatusMessageRef.current?.(editorText(locale, "selectToClear"));
         } else {
           const { from, to } = view.state.selection;
           const plainText = view.state.doc.textBetween(from, to, "\n");
@@ -708,10 +713,10 @@ function MilkdownSurface({
       view.focus();
       setContextMenu(null);
     },
-    [contextMenu, openInsert, pasteFromClipboard],
+    [contextMenu, locale, openInsert, pasteFromClipboard],
   );
 
-  const editorContextGroups = editorContextMenuGroups.map((group) => ({
+  const editorContextGroups = localizedEditorContextMenuGroups(locale).map((group) => ({
     label: group.label,
     items: group.items.map((item) => ({
       id: `wysiwyg-${item.action}`,
@@ -863,7 +868,7 @@ function MilkdownSurface({
       clipboardEvent.stopPropagation();
 
       if (!view || !editor || !handler) {
-        onStatusMessageRef.current?.("当前无法保存剪贴板图片，请切换源码模式或稍后重试。");
+        onStatusMessageRef.current?.(editorText(locale, "clipboardImageSaveUnavailable"));
         return;
       }
 
@@ -881,7 +886,7 @@ function MilkdownSurface({
             !currentEditor ||
             (initialMarkdown !== null && serializerRef.current?.(currentView.state.doc) !== initialMarkdown)
           ) {
-            onStatusMessageRef.current?.("正文内容已经变化，图片已保存但未插入引用。");
+            onStatusMessageRef.current?.(editorText(locale, "imageStale"));
             return;
           }
 
@@ -894,7 +899,7 @@ function MilkdownSurface({
           currentEditor.action(callCommand(insertImageCommand.key, { src, alt: "" }));
           focusEditorPreservingViewport();
         })
-        .catch(() => onStatusMessageRef.current?.("无法插入剪贴板图片，请切换源码模式继续操作。"));
+        .catch(() => onStatusMessageRef.current?.(editorText(locale, "imageFailure")));
     };
 
     container.addEventListener("input", handleInput);
@@ -929,7 +934,7 @@ function MilkdownSurface({
       }
       viewRef.current = null;
     };
-  }, [applyCompletionItem, focusEditorPreservingViewport, loading]);
+  }, [applyCompletionItem, focusEditorPreservingViewport, loading, locale]);
 
   return (
     <div
@@ -971,14 +976,21 @@ function MilkdownSurface({
         openInsert("link");
       }}
     >
-      {loading && <div className="wysiwyg-loading">正在准备所见即所得编辑器…</div>}
+      {loading && <div className="wysiwyg-loading">{editorText(locale, "wysiwygLoading")}</div>}
       {mountFailed && (
         <div className="wysiwyg-error" role="alert">
-          所见即所得编辑器初始化失败，内容未被修改。请切换到“源文本”模式继续编辑。
+          {editorText(locale, "wysiwygError")}
         </div>
       )}
-      <EditorToolbar canUndo={canUndo} canRedo={canRedo} onAction={applyContextAction} onInsert={openInsert} />
+      <EditorToolbar
+        locale={locale}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onAction={applyContextAction}
+        onInsert={openInsert}
+      />
       <EditorInsertPopover
+        locale={locale}
         open={insertOpen}
         kind={insertKind}
         initialValues={insertInitialValues}
@@ -993,7 +1005,7 @@ function MilkdownSurface({
         <div
           className="completion-overlay"
           role="listbox"
-          aria-label={completion.kind === "slash" ? "块级命令候选" : "双链补全候选"}
+          aria-label={editorText(locale, completion.kind === "slash" ? "slashOptions" : "wikiOptions")}
           style={{ top: completion.top, left: completion.left }}
         >
           {completion.items.map((item, index) => (
@@ -1016,8 +1028,8 @@ function MilkdownSurface({
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          title="编辑操作"
-          ariaLabel="正文编辑菜单"
+          title={editorText(locale, "menuTitle")}
+          ariaLabel={editorText(locale, "menuLabel")}
           groups={editorContextGroups}
           restoreFocusTarget={contextMenu.restoreFocusTarget}
           fallbackFocusTarget={contextMenu.fallbackFocusTarget}

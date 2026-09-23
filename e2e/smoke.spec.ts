@@ -5,7 +5,7 @@
  * can be run and diagnosed independently.
  */
 import { expect, test } from "@playwright/test";
-import { openMoreMenu, openSettingsMenu, switchToRenderedMode } from "./helpers";
+import { clickToolbarAction, openMoreMenu, openSettingsMenu, switchToRenderedMode } from "./helpers";
 
 test("persists reading layout preferences", async ({ page }) => {
   await page.goto("/");
@@ -154,6 +154,85 @@ test("switches and remembers the core interface locale", async ({ page }) => {
   });
   await expect(page.getByRole("toolbar", { name: "Open documents" })).toBeVisible();
   await expect(page.getByRole("contentinfo", { name: "Document status" })).toContainText("characters");
+
+  const visualToolbar = page.getByRole("toolbar", { name: "Editor toolbar" });
+  await expect(visualToolbar.getByRole("button", { name: "Bold" })).toBeVisible();
+  await visualToolbar.getByRole("button", { name: "Insert" }).click();
+  const visualInsert = page.getByRole("dialog", { name: "Insert content" });
+  await expect(visualInsert.getByRole("tablist", { name: "Insert type" })).toBeVisible();
+  await visualInsert.press("Escape");
+  await expect(visualInsert).toHaveCount(0);
+
+  await clickToolbarAction(page, "Source");
+  const sourceToolbar = page.getByRole("toolbar", { name: "Editor toolbar" });
+  await expect(sourceToolbar.getByRole("button", { name: "Clear formatting" })).toBeVisible();
+  const source = page.getByRole("textbox", { name: "Markdown source" });
+  await source.click({ button: "right" });
+  const editorMenu = page.getByRole("menu", { name: "Document editing menu" });
+  await expect(editorMenu.getByRole("menuitem", { name: "Paste as plain text" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(source).toBeFocused();
+});
+
+test("keeps editor tools usable in compact, standard, and wide desktop windows", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 720, height: 600 });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "editor-tools-layout.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Editor tools\n\nText for formatting."),
+  });
+  await expect(page.getByRole("toolbar", { name: "编辑工具栏" })).toBeVisible();
+
+  for (const mode of ["visual", "source"] as const) {
+    if (mode === "source") await clickToolbarAction(page, "源文本");
+    for (const width of [720, 900, 1240]) {
+      await page.setViewportSize({ width, height: 600 });
+      const closeContext = page.locator(".context-sidebar .panel-close-button");
+      if (await closeContext.isVisible()) await closeContext.click();
+      for (const media of [
+        { colorScheme: "light", forcedColors: "none" },
+        { colorScheme: "dark", forcedColors: "none" },
+        { colorScheme: "light", forcedColors: "active" },
+      ] as const) {
+        await page.emulateMedia(media);
+        const toolbar = page.getByRole("toolbar", { name: "编辑工具栏" });
+        const insert = toolbar.getByRole("button", { name: "插入" });
+        const clear = toolbar.getByRole("button", { name: "清除格式" });
+        await expect(insert).toBeVisible();
+        await expect(clear).toBeVisible();
+        const metrics = await page.evaluate(() => {
+          const toolbar = document.querySelector<HTMLElement>(".editor-format-toolbar")!;
+          const insert = toolbar.querySelector<HTMLElement>(".editor-toolbar-insert-button")!;
+          const rect = toolbar.getBoundingClientRect();
+          const insertRect = insert.getBoundingClientRect();
+          return {
+            bodyWidth: document.body.scrollWidth,
+            viewportWidth: document.documentElement.clientWidth,
+            toolbarLeft: rect.left,
+            toolbarRight: rect.right,
+            insertLeft: insertRect.left,
+            insertRight: insertRect.right,
+            insertHeight: insertRect.height,
+          };
+        });
+        expect(metrics.bodyWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+        expect(metrics.toolbarLeft).toBeGreaterThanOrEqual(0);
+        expect(metrics.toolbarRight).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+        expect(metrics.insertLeft).toBeGreaterThanOrEqual(metrics.toolbarLeft);
+        expect(metrics.insertRight).toBeLessThanOrEqual(metrics.toolbarRight);
+        expect(metrics.insertHeight).toBeGreaterThanOrEqual(32);
+        await insert.click();
+        const dialog = page.getByRole("dialog", { name: "插入内容" });
+        await expect(dialog).toBeVisible();
+        const dialogBox = await dialog.boundingBox();
+        expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+        expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(width + 1);
+        await dialog.press("Escape");
+      }
+    }
+  }
 });
 
 test("keeps remote images off until the local privacy setting is enabled", async ({ page }) => {

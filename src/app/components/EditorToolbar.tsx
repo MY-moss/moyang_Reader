@@ -1,42 +1,50 @@
 import type { EditorContextAction } from "../editor-context-menu";
 import type { EditorInsertKind } from "../editor-insertion";
 import { Icon } from "./Icon";
+import type { Locale } from "../i18n";
+import { editorText } from "../editor-i18n";
 
 type EditorToolbarProps = {
+  locale?: Locale;
   canUndo: boolean;
   canRedo: boolean;
   onAction: (action: EditorContextAction) => void;
   onInsert: (kind: EditorInsertKind) => void;
 };
 
-const paragraphOptions: readonly { action: EditorContextAction; label: string }[] = [
-  { action: "paragraph", label: "正文段落" },
-  { action: "heading-1", label: "标题 1" },
-  { action: "heading-2", label: "标题 2" },
-  { action: "heading-3", label: "标题 3" },
-  { action: "bullet-list", label: "无序列表" },
-  { action: "ordered-list", label: "有序列表" },
-  { action: "quote", label: "引用" },
-  { action: "code-block", label: "代码块" },
-  { action: "task-list", label: "任务列表" },
+const paragraphOptions: readonly { action: EditorContextAction; labelKey: Parameters<typeof editorText>[1] }[] = [
+  { action: "paragraph", labelKey: "paragraphText" },
+  { action: "heading-1", labelKey: "heading1" },
+  { action: "heading-2", labelKey: "heading2" },
+  { action: "heading-3", labelKey: "heading3" },
+  { action: "bullet-list", labelKey: "bulletList" },
+  { action: "ordered-list", labelKey: "orderedList" },
+  { action: "quote", labelKey: "quote" },
+  { action: "code-block", labelKey: "codeBlock" },
+  { action: "task-list", labelKey: "taskList" },
 ];
 
-const formatButtons: readonly { action: EditorContextAction; label: string; shortLabel: string }[] = [
-  { action: "bold", label: "粗体", shortLabel: "B" },
-  { action: "italic", label: "斜体", shortLabel: "I" },
-  { action: "strike", label: "删除线", shortLabel: "S" },
-  { action: "inline-code", label: "行内代码", shortLabel: "<>" },
+const formatButtons: readonly {
+  action: EditorContextAction;
+  labelKey: Parameters<typeof editorText>[1];
+  shortLabel: string;
+}[] = [
+  { action: "bold", labelKey: "bold", shortLabel: "B" },
+  { action: "italic", labelKey: "italic", shortLabel: "I" },
+  { action: "strike", labelKey: "strike", shortLabel: "S" },
+  { action: "inline-code", labelKey: "inlineCode", shortLabel: "<>" },
 ];
 
-export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorToolbarProps) {
+export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, onInsert }: EditorToolbarProps) {
+  const t = (key: Parameters<typeof editorText>[1]) => editorText(locale, key);
   return (
-    <div className="editor-format-toolbar" role="toolbar" aria-label="编辑工具栏">
-      <div className="editor-toolbar-group" aria-label="历史记录">
+    <div className="editor-format-toolbar" role="toolbar" aria-label={t("toolbar")}>
+      <div className="editor-toolbar-group" aria-label={t("history")}>
         <button
           type="button"
           className="editor-toolbar-button editor-toolbar-button-icon"
-          aria-label="撤销"
-          title="撤销 (Ctrl+Z)"
+          aria-label={t("undo")}
+          title={`${t("undo")} (Ctrl+Z)`}
           disabled={!canUndo}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("undo")}
@@ -46,8 +54,8 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
         <button
           type="button"
           className="editor-toolbar-button editor-toolbar-button-icon"
-          aria-label="重做"
-          title="重做 (Ctrl+Y)"
+          aria-label={t("redo")}
+          title={`${t("redo")} (Ctrl+Y)`}
           disabled={!canRedo}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("redo")}
@@ -58,14 +66,14 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
 
       <span className="editor-toolbar-divider" aria-hidden="true" />
 
-      <div className="editor-toolbar-group" aria-label="文字格式">
+      <div className="editor-toolbar-group" aria-label={t("formatting")}>
         {formatButtons.map((item) => (
           <button
             key={item.action}
             type="button"
             className="editor-toolbar-button editor-toolbar-format-button"
-            aria-label={item.label}
-            title={item.label}
+            aria-label={t(item.labelKey)}
+            title={t(item.labelKey)}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onAction(item.action)}
           >
@@ -75,22 +83,22 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
         <button
           type="button"
           className="editor-toolbar-button editor-toolbar-button-wide"
-          aria-label="清除格式"
-          title="清除格式"
+          aria-label={t("clear")}
+          title={t("clear")}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("clear-format")}
         >
-          清除
+          {t("clearShort")}
         </button>
       </div>
 
       <span className="editor-toolbar-divider" aria-hidden="true" />
 
       <label className="editor-toolbar-select-wrap">
-        <span className="sr-only">段落样式</span>
+        <span className="sr-only">{t("paragraphStyle")}</span>
         <select
           className="editor-toolbar-select"
-          aria-label="段落样式"
+          aria-label={t("paragraphStyle")}
           defaultValue=""
           onChange={(event) => {
             const selected = paragraphOptions.find((item) => item.action === event.target.value);
@@ -99,11 +107,11 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
           }}
         >
           <option value="" disabled>
-            段落样式
+            {t("paragraphStyle")}
           </option>
           {paragraphOptions.map((item) => (
             <option key={item.action} value={item.action}>
-              {item.label}
+              {t(item.labelKey)}
             </option>
           ))}
         </select>
@@ -114,13 +122,13 @@ export function EditorToolbar({ canUndo, canRedo, onAction, onInsert }: EditorTo
       <button
         type="button"
         className="editor-toolbar-button editor-toolbar-insert-button"
-        aria-label="插入"
-        title="插入链接、双链、图片或表格"
+        aria-label={t("insert")}
+        title={t("insertHint")}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => onInsert("link")}
       >
-        <span aria-hidden="true">＋</span>
-        插入
+        <Icon name="plus" size={16} />
+        {t("insert")}
       </button>
     </div>
   );

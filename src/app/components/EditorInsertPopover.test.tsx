@@ -81,4 +81,15 @@ describe("EditorInsertPopover", () => {
     expect(input?.value).toBe("images/cover.png");
     cleanup(container, root);
   });
+
+  it("localizes the insert form while preserving validation and tab keys", () => {
+    const { container, root } = renderPopover({ locale: "en-US" });
+    const dialog = document.body.querySelector<HTMLElement>('.editor-insert-popover[role="dialog"]');
+    expect(dialog?.getAttribute("aria-labelledby")).toBeTruthy();
+    expect(dialog?.textContent).toContain("Insert content");
+    expect(dialog?.querySelector('[role="tablist"]')?.getAttribute("aria-label")).toBe("Insert type");
+    act(() => dialog?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
+    expect(dialog?.querySelector('[role="alert"]')?.textContent).toBe("Enter link text and an address.");
+    cleanup(container, root);
+  });
 });

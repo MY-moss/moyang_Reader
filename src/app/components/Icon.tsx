@@ -18,6 +18,7 @@ export type IconName =
   | "panel-left"
   | "panel-right"
   | "printer"
+  | "plus"
   | "refresh-cw"
   | "save"
   | "search"
@@ -89,6 +90,8 @@ function renderIcon(name: IconName) {
           <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2" />
         </>
       );
+    case "plus":
+      return <path d="M12 5v14M5 12h14" />;
     case "download":
       return (
         <>
