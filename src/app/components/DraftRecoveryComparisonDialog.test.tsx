@@ -236,4 +236,38 @@ describe("DraftRecoveryComparisonDialog", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("keeps unavailable recovery blocked and fully labeled in English", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onAction = vi.fn();
+    act(() => {
+      root.render(
+        <DraftRecoveryComparisonDialog
+          locale="en-US"
+          snapshot={{ path: "C:/Notes/chapter.md", draft: "draft", baseSource: "source", savedAt: Date.now() }}
+          comparisonSource={null}
+          comparisonLabel="Current file on disk"
+          comparisonIsCurrent
+          comparisonStatus="unavailable"
+          comparisonError={null}
+          currentDocumentModified={false}
+          sourceChangedSinceDraft={false}
+          actionLabel="Restore to editor"
+          onAction={onAction}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Current version");
+    expect(container.textContent).toContain("Draft");
+    expect(container.textContent).toContain("Cannot determine the current differences");
+    expect(container.querySelector<HTMLButtonElement>('[data-testid="draft-comparison-action"]')?.disabled).toBe(true);
+    expect(onAction).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });

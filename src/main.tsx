@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./app/styles.css";
 import "./app/styles/redesign.css";
+import "./app/styles/safety-dialogs.css";
 import { App } from "./app/App";
 import { ErrorBoundary } from "./app/components/ErrorBoundary";
 

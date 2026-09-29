@@ -1,6 +1,8 @@
 import { useMemo, useRef } from "react";
 import { buildDraftComparison, type DraftDiffLine } from "../draft-recovery-diff";
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
 import { useModalBehavior } from "./useModalBehavior";
 
 export type RecoveryKind = "draft" | "previous-save";
@@ -8,6 +10,7 @@ export type RecoverySnapshot = Omit<DraftSnapshot, "savedAt"> & { savedAt?: numb
 
 type DraftRecoveryComparisonDialogProps = {
   snapshot: RecoverySnapshot;
+  locale?: Locale;
   comparisonSource: string | null;
   comparisonLabel: string;
   comparisonIsCurrent: boolean;
@@ -38,6 +41,7 @@ function diffPrefix(line: DraftDiffLine): string {
 }
 
 function recoveryDecision(
+  locale: Locale,
   comparison: ReturnType<typeof buildDraftComparison> | null,
   comparisonStatus: DraftRecoveryComparisonDialogProps["comparisonStatus"],
   comparisonIsCurrent: boolean,
@@ -45,53 +49,53 @@ function recoveryDecision(
   recoveryKind: RecoveryKind,
   candidateLabel: string,
 ): { tone: "neutral" | "ready" | "warning"; title: string; description: string } {
+  const t = (key: Parameters<typeof safetyText>[1]) => safetyText(locale, key);
   if (comparisonStatus === "loading") {
     return {
       tone: "neutral",
-      title: "正在读取当前版本",
-      description: "正在读取此刻的磁盘文件；读取完成前不会允许恢复。",
+      title: t("comparisonLoadingTitle"),
+      description: t("comparisonLoadingDescription"),
     };
   }
   if (comparisonStatus === "unavailable" || !comparison) {
     return {
       tone: "warning",
-      title: "无法判断是否需要恢复",
-      description: `当前文件无法读取，暂时不能可靠比较，也不会直接恢复${candidateLabel}。`,
+      title: t("comparisonUnavailableTitle"),
+      description: safetyText(locale, "comparisonUnavailableDescription", { name: candidateLabel }),
     };
   }
   if (!comparisonIsCurrent) {
     return {
       tone: "warning",
-      title: "还需要核对当前文件",
-      description: `这里只能与${candidateLabel}保存时的原文比较；打开当前文件后再决定是否恢复。`,
+      title: t("comparisonNeedsCurrentTitle"),
+      description: safetyText(locale, "comparisonNeedsCurrentDescription", { name: candidateLabel }),
     };
   }
   if (!comparison.hasChanges) {
     return {
       tone: "neutral",
-      title: "无需恢复",
-      description: `${candidateLabel}与当前版本内容相同，不需要恢复。`,
+      title: t("comparisonSameTitle"),
+      description: safetyText(locale, "comparisonSameDescription", { name: candidateLabel }),
     };
   }
   if (sourceChangedSinceDraft && recoveryKind === "draft") {
     return {
       tone: "warning",
-      title: "建议先核对",
-      description: "草稿保存后原文件又发生了变化；请确认两边内容后，再恢复到编辑区。",
+      title: t("comparisonChangedTitle"),
+      description: t("comparisonChangedDescription"),
     };
   }
   return {
     tone: "ready",
-    title: recoveryKind === "previous-save" ? "可以回到上一保存版本" : "存在未保存内容",
+    title: recoveryKind === "previous-save" ? t("comparisonReadyPreviousTitle") : t("comparisonReadyDraftTitle"),
     description:
-      recoveryKind === "previous-save"
-        ? "如果需要回到上一版，可以恢复到编辑区；点击“保存”后才会写回原文件。"
-        : "如果这些内容需要保留，可以恢复到编辑区；点击“保存”后才会写回原文件。",
+      recoveryKind === "previous-save" ? t("comparisonReadyPreviousDescription") : t("comparisonReadyDraftDescription"),
   };
 }
 
 export function DraftRecoveryComparisonDialog({
   snapshot,
+  locale = "zh-CN",
   comparisonSource,
   comparisonLabel,
   comparisonIsCurrent,
@@ -105,12 +109,16 @@ export function DraftRecoveryComparisonDialog({
   onClose,
   recoveryKind = "draft",
 }: DraftRecoveryComparisonDialogProps) {
-  const candidateLabel = recoveryKind === "previous-save" ? "上次保存版本" : "草稿";
-  const candidateDescription = recoveryKind === "previous-save" ? "保存前保留的本机版本" : "保存在本机的未保存快照";
+  const t = (key: Parameters<typeof safetyText>[1]) => safetyText(locale, key);
+  const candidateLabel = recoveryKind === "previous-save" ? t("previousSave") : t("draft");
+  const candidateDescription =
+    recoveryKind === "previous-save" ? t("comparisonPreviousDescription") : t("comparisonDraftDescription");
   const candidateDetail =
     recoveryKind === "previous-save"
-      ? "文件保存前的本机备份"
-      : `本机恢复快照 · ${snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt) : "未知时间"}`;
+      ? t("comparisonPreviousDetail")
+      : safetyText(locale, "comparisonDraftDetail", {
+          time: snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale) : t("unknownTime"),
+        });
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const comparison = useMemo(
@@ -121,6 +129,7 @@ export function DraftRecoveryComparisonDialog({
     [comparisonSource, comparisonStatus, snapshot.draft],
   );
   const decision = recoveryDecision(
+    locale,
     comparison,
     comparisonStatus,
     comparisonIsCurrent,
@@ -144,8 +153,7 @@ export function DraftRecoveryComparisonDialog({
       >
         <header className="quick-open-header draft-comparison-header">
           <div>
-            <div className="quick-open-kicker">LOCAL RECOVERY</div>
-            <h2 id="draft-comparison-title">恢复前查看差异</h2>
+            <h2 id="draft-comparison-title">{t("comparisonTitle")}</h2>
             <p className="draft-comparison-file" title={snapshot.path}>
               {fileName(snapshot.path)}
             </p>
@@ -155,22 +163,27 @@ export function DraftRecoveryComparisonDialog({
             type="button"
             className="quiet-button"
             onClick={onClose}
-            aria-label={`关闭${candidateLabel}差异`}
+            aria-label={safetyText(locale, "comparisonCloseAria", { name: candidateLabel })}
           >
-            关闭
+            {t("close")}
           </button>
         </header>
 
-        <div className="draft-comparison-body">
+        <div className="draft-comparison-body" tabIndex={0} role="region" aria-label={t("comparisonDetailsAria")}>
           <p id="draft-comparison-description" className="draft-comparison-intro">
-            <strong>当前版本</strong>是此刻可读取的文件内容，<strong>{candidateLabel}</strong>是{candidateDescription}。
-            当前比较基线：<strong>{comparisonLabel}</strong>
-            。恢复只会替换当前编辑区，确认后仍需点击“保存”才会写回原文件。
+            {safetyText(locale, "comparisonIntro", {
+              candidate: candidateLabel,
+              description: candidateDescription,
+              baseline: comparisonLabel,
+            })}
           </p>
 
-          <div className="draft-comparison-sources" aria-label={`当前版本与${candidateLabel}来源`}>
+          <div
+            className="draft-comparison-sources"
+            aria-label={safetyText(locale, "comparisonSourcesAria", { name: candidateLabel })}
+          >
             <div className="draft-comparison-source current">
-              <strong>当前版本</strong>
+              <strong>{t("comparisonCurrent")}</strong>
               <span>{comparisonLabel}</span>
             </div>
             <div className="draft-comparison-source draft">
@@ -179,18 +192,18 @@ export function DraftRecoveryComparisonDialog({
             </div>
           </div>
 
-          <div className="draft-comparison-key" aria-label="差异符号说明">
+          <div className="draft-comparison-key" aria-label={t("comparisonLegendAria")}>
             <span>
               <b className="removed" aria-hidden="true">
                 −
               </b>
-              当前版本有、{candidateLabel}中移除
+              {safetyText(locale, "comparisonRemoved", { name: candidateLabel })}
             </span>
             <span>
               <b className="added" aria-hidden="true">
                 +
               </b>
-              {candidateLabel}新增
+              {safetyText(locale, "comparisonAdded", { name: candidateLabel })}
             </span>
           </div>
 
@@ -200,35 +213,44 @@ export function DraftRecoveryComparisonDialog({
           </div>
 
           {comparison && (
-            <div className="draft-comparison-stats" aria-label={`${candidateLabel}变更摘要`}>
+            <div
+              className="draft-comparison-stats"
+              aria-label={safetyText(locale, "comparisonStatsAria", { name: candidateLabel })}
+            >
               <div>
-                <span>{comparisonIsCurrent ? "当前版本行" : "比较基线行"}</span>
+                <span>{comparisonIsCurrent ? t("comparisonCurrentLines") : t("comparisonBaselineLines")}</span>
                 <strong>{comparison.baselineLineCount}</strong>
               </div>
               <div>
-                <span>{candidateLabel}行</span>
+                <span>{safetyText(locale, "comparisonCandidateLines", { name: candidateLabel })}</span>
                 <strong>{comparison.draftLineCount}</strong>
               </div>
               <div>
-                <span>新增行</span>
+                <span>{t("comparisonAddedLines")}</span>
                 <strong className="draft-comparison-added">+{comparison.addedLineCount}</strong>
               </div>
               <div>
-                <span>移除行</span>
+                <span>{t("comparisonRemovedLines")}</span>
                 <strong className="draft-comparison-removed">−{comparison.removedLineCount}</strong>
               </div>
               <div>
-                <span>字符变化</span>
+                <span>{t("comparisonCharacters")}</span>
                 <strong>{signedNumber(comparison.characterDelta)}</strong>
               </div>
               <div>
-                <span>变更区域</span>
+                <span>{t("comparisonHunks")}</span>
                 <strong>{comparison.changeHunkCount}</strong>
               </div>
               <div>
-                <span>{recoveryKind === "previous-save" ? "备份来源" : "草稿保存"}</span>
+                <span>
+                  {recoveryKind === "previous-save" ? t("comparisonBackupSource") : t("comparisonDraftSaved")}
+                </span>
                 <strong>
-                  {recoveryKind === "previous-save" ? "保存前" : candidateDetail.replace("本机恢复快照 · ", "")}
+                  {recoveryKind === "previous-save"
+                    ? t("savedBefore")
+                    : snapshot.savedAt
+                      ? formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale)
+                      : t("unknownTime")}
                 </strong>
               </div>
             </div>
@@ -236,16 +258,16 @@ export function DraftRecoveryComparisonDialog({
 
           {comparisonStatus === "loading" && (
             <div className="draft-comparison-state" data-testid="draft-comparison-loading" role="status">
-              正在读取当前磁盘版本…
+              {t("comparisonReading")}
             </div>
           )}
           {comparisonStatus === "unavailable" && (
             <div className="draft-comparison-state error" data-testid="draft-comparison-error" role="alert">
-              <strong>无法判断当前差异</strong>
-              <span>{comparisonError || "当前文件不可访问，请确认文件仍存在且有读取权限。"}</span>
+              <strong>{t("comparisonReadError")}</strong>
+              <span>{comparisonError || t("comparisonReadFallback")}</span>
               {onRetry && (
                 <button type="button" className="quiet-button" data-testid="draft-comparison-retry" onClick={onRetry}>
-                  重新读取当前版本
+                  {t("comparisonRetry")}
                 </button>
               )}
             </div>
@@ -253,23 +275,26 @@ export function DraftRecoveryComparisonDialog({
 
           {currentDocumentModified && comparisonIsCurrent && (
             <div className="draft-comparison-warning" role="alert">
-              当前编辑区还有未保存修改；恢复会替换这些修改，但不会自动覆盖磁盘文件。
+              {t("comparisonModifiedWarning")}
             </div>
           )}
           {sourceChangedSinceDraft && recoveryKind === "draft" && comparisonIsCurrent && (
             <div className="draft-comparison-warning" role="note">
-              原文件在草稿保存后又发生过变化，以上差异已按当前磁盘版本计算。
+              {t("comparisonChangedWarning")}
             </div>
           )}
           {comparisonStatus === "ready" && !comparisonIsCurrent && (
             <div className="draft-comparison-warning" role="note">
-              当前文件尚未在这里读取；以上内容只与{candidateLabel}保存时的原文比较，不能代表此刻磁盘文件的完整差异。
+              {safetyText(locale, "comparisonOldBaseWarning", { name: candidateLabel })}
             </div>
           )}
 
           {comparison && (
             <>
-              <div className="draft-comparison-preview" aria-label={`${candidateLabel}差异预览`}>
+              <div
+                className="draft-comparison-preview"
+                aria-label={safetyText(locale, "comparisonPreviewAria", { name: candidateLabel })}
+              >
                 {comparison.preview.length > 0 ? (
                   comparison.preview.map((line, index) => (
                     <div
@@ -286,24 +311,20 @@ export function DraftRecoveryComparisonDialog({
                     </div>
                   ))
                 ) : (
-                  <div className="draft-comparison-empty">当前版本与{candidateLabel}没有可见差异，不需要恢复。</div>
+                  <div className="draft-comparison-empty">
+                    {safetyText(locale, "comparisonNoDiff", { name: candidateLabel })}
+                  </div>
                 )}
               </div>
-              {comparison.truncated && (
-                <p className="draft-comparison-footnote">文档较长，仅显示差异附近的有限内容。</p>
-              )}
-              {!comparison.precise && (
-                <p className="draft-comparison-footnote">
-                  文档较长，已使用快速差异摘要；恢复前建议打开编辑区再次确认全文。
-                </p>
-              )}
+              {comparison.truncated && <p className="draft-comparison-footnote">{t("comparisonTruncated")}</p>}
+              {!comparison.precise && <p className="draft-comparison-footnote">{t("comparisonApproximate")}</p>}
             </>
           )}
         </div>
 
         <footer className="quick-open-footer draft-comparison-actions">
           <button type="button" className="quiet-button" onClick={onClose}>
-            取消
+            {t("cancel")}
           </button>
           <button
             type="button"
@@ -313,9 +334,9 @@ export function DraftRecoveryComparisonDialog({
             disabled={!comparison || !comparison.hasChanges || comparisonStatus !== "ready"}
           >
             {comparisonStatus === "loading"
-              ? "正在读取…"
+              ? t("comparisonLoadingAction")
               : comparisonStatus === "unavailable"
-                ? "暂不可恢复"
+                ? t("comparisonUnavailableAction")
                 : actionLabel}
           </button>
         </footer>

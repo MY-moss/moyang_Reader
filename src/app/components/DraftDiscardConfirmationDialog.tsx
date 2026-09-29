@@ -1,63 +1,32 @@
-import { useRef } from "react";
-import { useModalBehavior } from "./useModalBehavior";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
+import { SafetyConfirmationDialog } from "./SafetyConfirmationDialog";
 
 type DraftDiscardConfirmationDialogProps = {
+  locale?: Locale;
   path: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
 
-function fileName(path: string): string {
-  return path.split(/[\\/]/).pop() || path;
-}
-
-export function DraftDiscardConfirmationDialog({ path, onCancel, onConfirm }: DraftDiscardConfirmationDialogProps) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  useModalBehavior({ containerRef: dialogRef, initialFocusRef: cancelButtonRef, onClose: onCancel });
-
+export function DraftDiscardConfirmationDialog({
+  locale = "zh-CN",
+  path,
+  onCancel,
+  onConfirm,
+}: DraftDiscardConfirmationDialogProps) {
+  const name = path.split(/[\\/]/).pop() || path;
+  const t = (key: Parameters<typeof safetyText>[1]) => safetyText(locale, key);
   return (
-    <div className="quick-open-backdrop close-confirm-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="quick-open-dialog close-confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="draft-discard-confirm-title"
-        aria-describedby="draft-discard-confirm-description"
-        tabIndex={-1}
-      >
-        <header className="quick-open-header">
-          <div>
-            <div className="quick-open-kicker">LOCAL RECOVERY</div>
-            <h2 id="draft-discard-confirm-title">丢弃草稿？</h2>
-          </div>
-        </header>
-        <div className="close-confirm-body">
-          <p id="draft-discard-confirm-description">
-            确定丢弃“{fileName(path)}”的本地草稿吗？此操作无法撤销，原文件不会被修改。
-          </p>
-        </div>
-        <footer className="quick-open-footer close-confirm-actions">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            className="quiet-button"
-            data-testid="draft-discard-cancel"
-            onClick={onCancel}
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            className="toolbar-button primary"
-            data-testid="draft-discard-confirm"
-            onClick={onConfirm}
-          >
-            丢弃草稿
-          </button>
-        </footer>
-      </section>
-    </div>
+    <SafetyConfirmationDialog
+      locale={locale}
+      id="draft-discard"
+      title={t("discardTitle")}
+      description={safetyText(locale, "discardDescription", { name })}
+      note={t("discardNote")}
+      facts={[{ label: t("localDraft"), value: name }]}
+      confirm={{ label: t("discardConfirm"), testId: "draft-discard-confirm", onClick: onConfirm }}
+      onCancel={onCancel}
+    />
   );
 }

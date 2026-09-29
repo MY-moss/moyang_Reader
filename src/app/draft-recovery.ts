@@ -194,11 +194,16 @@ export function clearAllDraftSnapshots(): void {
   }
 }
 
-export function formatDraftRecoveryTime(savedAt: number, now = Date.now()): string {
+export function formatDraftRecoveryTime(
+  savedAt: number,
+  now = Date.now(),
+  locale: "zh-CN" | "en-US" = "zh-CN",
+): string {
   const elapsedMinutes = Math.max(0, Math.floor((now - savedAt) / 60_000));
-  if (elapsedMinutes < 1) return "刚刚";
-  if (elapsedMinutes < 60) return `${elapsedMinutes} 分钟前`;
+  if (elapsedMinutes < 1) return locale === "en-US" ? "Just now" : "刚刚";
+  if (elapsedMinutes < 60) return locale === "en-US" ? `${elapsedMinutes} min ago` : `${elapsedMinutes} 分钟前`;
   const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) return `${elapsedHours} 小时前`;
-  return `${Math.floor(elapsedHours / 24)} 天前`;
+  if (elapsedHours < 24) return locale === "en-US" ? `${elapsedHours} hr ago` : `${elapsedHours} 小时前`;
+  const days = Math.floor(elapsedHours / 24);
+  return locale === "en-US" ? `${days} d ago` : `${days} 天前`;
 }

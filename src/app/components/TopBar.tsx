@@ -421,7 +421,7 @@ export function TopBar({
               type="button"
               className="toolbar-button recovery-button toolbar-optional"
               onClick={onOpenRecovery}
-              title="查看未保存草稿"
+              title={t("action.drafts")}
             >
               <Icon name="history" size={15} />
               <span className="toolbar-button-label">

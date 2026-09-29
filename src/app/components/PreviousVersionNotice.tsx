@@ -1,7 +1,10 @@
 import { buildDraftComparison } from "../draft-recovery-diff";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
 
 type PreviousVersionNoticeProps = {
   path: string;
+  locale?: Locale;
   currentSource: string;
   previousSource: string;
   onPreview: () => void;
@@ -14,6 +17,7 @@ function fileName(path: string): string {
 
 export function PreviousVersionNotice({
   path,
+  locale = "zh-CN",
   currentSource,
   previousSource,
   onPreview,
@@ -22,29 +26,32 @@ export function PreviousVersionNotice({
   const comparison = buildDraftComparison(currentSource, previousSource);
   const characterDelta = comparison.characterDelta > 0 ? `+${comparison.characterDelta}` : comparison.characterDelta;
   const diffSummary = comparison.hasChanges
-    ? `上一保存版本：新增 ${comparison.addedLineCount} 行、移除 ${comparison.removedLineCount} 行、${comparison.changeHunkCount} 个变更区域，字符 ${characterDelta}。`
-    : "上一保存版本与当前版本内容相同，不需要恢复。";
+    ? safetyText(locale, "previousDiff", {
+        added: comparison.addedLineCount,
+        removed: comparison.removedLineCount,
+        hunks: comparison.changeHunkCount,
+        delta: characterDelta,
+      })
+    : safetyText(locale, "previousSame");
 
   return (
     <div className="external-change-notice draft-recovery-notice previous-version-notice" role="status">
       <span className="draft-recovery-copy">
-        <strong>{fileName(path)} 保留了上一保存版本</strong>
-        <small className="draft-recovery-source-note">
-          这是保存前的本机备份，不会自动覆盖当前文件。先查看差异，再决定是否恢复到编辑区。
-        </small>
+        <strong>{safetyText(locale, "previousNotice", { name: fileName(path) })}</strong>
+        <small className="draft-recovery-source-note">{safetyText(locale, "previousSource")}</small>
         <small>{diffSummary}</small>
       </span>
       <div>
         <button
           type="button"
           data-testid="previous-version-preview"
-          aria-label="查看当前文件与上一保存版本的差异并决定是否恢复"
+          aria-label={safetyText(locale, "previousPreviewAria")}
           onClick={onPreview}
         >
-          查看差异
+          {safetyText(locale, "preview")}
         </button>
         <button type="button" className="notice-dismiss" onClick={onDismiss}>
-          忽略
+          {safetyText(locale, "ignore")}
         </button>
       </div>
     </div>

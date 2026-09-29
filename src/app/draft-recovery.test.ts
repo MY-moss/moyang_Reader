@@ -49,6 +49,7 @@ describe("draft recovery", () => {
     expect(loadDraftSnapshots()).toEqual([]);
     expect(formatDraftRecoveryTime(60_000, 60_000)).toBe("刚刚");
     expect(formatDraftRecoveryTime(0, 3_660_000)).toBe("1 小时前");
+    expect(formatDraftRecoveryTime(0, 3_660_000, "en-US")).toBe("1 hr ago");
   });
 
   it("clears all saved snapshots from the local recovery center", () => {

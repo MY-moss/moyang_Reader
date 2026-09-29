@@ -48,4 +48,25 @@ describe("ExternalOverwriteDialog", () => {
     act(() => root.unmount());
     container.remove();
   });
+
+  it("distinguishes the disk file and in-window edits in English", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <ExternalOverwriteDialog locale="en-US" fileName="chapter.md" onCancel={vi.fn()} onConfirm={vi.fn()} />,
+      );
+    });
+
+    expect(container.textContent).toContain("chapter.md");
+    expect(container.textContent).toContain("disk version changed externally");
+    expect(container.textContent).toContain("edits are still in this window");
+    expect(container.querySelector('[data-testid="external-overwrite-confirm"]')?.textContent).toBe(
+      "Overwrite and save",
+    );
+
+    act(() => root.unmount());
+    container.remove();
+  });
 });
