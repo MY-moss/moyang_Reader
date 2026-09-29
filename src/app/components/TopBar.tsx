@@ -209,10 +209,17 @@ export function TopBar({
       if (event.key !== "Escape" || !menuRefs.some((menuRef) => menuRef.current?.open)) return;
       const target = event.target;
       const isInsideMenu = target instanceof Node && menuRefs.some((menuRef) => menuRef.current?.contains(target));
+      const focusTarget =
+        target instanceof Node && moreMenuRef.current?.contains(target)
+          ? moreMenuRef.current.querySelector<HTMLElement>(":scope > summary")
+          : target instanceof Node && readingMenuRef.current?.contains(target)
+            ? readingMenuRef.current.querySelector<HTMLElement>(":scope > summary")
+            : null;
       closeMenus();
       if (isInsideMenu) {
         event.preventDefault();
         event.stopPropagation();
+        focusTarget?.focus();
       }
     };
 
@@ -682,7 +689,7 @@ export function TopBar({
                     exportMenuRef.current?.removeAttribute("open");
                   }}
                 >
-                  <summary className="toolbar-button" title="隐私与更新设置">
+                  <summary className="toolbar-button" title={t("settings.title")}>
                     <Icon name="settings" size={15} />
                     <span className="toolbar-button-label">{t("settings.title")}</span>
                   </summary>
@@ -696,9 +703,10 @@ export function TopBar({
                       <span className="settings-persistence-dot" aria-hidden="true" />
                       <span>{settingsStatusLabel}</span>
                     </div>
+                    <div className="settings-divider">{t("settings.general")}</div>
                     <button type="button" className="settings-guide-button" onClick={onOpenGuide}>
-                      <span>使用教程</span>
-                      <span aria-hidden="true">↗</span>
+                      <span>{t("settings.guide")}</span>
+                      <Icon name="book-open" size={15} />
                     </button>
                     <label className="settings-select-option">
                       <span>{t("settings.language")}</span>
@@ -764,7 +772,7 @@ export function TopBar({
                         <output aria-live="polite">{readingZoom}%</output>
                       </div>
                       <input
-                        aria-label="阅读缩放"
+                        aria-label={t("settings.zoom")}
                         type="range"
                         min="75"
                         max="150"
@@ -782,7 +790,7 @@ export function TopBar({
                     <label className="settings-select-option">
                       <span>{t("settings.width")}</span>
                       <select
-                        aria-label="正文宽度"
+                        aria-label={t("settings.width")}
                         value={readingWidth}
                         onChange={(event) => onReadingWidthChange(event.target.value as ReadingWidth)}
                       >
@@ -819,7 +827,7 @@ export function TopBar({
                     <label className="settings-select-option">
                       <span>{t("settings.paper")}</span>
                       <select
-                        aria-label="导出纸张"
+                        aria-label={t("settings.paper")}
                         value={exportPaper}
                         onChange={(event) => onExportPaperChange(event.target.value as ExportPaper)}
                       >
@@ -830,7 +838,7 @@ export function TopBar({
                     <label className="settings-select-option">
                       <span>{t("settings.orientation")}</span>
                       <select
-                        aria-label="导出方向"
+                        aria-label={t("settings.orientation")}
                         value={exportOrientation}
                         onChange={(event) => onExportOrientationChange(event.target.value as ExportOrientation)}
                       >
@@ -841,7 +849,7 @@ export function TopBar({
                     <label className="settings-select-option">
                       <span>{t("settings.margin")}</span>
                       <select
-                        aria-label="导出页边距"
+                        aria-label={t("settings.margin")}
                         value={exportMargin}
                         onChange={(event) => onExportMarginChange(event.target.value as ExportMargin)}
                       >

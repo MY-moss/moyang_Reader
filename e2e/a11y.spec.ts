@@ -179,6 +179,26 @@ test("keeps the settings panel free of serious accessibility violations", async 
   await expectNoSeriousA11yViolations(page, "settings");
 });
 
+test("keeps first-use actions visible and accessible in compact and high-contrast layouts", async ({ page }) => {
+  for (const width of [720, 900, 1240]) {
+    await page.setViewportSize({ width, height: 600 });
+    await page.emulateMedia({ forcedColors: width === 720 ? "active" : "none" });
+    await page.goto("/");
+    await openSettings(page);
+    const guideButton = page.locator(".settings-menu").getByRole("button", { name: "查看使用教程" });
+    await guideButton.click();
+    const dialog = page.getByRole("dialog", { name: "从本地文档开始" });
+    const openButton = dialog.getByRole("button", { name: "打开文档" });
+    await expect(openButton).toBeVisible();
+    const buttonBounds = await openButton.boundingBox();
+    expect(buttonBounds?.y).toBeGreaterThanOrEqual(0);
+    expect((buttonBounds?.y ?? 600) + (buttonBounds?.height ?? 0)).toBeLessThanOrEqual(600);
+    await expectNoSeriousA11yViolations(page, `first-use-${width}`);
+    await page.keyboard.press("Escape");
+    await expect(guideButton).toBeFocused();
+  }
+});
+
 test("keeps editor insertion and context menus accessible in both editing modes", async ({ page }) => {
   await loadReaderFixture(page);
   const toolbar = page.getByRole("toolbar", { name: "编辑工具栏" });

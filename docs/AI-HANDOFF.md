@@ -9,7 +9,7 @@
 - 产品边界：Windows x64、本地优先；浏览器版仅用于开发预览和 UI 测试。
 - 技术栈：Tauri 2 + Rust + React + TypeScript。
 - `main` 以 GitHub `Quality checks` 作为代码合并门禁；真实 Windows 安装、升级、签名和发布证据不能由 CI 代替。
-- 当前工程主线是：A14 v0.11.0 已发布 → B01–B06 v0.12 可靠性/真实使用切片完成 → C01–C04 v1.0 Freeze/Compatibility/RC 收口完成 → D00–D14 事实源、开发环境、架构预算与 App 编排提取完成 → D15–D19 v1.0 重设计质量、主题、应用壳、面板与编辑器工具迁移完成 → D20 设置与首次使用界面迁移 → 后续弹层与 v1.0 RC；总票为 #534。
+- 当前工程主线是：A14 v0.11.0 已发布 → B01–B06 v0.12 可靠性/真实使用切片完成 → C01–C04 v1.0 Freeze/Compatibility/RC 收口完成 → D00–D14 事实源、开发环境、架构预算与 App 编排提取完成 → D15–D20 v1.0 重设计质量、主题、应用壳、面板、编辑器工具、设置与首次使用迁移完成 → D21 确认/冲突/草稿弹层 → 后续更新/导出/错误状态与 v1.0 RC；总票为 #534。
 - Reading Inbox、Knowledge、AI、RAG、MCP、RSS、第三方插件等均为 v1.x GATED 候选，不属于当前可执行队列。
 
 ## AI 接手方式

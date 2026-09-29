@@ -10,7 +10,7 @@ test("renders the local reader landing page", async ({ page }) => {
   await page.goto("/");
 
   await expect(page).toHaveTitle("Moyang Reader");
-  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "打开文档，开始阅读" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开文档" })).toBeVisible();
   await expect(page.getByRole("button", { name: "添加整个文件夹" })).toBeVisible();
   await expect(page.locator(".brand-logo")).toBeVisible();
@@ -25,6 +25,23 @@ test("renders the local reader landing page", async ({ page }) => {
   await expect(page.getByText("MARKDOWN", { exact: true })).toBeVisible();
 });
 
+test("keeps the first-use actions clear of the compact context drawer", async ({ page }) => {
+  for (const width of [720, 900]) {
+    await page.setViewportSize({ width, height: 600 });
+    await page.goto("/");
+    await expect(page.locator(".context-sidebar")).toHaveCount(0);
+    await expect(page.locator(".context-toggle")).toHaveAttribute("aria-pressed", "false");
+    const openButton = page.locator(".empty-state").getByRole("button", { name: "打开文档" });
+    const fileChooser = page.waitForEvent("filechooser");
+    await openButton.click();
+    await fileChooser;
+    await page.locator(".context-toggle").click();
+    await expect(page.locator(".context-sidebar")).toBeVisible();
+    await page.locator(".context-sidebar").getByRole("button", { name: "隐藏上下文面板" }).click();
+    await expect(page.locator(".context-sidebar")).toHaveCount(0);
+  }
+});
+
 test("keeps the folder action available after collapsing the sidebar", async ({ page }) => {
   await page.goto("/");
 
@@ -37,7 +54,7 @@ test("keeps the folder shortcut available from the landing page", async ({ page 
   await page.goto("/");
 
   await page.keyboard.press("Control+Shift+O");
-  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "打开文档，开始阅读" })).toBeVisible();
 });
 
 test("shows remembered files and workspaces on the next launch", async ({ page }) => {
@@ -261,7 +278,7 @@ test("rejects unsupported browser files instead of rendering them as markdown", 
   });
 
   await expect(page.getByRole("alert")).toHaveText(/已跳过 1 个不支持的文件：unknown-binary\.exe/);
-  await expect(page.getByRole("heading", { name: "把文档打开，专心阅读。" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "打开文档，开始阅读" })).toBeVisible();
 });
 
 test("shows browser drag feedback and reports a partial drop", async ({ page }) => {
@@ -345,7 +362,7 @@ test("opens and closes the getting started guide from the empty state", async ({
   await page.goto("/");
 
   await page.getByRole("button", { name: "查看使用教程" }).click();
-  const dialog = page.getByRole("dialog", { name: "快速上手 Moyang Reader" });
+  const dialog = page.getByRole("dialog", { name: "从本地文档开始" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("添加阅读库");
   await expect(dialog).toContainText("设置保存到本机");

@@ -16,9 +16,11 @@ describe("GettingStartedDialog", () => {
       );
     });
 
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain("快速上手 Moyang Reader");
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain("从本地文档开始");
     expect(container.textContent).toContain("添加阅读库");
     expect(container.textContent).toContain("设置保存到本机");
+    expect(container.querySelectorAll(".getting-started-step")).toHaveLength(5);
+    expect(container.querySelector(".getting-started-footer .primary")?.textContent).toBe("打开文档");
 
     act(() => {
       const done = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "知道了");
@@ -26,6 +28,21 @@ describe("GettingStartedDialog", () => {
     });
     expect(onClose).toHaveBeenCalledTimes(1);
 
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("offers the same actions in English", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <GettingStartedDialog locale="en-US" onClose={() => {}} onOpenDocument={() => {}} onAddWorkspace={() => {}} />,
+      );
+    });
+    expect(container.textContent).toContain("Start with your local documents");
+    expect(container.querySelector(".getting-started-footer .primary")?.textContent).toBe("Open a document");
     act(() => root.unmount());
     container.remove();
   });
