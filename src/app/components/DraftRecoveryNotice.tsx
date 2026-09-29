@@ -37,7 +37,7 @@ export function DraftRecoveryNotice({
         <strong>
           {safetyText(locale, "noticeDraft", {
             name: snapshot.path.split(/[\\/]/).pop() ?? snapshot.path,
-            time: formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale),
+            time: formatDraftRecoveryTime(snapshot.savedAt, undefined, locale),
           })}
         </strong>
         <small className="draft-recovery-source-note">{safetyText(locale, "noticeDraftSource")}</small>

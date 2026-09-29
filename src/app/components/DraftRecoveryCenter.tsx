@@ -111,7 +111,7 @@ export function DraftRecoveryCenter({
                       <strong>{fileName(snapshot.path)}</strong>
                       <span title={snapshot.path}>{snapshot.path}</span>
                       <small>
-                        {formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale)} ·{" "}
+                        {formatDraftRecoveryTime(snapshot.savedAt, undefined, locale)} ·{" "}
                         {draftPreview(snapshot.draft, locale)}
                       </small>
                       <small className="draft-recovery-source-note">{t("centerCurrent")}</small>

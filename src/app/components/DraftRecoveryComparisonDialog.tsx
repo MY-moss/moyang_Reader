@@ -117,7 +117,7 @@ export function DraftRecoveryComparisonDialog({
     recoveryKind === "previous-save"
       ? t("comparisonPreviousDetail")
       : safetyText(locale, "comparisonDraftDetail", {
-          time: snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale) : t("unknownTime"),
+          time: snapshot.savedAt ? formatDraftRecoveryTime(snapshot.savedAt, undefined, locale) : t("unknownTime"),
         });
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -249,7 +249,7 @@ export function DraftRecoveryComparisonDialog({
                   {recoveryKind === "previous-save"
                     ? t("savedBefore")
                     : snapshot.savedAt
-                      ? formatDraftRecoveryTime(snapshot.savedAt, Date.now(), locale)
+                      ? formatDraftRecoveryTime(snapshot.savedAt, undefined, locale)
                       : t("unknownTime")}
                 </strong>
               </div>
