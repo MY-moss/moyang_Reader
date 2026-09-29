@@ -151,6 +151,9 @@ export type MessageKey =
   | "workspaceEntry.moveReopenFailure"
   | "workspaceEntry.deleteReopenFailure"
   | "settings.title"
+  | "settings.general"
+  | "settings.guide"
+  | "settings.zoom"
   | "settings.localFirst"
   | "settings.allowRemoteImages"
   | "settings.remoteImagesNote"
@@ -198,6 +201,16 @@ export type MessageKey =
   | "settings.language"
   | "settings.language.zh"
   | "settings.language.en"
+  | "empty.libraryTitle"
+  | "empty.libraryDescription"
+  | "empty.libraryHint"
+  | "empty.welcomeTitle"
+  | "empty.welcomeDescription"
+  | "empty.welcomeHint"
+  | "empty.formats"
+  | "empty.open"
+  | "empty.addLibrary"
+  | "empty.guide"
   | "error.fileRead"
   | "error.fileWrite"
   | "error.fileConflict"
@@ -361,6 +374,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "workspaceEntry.moveReopenFailure": "内容已移动，但重新打开当前文档失败，请从文件树中再次打开。",
     "workspaceEntry.deleteReopenFailure": "内容已删除，但无法打开相邻标签页。",
     "settings.title": "设置",
+    "settings.general": "常规与隐私",
+    "settings.guide": "查看使用教程",
+    "settings.zoom": "阅读缩放",
     "settings.localFirst": "本地优先",
     "settings.allowRemoteImages": "允许远程图片",
     "settings.remoteImagesNote": "关闭时只显示本地附件，减少文档追踪请求。",
@@ -408,6 +424,16 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.language": "界面语言",
     "settings.language.zh": "简体中文",
     "settings.language.en": "English",
+    "empty.libraryTitle": "从阅读库继续阅读",
+    "empty.libraryDescription": "从左侧文件树选择文档，或按 Ctrl+P 快速打开。",
+    "empty.libraryHint": "也可以把文档拖到窗口中",
+    "empty.welcomeTitle": "打开文档，开始阅读",
+    "empty.welcomeDescription": "文档保留在原位置。打开一份文件，或添加整个文件夹作为阅读库。",
+    "empty.welcomeHint": "桌面版还可以把文档或整个文件夹拖到窗口中",
+    "empty.formats": "支持的文档类型",
+    "empty.open": "打开文档",
+    "empty.addLibrary": "添加整个文件夹",
+    "empty.guide": "查看使用教程",
     "error.fileRead": "无法读取文件。",
     "error.fileWrite": "无法保存文件。",
     "error.fileConflict": "文件已被外部修改，未覆盖本地内容。",
@@ -574,6 +600,9 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
       "The item was moved, but the current document could not be reopened. Open it from the file tree.",
     "workspaceEntry.deleteReopenFailure": "The item was deleted, but the adjacent tab could not be opened.",
     "settings.title": "Settings",
+    "settings.general": "General & privacy",
+    "settings.guide": "View getting started guide",
+    "settings.zoom": "Reading zoom",
     "settings.localFirst": "LOCAL FIRST",
     "settings.allowRemoteImages": "Allow remote images",
     "settings.remoteImagesNote": "When off, only local attachments are shown and tracking requests are reduced.",
@@ -623,6 +652,16 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.language": "Interface language",
     "settings.language.zh": "简体中文",
     "settings.language.en": "English",
+    "empty.libraryTitle": "Continue from your library",
+    "empty.libraryDescription": "Choose a document from the left file tree, or press Ctrl+P to open one quickly.",
+    "empty.libraryHint": "You can also drop a document into the window",
+    "empty.welcomeTitle": "Open a document and start reading",
+    "empty.welcomeDescription": "Your files stay where they are. Open one document or add a whole folder as a library.",
+    "empty.welcomeHint": "In the desktop app, you can also drop files or folders into the window",
+    "empty.formats": "Supported document types",
+    "empty.open": "Open a document",
+    "empty.addLibrary": "Add a whole folder",
+    "empty.guide": "View getting started guide",
     "error.fileRead": "Unable to read the file.",
     "error.fileWrite": "Unable to save the file.",
     "error.fileConflict": "The file changed externally; local content was not overwritten.",

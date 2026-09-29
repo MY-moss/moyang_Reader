@@ -550,6 +550,14 @@ export function App() {
     flushAppSettings,
   } = useSettingsLifecycle();
   const [documentState, setDocumentState] = useState<OpenDocument | null>(null);
+  const [compactLayout, setCompactLayout] = useState(() => window.innerWidth <= 1180);
+  const [emptyContextRevealed, setEmptyContextRevealed] = useState(false);
+  const contextPanelVisible = rightPanelOpen && (!compactLayout || Boolean(documentState) || emptyContextRevealed);
+  useEffect(() => {
+    const updateCompactLayout = () => setCompactLayout(window.innerWidth <= 1180);
+    window.addEventListener("resize", updateCompactLayout);
+    return () => window.removeEventListener("resize", updateCompactLayout);
+  }, []);
   const [progressiveReaderReadyHtml, setProgressiveReaderReadyHtml] = useState<string | null>(null);
   const [mode, setMode] = useState<ReaderMode>("rendered");
   const [sourceDraft, setSourceDraft] = useState("");
@@ -2562,6 +2570,7 @@ export function App() {
   const closeContextPanel = useCallback(() => {
     const restoreFocusTarget = contextPanelRestoreFocusRef.current;
     contextPanelRestoreFocusRef.current = null;
+    setEmptyContextRevealed(false);
     setRightPanelOpen(false);
     window.requestAnimationFrame(() => {
       if (!focusElementWithoutScroll(restoreFocusTarget)) focusElementWithoutScroll(contextToggleRef.current);
@@ -2570,7 +2579,7 @@ export function App() {
 
   const toggleContextPanel = useCallback(
     (restoreFocusTarget?: HTMLElement | null) => {
-      if (rightPanelOpen) {
+      if (contextPanelVisible) {
         closeContextPanel();
         return;
       }
@@ -2583,9 +2592,10 @@ export function App() {
         activeElement !== document.documentElement
           ? activeElement
           : null);
+      setEmptyContextRevealed(true);
       setRightPanelOpen(true);
     },
-    [closeContextPanel, rightPanelOpen, setRightPanelOpen],
+    [closeContextPanel, contextPanelVisible, setRightPanelOpen],
   );
 
   const focusWorkspaceSearch = useCallback(() => {
@@ -2710,7 +2720,7 @@ export function App() {
       if (
         event.key === "Escape" &&
         window.innerWidth <= 1180 &&
-        rightPanelOpen &&
+        contextPanelVisible &&
         !focusMode &&
         !event.defaultPrevented
       ) {
@@ -2741,7 +2751,7 @@ export function App() {
     openDocumentSearch,
     preferencesRef,
     requestEditorInsert,
-    rightPanelOpen,
+    contextPanelVisible,
     saveDocument,
     setReadingZoom,
     setSidebarCollapsed,
@@ -4413,7 +4423,7 @@ export function App() {
       canUndo,
       canRedo,
       canEditHistory,
-      rightPanelOpen,
+      rightPanelOpen: contextPanelVisible,
     },
     {
       openSelectedFile,
@@ -4750,7 +4760,7 @@ export function App() {
       ref={appShellRef}
       className={`app-shell reading-width-${preferences.readingWidth} reading-typeface-${preferences.readingTypeface} reading-spacing-${preferences.readingLineSpacing}${
         focusMode ? " focus-mode" : ""
-      }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!rightPanelOpen ? " right-panel-collapsed" : ""}`}
+      }${sidebarCollapsed ? " sidebar-collapsed" : ""}${!contextPanelVisible ? " right-panel-collapsed" : ""}`}
       style={
         {
           "--sidebar-width": `${paneWidths.sidebar}px`,
@@ -4850,7 +4860,7 @@ export function App() {
         onToggleFocusMode={() => setFocusMode((current) => !current)}
         onToggleMode={toggleReadingEditing}
         onCycleMode={toggleDocumentMode}
-        rightPanelOpen={rightPanelOpen}
+        rightPanelOpen={contextPanelVisible}
         contextToggleRef={contextToggleRef}
         onToggleRightPanel={toggleContextPanel}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
@@ -5090,6 +5100,7 @@ export function App() {
           )}
           {!loading && !documentState && (
             <EmptyState
+              locale={locale}
               onOpen={() => void openSelectedFile()}
               onChooseWorkspace={() => void handleChooseWorkspace()}
               onOpenGuide={() => setGuideOpen(true)}
@@ -5213,10 +5224,10 @@ export function App() {
             />
           )}
         </main>
-        {rightPanelOpen && !focusMode && (
+        {contextPanelVisible && !focusMode && (
           <div className="context-panel-backdrop" role="presentation" onClick={closeContextPanel} />
         )}
-        {rightPanelOpen && !focusMode && (
+        {contextPanelVisible && !focusMode && (
           <PaneResizeHandle
             side="context"
             value={paneWidths.context}
@@ -5228,7 +5239,7 @@ export function App() {
             onReset={() => resetPane("context")}
           />
         )}
-        {rightPanelOpen && !focusMode && (
+        {contextPanelVisible && !focusMode && (
           <ContextPanel
             documentState={documentState}
             entry={currentIndexEntry}

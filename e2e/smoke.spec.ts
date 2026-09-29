@@ -30,6 +30,22 @@ test("persists reading layout preferences", async ({ page }) => {
   await expect(page.getByLabel("导出页边距")).toHaveValue("compact");
 });
 
+test("keeps first-use actions available in both interface languages", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "打开文档，开始阅读" })).toBeVisible();
+  await openSettingsMenu(page);
+  await page.getByRole("combobox", { name: "界面语言" }).selectOption("en-US");
+  await expect(page.getByRole("heading", { name: "Open a document and start reading" })).toBeVisible();
+  const guideButton = page.locator(".settings-menu").getByRole("button", { name: "View getting started guide" });
+  await guideButton.click();
+  const guide = page.getByRole("dialog", { name: "Start with your local documents" });
+  await expect(guide.getByRole("button", { name: "Open a document" })).toBeVisible();
+  await expect(guide.getByRole("button", { name: "Add a library" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(guide).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+});
+
 test("exports a local diagnostic summary without document content or paths", async ({ page }) => {
   await page.goto("/");
   await openSettingsMenu(page);
@@ -498,6 +514,7 @@ test("dismisses topbar menus with an outside click or Escape", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(settingsMenu).not.toHaveAttribute("open");
   await expect(overflowMenu).not.toHaveAttribute("open");
+  await expect(page.locator(".toolbar-overflow-trigger")).toBeFocused();
 
   await page.locator('input[type="file"]').setInputFiles({
     name: "menu-dismiss.md",

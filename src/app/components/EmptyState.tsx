@@ -1,4 +1,5 @@
 import brandLogo from "../../assets/moyang-reader-logo.png";
+import { translate, type Locale } from "../i18n";
 
 type EmptyStateProps = {
   onOpen: () => void;
@@ -6,6 +7,7 @@ type EmptyStateProps = {
   hasWorkspace: boolean;
   showWorkspaceAction: boolean;
   onOpenGuide: () => void;
+  locale: Locale;
 };
 
 export function EmptyState({
@@ -14,20 +16,17 @@ export function EmptyState({
   hasWorkspace,
   showWorkspaceAction,
   onOpenGuide,
+  locale,
 }: EmptyStateProps) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
   return (
     <section className="empty-state" aria-labelledby="empty-title">
       <div className="empty-mark" aria-hidden="true">
         <img className="empty-logo" src={brandLogo} alt="" aria-hidden="true" />
       </div>
-      <div className="empty-eyebrow">{hasWorkspace ? "READING LIBRARY" : "READ LOCAL · STAY PORTABLE"}</div>
-      <h1 id="empty-title">{hasWorkspace ? "从阅读库开始阅读。" : "把文档打开，专心阅读。"}</h1>
-      <p>
-        {hasWorkspace
-          ? "从左侧文件树选择文档，或按 Ctrl+P 快速打开。"
-          : "双击文档即可进入阅读模式。这里先保持安静，编辑、搜索和工作区能力会在需要时出现。"}
-      </p>
-      <div className="empty-capabilities" aria-label="支持的文档类型">
+      <h1 id="empty-title">{hasWorkspace ? t("empty.libraryTitle") : t("empty.welcomeTitle")}</h1>
+      <p>{hasWorkspace ? t("empty.libraryDescription") : t("empty.welcomeDescription")}</p>
+      <div className="empty-capabilities" aria-label={t("empty.formats")}>
         <span>MARKDOWN</span>
         <span>WORD</span>
         <span>PDF</span>
@@ -35,20 +34,18 @@ export function EmptyState({
       </div>
       <div className="empty-actions">
         <button type="button" className="empty-action" onClick={onOpen}>
-          打开文档
+          {t("empty.open")}
         </button>
         {showWorkspaceAction && (
           <button type="button" className="empty-action secondary" onClick={onChooseWorkspace}>
-            添加整个文件夹
+            {t("empty.addLibrary")}
           </button>
         )}
         <button type="button" className="empty-action secondary" onClick={onOpenGuide}>
-          查看使用教程
+          {t("empty.guide")}
         </button>
       </div>
-      <p className="empty-hint">
-        {hasWorkspace ? "也可以把文档拖到窗口中" : "桌面版还可以把文档或整个文件夹拖到窗口中"}
-      </p>
+      <p className="empty-hint">{hasWorkspace ? t("empty.libraryHint") : t("empty.welcomeHint")}</p>
     </section>
   );
 }

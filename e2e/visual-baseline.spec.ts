@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { switchToRenderedMode } from "./helpers";
+import { openSettingsMenu, switchToRenderedMode } from "./helpers";
 
 const VISUAL_VIEWPORT = { width: 1240, height: 820 } as const;
 const THEMES = ["light", "dark"] as const;
@@ -102,6 +102,16 @@ for (const theme of THEMES) {
     await expectStateScreenshot(emptyState, "empty-state", theme, { maxDiffPixelRatio: 0.01 });
   });
 
+  test(`captures settings and first-use guidance (${theme})`, async ({ page }) => {
+    await page.setViewportSize(VISUAL_VIEWPORT);
+    await page.goto("/");
+    await setTheme(page, theme);
+    await openSettingsMenu(page);
+    await expectStateScreenshot(page.locator(".toolbar-overflow-panel"), "settings-panel", theme);
+    await page.locator(".empty-state").getByRole("button", { name: "查看使用教程" }).click();
+    await expectStateScreenshot(page.getByRole("dialog", { name: "从本地文档开始" }), "getting-started", theme);
+  });
+
   test(`captures the reader state baseline (${theme})`, async ({ page }) => {
     await loadDocument(page, theme, "reader");
     await expectStateScreenshot(page.locator(".reader-content"), "reader-content", theme);
@@ -144,6 +154,17 @@ for (const theme of THEMES) {
     await expectStateScreenshot(dialog, "confirmation-dialog", theme);
   });
 }
+
+test("captures the compact settings and first-use layout", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 600 });
+  await page.goto("/");
+  await setTheme(page, "light");
+  await expectStateScreenshot(page.locator(".app-shell"), "first-use-shell-720", "light");
+  await openSettingsMenu(page);
+  await expectStateScreenshot(page.locator(".toolbar-overflow-panel"), "settings-panel-720", "light");
+  await page.locator(".settings-menu").getByRole("button", { name: "查看使用教程" }).click();
+  await expectStateScreenshot(page.getByRole("dialog", { name: "从本地文档开始" }), "getting-started-720", "light");
+});
 
 test("keeps reader anchors within the compact and wide Windows viewports", async ({ page }) => {
   for (const width of [720, 1240] as const) {
