@@ -1,9 +1,10 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
 type ModalBehaviorOptions = {
   containerRef: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
   restoreFocusTarget?: HTMLElement | null;
+  fallbackFocusTarget?: HTMLElement | null;
   onClose: () => void;
 };
 
@@ -36,6 +37,7 @@ export function useModalBehavior({
   containerRef,
   initialFocusRef,
   restoreFocusTarget,
+  fallbackFocusTarget,
   onClose,
 }: ModalBehaviorOptions): void {
   const onCloseRef = useRef(onClose);
@@ -44,7 +46,9 @@ export function useModalBehavior({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  useEffect(() => {
+  // Establish and hand off focus before paint. A visible confirmation must not
+  // expose a frame focused on the dismissed menu (or the page behind it).
+  useLayoutEffect(() => {
     const previousFocus =
       restoreFocusTarget ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const modalContainer = containerRef.current;
@@ -98,7 +102,9 @@ export function useModalBehavior({
       window.removeEventListener("keydown", handleKeyDown, true);
       if (previousFocus?.isConnected && !modalContainer?.contains(previousFocus)) {
         previousFocus.focus();
+      } else if (fallbackFocusTarget?.isConnected) {
+        fallbackFocusTarget.focus();
       }
     };
-  }, [containerRef, initialFocusRef, restoreFocusTarget]);
+  }, [containerRef, fallbackFocusTarget, initialFocusRef, restoreFocusTarget]);
 }

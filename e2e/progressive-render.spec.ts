@@ -7,7 +7,8 @@ async function openMoreMenu(page: Page): Promise<void> {
   }
 }
 
-async function switchToRenderedMode(page: Page): Promise<void> {
+async function switchToRenderedMode(page: Page, documentName: string): Promise<void> {
+  await expect(page.locator(".tab-item.active .tab-label")).toHaveText(documentName);
   await openMoreMenu(page);
   const sourceButton = page.getByRole("button", { name: "源文本", exact: true });
   if ((await sourceButton.count()) > 0) {
@@ -21,6 +22,15 @@ async function switchToRenderedMode(page: Page): Promise<void> {
 }
 
 test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
+  // Formula rendering/imports can finish after the file picker event. Keep that
+  // timing deterministic so the test cannot switch the previous document's mode.
+  await page.addInitScript(() => {
+    const readText = File.prototype.text;
+    File.prototype.text = async function () {
+      if (this.name === "formula-note.md") await new Promise((resolve) => setTimeout(resolve, 300));
+      return readText.call(this);
+    };
+  });
   const stylesheetRequests: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "stylesheet") stylesheetRequests.push(request.url());
@@ -32,7 +42,7 @@ test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# 普通文档\n\n这里没有公式。"),
   });
-  await switchToRenderedMode(page);
+  await switchToRenderedMode(page, "plain-note.md");
   await expect(page.locator(".reader-content")).toContainText("这里没有公式。");
   expect(stylesheetRequests.some((url) => /katex/i.test(url))).toBe(false);
 
@@ -41,7 +51,7 @@ test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
     mimeType: "text/markdown",
     buffer: Buffer.from("# 公式文档\n\n$$x^2 + y^2 = z^2$$"),
   });
-  await switchToRenderedMode(page);
+  await switchToRenderedMode(page, "formula-note.md");
   await expect(page.locator(".reader-content .katex")).toBeVisible();
   await expect.poll(() => stylesheetRequests.some((url) => /katex/i.test(url))).toBe(true);
 });
@@ -77,7 +87,7 @@ test("mounts large reader content incrementally and eventually exposes every hea
     mimeType: "text/markdown",
     buffer: Buffer.from(`# 大文档\n\n${sections}`),
   });
-  await switchToRenderedMode(page);
+  await switchToRenderedMode(page, "large-progressive-note.md");
 
   const reader = page.locator('[data-progressive-reader="true"]');
   await expect(reader).toHaveAttribute("data-progressive-reader-ready", "false");

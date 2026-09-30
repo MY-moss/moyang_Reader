@@ -1,6 +1,24 @@
 import type { Locale } from "../i18n";
 
 const zh = {
+  transitionTitle: "{action}？",
+  transitionOpen: "打开新文档",
+  transitionSwitch: "切换文档",
+  transitionBack: "返回上一文档",
+  transitionNew: "切换到新文档",
+  transitionDraft: "打开另一个草稿的文件",
+  transitionClose: "关闭标签",
+  transitionWorkspace: "切换阅读库",
+  transitionReload: "重新载入",
+  transitionDescription: "当前编辑尚未写回原文件。继续后将离开当前编辑内容。",
+  transitionCloseDescription: "将关闭 {count} 个标签，包含当前未保存文档。",
+  transitionReloadDescription: "重新载入会用当前磁盘版本替换编辑区中的未保存内容，不会覆盖磁盘文件。",
+  transitionSavedNote: "最新修改已自动保留为本机草稿，可在“草稿”中心恢复。原文件不会被修改；取消会保留当前编辑。",
+  transitionUnsavedNote: "浏览器临时预览无法保留可恢复草稿；继续后未保存修改将丢失。请先取消并保存需要的内容。",
+  transitionTarget: "目标文档",
+  transitionWorkspaceTarget: "目标阅读库",
+  transitionCount: "目标数量",
+  transitionEdits: "尚未写回原文件",
   workspaceDeleteTitle: "移入 Windows 回收站？",
   workspaceDeleteFile: "确认后，这个文件将移入 Windows 回收站。",
   workspaceDeleteFolder: "确认后，这个文件夹及其中的全部内容将移入 Windows 回收站。",
@@ -144,6 +162,28 @@ const zh = {
 type SafetyCopyKey = keyof typeof zh;
 
 const en: Record<SafetyCopyKey, string> = {
+  transitionTitle: "{action}?",
+  transitionOpen: "Open new documents",
+  transitionSwitch: "Switch documents",
+  transitionBack: "Go back to the previous document",
+  transitionNew: "Switch to the new document",
+  transitionDraft: "Open another draft's file",
+  transitionClose: "Close tabs",
+  transitionWorkspace: "Switch libraries",
+  transitionReload: "Reload",
+  transitionDescription:
+    "Your edits have not been written to the original file. Continuing will leave the current edits.",
+  transitionCloseDescription: "This closes {count} tabs, including the current document with unsaved edits.",
+  transitionReloadDescription:
+    "Reload replaces unsaved editor content with the current disk version. It does not overwrite the file on disk.",
+  transitionSavedNote:
+    "The latest edits are kept as a local draft. Restore them from Drafts. The original file will not change; Cancel keeps the current edits.",
+  transitionUnsavedNote:
+    "Temporary browser previews cannot keep a recoverable draft. Continuing loses unsaved edits. Cancel and save anything you need first.",
+  transitionTarget: "Target document",
+  transitionWorkspaceTarget: "Target library",
+  transitionCount: "Target count",
+  transitionEdits: "Not written to the original file",
   workspaceDeleteTitle: "Move to Windows Recycle Bin?",
   workspaceDeleteFile: "Confirming will move this file to the Windows Recycle Bin.",
   workspaceDeleteFolder: "Confirming will move this folder and everything inside it to the Windows Recycle Bin.",

@@ -16,6 +16,7 @@ type SafetyConfirmationDialogProps = {
   confirm: SafetyAction;
   secondary?: SafetyAction;
   onCancel: () => void;
+  fallbackFocusTarget?: HTMLElement | null;
 };
 
 export function SafetyConfirmationDialog({
@@ -28,10 +29,16 @@ export function SafetyConfirmationDialog({
   confirm,
   secondary,
   onCancel,
+  fallbackFocusTarget,
 }: SafetyConfirmationDialogProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  useModalBehavior({ containerRef: dialogRef, initialFocusRef: cancelButtonRef, onClose: onCancel });
+  useModalBehavior({
+    containerRef: dialogRef,
+    initialFocusRef: cancelButtonRef,
+    fallbackFocusTarget,
+    onClose: onCancel,
+  });
 
   return (
     <div className="quick-open-backdrop close-confirm-backdrop" role="presentation">

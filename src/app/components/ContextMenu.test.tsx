@@ -1,8 +1,9 @@
-import { act, useState } from "react";
+import { act, useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { ContextMenu, type ContextMenuGroup } from "./ContextMenu";
+import { SafetyConfirmationDialog } from "./SafetyConfirmationDialog";
 
 const groups: ContextMenuGroup[] = [
   {
@@ -47,7 +48,73 @@ function keyboardEvent(key: string, options: KeyboardEventInit = {}): KeyboardEv
   return new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...options });
 }
 
+function MenuConfirmation({ trigger, onDialogCommit }: { trigger: HTMLElement; onDialogCommit: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  useLayoutEffect(() => {
+    if (dialogOpen) onDialogCommit();
+  }, [dialogOpen, onDialogCommit]);
+  return (
+    <>
+      {menuOpen && (
+        <ContextMenu
+          x={20}
+          y={24}
+          ariaLabel="测试菜单"
+          restoreFocusTarget={trigger}
+          groups={[{ items: [{ id: "delete", label: "删除", onSelect: () => setDialogOpen(true) }] }]}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
+      {dialogOpen && (
+        <SafetyConfirmationDialog
+          locale="zh-CN"
+          id="test-confirm"
+          title="删除文件"
+          description="确认删除"
+          note="取消保留文件"
+          confirm={{ label: "删除", testId: "test-confirm-confirm", onClick: () => setDialogOpen(false) }}
+          onCancel={() => setDialogOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 describe("ContextMenu", () => {
+  it("hands focus to Cancel before the confirmation is painted and returns it to the row", () => {
+    const container = document.createElement("div");
+    const trigger = document.createElement("button");
+    document.body.append(trigger, container);
+    trigger.focus();
+    const root = createRoot(container);
+    const committedFocus: Element[] = [];
+    act(() => {
+      root.render(
+        <MenuConfirmation
+          trigger={trigger}
+          onDialogCommit={() => {
+            if (document.activeElement) committedFocus.push(document.activeElement);
+          }}
+        />,
+      );
+    });
+    act(() => {
+      document.body.querySelector<HTMLButtonElement>('[role="menuitem"]')?.click();
+    });
+    const cancel = container.querySelector<HTMLButtonElement>('[data-testid="test-confirm-cancel"]');
+    try {
+      expect(committedFocus).toEqual([cancel]);
+      expect(document.activeElement).toBe(cancel);
+      act(() => cancel?.click());
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+      trigger.remove();
+    }
+  });
+
   it("renders outside a containing content area so fixed coordinates stay in the viewport", () => {
     const contentArea = document.createElement("div");
     contentArea.className = "content-area";

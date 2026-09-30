@@ -24,6 +24,23 @@ function createOptions(overrides: Partial<OpenPathsControllerOptions> = {}): Ope
 }
 
 describe("open paths controller", () => {
+  it("waits for an asynchronous rejected document decision before authorizing paths", async () => {
+    const options = createOptions({ confirmDocumentReplacement: vi.fn(async () => false) });
+    await expect(
+      createOpenPathsController(options).handleOpenPaths([{ path: "C:/other.txt", kind: "document" }]),
+    ).resolves.toMatchObject({ cancelled: true });
+    expect(options.authorizeStoredPath).not.toHaveBeenCalled();
+    expect(options.openPath).not.toHaveBeenCalled();
+  });
+
+  it("waits for an asynchronous rejected library decision before loading it", async () => {
+    const options = createOptions({ confirmWorkspaceSwitch: vi.fn(async () => false) });
+    await expect(
+      createOpenPathsController(options).handleOpenPaths([{ path: "C:/Archive", kind: "workspace" }]),
+    ).resolves.toMatchObject({ cancelled: true });
+    expect(options.authorizeStoredPath).not.toHaveBeenCalled();
+    expect(options.loadWorkspace).not.toHaveBeenCalled();
+  });
   it("confirms, authorizes, de-duplicates, and opens workspace and document paths", async () => {
     const options = createOptions();
     const controller = createOpenPathsController(options);
@@ -39,11 +56,8 @@ describe("open paths controller", () => {
       duplicateCount: 1,
       cancelled: false,
     });
-    expect(options.confirmWorkspaceSwitch).toHaveBeenCalledWith("C:/other", "切换阅读库");
-    expect(options.confirmDocumentReplacement).toHaveBeenCalledWith(
-      ["C:/other/note.md", "C:/other/note.md"],
-      "打开新文档",
-    );
+    expect(options.confirmWorkspaceSwitch).toHaveBeenCalledWith("C:/other", "switch-workspace");
+    expect(options.confirmDocumentReplacement).toHaveBeenCalledWith(["C:/other/note.md", "C:/other/note.md"], "open");
     expect(options.authorizeStoredPath).toHaveBeenNthCalledWith(1, "C:/other", true);
     expect(options.authorizeStoredPath).toHaveBeenNthCalledWith(2, "C:/other/note.md", false);
     expect(options.loadWorkspace).toHaveBeenCalledWith("authorized:C:/other");
@@ -80,7 +94,7 @@ describe("open paths controller", () => {
       failedCount: 0,
       cancelled: false,
     });
-    expect(options.confirmDocumentReplacement).toHaveBeenCalledWith(["C:/library/next.md"], "打开新文档");
+    expect(options.confirmDocumentReplacement).toHaveBeenCalledWith(["C:/library/next.md"], "open");
     expect(options.authorizeStoredPath).toHaveBeenCalledTimes(1);
   });
 
