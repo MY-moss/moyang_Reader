@@ -1,6 +1,18 @@
 import type { Locale } from "../i18n";
 
 const zh = {
+  workspaceDeleteTitle: "移入 Windows 回收站？",
+  workspaceDeleteFile: "确认后，这个文件将移入 Windows 回收站。",
+  workspaceDeleteFolder: "确认后，这个文件夹及其中的全部内容将移入 Windows 回收站。",
+  workspaceDeleteNote: "成功后将移除对应标签与最近记录。文件可从 Windows 回收站还原。",
+  workspaceDeleteConfirm: "移入回收站",
+  workspaceFile: "目标文件",
+  workspaceFolder: "目标文件夹",
+  workspaceSaveTitle: "先保存，再{action}？",
+  workspaceSaveDescription: "当前文档有未保存修改，需要先保存才能继续这项操作。",
+  workspaceSaveNote: "保存失败时操作会停止。取消会保留文件与未保存编辑。",
+  workspaceSaveDeleteNote: "保存成功后，文件仍将移入 Windows 回收站。取消会保留文件与未保存编辑。",
+  workspaceSaveConfirm: "保存并{action}",
   cancel: "取消",
   close: "关闭",
   later: "稍后处理",
@@ -132,6 +144,20 @@ const zh = {
 type SafetyCopyKey = keyof typeof zh;
 
 const en: Record<SafetyCopyKey, string> = {
+  workspaceDeleteTitle: "Move to Windows Recycle Bin?",
+  workspaceDeleteFile: "Confirming will move this file to the Windows Recycle Bin.",
+  workspaceDeleteFolder: "Confirming will move this folder and everything inside it to the Windows Recycle Bin.",
+  workspaceDeleteNote:
+    "After success, matching tabs and recent entries are removed. Files can be restored from the Windows Recycle Bin.",
+  workspaceDeleteConfirm: "Move to Recycle Bin",
+  workspaceFile: "Target file",
+  workspaceFolder: "Target folder",
+  workspaceSaveTitle: "Save before you {action}?",
+  workspaceSaveDescription: "The current document has unsaved edits. Save it before continuing this operation.",
+  workspaceSaveNote: "A failed save stops the operation. Cancel keeps the file and your unsaved edits.",
+  workspaceSaveDeleteNote:
+    "After saving, the file will still move to the Windows Recycle Bin. Cancel keeps the file and your unsaved edits.",
+  workspaceSaveConfirm: "Save and {action}",
   cancel: "Cancel",
   close: "Close",
   later: "Later",

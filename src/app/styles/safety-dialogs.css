@@ -241,6 +241,14 @@
 }
 
 @media (forced-colors: active) {
+  .safety-confirm-dialog {
+    --ink: CanvasText;
+    --muted-strong: CanvasText;
+    --surface-strong: Canvas;
+    background: Canvas;
+    color: CanvasText;
+  }
+
   .safety-confirm-actions {
     background: Canvas;
   }

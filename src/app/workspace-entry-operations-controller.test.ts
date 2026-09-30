@@ -99,6 +99,50 @@ function setup() {
 }
 
 describe("workspace entry operations", () => {
+  it("waits for an asynchronous deletion decision and leaves state untouched on cancellation", async () => {
+    const { state, options, replaceOpenTabs, session } = setup();
+    let decide!: (accepted: boolean) => void;
+    options.confirm = vi.fn(() => new Promise<boolean>((resolve) => (decide = resolve)));
+    const controller = createWorkspaceEntryOperationsController(options);
+    const pending = controller.remove("Projects", "folder");
+    expect(options.deleteEntry).not.toHaveBeenCalled();
+    expect(await controller.remove("other.md", "file")).toBe(false);
+    expect(options.confirm).toHaveBeenCalledOnce();
+    decide(false);
+    expect(await pending).toBe(false);
+    expect(options.deleteEntry).not.toHaveBeenCalled();
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.persistWorkspaceSession).not.toHaveBeenCalled();
+    expect(state.current?.path).toBe("C:\\Notes\\Projects\\one.md");
+  });
+
+  it("does not save or delete after the workspace changes while deletion confirmation is open", async () => {
+    const { state, options } = setup();
+    state.current = { path: state.current!.path, modified: true };
+    options.confirm = vi.fn(async () => {
+      state.root = "D:\\Books";
+      return true;
+    });
+    expect(await createWorkspaceEntryOperationsController(options).remove("Projects", "folder")).toBe(false);
+    expect(options.confirm).toHaveBeenCalledOnce();
+    expect(options.saveDocument).not.toHaveBeenCalled();
+    expect(options.deleteEntry).not.toHaveBeenCalled();
+  });
+
+  it("does not save a different document selected while the dirty-document confirmation is open", async () => {
+    const { state, options } = setup();
+    state.current = { path: state.current!.path, modified: true };
+    options.confirm = vi.fn(async () => {
+      state.current = { path: "C:\\Notes\\other.md", modified: true };
+      return true;
+    });
+    expect(
+      await createWorkspaceEntryOperationsController(options).transfer("Projects", "Archive", "move", "folder"),
+    ).toBe(false);
+    expect(options.saveDocument).not.toHaveBeenCalled();
+    expect(options.moveEntry).not.toHaveBeenCalled();
+  });
+
   it("rebases affected tabs, recent files, the cached session and current document after a folder rename", async () => {
     const { state, options, session, replaceOpenTabs } = setup();
     options.prompt = vi.fn(() => "Archive");
@@ -159,16 +203,14 @@ describe("workspace entry operations", () => {
     expect(replaceOpenTabs).not.toHaveBeenCalled();
   });
 
-  it("uses English confirmations when the interface locale is English", async () => {
+  it("describes the deletion target without coupling the controller to dialog copy", async () => {
     const { state, options } = setup();
     state.current = { path: state.current!.path, modified: true };
     options.getLocale = () => "en-US";
     options.confirm = vi.fn(() => false);
 
     expect(await createWorkspaceEntryOperationsController(options).remove("Projects", "folder")).toBe(false);
-    expect(options.confirm).toHaveBeenCalledWith(
-      "Move “Projects” and everything inside it to the Windows Recycle Bin?",
-    );
+    expect(options.confirm).toHaveBeenCalledWith({ type: "delete", path: "C:\\Notes\\Projects", kind: "folder" });
   });
 
   it("does not start a native mutation when saving a dirty document fails", async () => {

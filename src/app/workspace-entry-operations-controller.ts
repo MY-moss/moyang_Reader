@@ -6,6 +6,10 @@ import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } fr
 
 export type WorkspaceEntryKind = "file" | "folder";
 export type WorkspaceTransferMode = "copy" | "move";
+export type WorkspaceEntryAction = "rename" | "delete" | "move" | "copy";
+export type WorkspaceEntryConfirmationRequest =
+  | { type: "delete"; path: string; kind: WorkspaceEntryKind }
+  | { type: "save"; path: string; action: WorkspaceEntryAction };
 
 type CurrentDocument = Pick<OpenDocument, "path" | "modified">;
 
@@ -16,7 +20,7 @@ export type WorkspaceEntryOperationsOptions = {
   getCurrentDocument: () => CurrentDocument | null;
   getOpenTabs: () => RecentFile[];
   prompt: (message: string, value: string) => string | null;
-  confirm: (message: string) => boolean;
+  confirm: (request: WorkspaceEntryConfirmationRequest) => boolean | Promise<boolean>;
   saveDocument: () => Promise<boolean>;
   openPath: (path: string, preserveMode: boolean) => Promise<boolean>;
   renameEntry: (root: string, entryPath: string, name: string) => Promise<string>;
@@ -95,10 +99,23 @@ export function createWorkspaceEntryOperationsController(
     return null;
   };
 
-  const confirmCurrentSave = async (entryAbsolutePath: string, action: string): Promise<boolean> => {
+  const confirmCurrentSave = async (
+    root: string,
+    entryAbsolutePath: string,
+    action: WorkspaceEntryAction,
+  ): Promise<boolean> => {
+    if (!isCurrentRoot(root)) return false;
     const current = options.getCurrentDocument();
     if (!current?.modified || !isPathWithinEntry(current.path, entryAbsolutePath)) return true;
-    return options.confirm(message("workspaceEntry.confirmDirty", { action })) && (await options.saveDocument());
+    if (!(await options.confirm({ type: "save", path: current.path, action }))) return false;
+    // An application modal yields to other events, unlike window.confirm.
+    // Never save a different document or continue an old workspace operation.
+    if (!isCurrentRoot(root) || !samePath(options.getCurrentDocument()?.path ?? "", current.path)) return false;
+    return (
+      (await options.saveDocument()) &&
+      isCurrentRoot(root) &&
+      samePath(options.getCurrentDocument()?.path ?? "", current.path)
+    );
   };
 
   const updateSession = (root: string, oldPath: string, nextPath: string | null, tabs: RecentFile[]): void => {
@@ -194,8 +211,7 @@ export function createWorkspaceEntryOperationsController(
         .prompt(message(kind === "folder" ? "workspaceEntry.renameFolder" : "workspaceEntry.renameFile"), oldName)
         ?.trim();
       if (!name || name === oldName) return false;
-      if (!(await confirmCurrentSave(oldPath, message("workspaceEntry.actionRename"))) || !isCurrentRoot(root))
-        return false;
+      if (!(await confirmCurrentSave(root, oldPath, "rename")) || !isCurrentRoot(root)) return false;
       const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
       let nextPath: string;
       try {
@@ -221,13 +237,8 @@ export function createWorkspaceEntryOperationsController(
       if (!root) return false;
       const oldPath = workspaceEntryAbsolutePath(root, entryPath);
       const label = fileNameFromPath(entryPath);
-      const confirmation = message(
-        kind === "folder" ? "workspaceEntry.confirmDeleteFolder" : "workspaceEntry.confirmDeleteFile",
-        { name: label },
-      );
-      if (!options.confirm(confirmation)) return false;
-      if (!(await confirmCurrentSave(oldPath, message("workspaceEntry.actionDelete"))) || !isCurrentRoot(root))
-        return false;
+      if (!(await options.confirm({ type: "delete", path: oldPath, kind })) || !isCurrentRoot(root)) return false;
+      if (!(await confirmCurrentSave(root, oldPath, "delete")) || !isCurrentRoot(root)) return false;
       const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
       try {
         await options.deleteEntry(root, entryPath);
@@ -257,7 +268,7 @@ export function createWorkspaceEntryOperationsController(
       const root = currentRoot(action, entryPath);
       if (!root) return false;
       const oldPath = workspaceEntryAbsolutePath(root, entryPath);
-      if (!(await confirmCurrentSave(oldPath, action)) || !isCurrentRoot(root)) return false;
+      if (!(await confirmCurrentSave(root, oldPath, mode)) || !isCurrentRoot(root)) return false;
       const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
       let nextPath: string;
       try {
