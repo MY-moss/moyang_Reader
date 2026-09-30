@@ -33,6 +33,8 @@ import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirm
 import { ExternalChangeNotice, type ExternalChangeKind } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { safetyText } from "./components/safety-dialog-copy";
+import { WorkspaceEntryConfirmationDialog } from "./components/WorkspaceEntryConfirmationDialog";
+import { useWorkspaceEntryConfirmation } from "./use-workspace-entry-confirmation";
 import { GettingStartedDialog } from "./components/GettingStartedDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
@@ -2053,6 +2055,11 @@ export function App() {
   }, [resetEditorHistory]);
 
   const workspaceEntryOperationsRef = useRef<WorkspaceEntryOperationsController | null>(null);
+  const {
+    request: workspaceEntryConfirmation,
+    confirm: confirmWorkspaceEntry,
+    decide: decideWorkspaceEntry,
+  } = useWorkspaceEntryConfirmation();
   useEffect(() => {
     const controller = createWorkspaceEntryOperationsController({
       isNative: isTauriRuntime,
@@ -2061,7 +2068,7 @@ export function App() {
       getCurrentDocument: getCurrentDocumentValue,
       getOpenTabs: getOpenTabsValue,
       prompt: (message, value) => window.prompt(message, value),
-      confirm: (message) => window.confirm(message),
+      confirm: confirmWorkspaceEntry,
       saveDocument,
       openPath,
       renameEntry: renameWorkspaceEntry,
@@ -2093,6 +2100,7 @@ export function App() {
     };
   }, [
     clearCurrentDocumentForWorkspaceEntry,
+    confirmWorkspaceEntry,
     getCurrentDocumentValue,
     getOpenTabsValue,
     getWorkspacePathValue,
@@ -5419,6 +5427,14 @@ export function App() {
           onCancel={cancelCloseConfirmation}
           onConfirm={confirmClose}
           onSaveAndClose={saveAndClose}
+        />
+      )}
+      {workspaceEntryConfirmation && (
+        <WorkspaceEntryConfirmationDialog
+          key={workspaceEntryConfirmation.type}
+          locale={locale}
+          request={workspaceEntryConfirmation}
+          onDecision={decideWorkspaceEntry}
         />
       )}
       {externalOverwriteConfirmationOpen && (

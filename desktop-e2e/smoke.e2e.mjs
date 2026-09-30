@@ -1151,26 +1151,39 @@ describe("Moyang Reader desktop runtime", () => {
       assert.equal(fs.existsSync(originalFilePath), false);
       assert.equal(fs.existsSync(renamedFilePath), true);
 
-      await browser.execute(() => {
-        window.__desktopE2EOriginalConfirm = window.confirm;
-        window.confirm = () => true;
-      });
       const deleteFileMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
       await deleteFileMenu.$("button=删除文件").click();
+      let deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
+      await deleteDialog.waitForDisplayed();
+      assert.match(await deleteDialog.getText(), /Windows 回收站/);
+      const cancelDelete = await deleteDialog.$('[data-testid="workspace-entry-confirm-cancel"]');
+      assert.ok(await cancelDelete.isFocused(), "deletion confirmation should focus Cancel");
+      await browser.keys("Escape");
+      await deleteDialog.waitForDisplayed({ reverse: true });
+      assert.equal(fs.existsSync(renamedFilePath), true, "cancelled deletion must preserve the file");
+      const renamedEntry = await findWorkspaceElement(".workspace-file", renamedFileName);
+      assert.ok(await renamedEntry.isFocused(), "cancel should restore the workspace row focus");
+      const retryDeleteMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
+      await retryDeleteMenu.$("button=删除文件").click();
+      deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
+      await deleteDialog.waitForDisplayed();
+      await deleteDialog.$('[data-testid="workspace-entry-confirm-confirm"]').click();
       await waitForWorkspaceEntry(".workspace-file", renamedFileName, false, "the context-menu file was not deleted");
       assert.equal(fs.existsSync(renamedFilePath), false);
 
       const deleteFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
       await deleteFolderMenu.$("button=删除文件夹及内容").click();
+      deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
+      await deleteDialog.waitForDisplayed();
+      assert.match(await deleteDialog.getText(), /全部内容/);
+      await deleteDialog.$('[data-testid="workspace-entry-confirm-confirm"]').click();
       await waitForWorkspaceEntry(".workspace-folder", folderName, false, "the context-menu folder was not deleted");
       assert.equal(fs.existsSync(folderPath), false);
     } finally {
       await browser
         .execute(() => {
           if (window.__desktopE2EOriginalPrompt) window.prompt = window.__desktopE2EOriginalPrompt;
-          if (window.__desktopE2EOriginalConfirm) window.confirm = window.__desktopE2EOriginalConfirm;
           delete window.__desktopE2EOriginalPrompt;
-          delete window.__desktopE2EOriginalConfirm;
         })
         .catch(() => undefined);
       fs.rmSync(originalFilePath, { force: true });
