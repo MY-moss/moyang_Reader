@@ -1,6 +1,5 @@
 import { clearDraftSnapshot, saveDraftSnapshot, type DraftSaveResult, type DraftSnapshot } from "./draft-recovery";
 import {
-  formatTransitionConfirmation,
   isSameDocumentPath,
   shouldConfirmDocumentReplacement,
   shouldConfirmWorkspaceSwitch,
@@ -13,6 +12,16 @@ import type { OpenDocument, RenderedMarkdown } from "./types";
 export type DocumentOpenNavigation = "sync" | "push" | "back" | "forward";
 
 export type DraftFlushOutcome = "not-needed" | "saved" | "unavailable" | "failed";
+
+export type DocumentTransitionAction =
+  "open" | "switch" | "back" | "new-document" | "open-draft" | "close-tabs" | "switch-workspace" | "reload";
+
+export type DocumentTransitionConfirmationRequest = {
+  action: DocumentTransitionAction;
+  path: string;
+  draftSaved: boolean;
+  targets: readonly string[];
+};
 
 export type DocumentSaveCommit = {
   path: string;
@@ -52,14 +61,15 @@ export type DocumentSessionControllerOptions = {
   getSelfWrittenPaths?: () => Map<string, number>;
   clearDraft?: (path: string) => DraftSnapshot[];
   saveDraft?: (snapshot: DraftSnapshot) => DraftSaveResult;
-  confirm?: (message: string) => boolean;
+  confirm?: (request: DocumentTransitionConfirmationRequest) => boolean | Promise<boolean>;
   now?: () => number;
 };
 
 export type DocumentSessionController = {
   flushDraft: () => DraftFlushOutcome;
-  confirmDocumentReplacement: (nextPaths: readonly string[], action: string) => boolean;
-  confirmWorkspaceSwitch: (nextWorkspacePath: string, action: string) => boolean;
+  confirmTransition: (action: DocumentTransitionAction, targets?: readonly string[]) => Promise<boolean>;
+  confirmDocumentReplacement: (nextPaths: readonly string[], action: DocumentTransitionAction) => Promise<boolean>;
+  confirmWorkspaceSwitch: (nextWorkspacePath: string, action: DocumentTransitionAction) => Promise<boolean>;
   openPath: (path: string, preserveMode?: boolean, navigation?: DocumentOpenNavigation) => Promise<boolean>;
   reloadExternalChange: (externalChangePath: string | null) => Promise<void>;
   resolveDraftRecovery: (snapshot: DraftSnapshot) => string | null;
@@ -82,14 +92,15 @@ export function createDocumentSessionController(options: DocumentSessionControll
   const saveDraft = options.saveDraft ?? saveDraftSnapshot;
   const clearDraft = options.clearDraft ?? clearDraftSnapshot;
   const onDraftSaved = options.onDraftSaved ?? ((result) => result.ok);
-  const confirm =
-    options.confirm ?? ((message: string) => (typeof window === "undefined" ? false : window.confirm(message)));
+  const confirm = options.confirm ?? (() => false);
   const now = options.now ?? Date.now;
   const fallbackSelfWritingPaths = options.selfWritingPaths ?? new Set<string>();
   const fallbackSelfWrittenPaths = options.selfWrittenPaths ?? new Map<string, number>();
   const getSelfWritingPaths = options.getSelfWritingPaths ?? (() => fallbackSelfWritingPaths);
   const getSelfWrittenPaths = options.getSelfWrittenPaths ?? (() => fallbackSelfWrittenPaths);
   let closeOperation = 0;
+  let disposed = false;
+  let confirmationPending = false;
 
   const saveCurrentDraft = (): DraftSaveResult | null => {
     const current = options.getCurrentDocument();
@@ -147,21 +158,63 @@ export function createDocumentSessionController(options: DocumentSessionControll
     return onDraftSaved(result) ? "saved" : "failed";
   };
 
-  const confirmDocumentReplacement = (nextPaths: readonly string[], action: string): boolean => {
-    if (!shouldConfirmDocumentReplacement(options.getCurrentDocument(), nextPaths)) return true;
-    const outcome = flushDraft();
-    if (outcome === "failed") return false;
-    return confirm(formatTransitionConfirmation(action, outcome === "saved"));
+  const confirmTransition = async (
+    action: DocumentTransitionAction,
+    targets: readonly string[] = [],
+  ): Promise<boolean> => {
+    if (disposed || confirmationPending) return false;
+    const current = options.getCurrentDocument();
+    if (!current?.modified) return true;
+    const workspace = options.getWorkspacePath();
+    const draft = options.getSourceDraft();
+    confirmationPending = true;
+    try {
+      // Reload has historically preserved browser drafts too; other browser transitions warn of loss.
+      const result = action === "reload" ? saveCurrentDraft() : null;
+      const outcome = action === "reload" ? (result && onDraftSaved(result) ? "saved" : "failed") : flushDraft();
+      if (outcome === "failed") return false;
+      const accepted = await confirm({
+        action,
+        path: current.path,
+        draftSaved: outcome === "saved",
+        targets: [...targets],
+      });
+      const latest = options.getCurrentDocument();
+      return Boolean(
+        accepted &&
+        !disposed &&
+        latest &&
+        isSameDocumentPath(latest.path, current.path) &&
+        latest.source === current.source &&
+        latest.modified === current.modified &&
+        latest.externallyModified === current.externallyModified &&
+        options.getSourceDraft() === draft &&
+        options.getWorkspacePath() === workspace,
+      );
+    } finally {
+      confirmationPending = false;
+    }
   };
 
-  const confirmWorkspaceSwitch = (nextWorkspacePath: string, action: string): boolean => {
+  const confirmDocumentReplacement = async (
+    nextPaths: readonly string[],
+    action: DocumentTransitionAction,
+  ): Promise<boolean> => {
+    if (disposed || confirmationPending) return false;
+    if (!shouldConfirmDocumentReplacement(options.getCurrentDocument(), nextPaths)) return true;
+    return confirmTransition(action, nextPaths);
+  };
+
+  const confirmWorkspaceSwitch = async (
+    nextWorkspacePath: string,
+    action: DocumentTransitionAction,
+  ): Promise<boolean> => {
+    if (disposed || confirmationPending) return false;
     const current = options.getCurrentDocument();
     if (!shouldConfirmWorkspaceSwitch(Boolean(current?.modified), options.getWorkspacePath(), nextWorkspacePath)) {
       return true;
     }
-    const outcome = flushDraft();
-    if (outcome === "failed") return false;
-    return confirm(formatTransitionConfirmation(action, outcome === "saved"));
+    return confirmTransition(action, [nextWorkspacePath]);
   };
 
   const openPath = async (
@@ -185,10 +238,10 @@ export function createDocumentSessionController(options: DocumentSessionControll
     if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;
 
     if (current.modified) {
-      const result = saveCurrentDraft();
-      if (result && !onDraftSaved(result)) return;
-      if (!confirm("重新载入会覆盖当前未保存修改，已先保留一份草稿恢复副本。继续吗？")) return;
+      if (!(await confirmTransition("reload"))) return;
     }
+
+    if (disposed || confirmationPending) return;
 
     options.onExternalChangePath(null);
     const opened = await openPath(current.path, true);
@@ -260,6 +313,7 @@ export function createDocumentSessionController(options: DocumentSessionControll
 
   return {
     flushDraft,
+    confirmTransition,
     confirmDocumentReplacement,
     confirmWorkspaceSwitch,
     openPath,
@@ -272,6 +326,7 @@ export function createDocumentSessionController(options: DocumentSessionControll
     },
     isCurrentCloseOperation: (operation) => operation === closeOperation,
     dispose: () => {
+      disposed = true;
       closeOperation += 1;
     },
   };

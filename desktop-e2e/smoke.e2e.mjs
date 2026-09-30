@@ -1996,7 +1996,6 @@ describe("Moyang Reader desktop runtime", () => {
     const targetName = "draft-flush-target.md";
     const targetPath = path.join(path.dirname(documentPath), targetName);
     const draftText = "切页前最后一段输入。";
-    let confirmIntercepted = false;
     let targetOpened = false;
     fs.writeFileSync(targetPath, "# Draft flush target\n\n目标文档。\n", "utf8");
 
@@ -2029,22 +2028,18 @@ describe("Moyang Reader desktop runtime", () => {
         timeoutMsg: "the latest draft edit was not applied before switching",
       });
 
-      await browser.execute(() => {
-        window.__desktopE2EOriginalConfirm = window.confirm;
-        window.__desktopE2EConfirmMessage = null;
-        window.confirm = (message) => {
-          window.__desktopE2EConfirmMessage = String(message);
-          return true;
-        };
-      });
-      confirmIntercepted = true;
-      await clickWorkspaceFile(targetName);
-      await browser.waitUntil(() => browser.execute(() => typeof window.__desktopE2EConfirmMessage === "string"), {
-        timeout: 5_000,
-        timeoutMsg: "switching documents did not show the draft-preservation confirmation",
-      });
-      const confirmationMessage = await browser.execute(() => window.__desktopE2EConfirmMessage || "");
-      assert.match(confirmationMessage, /自动保留为草稿/);
+      await (await findWorkspaceElement(".workspace-file", targetName)).click();
+      let confirmation = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
+      await confirmation.waitForDisplayed();
+      assert.match(await confirmation.getText(), /最新修改已自动保留/);
+      assert.ok(await confirmation.$('[data-testid="document-transition-confirm-cancel"]').isFocused());
+      await browser.keys("Escape");
+      assert.match(await editor.getText(), new RegExp(draftText));
+      assert.equal(fs.readFileSync(documentPath, "utf8").includes(draftText), false);
+      await (await findWorkspaceElement(".workspace-file", targetName)).click();
+      confirmation = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
+      await confirmation.waitForDisplayed();
+      await confirmation.$('[data-testid="document-transition-confirm-confirm"]').click();
       await browser.$("h1=Draft flush target").waitForDisplayed();
       targetOpened = true;
 
@@ -2084,15 +2079,6 @@ describe("Moyang Reader desktop runtime", () => {
           // Preserve the original assertion when desktop cleanup cannot finish.
         }
       }
-      if (confirmIntercepted) {
-        await browser
-          .execute(() => {
-            window.confirm = window.__desktopE2EOriginalConfirm;
-            delete window.__desktopE2EOriginalConfirm;
-            delete window.__desktopE2EConfirmMessage;
-          })
-          .catch(() => undefined);
-      }
       fs.rmSync(targetPath, { force: true });
     }
   });
@@ -2126,6 +2112,14 @@ describe("Moyang Reader desktop runtime", () => {
     assert.match(await notice.getText(), /已被其他程序修改/);
     assert.match(await editor.getText(), new RegExp(localText));
     assert.equal(await browser.$("button=重新载入").isDisplayed(), true);
+    await notice.$("button=重新载入").click();
+    const reloadDialog = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
+    await reloadDialog.waitForDisplayed();
+    assert.match(await reloadDialog.getText(), /不会覆盖磁盘文件/);
+    assert.ok(await reloadDialog.$('[data-testid="document-transition-confirm-cancel"]').isFocused());
+    await reloadDialog.$('[data-testid="document-transition-confirm-cancel"]').click();
+    assert.match(await editor.getText(), new RegExp(localText));
+    assert.equal(fs.readFileSync(documentPath, "utf8").includes(localText), false);
   });
 
   it("keeps the external-change marker after dismiss and blocks accidental overwrite", async () => {

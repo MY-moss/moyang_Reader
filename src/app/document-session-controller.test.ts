@@ -42,33 +42,145 @@ function createOptions(
 }
 
 describe("document session controller", () => {
-  it("flushes the current editable draft before a document replacement", () => {
+  it("waits for cancellation without opening or clearing an external-change notice", async () => {
+    let decide!: (value: boolean) => void;
+    const options = createOptions(createDocument(), {
+      confirm: vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            decide = resolve;
+          }),
+      ),
+    });
+    const controller = createDocumentSessionController(options);
+    const pending = controller.reloadExternalChange("C:/Notes/today.md");
+    expect(options.loadDocument).not.toHaveBeenCalled();
+    decide(false);
+    await pending;
+    expect(options.loadDocument).not.toHaveBeenCalled();
+    expect(options.onExternalChangePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects a decision if the current document changes during confirmation", async () => {
+    let current = createDocument();
+    let decide!: (value: boolean) => void;
+    const controller = createDocumentSessionController(
+      createOptions(current, {
+        getCurrentDocument: () => current,
+        confirm: () =>
+          new Promise<boolean>((resolve) => {
+            decide = resolve;
+          }),
+      }),
+    );
+    const pending = controller.confirmDocumentReplacement(["C:/Notes/other.md"], "switch");
+    current = createDocument({ path: "C:/Notes/new.md" });
+    decide(true);
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it("rejects changed edits and concurrent requests while awaiting a workspace decision", async () => {
+    let draft = "draft";
+    let decide!: (value: boolean) => void;
+    const confirm = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          decide = resolve;
+        }),
+    );
+    const controller = createDocumentSessionController(
+      createOptions(createDocument(), {
+        getSourceDraft: () => draft,
+        confirm,
+      }),
+    );
+    const pending = controller.confirmWorkspaceSwitch("C:/Archive", "switch-workspace");
+    await expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "open")).resolves.toBe(false);
+    draft = "newer edit";
+    decide(true);
+    await expect(pending).resolves.toBe(false);
+    expect(confirm).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates a pending reload when disposed", async () => {
+    let decide!: (value: boolean) => void;
+    const options = createOptions(createDocument(), {
+      confirm: () =>
+        new Promise<boolean>((resolve) => {
+          decide = resolve;
+        }),
+    });
+    const controller = createDocumentSessionController(options);
+    const pending = controller.reloadExternalChange("C:/Notes/today.md");
+    controller.dispose();
+    decide(true);
+    await pending;
+    expect(options.loadDocument).not.toHaveBeenCalled();
+    expect(options.onExternalChangePath).not.toHaveBeenCalled();
+  });
+
+  it("invalidates a workspace decision if its root changes", async () => {
+    let workspace = "C:/Notes";
+    let decide!: (value: boolean) => void;
+    const controller = createDocumentSessionController(
+      createOptions(createDocument(), {
+        getWorkspacePath: () => workspace,
+        confirm: () =>
+          new Promise<boolean>((resolve) => {
+            decide = resolve;
+          }),
+      }),
+    );
+    const pending = controller.confirmWorkspaceSwitch("C:/Archive", "switch-workspace");
+    workspace = "C:/Different";
+    decide(true);
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it("does not reload or clear the notice if draft preservation fails", async () => {
+    const options = createOptions(createDocument(), {
+      saveDraft: vi.fn().mockReturnValue({ ok: false, prunedCount: 0 }),
+      onDraftSaved: vi.fn().mockReturnValue(false),
+      confirm: vi.fn().mockReturnValue(true),
+    });
+    await createDocumentSessionController(options).reloadExternalChange("C:/Notes/today.md");
+    expect(options.confirm).not.toHaveBeenCalled();
+    expect(options.loadDocument).not.toHaveBeenCalled();
+    expect(options.onExternalChangePath).not.toHaveBeenCalled();
+  });
+
+  it("flushes the current editable draft before a document replacement", async () => {
     const saveDraft = vi.fn().mockReturnValue({ ok: true, prunedCount: 0, snapshots: [] });
     const confirm = vi.fn().mockReturnValue(true);
     const options = createOptions(createDocument(), { saveDraft, confirm });
     const controller = createDocumentSessionController(options);
 
-    expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "切换文档")).toBe(true);
+    await expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "switch")).resolves.toBe(true);
     expect(saveDraft).toHaveBeenCalledWith({
       path: "C:\\Notes\\today.md",
       draft: "draft",
       baseSource: "base",
       savedAt: expect.any(Number),
     });
-    expect(confirm).toHaveBeenCalledWith("当前文档的最新修改已自动保留为草稿，可在“草稿”中心恢复。仍要切换文档吗？");
+    expect(confirm).toHaveBeenCalledWith({
+      action: "switch",
+      path: "C:\\Notes\\today.md",
+      draftSaved: true,
+      targets: ["C:/Notes/other.md"],
+    });
   });
 
-  it("does not confirm or save when the replacement is the active path", () => {
+  it("does not confirm or save when the replacement is the active path", async () => {
     const saveDraft = vi.fn();
     const confirm = vi.fn();
     const controller = createDocumentSessionController(createOptions(createDocument(), { saveDraft, confirm }));
 
-    expect(controller.confirmDocumentReplacement(["c:/notes/today.md/"], "切换文档")).toBe(true);
+    await expect(controller.confirmDocumentReplacement(["c:/notes/today.md/"], "switch")).resolves.toBe(true);
     expect(saveDraft).not.toHaveBeenCalled();
     expect(confirm).not.toHaveBeenCalled();
   });
 
-  it("flushes the current draft before switching workspaces", () => {
+  it("flushes the current draft before switching workspaces", async () => {
     const saveDraft = vi.fn().mockReturnValue({ ok: true, prunedCount: 0, snapshots: [] });
     const confirm = vi.fn().mockReturnValue(true);
     const controller = createDocumentSessionController(
@@ -79,12 +191,17 @@ describe("document session controller", () => {
       }),
     );
 
-    expect(controller.confirmWorkspaceSwitch("C:\\Archive", "切换阅读库")).toBe(true);
+    await expect(controller.confirmWorkspaceSwitch("C:\\Archive", "switch-workspace")).resolves.toBe(true);
     expect(saveDraft).toHaveBeenCalledOnce();
-    expect(confirm).toHaveBeenCalledWith("当前文档的最新修改已自动保留为草稿，可在“草稿”中心恢复。仍要切换阅读库吗？");
+    expect(confirm).toHaveBeenCalledWith({
+      action: "switch-workspace",
+      path: "C:\\Notes\\today.md",
+      draftSaved: true,
+      targets: ["C:\\Archive"],
+    });
   });
 
-  it("blocks document replacement when the draft cannot be preserved", () => {
+  it("blocks document replacement when the draft cannot be preserved", async () => {
     const saveDraft = vi.fn().mockReturnValue({ ok: false, prunedCount: 0, snapshots: [] });
     const confirm = vi.fn().mockReturnValue(true);
     const onDraftSaved = vi.fn().mockReturnValue(false);
@@ -92,7 +209,7 @@ describe("document session controller", () => {
       createOptions(createDocument(), { saveDraft, confirm, onDraftSaved }),
     );
 
-    expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "切换文档")).toBe(false);
+    await expect(controller.confirmDocumentReplacement(["C:/Notes/other.md"], "switch")).resolves.toBe(false);
     expect(confirm).not.toHaveBeenCalled();
   });
 

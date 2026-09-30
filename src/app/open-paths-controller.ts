@@ -1,6 +1,7 @@
 import type { OpenDocument, OpenPath } from "./types";
 import { normalizePathKey } from "./path-key";
 import { isSameDocumentPath, shouldConfirmWorkspaceSwitch } from "./document-transition";
+import type { DocumentTransitionAction } from "./document-session-controller";
 
 export type OpenPathsOutcome = {
   openedCount: number;
@@ -14,8 +15,11 @@ export type OpenPathsControllerOptions = {
   getWorkspacePath: () => string | null;
   isNative: () => boolean;
   authorizeStoredPath: (path: string, workspace: boolean) => Promise<string>;
-  confirmWorkspaceSwitch: (nextWorkspacePath: string, action: string) => boolean;
-  confirmDocumentReplacement: (nextPaths: readonly string[], action: string) => boolean;
+  confirmWorkspaceSwitch: (nextWorkspacePath: string, action: DocumentTransitionAction) => boolean | Promise<boolean>;
+  confirmDocumentReplacement: (
+    nextPaths: readonly string[],
+    action: DocumentTransitionAction,
+  ) => boolean | Promise<boolean>;
   loadWorkspace: (path: string) => Promise<boolean>;
   openPath: (path: string) => Promise<boolean>;
   setError: (message: string | null) => void;
@@ -42,7 +46,7 @@ export function createOpenPathsController(options: OpenPathsControllerOptions): 
     const workspacePathToConfirm = workspacePaths.find((path) =>
       shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePath, path),
     );
-    if (workspacePathToConfirm && !options.confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {
+    if (workspacePathToConfirm && !(await options.confirmWorkspaceSwitch(workspacePathToConfirm, "switch-workspace"))) {
       return cancelledOutcome();
     }
 
@@ -51,7 +55,7 @@ export function createOpenPathsController(options: OpenPathsControllerOptions): 
       ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(entry.path, currentModifiedPath))
       : paths;
     const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
-    if (!options.confirmDocumentReplacement(documentPaths, "打开新文档")) {
+    if (!(await options.confirmDocumentReplacement(documentPaths, "open"))) {
       return cancelledOutcome();
     }
 

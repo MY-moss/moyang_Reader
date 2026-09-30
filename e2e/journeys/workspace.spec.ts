@@ -345,15 +345,18 @@ test("protects unsaved browser edits before opening another document", async ({ 
   const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
   await editor.fill("# Unsaved note\n\n尚未保存");
 
-  page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("未保存修改");
-    await dialog.dismiss();
-  });
   await page.locator('input[type="file"]').setInputFiles({
     name: "replacement-note.md",
     mimeType: "text/markdown",
     buffer: Buffer.from("# Replacement note"),
   });
+
+  const confirmation = page.locator('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText("继续后未保存修改将丢失");
+  await expect(confirmation.getByTestId("document-transition-confirm-cancel")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
 
   await expectEditorText(editor, "# Unsaved note\n\n尚未保存");
 });

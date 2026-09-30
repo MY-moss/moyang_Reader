@@ -35,6 +35,8 @@ import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { safetyText } from "./components/safety-dialog-copy";
 import { WorkspaceEntryConfirmationDialog } from "./components/WorkspaceEntryConfirmationDialog";
 import { useWorkspaceEntryConfirmation } from "./use-workspace-entry-confirmation";
+import { DocumentTransitionConfirmationDialog } from "./components/DocumentTransitionConfirmationDialog";
+import { useDocumentTransitionConfirmation } from "./use-document-transition-confirmation";
 import { GettingStartedDialog } from "./components/GettingStartedDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
@@ -234,6 +236,7 @@ import {
   type DocumentSaveCommit,
   type DocumentSaveFailure,
   type DocumentSessionController,
+  type DocumentTransitionAction,
   type DraftFlushOutcome,
 } from "./document-session-controller";
 import { hasSeenGettingStarted, markGettingStartedSeen } from "./onboarding";
@@ -270,7 +273,7 @@ import { clampPaneWidth, DEFAULT_PANE_WIDTHS, PANE_WIDTH_LIMITS, type PaneSide }
 import { scrollHeadingInContainer } from "./heading-navigation";
 import { resolveProgrammaticScrollBehavior } from "./scroll-behavior";
 import { matchesWorkspaceFilter, type WorkspaceKindFilter } from "./workspace-filter";
-import { formatTransitionConfirmation, isSameDocumentPath } from "./document-transition";
+import { isSameDocumentPath } from "./document-transition";
 import {
   clipboardAssetFileName,
   clipboardAssetPath,
@@ -1097,12 +1100,26 @@ export function App() {
     return documentSessionControllerRef.current?.flushDraft() ?? "not-needed";
   }, []);
 
-  const confirmDocumentReplacement = useCallback((nextPaths: readonly string[], action: string) => {
-    return documentSessionControllerRef.current?.confirmDocumentReplacement(nextPaths, action) ?? true;
+  const {
+    request: documentTransitionRequest,
+    confirm: confirmDocumentTransition,
+    decide: decideDocumentTransition,
+  } = useDocumentTransitionConfirmation();
+
+  const confirmTransition = useCallback((action: DocumentTransitionAction, targets?: readonly string[]) => {
+    return documentSessionControllerRef.current?.confirmTransition(action, targets) ?? Promise.resolve(false);
   }, []);
 
-  const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, action: string) => {
-    return documentSessionControllerRef.current?.confirmWorkspaceSwitch(nextWorkspacePath, action) ?? true;
+  const confirmDocumentReplacement = useCallback((nextPaths: readonly string[], action: DocumentTransitionAction) => {
+    return (
+      documentSessionControllerRef.current?.confirmDocumentReplacement(nextPaths, action) ?? Promise.resolve(false)
+    );
+  }, []);
+
+  const confirmWorkspaceSwitch = useCallback((nextWorkspacePath: string, action: DocumentTransitionAction) => {
+    return (
+      documentSessionControllerRef.current?.confirmWorkspaceSwitch(nextWorkspacePath, action) ?? Promise.resolve(false)
+    );
   }, []);
 
   const exportDiagnosticSummary = useCallback(async () => {
@@ -1479,7 +1496,7 @@ export function App() {
 
   const handleChooseWorkspace = useCallback(async () => {
     const selected = await chooseWorkspacePath();
-    if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {
+    if (selected && (await confirmWorkspaceSwitch(selected, "switch-workspace"))) {
       await loadWorkspace(selected);
     }
   }, [confirmWorkspaceSwitch, loadWorkspace]);
@@ -1488,7 +1505,7 @@ export function App() {
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, true);
-        if (!confirmWorkspaceSwitch(authorizedPath, "切换阅读库")) {
+        if (!(await confirmWorkspaceSwitch(authorizedPath, "switch-workspace"))) {
           return;
         }
         await loadWorkspace(authorizedPath);
@@ -1805,6 +1822,7 @@ export function App() {
       invalidateCache: invalidateDocumentCache,
       getSelfWritingPaths,
       getSelfWrittenPaths,
+      confirm: confirmDocumentTransition,
     });
     documentSessionControllerRef.current = documentSessionController;
     return () => {
@@ -1814,6 +1832,7 @@ export function App() {
       documentSessionController.dispose();
     };
   }, [
+    confirmDocumentTransition,
     commitDocumentOpenNavigation,
     downloadDocumentText,
     getCurrentDocument,
@@ -1906,7 +1925,7 @@ export function App() {
   const handleNavigateBack = useCallback(async () => {
     const targetPath = getBackNavigationPath(navigationHistoryRef.current);
     if (!targetPath) return;
-    if (!confirmDocumentReplacement([targetPath], "返回上一文档")) return;
+    if (!(await confirmDocumentReplacement([targetPath], "back"))) return;
     await openPath(targetPath, false, "back");
   }, [confirmDocumentReplacement, openPath]);
 
@@ -1972,13 +1991,7 @@ export function App() {
         setError("请先添加一个工作区文件夹，再创建未解析链接。");
         return;
       }
-      const draftOutcome = documentState.modified ? flushCurrentDraft() : "not-needed";
-      if (
-        documentState.modified &&
-        (draftOutcome === "failed" ||
-          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))
-      )
-        return;
+      if (!(await confirmTransition("new-document"))) return;
 
       try {
         const path = await createMarkdownFile(workspacePath, documentState.path, target);
@@ -1988,7 +2001,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "无法创建新文档。");
       }
     },
-    [documentState, flushCurrentDraft, loadWorkspace, openPath, workspacePath],
+    [confirmTransition, documentState, loadWorkspace, openPath, workspacePath],
   );
 
   const handleCreateWorkspaceNote = useCallback(
@@ -2000,15 +2013,7 @@ export function App() {
       const name = window.prompt("新建笔记", "未命名笔记")?.trim();
       if (!name) return;
 
-      const currentDocument = documentStateRef.current;
-      const draftOutcome = currentDocument?.modified ? flushCurrentDraft() : "not-needed";
-      if (
-        currentDocument?.modified &&
-        (draftOutcome === "failed" ||
-          !window.confirm(formatTransitionConfirmation("切换到新文档", draftOutcome === "saved")))
-      ) {
-        return;
-      }
+      if (!(await confirmTransition("new-document"))) return;
 
       try {
         const path = await createWorkspaceNote(workspacePath, parentPath, name);
@@ -2019,7 +2024,7 @@ export function App() {
         setError(cause instanceof Error ? cause.message : "无法创建新笔记。");
       }
     },
-    [flushCurrentDraft, openPath, refreshWorkspaceChanges, workspacePath],
+    [confirmTransition, openPath, refreshWorkspaceChanges, workspacePath],
   );
 
   const handleCreateWorkspaceFolder = useCallback(
@@ -3124,7 +3129,7 @@ export function App() {
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, false);
-        if (!confirmDocumentReplacement([authorizedPath], "打开另一个草稿")) {
+        if (!(await confirmDocumentReplacement([authorizedPath], "open-draft"))) {
           return;
         }
         const opened = await openPath(authorizedPath);
@@ -3748,7 +3753,7 @@ export function App() {
           return;
         }
         const nextPaths = supportedFiles.map((entry) => entry.path);
-        if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {
+        if (!(await confirmDocumentReplacement(nextPaths, "open"))) {
           return;
         }
 
@@ -3789,7 +3794,7 @@ export function App() {
   const handleSelectTab = useCallback(
     async (path: string): Promise<boolean> => {
       if (documentState?.path && isSameDocumentPath(path, documentState.path)) return true;
-      if (!confirmDocumentReplacement([path], "切换文档")) return false;
+      if (!(await confirmDocumentReplacement([path], "switch"))) return false;
       try {
         const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
         return await openPath(authorizedPath, false, "push");
@@ -3810,15 +3815,15 @@ export function App() {
       const current = documentStateRef.current;
       const activeIndex = current ? currentTabs.findIndex((tab) => isSameDocumentPath(tab.path, current.path)) : -1;
       const closesActive = Boolean(current && targetTabs.some((tab) => isSameDocumentPath(tab.path, current.path)));
-      if (closesActive && current?.modified) {
-        const draftOutcome = flushCurrentDraft();
-        if (
-          draftOutcome === "failed" ||
-          !window.confirm(formatTransitionConfirmation("关闭标签", draftOutcome === "saved"))
-        ) {
-          return;
-        }
-      }
+      if (
+        closesActive &&
+        !(await confirmTransition(
+          "close-tabs",
+          targetTabs.map((tab) => tab.path),
+        ))
+      )
+        return;
+      if (openTabsRef.current !== currentTabs) return;
 
       const nextTabs = currentTabs.filter(
         (tab) => !targetTabs.some((target) => isSameDocumentPath(target.path, tab.path)),
@@ -3847,7 +3852,7 @@ export function App() {
     },
     [
       commitNavigationHistory,
-      flushCurrentDraft,
+      confirmTransition,
       openPath,
       releaseDocumentResources,
       resetDocumentSearch,
@@ -5435,6 +5440,13 @@ export function App() {
           locale={locale}
           request={workspaceEntryConfirmation}
           onDecision={decideWorkspaceEntry}
+        />
+      )}
+      {documentTransitionRequest && (
+        <DocumentTransitionConfirmationDialog
+          locale={locale}
+          request={documentTransitionRequest}
+          onDecision={decideDocumentTransition}
         />
       )}
       {externalOverwriteConfirmationOpen && (
