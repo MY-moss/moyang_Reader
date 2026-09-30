@@ -63,14 +63,43 @@ describe("CloseConfirmationDialog", () => {
     const { container, root } = mountDialog(onCancel, onConfirm, onSaveAndClose);
 
     expect(container.textContent).toContain("草稿副本");
-    expect(container.textContent).toContain("退出 Moyang Reader”不会写回原文件");
-    expect(container.textContent).toContain("保存并退出”会先保存当前修改");
+    expect(container.textContent).toContain("直接退出不会写回原文件");
+    expect(container.textContent).toContain("保存失败时不会退出");
+    expect(container.querySelectorAll(".safety-confirm-facts > div")).toHaveLength(3);
     const saveButton = container.querySelector<HTMLButtonElement>('[data-testid="close-confirm-save"]');
     expect(saveButton?.textContent).toBe("保存并退出");
     act(() => saveButton?.click());
     expect(onSaveAndClose).toHaveBeenCalledOnce();
     expect(onCancel).not.toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("keeps the three sources and consequences readable in English", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <CloseConfirmationDialog
+          locale="en-US"
+          fileName="chapter.md"
+          onCancel={vi.fn()}
+          onConfirm={vi.fn()}
+          onSaveAndClose={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("chapter.md");
+    expect(container.textContent).toContain("Unsaved edits");
+    expect(container.textContent).toContain("Local draft");
+    expect(container.textContent).toContain("a failed save will not close the app");
+    expect(container.querySelector('[role="dialog"]')?.getAttribute("aria-describedby")).toBe(
+      "close-confirm-description close-confirm-note",
+    );
 
     act(() => root.unmount());
     container.remove();

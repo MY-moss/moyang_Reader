@@ -1,7 +1,11 @@
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
+
 export type ExternalChangeKind = "modified" | "deleted";
 
 type ExternalChangeNoticeProps = {
   fileName: string;
+  locale?: Locale;
   changeKind?: ExternalChangeKind;
   onReload: () => void;
   onOverwrite: () => void;
@@ -11,6 +15,7 @@ type ExternalChangeNoticeProps = {
 
 export function ExternalChangeNotice({
   fileName,
+  locale = "zh-CN",
   changeKind = "modified",
   onReload,
   onOverwrite,
@@ -21,28 +26,23 @@ export function ExternalChangeNotice({
 
   return (
     <div className="external-change-notice" role="alert">
-      <span>
-        <strong>{fileName}</strong>{" "}
-        {deleted
-          ? "已被删除或移走。当前内容仍保留在窗口中，不会自动写回原路径。请另存为或稍后处理。"
-          : "已被其他程序修改。当前编辑不会自动覆盖原文件，请选择处理方式。"}
-      </span>
+      <span>{safetyText(locale, deleted ? "externalDeleted" : "externalModified", { name: fileName })}</span>
       <div>
         {!deleted && (
           <>
             <button type="button" onClick={onReload}>
-              重新载入
+              {safetyText(locale, "externalReload")}
             </button>
             <button type="button" onClick={onOverwrite}>
-              覆盖保存
+              {safetyText(locale, "externalOverwrite")}
             </button>
           </>
         )}
         <button type="button" onClick={onSaveAs}>
-          另存为
+          {safetyText(locale, "externalSaveAs")}
         </button>
         <button type="button" className="notice-dismiss" onClick={onDismiss}>
-          稍后处理
+          {safetyText(locale, "later")}
         </button>
       </div>
     </div>

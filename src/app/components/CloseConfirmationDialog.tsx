@@ -1,63 +1,38 @@
-import { useRef } from "react";
-import { useModalBehavior } from "./useModalBehavior";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
+import { SafetyConfirmationDialog } from "./SafetyConfirmationDialog";
 
 type CloseConfirmationDialogProps = {
+  locale?: Locale;
+  fileName?: string;
   onCancel: () => void;
   onConfirm: () => void;
   onSaveAndClose: () => void;
 };
 
-export function CloseConfirmationDialog({ onCancel, onConfirm, onSaveAndClose }: CloseConfirmationDialogProps) {
-  const dialogRef = useRef<HTMLElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  useModalBehavior({ containerRef: dialogRef, initialFocusRef: cancelButtonRef, onClose: onCancel });
-
+export function CloseConfirmationDialog({
+  locale = "zh-CN",
+  fileName,
+  onCancel,
+  onConfirm,
+  onSaveAndClose,
+}: CloseConfirmationDialogProps) {
+  const t = (key: Parameters<typeof safetyText>[1]) => safetyText(locale, key);
   return (
-    <div className="quick-open-backdrop close-confirm-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="quick-open-dialog close-confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="close-confirm-title"
-        aria-describedby="close-confirm-description"
-        tabIndex={-1}
-      >
-        <header className="quick-open-header">
-          <div>
-            <div className="quick-open-kicker">UNSAVED CHANGES</div>
-            <h2 id="close-confirm-title">退出 Moyang Reader？</h2>
-          </div>
-        </header>
-        <div className="close-confirm-body">
-          <p id="close-confirm-description">
-            当前文档有未保存修改。退出前已为你保留一份草稿副本，可随时在草稿恢复中心找回。选择“退出 Moyang
-            Reader”不会写回原文件，选择“保存并退出”会先保存当前修改。
-          </p>
-        </div>
-        <footer className="quick-open-footer close-confirm-actions">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            className="quiet-button"
-            data-testid="close-confirm-cancel"
-            onClick={onCancel}
-          >
-            取消
-          </button>
-          <button type="button" className="quiet-button" data-testid="close-confirm-confirm" onClick={onConfirm}>
-            退出 Moyang Reader
-          </button>
-          <button
-            type="button"
-            className="toolbar-button primary"
-            data-testid="close-confirm-save"
-            onClick={onSaveAndClose}
-          >
-            保存并退出
-          </button>
-        </footer>
-      </section>
-    </div>
+    <SafetyConfirmationDialog
+      locale={locale}
+      id="close-confirm"
+      title={t("closeTitle")}
+      description={t("closeDescription")}
+      note={`${t("closeExitNote")} ${t("closeSaveNote")}`}
+      facts={[
+        { label: t("closeFile"), value: fileName || t("currentFile") },
+        { label: t("unsavedEdits"), value: t("closeEdits") },
+        { label: t("localDraft"), value: t("closeDraft") },
+      ]}
+      secondary={{ label: t("closeExit"), testId: "close-confirm-confirm", onClick: onConfirm }}
+      confirm={{ label: t("closeSave"), testId: "close-confirm-save", onClick: onSaveAndClose }}
+      onCancel={onCancel}
+    />
   );
 }

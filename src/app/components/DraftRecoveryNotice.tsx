@@ -1,8 +1,11 @@
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
 import { buildDraftComparison } from "../draft-recovery-diff";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
 
 type DraftRecoveryNoticeProps = {
   snapshot: DraftSnapshot;
+  locale?: Locale;
   currentSource: string;
   onPreview: () => void;
   onLater: () => void;
@@ -11,6 +14,7 @@ type DraftRecoveryNoticeProps = {
 
 export function DraftRecoveryNotice({
   snapshot,
+  locale = "zh-CN",
   currentSource,
   onPreview,
   onLater,
@@ -19,33 +23,40 @@ export function DraftRecoveryNotice({
   const comparison = buildDraftComparison(currentSource, snapshot.draft);
   const characterDelta = comparison.characterDelta > 0 ? `+${comparison.characterDelta}` : comparison.characterDelta;
   const diffSummary = comparison.hasChanges
-    ? `相比当前版本：新增 ${comparison.addedLineCount} 行、移除 ${comparison.removedLineCount} 行、${comparison.changeHunkCount} 个变更区域，字符 ${characterDelta}。`
-    : "草稿与当前版本内容相同，不需要恢复。";
+    ? safetyText(locale, "noticeDiff", {
+        added: comparison.addedLineCount,
+        removed: comparison.removedLineCount,
+        hunks: comparison.changeHunkCount,
+        delta: characterDelta,
+      })
+    : safetyText(locale, "noticeSame");
 
   return (
     <div className="external-change-notice draft-recovery-notice" role="status">
       <span className="draft-recovery-copy">
-        <strong>{snapshot.path.split(/[\\/]/).pop() ?? snapshot.path}</strong> 检测到上次未保存的草稿（
-        {formatDraftRecoveryTime(snapshot.savedAt)}）。
-        <small className="draft-recovery-source-note">
-          当前打开的是文件版本；草稿保存在本机。先查看差异，再决定是否恢复。
-        </small>
+        <strong>
+          {safetyText(locale, "noticeDraft", {
+            name: snapshot.path.split(/[\\/]/).pop() ?? snapshot.path,
+            time: formatDraftRecoveryTime(snapshot.savedAt, undefined, locale),
+          })}
+        </strong>
+        <small className="draft-recovery-source-note">{safetyText(locale, "noticeDraftSource")}</small>
         <small>{diffSummary}</small>
       </span>
       <div>
         <button
           type="button"
           data-testid="draft-recovery-preview"
-          aria-label="查看当前文件与草稿的差异并决定是否恢复"
+          aria-label={safetyText(locale, "noticePreviewAria")}
           onClick={onPreview}
         >
-          查看差异
+          {safetyText(locale, "preview")}
         </button>
         <button type="button" className="notice-dismiss" onClick={onLater}>
-          稍后处理
+          {safetyText(locale, "later")}
         </button>
         <button type="button" className="notice-dismiss" onClick={onDiscard}>
-          丢弃
+          {safetyText(locale, "discard")}
         </button>
       </div>
     </div>

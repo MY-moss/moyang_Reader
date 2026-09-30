@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { openSettingsMenu, switchToRenderedMode } from "./helpers";
 
 const VISUAL_VIEWPORT = { width: 1240, height: 820 } as const;
@@ -67,6 +68,42 @@ async function loadReadingHistoryConfirmation(page: Page, theme: Theme): Promise
   await expect(dialog).toBeVisible();
   await setTheme(page, theme);
   return dialog;
+}
+
+async function loadDraftComparison(page: Page, theme: Theme, width = 1240, english = false): Promise<Locator> {
+  await page.setViewportSize({ width, height: width === 720 ? 600 : 820 });
+  await page.addInitScript((useEnglish) => {
+    if (useEnglish) localStorage.setItem("moyang-reader-locale", "en-US");
+    localStorage.setItem(
+      "moyang-reader-drafts",
+      JSON.stringify([
+        {
+          path: "C:/Notes/visual-baseline.md",
+          draft: "# Visual baseline\n\nA recoverable local draft",
+          baseSource: "# Visual baseline\n\nOriginal file content",
+          savedAt: Date.now() - 60_000,
+        },
+      ]),
+    );
+  }, english);
+  await page.goto("/");
+  await setTheme(page, theme);
+  if (width <= 900) {
+    await page.locator(".toolbar-overflow-trigger").click();
+    await page.locator(".toolbar-overflow-panel .recovery-button").click();
+  } else {
+    await page.locator(".toolbar-optional.recovery-button").click();
+  }
+  const center = page.getByRole("dialog", { name: english ? "Unsaved drafts" : "未保存草稿" });
+  await expect(center).toBeVisible();
+  await center
+    .getByRole("button", { name: english ? /Review the differences/ : /查看 .*当前文件与草稿的差异/ })
+    .click();
+  const comparison = page.getByRole("dialog", {
+    name: english ? "Review differences before recovery" : "恢复前查看差异",
+  });
+  await expect(comparison).toBeVisible();
+  return comparison;
 }
 
 async function expectStateScreenshot(
@@ -153,7 +190,55 @@ for (const theme of THEMES) {
     const dialog = await loadReadingHistoryConfirmation(page, theme);
     await expectStateScreenshot(dialog, "confirmation-dialog", theme);
   });
+
+  test(`captures the draft recovery comparison baseline (${theme})`, async ({ page }) => {
+    const dialog = await loadDraftComparison(page, theme);
+    await expectStateScreenshot(dialog, "draft-comparison-dialog", theme);
+  });
 }
+
+test("keeps English draft recovery usable at 720×600", async ({ page }) => {
+  const dialog = await loadDraftComparison(page, "light", 720, true);
+  await expect(dialog.getByRole("button", { name: "Close differences for Draft" })).toBeFocused();
+  await expect(dialog).toContainText("Original file when draft was saved");
+  await expectStateScreenshot(dialog, "draft-comparison-dialog-720-en", "light");
+  const bounds = await dialog.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  });
+  expect(bounds.left).toBeGreaterThanOrEqual(0);
+  expect(bounds.right).toBeLessThanOrEqual(720);
+  expect(bounds.top).toBeGreaterThanOrEqual(0);
+  expect(bounds.bottom).toBeLessThanOrEqual(600);
+  const results = await new AxeBuilder({ page }).include(".draft-comparison-dialog").analyze();
+  expect(results.violations.filter((item) => item.impact === "serious" || item.impact === "critical")).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
+test("keeps draft comparison keyboard and high-contrast layout usable at 900px", async ({ page }) => {
+  const dialog = await loadDraftComparison(page, "dark", 900);
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("region", { name: "差异详情" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "关闭草稿差异" })).toBeFocused();
+  const metrics = await dialog.evaluate((node) => {
+    const bounds = node.getBoundingClientRect();
+    const actions = Array.from(node.querySelectorAll<HTMLButtonElement>("button"));
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      bodyScrollWidth: document.body.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+      shortButtons: actions.filter((button) => button.getBoundingClientRect().height < 32).length,
+    };
+  });
+  expect(metrics.left).toBeGreaterThanOrEqual(0);
+  expect(metrics.right).toBeLessThanOrEqual(900);
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.shortButtons).toBe(0);
+});
 
 test("captures the compact settings and first-use layout", async ({ page }) => {
   await page.setViewportSize({ width: 720, height: 600 });

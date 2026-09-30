@@ -32,6 +32,7 @@ import { PreviousVersionNotice } from "./components/PreviousVersionNotice";
 import { DraftDiscardConfirmationDialog } from "./components/DraftDiscardConfirmationDialog";
 import { ExternalChangeNotice, type ExternalChangeKind } from "./components/ExternalChangeNotice";
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
+import { safetyText } from "./components/safety-dialog-copy";
 import { GettingStartedDialog } from "./components/GettingStartedDialog";
 import { ImagePreview } from "./components/ImagePreview";
 import { PdfPreview } from "./components/PdfPreview";
@@ -509,7 +510,7 @@ type PdfBatchExportState = {
 type DraftComparisonRequest = {
   snapshot: RecoverySnapshot;
   comparisonSource: string | null;
-  comparisonLabel: string;
+  comparisonLabel: "current-disk" | "current-preview" | "saved-preview";
   comparisonIsCurrent: boolean;
   comparisonStatus: "loading" | "ready" | "unavailable";
   comparisonError: string | null;
@@ -2929,7 +2930,7 @@ export function App() {
         setDraftComparison({
           snapshot,
           comparisonSource,
-          comparisonLabel: isCurrentDocument ? "当前打开版本（浏览器预览）" : "草稿保存时的原文（浏览器预览）",
+          comparisonLabel: isCurrentDocument ? "current-preview" : "saved-preview",
           comparisonIsCurrent: isCurrentDocument,
           comparisonStatus: "ready",
           comparisonError: null,
@@ -2944,7 +2945,7 @@ export function App() {
       setDraftComparison({
         snapshot,
         comparisonSource: null,
-        comparisonLabel: "当前磁盘版本",
+        comparisonLabel: "current-disk",
         comparisonIsCurrent: true,
         comparisonStatus: "loading",
         comparisonError: null,
@@ -2966,7 +2967,7 @@ export function App() {
         setDraftComparison({
           snapshot,
           comparisonSource,
-          comparisonLabel: "当前磁盘版本",
+          comparisonLabel: "current-disk",
           comparisonIsCurrent: true,
           comparisonStatus: "ready",
           comparisonError: null,
@@ -2975,15 +2976,15 @@ export function App() {
           sourceChangedSinceDraft: !areDraftSourcesEquivalent(comparisonSource, snapshot.baseSource),
           recoveryKind: "draft",
         });
-      } catch (cause) {
+      } catch {
         if (draftComparisonRequestIdRef.current !== requestId) return;
         setDraftComparison({
           snapshot,
           comparisonSource: null,
-          comparisonLabel: "当前磁盘版本",
+          comparisonLabel: "current-disk",
           comparisonIsCurrent: true,
           comparisonStatus: "unavailable",
-          comparisonError: cause instanceof Error ? cause.message : "当前文件不可访问，请确认文件仍存在且有读取权限。",
+          comparisonError: null,
           currentDocumentModified,
           isCurrentDocument,
           sourceChangedSinceDraft: false,
@@ -3005,7 +3006,7 @@ export function App() {
       setDraftComparison({
         snapshot,
         comparisonSource: null,
-        comparisonLabel: "当前磁盘版本",
+        comparisonLabel: "current-disk",
         comparisonIsCurrent: true,
         comparisonStatus: "loading",
         comparisonError: null,
@@ -3022,7 +3023,7 @@ export function App() {
         setDraftComparison({
           snapshot: { ...snapshot, baseSource: comparisonSource },
           comparisonSource,
-          comparisonLabel: "当前磁盘版本",
+          comparisonLabel: "current-disk",
           comparisonIsCurrent: true,
           comparisonStatus: "ready",
           comparisonError: null,
@@ -3031,15 +3032,15 @@ export function App() {
           sourceChangedSinceDraft: false,
           recoveryKind: "previous-save",
         });
-      } catch (cause) {
+      } catch {
         if (draftComparisonRequestIdRef.current !== requestId) return;
         setDraftComparison({
           snapshot,
           comparisonSource: null,
-          comparisonLabel: "当前磁盘版本",
+          comparisonLabel: "current-disk",
           comparisonIsCurrent: true,
           comparisonStatus: "unavailable",
-          comparisonError: cause instanceof Error ? cause.message : "当前文件不可访问，请确认文件仍存在且有读取权限。",
+          comparisonError: null,
           currentDocumentModified,
           isCurrentDocument: true,
           sourceChangedSinceDraft: false,
@@ -5067,6 +5068,7 @@ export function App() {
           )}
           {externalChangePath && documentState?.path === externalChangePath && (
             <ExternalChangeNotice
+              locale={locale}
               fileName={documentState.name}
               changeKind={externalChangeKind}
               onReload={() => void reloadExternalChange()}
@@ -5077,6 +5079,7 @@ export function App() {
           )}
           {draftRecovery && isSameDocumentPath(documentState?.path ?? "", draftRecovery.path) && (
             <DraftRecoveryNotice
+              locale={locale}
               snapshot={draftRecovery}
               currentSource={documentState?.source ?? draftRecovery.baseSource}
               onPreview={previewCurrentDraft}
@@ -5086,6 +5089,7 @@ export function App() {
           )}
           {previousVersion && isSameDocumentPath(documentState?.path ?? "", previousVersion.path) && (
             <PreviousVersionNotice
+              locale={locale}
               path={previousVersion.path}
               currentSource={documentState?.source ?? ""}
               previousSource={previousVersion.source}
@@ -5347,6 +5351,7 @@ export function App() {
       )}
       {draftRecoveryOpen && draftSnapshots.length > 0 && (
         <DraftRecoveryCenter
+          locale={locale}
           snapshots={draftSnapshots}
           onOpen={(path) => void openDraftSnapshot(path)}
           onPreview={previewDraftSnapshot}
@@ -5358,25 +5363,41 @@ export function App() {
         />
       )}
       {draftClearAllConfirmationOpen && (
-        <DraftClearAllConfirmationDialog onCancel={cancelClearAllDrafts} onConfirm={confirmClearAllDrafts} />
+        <DraftClearAllConfirmationDialog
+          locale={locale}
+          onCancel={cancelClearAllDrafts}
+          onConfirm={confirmClearAllDrafts}
+        />
       )}
       {readingHistoryClearConfirmationOpen && (
         <ReadingHistoryClearConfirmationDialog
+          locale={locale}
           onCancel={cancelClearReadingHistory}
           onConfirm={confirmClearReadingHistory}
         />
       )}
       {draftComparison && (
         <DraftRecoveryComparisonDialog
+          locale={locale}
           snapshot={draftComparison.snapshot}
           comparisonSource={draftComparison.comparisonSource}
-          comparisonLabel={draftComparison.comparisonLabel}
+          comparisonLabel={safetyText(
+            locale,
+            draftComparison.comparisonLabel === "current-disk"
+              ? "comparisonCurrentDisk"
+              : draftComparison.comparisonLabel === "current-preview"
+                ? "comparisonCurrentPreview"
+                : "comparisonSavedPreview",
+          )}
           comparisonIsCurrent={draftComparison.comparisonIsCurrent}
           comparisonStatus={draftComparison.comparisonStatus}
           comparisonError={draftComparison.comparisonError}
           currentDocumentModified={draftComparison.currentDocumentModified}
           sourceChangedSinceDraft={draftComparison.sourceChangedSinceDraft}
-          actionLabel={draftComparison.isCurrentDocument ? "恢复到编辑区" : "打开文档继续确认"}
+          actionLabel={safetyText(
+            locale,
+            draftComparison.isCurrentDocument ? "comparisonRestoreAction" : "comparisonOpenAction",
+          )}
           onAction={handleDraftComparisonAction}
           onRetry={retryDraftComparison}
           onClose={closeDraftComparison}
@@ -5385,6 +5406,7 @@ export function App() {
       )}
       {draftDiscardRequest && (
         <DraftDiscardConfirmationDialog
+          locale={locale}
           path={draftDiscardRequest.path}
           onCancel={cancelDraftDiscard}
           onConfirm={confirmDraftDiscard}
@@ -5392,13 +5414,20 @@ export function App() {
       )}
       {closeConfirmationOpen && (
         <CloseConfirmationDialog
+          locale={locale}
+          fileName={documentState?.name}
           onCancel={cancelCloseConfirmation}
           onConfirm={confirmClose}
           onSaveAndClose={saveAndClose}
         />
       )}
       {externalOverwriteConfirmationOpen && (
-        <ExternalOverwriteDialog onCancel={cancelExternalOverwrite} onConfirm={confirmExternalOverwrite} />
+        <ExternalOverwriteDialog
+          locale={locale}
+          fileName={documentState?.name}
+          onCancel={cancelExternalOverwrite}
+          onConfirm={confirmExternalOverwrite}
+        />
       )}
       {annotationDialog && (
         <AnnotationDialog

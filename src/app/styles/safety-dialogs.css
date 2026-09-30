@@ -1,0 +1,252 @@
+/* D21: safety and recovery surfaces share one readable, bounded overlay rhythm. */
+.safety-confirm-dialog {
+  display: flex;
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+}
+
+.safety-confirm-header {
+  flex: 0 0 auto;
+  padding: 22px 24px 14px;
+}
+
+.safety-confirm-header h2,
+.draft-recovery-dialog .quick-open-header h2,
+.draft-comparison-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--type-heading);
+  font-weight: 730;
+  line-height: 1.3;
+}
+
+.safety-confirm-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px 18px;
+  color: var(--muted-strong);
+  font-size: var(--type-body);
+  line-height: 1.6;
+}
+
+.safety-confirm-facts {
+  display: grid;
+  margin: 18px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.safety-confirm-facts > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 32%) minmax(0, 1fr);
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.safety-confirm-facts dt {
+  color: var(--muted-strong);
+  font-weight: 700;
+}
+
+.safety-confirm-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.safety-confirm-note {
+  margin-top: 16px !important;
+  color: var(--muted-strong);
+}
+
+.safety-confirm-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  padding: 14px 24px;
+  background: var(--surface-strong);
+  font-size: var(--type-body);
+}
+
+.safety-confirm-actions .toolbar-button,
+.safety-confirm-actions .quiet-button {
+  min-height: 36px;
+  font-size: var(--type-body);
+}
+
+.safety-confirm-secondary {
+  border-color: var(--line-strong);
+}
+
+.draft-recovery-dialog {
+  display: flex;
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+}
+
+.draft-recovery-dialog .quick-open-header,
+.draft-comparison-header {
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 20px 24px 16px;
+}
+
+.draft-recovery-list {
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+  padding: 0 18px 10px;
+}
+
+.draft-recovery-open {
+  min-height: 76px;
+  padding: 12px 8px;
+}
+
+.draft-recovery-open strong,
+.draft-recovery-open span,
+.draft-recovery-open small,
+.draft-recovery-preview,
+.draft-recovery-discard,
+.draft-recovery-footer,
+.draft-recovery-footer .quiet-button {
+  font-size: var(--type-body);
+}
+
+.draft-recovery-actions {
+  gap: 6px;
+}
+
+.draft-recovery-preview,
+.draft-recovery-discard {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.draft-recovery-footer {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+  line-height: 1.5;
+}
+
+.draft-recovery-footer .quiet-button {
+  min-height: 36px;
+  margin-inline-start: auto;
+}
+
+.draft-comparison-dialog {
+  max-height: calc(100dvh - 48px);
+}
+
+.draft-comparison-file,
+.draft-comparison-source strong,
+.draft-comparison-source span,
+.draft-comparison-key,
+.draft-comparison-decision span,
+.draft-comparison-stats span,
+.draft-comparison-warning,
+.draft-comparison-state,
+.draft-comparison-preview,
+.draft-comparison-footnote {
+  font-size: var(--type-body);
+}
+
+.draft-comparison-intro {
+  color: var(--muted-strong);
+}
+
+.draft-comparison-source span {
+  color: var(--muted-strong);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.draft-comparison-source.current,
+.draft-comparison-source.draft {
+  border-left-width: 1px;
+}
+
+.draft-comparison-decision span,
+.draft-comparison-stats span {
+  color: var(--muted-strong);
+}
+
+.draft-comparison-stats .draft-comparison-removed {
+  color: var(--status-negative-strong);
+}
+
+.draft-comparison-actions {
+  flex-wrap: wrap;
+  padding: 14px 20px;
+}
+
+.draft-comparison-actions button,
+.draft-comparison-state .quiet-button {
+  min-height: 36px;
+  font-size: var(--type-body);
+}
+
+.draft-recovery-copy small,
+.external-change-notice button {
+  font-size: var(--type-body);
+}
+
+.external-change-notice button {
+  min-height: 36px;
+}
+
+@media screen and (max-width: 720px) {
+  .close-confirm-backdrop,
+  .draft-recovery-backdrop,
+  .draft-comparison-backdrop {
+    align-items: center;
+    padding: 16px;
+  }
+
+  .safety-confirm-dialog,
+  .draft-recovery-dialog,
+  .draft-comparison-dialog {
+    max-height: calc(100dvh - 32px);
+  }
+
+  .safety-confirm-header,
+  .draft-recovery-dialog .quick-open-header,
+  .draft-comparison-header {
+    padding-inline: 16px;
+  }
+
+  .safety-confirm-body,
+  .safety-confirm-actions,
+  .draft-comparison-body {
+    padding-inline: 16px;
+  }
+
+  .draft-recovery-item {
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+  }
+
+  .draft-recovery-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .draft-comparison-sources {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (forced-colors: active) {
+  .safety-confirm-actions {
+    background: Canvas;
+  }
+
+  .safety-confirm-facts > div,
+  .safety-confirm-facts {
+    border-color: ButtonText;
+  }
+}

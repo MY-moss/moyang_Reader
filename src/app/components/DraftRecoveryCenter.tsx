@@ -2,10 +2,13 @@ import { useRef } from "react";
 import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
 import { buildDraftComparison } from "../draft-recovery-diff";
 import { isSameDocumentPath } from "../document-transition";
+import type { Locale } from "../i18n";
+import { safetyText } from "./safety-dialog-copy";
 import { useModalBehavior } from "./useModalBehavior";
 
 type DraftRecoveryCenterProps = {
   snapshots: DraftSnapshot[];
+  locale?: Locale;
   onOpen: (path: string) => void;
   onPreview: (path: string) => void;
   onDiscard: (path: string) => void;
@@ -19,13 +22,14 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
 
-function draftPreview(draft: string): string {
+function draftPreview(draft: string, locale: Locale): string {
   const preview = draft.replace(/\s+/g, " ").trim();
-  return preview.length > 100 ? `${preview.slice(0, 100)}…` : preview || "（空文档）";
+  return preview.length > 100 ? `${preview.slice(0, 100)}…` : preview || safetyText(locale, "emptyDocument");
 }
 
 export function DraftRecoveryCenter({
   snapshots,
+  locale = "zh-CN",
   onOpen,
   onPreview,
   onDiscard,
@@ -37,6 +41,7 @@ export function DraftRecoveryCenter({
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: closeButtonRef, onClose });
+  const t = (key: Parameters<typeof safetyText>[1]) => safetyText(locale, key);
 
   return (
     <div
@@ -56,17 +61,16 @@ export function DraftRecoveryCenter({
       >
         <header className="quick-open-header">
           <div>
-            <div className="quick-open-kicker">LOCAL RECOVERY</div>
-            <h2 id="draft-recovery-title">未保存草稿</h2>
+            <h2 id="draft-recovery-title">{t("centerTitle")}</h2>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             className="quiet-button"
             onClick={onClose}
-            aria-label="关闭草稿恢复中心"
+            aria-label={t("centerCloseAria")}
           >
-            关闭
+            {t("close")}
           </button>
         </header>
         <div className="draft-recovery-list">
@@ -86,9 +90,15 @@ export function DraftRecoveryCenter({
                     : (currentComparison?.characterDelta ?? 0);
                 const diffSummary = currentComparison
                   ? currentComparison.hasChanges
-                    ? `已打开内容差异：+${currentComparison.addedLineCount} 行 / −${currentComparison.removedLineCount} 行 · ${currentComparison.changeHunkCount} 个区域 · 字符 ${characterDelta}${currentComparison.precise ? "" : " · 快速摘要"}`
-                    : "已打开内容与草稿相同 · 无需恢复"
-                  : "查看差异时将读取当前文件 · 不会自动恢复";
+                    ? safetyText(locale, "centerDiff", {
+                        added: currentComparison.addedLineCount,
+                        removed: currentComparison.removedLineCount,
+                        hunks: currentComparison.changeHunkCount,
+                        delta: characterDelta,
+                        qualifier: currentComparison.precise ? "" : t("centerQuick"),
+                      })
+                    : t("centerSame")
+                  : t("centerPending");
 
                 return (
                   <>
@@ -96,14 +106,15 @@ export function DraftRecoveryCenter({
                       type="button"
                       className="draft-recovery-open"
                       onClick={() => onOpen(snapshot.path)}
-                      aria-label={`打开 ${fileName(snapshot.path)} 的当前文件（不会自动恢复草稿）`}
+                      aria-label={safetyText(locale, "centerOpenAria", { name: fileName(snapshot.path) })}
                     >
                       <strong>{fileName(snapshot.path)}</strong>
                       <span title={snapshot.path}>{snapshot.path}</span>
                       <small>
-                        {formatDraftRecoveryTime(snapshot.savedAt)} · {draftPreview(snapshot.draft)}
+                        {formatDraftRecoveryTime(snapshot.savedAt, undefined, locale)} ·{" "}
+                        {draftPreview(snapshot.draft, locale)}
                       </small>
-                      <small className="draft-recovery-source-note">当前文件 · 不会自动恢复草稿</small>
+                      <small className="draft-recovery-source-note">{t("centerCurrent")}</small>
                       <small className="draft-recovery-diff-summary">{diffSummary}</small>
                     </button>
                     <div className="draft-recovery-actions">
@@ -111,17 +122,17 @@ export function DraftRecoveryCenter({
                         type="button"
                         className="draft-recovery-preview"
                         onClick={() => onPreview(snapshot.path)}
-                        aria-label={`查看 ${fileName(snapshot.path)} 当前文件与草稿的差异`}
+                        aria-label={safetyText(locale, "centerPreviewAria", { name: fileName(snapshot.path) })}
                       >
-                        查看差异
+                        {t("preview")}
                       </button>
                       <button
                         type="button"
                         className="draft-recovery-discard"
                         onClick={() => onDiscard(snapshot.path)}
-                        aria-label={`丢弃 ${fileName(snapshot.path)} 草稿`}
+                        aria-label={safetyText(locale, "centerDiscardAria", { name: fileName(snapshot.path) })}
                       >
-                        丢弃
+                        {t("discard")}
                       </button>
                     </div>
                   </>
@@ -131,9 +142,9 @@ export function DraftRecoveryCenter({
           ))}
         </div>
         <footer className="quick-open-footer draft-recovery-footer">
-          <span>先查看当前文件与草稿的差异，再决定是否恢复；恢复只进入编辑区，点击“保存”后才写回文件。</span>
+          <span>{t("centerFooter")}</span>
           <button type="button" className="quiet-button" onClick={onClearAll}>
-            清空全部
+            {t("centerClear")}
           </button>
         </footer>
       </section>
