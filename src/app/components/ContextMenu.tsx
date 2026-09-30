@@ -101,7 +101,9 @@ export function ContextMenu({
     setPosition(clampMenuPosition(x, y, rect.width, rect.height));
   }, [x, y]);
 
-  useEffect(() => {
+  // Restore the row during the commit, before a replacement dialog captures
+  // its return target and takes focus. Passive cleanup is too late for that handoff.
+  useLayoutEffect(() => {
     const menuElement = menuRef.current;
     if (!menuElement) return;
     const restoreTarget = restoreFocusTargetRef.current;

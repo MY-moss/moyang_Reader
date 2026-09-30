@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
 type ModalBehaviorOptions = {
   containerRef: RefObject<HTMLElement | null>;
@@ -46,7 +46,9 @@ export function useModalBehavior({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  useEffect(() => {
+  // Establish and hand off focus before paint. A visible confirmation must not
+  // expose a frame focused on the dismissed menu (or the page behind it).
+  useLayoutEffect(() => {
     const previousFocus =
       restoreFocusTarget ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const modalContainer = containerRef.current;
