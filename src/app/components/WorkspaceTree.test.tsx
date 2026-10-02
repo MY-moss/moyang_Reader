@@ -28,6 +28,39 @@ function workspaceFile(path: string, relativePath: string): WorkspaceFile {
 describe("WorkspaceTreeView", () => {
   beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
   afterEach(() => vi.unstubAllGlobals());
+  it.each(["zh-CN", "en-US"] as const)("localizes the copy entry action in %s", (locale) => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const onDuplicateEntry = vi.fn();
+    try {
+      act(() =>
+        root.render(
+          <WorkspaceTreeView
+            locale={locale}
+            files={[file(0)]}
+            activePath={null}
+            onOpenFile={() => {}}
+            onDuplicateEntry={onDuplicateEntry}
+          />,
+        ),
+      );
+      act(() => {
+        container
+          .querySelector<HTMLButtonElement>(".workspace-file")
+          ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+      });
+      const copy = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+        (node) => node.textContent === (locale === "zh-CN" ? "复制文件" : "Copy file"),
+      );
+      expect(copy).toBeTruthy();
+      act(() => copy?.click());
+      expect(onDuplicateEntry).toHaveBeenCalledExactlyOnceWith("notes/0.md", "file");
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
+  });
   it.each(["row", "tree", "dialog", "menu", "tree-before-effect"])(
     "does not let a delayed rename fallback steal %s focus",
     (owner) => {

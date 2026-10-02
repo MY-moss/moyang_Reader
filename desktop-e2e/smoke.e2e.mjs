@@ -1125,18 +1125,42 @@ describe("Moyang Reader desktop runtime", () => {
       await browser.execute(() => {
         window.__desktopE2EOriginalPrompt = window.prompt;
         window.prompt = (message) => {
-          if (message === "复制文件") return "context-managed-copy";
-          if (message === "复制文件夹") return "context-managed-folder-copy";
           throw new Error(`Unexpected native prompt: ${message}`);
         };
       });
       const duplicateFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
       await duplicateFileMenu.$("button=复制文件").click();
+      let copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await copyDialog.waitForDisplayed();
+      assert.match(await copyDialog.getText(), /来源/);
+      assert.match(await copyDialog.getText(), /目标目录/);
+      await copyDialog.$("input").setValue("CON");
+      assert.equal(await copyDialog.$('[data-testid="workspace-name-submit"]').isEnabled(), false);
+      await pressDesktopEscape();
+      await copyDialog.waitForDisplayed({ reverse: true });
+      assert.equal(fs.existsSync(copiedFilePath), false);
+      const retryFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
+      await retryFileMenu.$("button=复制文件").click();
+      copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await copyDialog.waitForDisplayed();
+      await copyDialog.$("input").setValue("context-managed");
+      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
+      await copyDialog.$('[role="alert"]').waitForDisplayed();
+      assert.equal(await copyDialog.$("input").getValue(), "context-managed");
+      assert.equal(fs.readFileSync(originalFilePath, "utf8"), "# Context managed\n");
+      await copyDialog.$("input").setValue("context-managed-copy");
+      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
+      await copyDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(".workspace-file", copiedFileName, true, "the context-menu file was not copied");
       assert.equal(fs.readFileSync(copiedFilePath, "utf8"), "# Context managed\n");
 
       const duplicateFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
       await duplicateFolderMenu.$("button=复制文件夹").click();
+      copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await copyDialog.waitForDisplayed();
+      await copyDialog.$("input").setValue(copiedFolderName);
+      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
+      await copyDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(
         ".workspace-folder",
         copiedFolderName,

@@ -78,6 +78,7 @@ function setup() {
     deleteEntry: vi.fn(async () => undefined),
     moveEntry: vi.fn(async () => "C:\\Notes\\Archive\\Projects"),
     copyEntry: vi.fn(async () => "C:\\Notes\\Archive\\Projects"),
+    duplicateEntry: vi.fn(async () => "C:\\Notes\\Projects\\one 副本.md"),
     replaceOpenTabs,
     updateRecentFiles: vi.fn((update) => {
       state.recent = update(state.recent);
@@ -102,6 +103,100 @@ function setup() {
 }
 
 describe("workspace entry operations", () => {
+  it.each([
+    ["zh-CN", "file", "Projects/one.md", "one 副本.md"],
+    ["en-US", "file", "Projects/one.md", "one copy.md"],
+    ["zh-CN", "folder", "Projects/Folder.txt", "Folder.txt 副本"],
+    ["en-US", "folder", "Projects/Folder.txt", "Folder.txt copy"],
+  ] as const)("duplicates %s %s without changing source sessions", async (locale, kind, entry, name) => {
+    const { options, state, replaceOpenTabs, session } = setup();
+    options.getLocale = () => locale;
+    state.current!.modified = true;
+    const current = state.current;
+    const recent = [...state.recent];
+    expect(await createWorkspaceEntryOperationsController(options).duplicate(entry, kind)).toBe(true);
+    expect(options.requestName).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "duplicate", kind, parentPath: "Projects", initialName: name }),
+      expect.any(Function),
+    );
+    expect(options.duplicateEntry).toHaveBeenCalledExactlyOnceWith("C:\\Notes", entry, name);
+    expect(options.saveDocument).not.toHaveBeenCalled();
+    expect(options.confirm).not.toHaveBeenCalled();
+    expect(options.openPath).not.toHaveBeenCalled();
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.updateCachedWorkspace).not.toHaveBeenCalled();
+    expect(state.current).toBe(current);
+    expect(state.recent).toEqual(recent);
+    expect(options.invalidateDocumentCache).toHaveBeenCalledWith(["C:\\Notes\\Projects\\one 副本.md"]);
+  });
+
+  it("does not copy when the input is cancelled", async () => {
+    const { options } = setup();
+    options.requestName = vi.fn(async () => false);
+    expect(await createWorkspaceEntryOperationsController(options).duplicate("Projects/one.md", "file")).toBe(false);
+    expect(options.duplicateEntry).not.toHaveBeenCalled();
+  });
+
+  it.each(["root", "dispose"])("invalidates pending copy on %s and holds the mutation lock", async (change) => {
+    const { options, state } = setup();
+    let submit!: Parameters<WorkspaceEntryOperationsOptions["requestName"]>[1];
+    let resolve!: (value: boolean) => void;
+    options.requestName = vi.fn((_request, callback) => {
+      submit = callback;
+      return new Promise<boolean>((done) => {
+        resolve = done;
+      });
+    });
+    const controller = createWorkspaceEntryOperationsController(options);
+    const pending = controller.duplicate("Projects/one.md", "file");
+    expect(await controller.rename("Projects/one.md", "file")).toBe(false);
+    expect(options.requestName).toHaveBeenCalledOnce();
+    if (change === "root") state.root = "D:\\Other";
+    else controller.dispose();
+    expect(await submit("Another.md")).toBe("cancelled");
+    resolve(false);
+    expect(await pending).toBe(false);
+    expect(options.duplicateEntry).not.toHaveBeenCalled();
+  });
+
+  it("leaves IO failure retryable without touching cache, tabs or sessions", async () => {
+    const { options, replaceOpenTabs, session } = setup();
+    const cause = new Error("existing target");
+    options.duplicateEntry = vi.fn(async () => {
+      throw cause;
+    });
+    await expect(createWorkspaceEntryOperationsController(options).duplicate("Projects/one.md", "file")).rejects.toBe(
+      cause,
+    );
+    expect(options.refreshWorkspaceChanges).not.toHaveBeenCalled();
+    expect(options.invalidateDocumentCache).not.toHaveBeenCalled();
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.updateCachedWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("completes the input after a successful copy even when refresh fails", async () => {
+    const { options } = setup();
+    options.refreshWorkspaceChanges = vi.fn(async () => {
+      throw new Error();
+    });
+    expect(await createWorkspaceEntryOperationsController(options).duplicate("Projects/one.md", "file")).toBe(true);
+    expect(options.duplicateEntry).toHaveBeenCalledOnce();
+    expect(options.setError).toHaveBeenCalledWith(expect.stringContaining("不要重复复制"));
+  });
+
+  it("does not overwrite a new workspace's feedback after copy IO", async () => {
+    const { options, state, replaceOpenTabs } = setup();
+    options.duplicateEntry = vi.fn(async () => {
+      state.root = "D:\\Other";
+      state.error = "new workspace warning";
+      return "C:\\Notes\\Projects\\one 副本.md";
+    });
+    expect(await createWorkspaceEntryOperationsController(options).duplicate("Projects/one.md", "file")).toBe(true);
+    expect(state.error).toBe("new workspace warning");
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(options.openPath).not.toHaveBeenCalled();
+  });
+
   it("creates a note only after document replacement, then refreshes and opens it", async () => {
     const { options } = setup();
     const controller = createWorkspaceEntryOperationsController(options);

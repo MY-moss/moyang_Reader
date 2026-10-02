@@ -33,12 +33,13 @@ export type WorkspaceEntryOperationsOptions = {
   deleteEntry: (root: string, entryPath: string) => Promise<void>;
   moveEntry: (root: string, entryPath: string, destinationParentPath: string) => Promise<string>;
   copyEntry: (root: string, entryPath: string, destinationParentPath: string) => Promise<string>;
+  duplicateEntry: (root: string, entryPath: string, name: string) => Promise<string>;
   replaceOpenTabs: (tabs: RecentFile[]) => void;
   updateRecentFiles: (update: (files: RecentFile[]) => RecentFile[]) => void;
   invalidateDocumentCache: (paths: string[]) => void;
   releaseDocumentResources: (path: string) => void;
   clearCurrentDocument: () => void;
-  refreshWorkspaceChanges: (root: string, paths: string[]) => Promise<void>;
+  refreshWorkspaceChanges: (root: string, paths: string[], rejectOnFailure?: boolean) => Promise<void>;
   session: Pick<WorkspaceSessionController, "getCachedWorkspace" | "updateCachedWorkspace" | "persistWorkspaceSession">;
   setError: (message: string | null) => void;
   notify: (message: string) => void;
@@ -48,6 +49,7 @@ export type WorkspaceEntryOperationsController = {
   createNote: (parentPath: string) => Promise<boolean>;
   createFolder: (parentPath: string) => Promise<boolean>;
   dispose: () => void;
+  duplicate: (entryPath: string, kind: WorkspaceEntryKind) => Promise<boolean>;
   rename: (entryPath: string, kind: WorkspaceEntryKind) => Promise<boolean>;
   remove: (entryPath: string, kind: WorkspaceEntryKind) => Promise<boolean>;
   transfer: (
@@ -248,6 +250,51 @@ export function createWorkspaceEntryOperationsController(
       );
     });
 
+  const duplicate = (entryPath: string, kind: WorkspaceEntryKind): Promise<boolean> =>
+    run(async () => {
+      const root = currentRoot(message("workspaceEntry.actionCopy"), entryPath);
+      if (!root) return false;
+      const text = (key: Parameters<typeof workspaceNameText>[1], values?: Record<string, string>) =>
+        workspaceNameText(options.getLocale(), key, values);
+      const currentName = fileNameFromPath(entryPath);
+      const extensionIndex = kind === "file" ? currentName.lastIndexOf(".") : -1;
+      const initialName =
+        extensionIndex > 0
+          ? `${currentName.slice(0, extensionIndex)}${text("copySuffix")}${currentName.slice(extensionIndex)}`
+          : `${currentName}${text("copySuffix")}`;
+      const initialDocument = options.getCurrentDocument();
+      return options.requestName(
+        {
+          action: "duplicate",
+          kind,
+          root,
+          currentName,
+          initialName,
+          sourcePath: workspaceEntryAbsolutePath(root, entryPath),
+          parentPath: entryPath.replace(/\\/g, "/").split("/").slice(0, -1).join("/"),
+        },
+        async (name) => {
+          if (!isCurrentRoot(root)) return "cancelled";
+          // Duplicate the saved disk content without saving or replacing the editor.
+          const path = await options.duplicateEntry(root, entryPath, name);
+          if (disposed) return "done";
+          options.invalidateDocumentCache([path]);
+          let warning: string | null = null;
+          try {
+            await options.refreshWorkspaceChanges(root, [path], true);
+          } catch {
+            warning = text("copyRefreshFailed");
+          }
+          if (!disposed) {
+            options.notify(text("copyCreated", { name: fileNameFromPath(path) }));
+            if (isCurrentRoot(root) && options.getCurrentDocument() === initialDocument) options.setError(warning);
+            else if (warning) options.notify(warning);
+          }
+          return "done";
+        },
+      );
+    });
+
   const remove = (entryPath: string, kind: WorkspaceEntryKind): Promise<boolean> =>
     run(async () => {
       const root = currentRoot(message("workspaceEntry.actionDelete"), entryPath);
@@ -372,6 +419,7 @@ export function createWorkspaceEntryOperationsController(
     });
   return {
     rename,
+    duplicate,
     remove,
     transfer,
     createNote: (parent) => create(parent, true),

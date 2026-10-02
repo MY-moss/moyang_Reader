@@ -327,14 +327,6 @@ function fileNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
 
-function duplicateEntryName(path: string, kind: "file" | "folder"): string {
-  const name = fileNameFromPath(path);
-  if (kind === "folder") return `${name} 副本`;
-  const extensionIndex = name.lastIndexOf(".");
-  if (extensionIndex > 0) return `${name.slice(0, extensionIndex)} 副本${name.slice(extensionIndex)}`;
-  return `${name} 副本`;
-}
-
 function focusElementWithoutScroll(element: HTMLElement | null): boolean {
   if (!element?.isConnected) return false;
   try {
@@ -1487,7 +1479,8 @@ export function App() {
   }, []);
 
   const refreshWorkspaceChanges = useCallback(
-    (root: string, paths: string[]): Promise<void> => workspaceSessionController.refreshWorkspaceChanges(root, paths),
+    (root: string, paths: string[], rejectOnFailure?: boolean): Promise<void> =>
+      workspaceSessionController.refreshWorkspaceChanges(root, paths, rejectOnFailure),
     [workspaceSessionController],
   );
 
@@ -2058,6 +2051,7 @@ export function App() {
       deleteEntry: deleteWorkspaceEntry,
       moveEntry: moveWorkspaceEntry,
       copyEntry: copyWorkspaceEntry,
+      duplicateEntry: duplicateWorkspaceEntry,
       replaceOpenTabs: (tabs) => {
         openTabsRef.current = tabs;
         setOpenTabs(tabs);
@@ -2161,27 +2155,8 @@ export function App() {
   }, []);
 
   const handleDuplicateWorkspaceEntry = useCallback(
-    async (entryPath: string, kind: "file" | "folder") => {
-      const root = workspacePathRef.current;
-      if (!root || !isTauriRuntime() || !entryPath.trim()) {
-        setError("请先添加工作区，再复制文件或文件夹。");
-        return;
-      }
-
-      const defaultName = duplicateEntryName(entryPath, kind);
-      const name = window.prompt(kind === "folder" ? "复制文件夹" : "复制文件", defaultName)?.trim();
-      if (!name) return;
-
-      try {
-        const duplicatedPath = await duplicateWorkspaceEntry(root, entryPath, name);
-        await refreshWorkspaceChanges(root, [duplicatedPath]);
-        notify(`已创建副本：${fileNameFromPath(duplicatedPath)}`);
-        setError(null);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "无法创建工作区副本。");
-      }
-    },
-    [notify, refreshWorkspaceChanges],
+    (entryPath: string, kind: "file" | "folder") => workspaceEntryOperationsRef.current?.duplicate(entryPath, kind),
+    [],
   );
 
   const handleRevealWorkspaceEntry = useCallback(async (entryPath: string) => {

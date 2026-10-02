@@ -242,6 +242,20 @@ afterEach(() => {
 });
 
 describe("workspace session controller", () => {
+  it("reports requested refresh failures to a foreground operation without poisoning background refreshes", async () => {
+    const harness = createHarness();
+    await harness.controller.loadWorkspace(root);
+    const cause = new Error("private refresh failure");
+    harness.refreshWorkspace.mockRejectedValueOnce(cause);
+    await expect(harness.controller.refreshWorkspaceChanges(root, [`${root}\\note.md`], true)).rejects.toBe(cause);
+    expect(harness.state.indexLoading).toBe(false);
+    expect(harness.state.watchError).toBeNull();
+    harness.refreshWorkspace.mockRejectedValueOnce(cause);
+    await expect(harness.controller.refreshWorkspaceChanges(root, [`${root}\\note.md`])).resolves.toBeUndefined();
+    expect(harness.state.watchError).toContain("工作区增量刷新失败");
+    await expect(harness.controller.refreshWorkspaceChanges(root, [`${root}\\note.md`], true)).resolves.toBeUndefined();
+    expect(harness.refreshWorkspace).toHaveBeenCalledTimes(3);
+  });
   it("loads a workspace, mounts it, and finishes its background index", async () => {
     const file = createFile(`${root}\\today.md`);
     const index = [createIndex(file)];

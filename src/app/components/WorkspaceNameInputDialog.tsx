@@ -32,14 +32,19 @@ export function WorkspaceNameInputDialog({
   const feedback =
     touched && validation ? t(validation) : error ? workspaceNameError(locale, error, request.action) : null;
   const rename = request.action === "rename";
+  const duplicate = request.action === "duplicate";
   const title = t(
-    rename
+    duplicate
       ? request.kind === "folder"
-        ? "renameFolder"
-        : "renameFile"
-      : request.action === "create-note"
-        ? "createNote"
-        : "createFolder",
+        ? "duplicateFolder"
+        : "duplicateFile"
+      : rename
+        ? request.kind === "folder"
+          ? "renameFolder"
+          : "renameFile"
+        : request.action === "create-note"
+          ? "createNote"
+          : "createFolder",
   );
   useModalBehavior({ containerRef: dialogRef, initialFocusRef: inputRef, fallbackFocusTarget, onClose: onCancel });
   useLayoutEffect(() => {
@@ -74,8 +79,14 @@ export function WorkspaceNameInputDialog({
         </header>
         <div className="close-confirm-body safety-confirm-body">
           <dl className="safety-confirm-facts">
+            {duplicate && (
+              <div>
+                <dt>{t("source")}</dt>
+                <dd>{request.sourcePath}</dd>
+              </div>
+            )}
             <div>
-              <dt>{t("directory")}</dt>
+              <dt>{t(duplicate ? "destination" : "directory")}</dt>
               <dd>{workspaceEntryAbsolutePath(request.root, request.parentPath)}</dd>
             </div>
             {rename && (
@@ -86,7 +97,7 @@ export function WorkspaceNameInputDialog({
             )}
           </dl>
           <label className="workspace-name-label" htmlFor="workspace-name-input">
-            {t(rename ? "newName" : "name")}
+            {t(duplicate ? "copyName" : rename ? "newName" : "name")}
           </label>
           <input
             ref={inputRef}
@@ -108,7 +119,17 @@ export function WorkspaceNameInputDialog({
             }}
           />
           <p id="workspace-name-hint" className="safety-confirm-note">
-            {t(rename ? "renameHint" : request.action === "create-note" ? "noteHint" : "folderHint")}
+            {t(
+              duplicate
+                ? request.kind === "folder"
+                  ? "copyFolderHint"
+                  : "copyFileHint"
+                : rename
+                  ? "renameHint"
+                  : request.action === "create-note"
+                    ? "noteHint"
+                    : "folderHint",
+            )}
           </p>
           {feedback && (
             <p id="workspace-name-error" className="workspace-name-error" role="alert">
@@ -133,7 +154,7 @@ export function WorkspaceNameInputDialog({
             disabled={busy || Boolean(validation)}
             data-testid="workspace-name-submit"
           >
-            {t(rename ? "rename" : "create")}
+            {t(duplicate ? "duplicate" : rename ? "rename" : "create")}
           </button>
         </footer>
       </form>

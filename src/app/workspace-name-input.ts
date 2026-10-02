@@ -1,13 +1,12 @@
 import { documentAdapterForPath } from "../lib/adapters/registry";
 
 export type WorkspaceNameInputRequest = {
-  action: "create-note" | "create-folder" | "rename";
   kind: "file" | "folder";
   root: string;
   parentPath: string;
   initialName: string;
   currentName?: string;
-};
+} & ({ action: "create-note" | "create-folder" | "rename" } | { action: "duplicate"; sourcePath: string });
 export type WorkspaceNameInputSubmit = (name: string) => Promise<"done" | "cancelled">;
 export type WorkspaceNameInput = (
   request: WorkspaceNameInputRequest,
@@ -32,7 +31,8 @@ export function validateWorkspaceNameInput(
   if (name.lastIndexOf(".") > 0) {
     const adapter = documentAdapterForPath(name);
     if (request.action === "create-note" && adapter?.kind !== "markdown") return "markdownOnly";
-    if (request.action === "rename" && request.kind === "file" && !adapter) return "unsupportedType";
+    if ((request.action === "rename" || request.action === "duplicate") && request.kind === "file" && !adapter)
+      return "unsupportedType";
   }
   return null;
 }
