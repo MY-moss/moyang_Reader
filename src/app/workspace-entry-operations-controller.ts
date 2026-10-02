@@ -3,6 +3,9 @@ import type { WorkspaceSessionController } from "./workspace-session-controller"
 import { translate, type Locale, type MessageKey } from "./i18n";
 import { isPathWithin, normalizePathKey } from "./path-key";
 import { isPathWithinEntry, rebaseWorkspacePath, workspaceEntryAbsolutePath } from "./workspace-entry";
+import type { WorkspaceNameInput } from "./workspace-name-input";
+import { workspaceNameText } from "./workspace-name-copy";
+import { AppError, ERROR_CODES } from "./error-contract";
 
 export type WorkspaceEntryKind = "file" | "folder";
 export type WorkspaceTransferMode = "copy" | "move";
@@ -19,7 +22,10 @@ export type WorkspaceEntryOperationsOptions = {
   getWorkspacePath: () => string | null;
   getCurrentDocument: () => CurrentDocument | null;
   getOpenTabs: () => RecentFile[];
-  prompt: (message: string, value: string) => string | null;
+  requestName: WorkspaceNameInput;
+  confirmDocumentReplacement: () => Promise<boolean>;
+  createNote: (root: string, parentPath: string, name: string) => Promise<string>;
+  createFolder: (root: string, parentPath: string, name: string) => Promise<string>;
   confirm: (request: WorkspaceEntryConfirmationRequest) => boolean | Promise<boolean>;
   saveDocument: () => Promise<boolean>;
   openPath: (path: string, preserveMode: boolean) => Promise<boolean>;
@@ -39,6 +45,9 @@ export type WorkspaceEntryOperationsOptions = {
 };
 
 export type WorkspaceEntryOperationsController = {
+  createNote: (parentPath: string) => Promise<boolean>;
+  createFolder: (parentPath: string) => Promise<boolean>;
+  dispose: () => void;
   rename: (entryPath: string, kind: WorkspaceEntryKind) => Promise<boolean>;
   remove: (entryPath: string, kind: WorkspaceEntryKind) => Promise<boolean>;
   transfer: (
@@ -66,6 +75,7 @@ export function createWorkspaceEntryOperationsController(
   options: WorkspaceEntryOperationsOptions,
 ): WorkspaceEntryOperationsController {
   let busy = false;
+  let disposed = false;
   const message = (key: MessageKey, values: Record<string, string> = {}): string =>
     translate(options.getLocale(), key).replace(
       /\{(\w+)\}/g,
@@ -73,13 +83,14 @@ export function createWorkspaceEntryOperationsController(
     );
   const kindLabel = (kind: WorkspaceEntryKind): string =>
     message(kind === "folder" ? "workspaceEntry.kindFolder" : "workspaceEntry.kindFile");
-  const isCurrentRoot = (root: string): boolean => samePath(options.getWorkspacePath() ?? "", root);
+  const isCurrentRoot = (root: string): boolean => !disposed && samePath(options.getWorkspacePath() ?? "", root);
   const reportError = (root: string, message: string): void => {
     if (isCurrentRoot(root)) options.setError(message);
     else options.notify(message);
   };
 
   const run = async (operation: () => Promise<boolean>): Promise<boolean> => {
+    if (disposed) return false;
     if (busy) {
       options.setError(message("workspaceEntry.busy"));
       return false;
@@ -103,19 +114,18 @@ export function createWorkspaceEntryOperationsController(
     root: string,
     entryAbsolutePath: string,
     action: WorkspaceEntryAction,
-  ): Promise<boolean> => {
-    if (!isCurrentRoot(root)) return false;
+  ): Promise<"ready" | "cancelled" | "failed"> => {
+    if (!isCurrentRoot(root)) return "cancelled";
     const current = options.getCurrentDocument();
-    if (!current?.modified || !isPathWithinEntry(current.path, entryAbsolutePath)) return true;
-    if (!(await options.confirm({ type: "save", path: current.path, action }))) return false;
+    if (!current?.modified || !isPathWithinEntry(current.path, entryAbsolutePath)) return "ready";
+    if (!(await options.confirm({ type: "save", path: current.path, action }))) return "cancelled";
     // An application modal yields to other events, unlike window.confirm.
     // Never save a different document or continue an old workspace operation.
-    if (!isCurrentRoot(root) || !samePath(options.getCurrentDocument()?.path ?? "", current.path)) return false;
-    return (
-      (await options.saveDocument()) &&
-      isCurrentRoot(root) &&
-      samePath(options.getCurrentDocument()?.path ?? "", current.path)
-    );
+    if (!isCurrentRoot(root) || !samePath(options.getCurrentDocument()?.path ?? "", current.path)) return "cancelled";
+    if (!(await options.saveDocument())) return "failed";
+    return isCurrentRoot(root) && samePath(options.getCurrentDocument()?.path ?? "", current.path)
+      ? "ready"
+      : "cancelled";
   };
 
   const updateSession = (root: string, oldPath: string, nextPath: string | null, tabs: RecentFile[]): void => {
@@ -207,28 +217,35 @@ export function createWorkspaceEntryOperationsController(
       if (!root) return false;
       const oldPath = workspaceEntryAbsolutePath(root, entryPath);
       const oldName = fileNameFromPath(entryPath);
-      const name = options
-        .prompt(message(kind === "folder" ? "workspaceEntry.renameFolder" : "workspaceEntry.renameFile"), oldName)
-        ?.trim();
-      if (!name || name === oldName) return false;
-      if (!(await confirmCurrentSave(root, oldPath, "rename")) || !isCurrentRoot(root)) return false;
-      const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
-      let nextPath: string;
-      try {
-        nextPath = await options.renameEntry(root, entryPath, name);
-      } catch (cause) {
-        reportError(root, cause instanceof Error ? cause.message : message("workspaceEntry.renameFailure"));
-        return false;
-      }
-      await finish(
-        root,
-        oldPath,
-        nextPath,
-        initialCurrentPath,
-        message("workspaceEntry.renamed", { kind: kindLabel(kind), name }),
-        message("workspaceEntry.renameReopenFailure"),
+      const initialDocument = options.getCurrentDocument();
+      return options.requestName(
+        {
+          action: "rename",
+          kind,
+          root,
+          parentPath: entryPath.replace(/\\/g, "/").split("/").slice(0, -1).join("/"),
+          initialName: oldName,
+          currentName: oldName,
+        },
+        async (name) => {
+          if (!isCurrentRoot(root) || options.getCurrentDocument() !== initialDocument || !name || name === oldName)
+            return "cancelled";
+          const saved = await confirmCurrentSave(root, oldPath, "rename");
+          if (saved === "failed") throw new AppError(ERROR_CODES.FILE_WRITE_FAILED, "Save preceding rename failed");
+          if (saved !== "ready" || !isCurrentRoot(root)) return "cancelled";
+          const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
+          const nextPath = await options.renameEntry(root, entryPath, name);
+          await finish(
+            root,
+            oldPath,
+            nextPath,
+            initialCurrentPath,
+            message("workspaceEntry.renamed", { kind: kindLabel(kind), name }),
+            message("workspaceEntry.renameReopenFailure"),
+          );
+          return "done";
+        },
       );
-      return true;
     });
 
   const remove = (entryPath: string, kind: WorkspaceEntryKind): Promise<boolean> =>
@@ -238,7 +255,7 @@ export function createWorkspaceEntryOperationsController(
       const oldPath = workspaceEntryAbsolutePath(root, entryPath);
       const label = fileNameFromPath(entryPath);
       if (!(await options.confirm({ type: "delete", path: oldPath, kind })) || !isCurrentRoot(root)) return false;
-      if (!(await confirmCurrentSave(root, oldPath, "delete")) || !isCurrentRoot(root)) return false;
+      if ((await confirmCurrentSave(root, oldPath, "delete")) !== "ready" || !isCurrentRoot(root)) return false;
       const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
       try {
         await options.deleteEntry(root, entryPath);
@@ -268,7 +285,7 @@ export function createWorkspaceEntryOperationsController(
       const root = currentRoot(action, entryPath);
       if (!root) return false;
       const oldPath = workspaceEntryAbsolutePath(root, entryPath);
-      if (!(await confirmCurrentSave(root, oldPath, mode)) || !isCurrentRoot(root)) return false;
+      if ((await confirmCurrentSave(root, oldPath, mode)) !== "ready" || !isCurrentRoot(root)) return false;
       const initialCurrentPath = options.getCurrentDocument()?.path ?? null;
       let nextPath: string;
       try {
@@ -305,5 +322,62 @@ export function createWorkspaceEntryOperationsController(
       return true;
     });
 
-  return { rename, remove, transfer };
+  const create = (parentPath: string, note: boolean): Promise<boolean> =>
+    run(async () => {
+      const text = (key: Parameters<typeof workspaceNameText>[1], values?: Record<string, string>) =>
+        workspaceNameText(options.getLocale(), key, values);
+      const root = options.getWorkspacePath();
+      if (!root || !options.isNative()) {
+        options.setError(text("requireWorkspace"));
+        return false;
+      }
+      const initialDocument = options.getCurrentDocument();
+      return options.requestName(
+        {
+          action: note ? "create-note" : "create-folder",
+          kind: note ? "file" : "folder",
+          root,
+          parentPath,
+          initialName: text(note ? "untitledNote" : "untitledFolder"),
+        },
+        async (name) => {
+          const valid = () => isCurrentRoot(root) && options.getCurrentDocument() === initialDocument;
+          if (!valid()) return "cancelled";
+          if (note && (!(await options.confirmDocumentReplacement()) || !valid())) return "cancelled";
+          const path = await (note ? options.createNote : options.createFolder)(root, parentPath, name);
+          // The disk operation has succeeded. Refresh/open failures must not invite
+          // another create, and a changed workspace/document must retain its view.
+          let warning: string | null = null;
+          try {
+            await options.refreshWorkspaceChanges(root, [path]);
+          } catch {
+            warning = text("refreshFailed");
+          }
+          if (note && valid()) {
+            try {
+              if (!(await options.openPath(path, false))) warning ??= text("openFailed");
+            } catch {
+              warning ??= text("openFailed");
+            }
+          }
+          if (!disposed) {
+            options.notify(text("created", { name: fileNameFromPath(path) }));
+            if (isCurrentRoot(root) && (valid() || samePath(options.getCurrentDocument()?.path ?? "", path)))
+              options.setError(warning);
+            else if (warning) options.notify(warning);
+          }
+          return "done";
+        },
+      );
+    });
+  return {
+    rename,
+    remove,
+    transfer,
+    createNote: (parent) => create(parent, true),
+    createFolder: (parent) => create(parent, false),
+    dispose: () => {
+      disposed = true;
+    },
+  };
 }

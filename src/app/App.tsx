@@ -34,6 +34,8 @@ import { ExternalChangeNotice, type ExternalChangeKind } from "./components/Exte
 import { ExternalOverwriteDialog } from "./components/ExternalOverwriteDialog";
 import { safetyText } from "./components/safety-dialog-copy";
 import { WorkspaceEntryConfirmationDialog } from "./components/WorkspaceEntryConfirmationDialog";
+import { WorkspaceNameInputDialog } from "./components/WorkspaceNameInputDialog";
+import { useWorkspaceNameInput } from "./use-workspace-name-input";
 import { useWorkspaceEntryConfirmation } from "./use-workspace-entry-confirmation";
 import { DocumentTransitionConfirmationDialog } from "./components/DocumentTransitionConfirmationDialog";
 import { useDocumentTransitionConfirmation } from "./use-document-transition-confirmation";
@@ -2004,47 +2006,14 @@ export function App() {
     [confirmTransition, documentState, loadWorkspace, openPath, workspacePath],
   );
 
+  const workspaceEntryOperationsRef = useRef<WorkspaceEntryOperationsController | null>(null);
   const handleCreateWorkspaceNote = useCallback(
-    async (parentPath: string) => {
-      if (!workspacePath || !isTauriRuntime()) {
-        setError("请先添加一个工作区文件夹，再新建笔记。");
-        return;
-      }
-      const name = window.prompt("新建笔记", "未命名笔记")?.trim();
-      if (!name) return;
-
-      if (!(await confirmTransition("new-document"))) return;
-
-      try {
-        const path = await createWorkspaceNote(workspacePath, parentPath, name);
-        await refreshWorkspaceChanges(workspacePath, [path]);
-        await openPath(path);
-        setError(null);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "无法创建新笔记。");
-      }
-    },
-    [confirmTransition, openPath, refreshWorkspaceChanges, workspacePath],
+    (parentPath: string) => workspaceEntryOperationsRef.current?.createNote(parentPath) ?? Promise.resolve(false),
+    [],
   );
-
   const handleCreateWorkspaceFolder = useCallback(
-    async (parentPath: string) => {
-      if (!workspacePath || !isTauriRuntime()) {
-        setError("请先添加一个工作区文件夹，再新建文件夹。");
-        return;
-      }
-      const name = window.prompt("新建文件夹", "新建文件夹")?.trim();
-      if (!name) return;
-
-      try {
-        const path = await createWorkspaceFolder(workspacePath, parentPath, name);
-        await refreshWorkspaceChanges(workspacePath, [path]);
-        setError(null);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "无法创建新文件夹。");
-      }
-    },
-    [refreshWorkspaceChanges, workspacePath],
+    (parentPath: string) => workspaceEntryOperationsRef.current?.createFolder(parentPath) ?? Promise.resolve(false),
+    [],
   );
 
   const clearCurrentDocumentForWorkspaceEntry = useCallback(() => {
@@ -2059,7 +2028,13 @@ export function App() {
     saveLastDocumentPath(null);
   }, [resetEditorHistory]);
 
-  const workspaceEntryOperationsRef = useRef<WorkspaceEntryOperationsController | null>(null);
+  const {
+    state: workspaceNameInput,
+    requestName,
+    cancel: cancelWorkspaceName,
+    submitName,
+    clearError: clearNameError,
+  } = useWorkspaceNameInput();
   const {
     request: workspaceEntryConfirmation,
     confirm: confirmWorkspaceEntry,
@@ -2072,7 +2047,10 @@ export function App() {
       getWorkspacePath: getWorkspacePathValue,
       getCurrentDocument: getCurrentDocumentValue,
       getOpenTabs: getOpenTabsValue,
-      prompt: (message, value) => window.prompt(message, value),
+      requestName,
+      confirmDocumentReplacement: () => confirmTransition("new-document"),
+      createNote: createWorkspaceNote,
+      createFolder: createWorkspaceFolder,
       confirm: confirmWorkspaceEntry,
       saveDocument,
       openPath,
@@ -2101,11 +2079,14 @@ export function App() {
     });
     workspaceEntryOperationsRef.current = controller;
     return () => {
+      controller.dispose();
       if (workspaceEntryOperationsRef.current === controller) workspaceEntryOperationsRef.current = null;
     };
   }, [
     clearCurrentDocumentForWorkspaceEntry,
     confirmWorkspaceEntry,
+    confirmTransition,
+    requestName,
     getCurrentDocumentValue,
     getOpenTabsValue,
     getWorkspacePathValue,
@@ -5432,6 +5413,18 @@ export function App() {
           onCancel={cancelCloseConfirmation}
           onConfirm={confirmClose}
           onSaveAndClose={saveAndClose}
+        />
+      )}
+      {workspaceNameInput && (
+        <WorkspaceNameInputDialog
+          locale={locale}
+          state={workspaceNameInput}
+          covered={Boolean(
+            workspaceEntryConfirmation || documentTransitionRequest || externalOverwriteConfirmationOpen,
+          )}
+          onCancel={cancelWorkspaceName}
+          onSubmit={submitName}
+          onChange={clearNameError}
         />
       )}
       {workspaceEntryConfirmation && (

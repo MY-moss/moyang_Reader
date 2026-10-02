@@ -1127,7 +1127,7 @@ describe("Moyang Reader desktop runtime", () => {
         window.prompt = (message) => {
           if (message === "复制文件") return "context-managed-copy";
           if (message === "复制文件夹") return "context-managed-folder-copy";
-          return "context-renamed";
+          throw new Error(`Unexpected native prompt: ${message}`);
         };
       });
       const duplicateFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
@@ -1145,8 +1145,58 @@ describe("Moyang Reader desktop runtime", () => {
       );
       assert.equal(fs.readFileSync(path.join(copiedFolderPath, "nested.md"), "utf8"), "# Nested\n");
 
+      const createFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
+      await createFolderMenu.$("button=新建文件夹").click();
+      let createDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await createDialog.waitForDisplayed();
+      await createDialog.$("input").setValue("input-created-folder");
+      await createDialog.$('[data-testid="workspace-name-submit"]').click();
+      await createDialog.waitForDisplayed({ reverse: true });
+      assert.ok(fs.statSync(path.join(folderPath, "input-created-folder")).isDirectory());
+
+      const createNoteMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
+      await createNoteMenu.$("button=新建笔记").click();
+      createDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await createDialog.waitForDisplayed();
+      await createDialog.$("input").setValue("input-created-note");
+      // The embedded driver dispatches an untrusted keydown without the browser's
+      // implicit form-submit default. Real Enter/IME behavior is in Playwright;
+      // use the shipped submit button here to verify the Windows filesystem path.
+      await createDialog.$('[data-testid="workspace-name-submit"]').click();
+      await createDialog.waitForDisplayed({ reverse: true });
+      assert.ok(fs.existsSync(path.join(folderPath, "input-created-note.md")));
+      await browser.waitUntil(async () => (await browser.$(".document-title").getText()) === "input-created-note.md", {
+        timeout: 15_000,
+        timeoutMsg: "the created note did not become the current document",
+      });
+
       const renameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
       await renameMenu.$("button=重命名文件").click();
+      let nameDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await nameDialog.waitForDisplayed();
+      let nameInput = await nameDialog.$("input");
+      assert.ok(await nameInput.isFocused(), "rename input should take focus before the dialog is visible");
+      assert.equal(await nameInput.getValue(), originalFileName);
+      await nameInput.setValue("CON");
+      assert.equal(await nameDialog.$('[data-testid="workspace-name-submit"]').isEnabled(), false);
+      assert.equal(fs.existsSync(originalFilePath), true);
+      await browser.keys("Escape");
+      await nameDialog.waitForDisplayed({ reverse: true });
+      assert.equal(fs.existsSync(originalFilePath), true, "cancelled rename must retain the original file");
+      const retryRenameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
+      await retryRenameMenu.$("button=重命名文件").click();
+      nameDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
+      await nameDialog.waitForDisplayed();
+      nameInput = await nameDialog.$("input");
+      await nameInput.setValue(copiedFileName);
+      await nameDialog.$('[data-testid="workspace-name-submit"]').click();
+      const renameError = await nameDialog.$('[role="alert"]');
+      await renameError.waitForDisplayed();
+      assert.equal(await nameInput.getValue(), copiedFileName, "an existing name should retain input for retry");
+      assert.equal(fs.existsSync(originalFilePath), true);
+      await nameInput.setValue("context-renamed");
+      await nameDialog.$('[data-testid="workspace-name-submit"]').click();
+      await nameDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(".workspace-file", renamedFileName, true, "the context-menu file was not renamed");
       assert.equal(fs.existsSync(originalFilePath), false);
       assert.equal(fs.existsSync(renamedFilePath), true);
