@@ -282,7 +282,11 @@ test("creates a folder and renames a file through the shipped inputs", async ({ 
   await page.evaluate(
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
-  await expect(page.locator(".workspace-tree")).toBeFocused();
+  const focusAfterResize = await page.evaluate(() => ({
+    active: document.activeElement?.outerHTML.slice(0, 400),
+    treeConnected: document.querySelector(".workspace-tree")?.isConnected,
+  }));
+  await expect(page.locator(".workspace-tree"), JSON.stringify(focusAfterResize)).toBeFocused();
   const renamed = page.locator(".workspace-file").filter({ hasText: "Renamed.txt" });
   await renamed.focus();
   await page.keyboard.press("Shift+F10");

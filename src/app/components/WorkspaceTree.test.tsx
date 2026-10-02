@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,54 +28,69 @@ function workspaceFile(path: string, relativePath: string): WorkspaceFile {
 describe("WorkspaceTreeView", () => {
   beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
   afterEach(() => vi.unstubAllGlobals());
-  it.each(["row", "tree", "dialog", "menu"])("does not let a delayed rename fallback steal %s focus", (owner) => {
-    const frames: FrameRequestCallback[] = [];
-    const animation = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
-      frames.push(callback);
-      return frames.length;
-    });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    const active = workspaceFile("C:/vault/active.md", "active.md");
-    const old = workspaceFile("C:/vault/old.md", "old.md");
-    const renamed = workspaceFile("C:/vault/renamed.md", "renamed.md");
-    const folders: [] = [];
-    const overlay = document.createElement("section");
-    const render = (target: WorkspaceFile) =>
-      root.render(
-        <WorkspaceTreeView files={[active, target]} folders={folders} activePath={active.path} onOpenFile={() => {}} />,
-      );
-    try {
-      act(() => render(old));
-      act(() => container.querySelectorAll<HTMLButtonElement>(".workspace-file")[1].focus());
-      // Rename removes the roving row. Its automatic fallback is waiting for
-      // the tree's measurement frame, just as on a slower desktop WebView.
-      act(() => render(renamed));
-      let target: HTMLElement = container.querySelectorAll<HTMLButtonElement>(".workspace-file")[1];
-      if (owner === "tree") target = container.querySelector<HTMLElement>(".workspace-tree")!;
-      else if (owner !== "row") {
-        if (owner === "dialog") {
-          overlay.setAttribute("role", "dialog");
-          overlay.setAttribute("aria-modal", "true");
-        } else {
-          overlay.setAttribute("role", "menu");
-          overlay.className = "moyang-context-menu";
-        }
-        target = document.createElement("button");
-        overlay.append(target);
-        document.body.append(overlay);
+  it.each(["row", "tree", "dialog", "menu", "tree-before-effect"])(
+    "does not let a delayed rename fallback steal %s focus",
+    (owner) => {
+      const frames: FrameRequestCallback[] = [];
+      const animation = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+        frames.push(callback);
+        return frames.length;
+      });
+      const container = document.createElement("div");
+      document.body.append(container);
+      const root = createRoot(container);
+      const active = workspaceFile("C:/vault/active.md", "active.md");
+      const old = workspaceFile("C:/vault/old.md", "old.md");
+      const renamed = workspaceFile("C:/vault/renamed.md", "renamed.md");
+      const folders: [] = [];
+      const overlay = document.createElement("section");
+      function Harness({ target }: { target: WorkspaceFile }) {
+        useLayoutEffect(() => {
+          if (owner === "tree-before-effect" && target === renamed) {
+            container.querySelector<HTMLElement>(".workspace-tree")?.focus();
+          }
+        }, [target]);
+        return (
+          <WorkspaceTreeView
+            files={[active, target]}
+            folders={folders}
+            activePath={active.path}
+            onOpenFile={() => {}}
+          />
+        );
       }
-      act(() => target.focus());
-      act(() => frames.splice(0).forEach((callback) => callback(0)));
-      expect(document.activeElement).toBe(target);
-    } finally {
-      act(() => root.unmount());
-      container.remove();
-      overlay.remove();
-      animation.mockRestore();
-    }
-  });
+      const render = (target: WorkspaceFile) => root.render(<Harness target={target} />);
+      try {
+        act(() => render(old));
+        act(() => container.querySelectorAll<HTMLButtonElement>(".workspace-file")[1].focus());
+        // Rename removes the roving row. Its automatic fallback is waiting for
+        // the tree's measurement frame, just as on a slower desktop WebView.
+        act(() => render(renamed));
+        let target: HTMLElement = container.querySelectorAll<HTMLButtonElement>(".workspace-file")[1];
+        if (owner.startsWith("tree")) target = container.querySelector<HTMLElement>(".workspace-tree")!;
+        else if (owner !== "row") {
+          if (owner === "dialog") {
+            overlay.setAttribute("role", "dialog");
+            overlay.setAttribute("aria-modal", "true");
+          } else {
+            overlay.setAttribute("role", "menu");
+            overlay.className = "moyang-context-menu";
+          }
+          target = document.createElement("button");
+          overlay.append(target);
+          document.body.append(overlay);
+        }
+        act(() => target.focus());
+        act(() => frames.splice(0).forEach((callback) => callback(0)));
+        expect(document.activeElement).toBe(target);
+      } finally {
+        act(() => root.unmount());
+        container.remove();
+        overlay.remove();
+        animation.mockRestore();
+      }
+    },
+  );
 
   it("uses one roving tree item and follows visible tree navigation", () => {
     const container = document.createElement("div");

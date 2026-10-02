@@ -493,7 +493,11 @@ export function WorkspaceTreeView({
               : null;
 
     if (preferredRowKey !== rovingRowKey) {
-      if (!rovingRowVisible) pendingFocusKeyRef.current = preferredRowKey;
+      // The modal can return focus before this passive effect runs. Only
+      // recover genuinely lost focus, not replace that newer explicit owner.
+      if (!rovingRowVisible && document.activeElement === document.body) {
+        pendingFocusKeyRef.current = preferredRowKey;
+      }
       setRovingRowKey(preferredRowKey);
     }
   }, [activePath, rovingRowKey, rows]);
