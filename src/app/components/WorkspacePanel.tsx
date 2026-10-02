@@ -571,6 +571,7 @@ export function WorkspacePanel({
             <div className="workspace-files" aria-label={t("workspace.filesLabel")}>
               <div className="workspace-subheading">{t("workspace.files")}</div>
               <WorkspaceTreeView
+                locale={locale}
                 files={visibleFiles}
                 folders={treeFolders}
                 activePath={activePath}

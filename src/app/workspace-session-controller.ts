@@ -91,7 +91,7 @@ export type WorkspaceSessionControllerOptions = {
 
 export type WorkspaceSessionController = {
   loadWorkspace: (root: string, silent?: boolean) => Promise<boolean>;
-  refreshWorkspaceChanges: (root: string, paths: string[]) => Promise<void>;
+  refreshWorkspaceChanges: (root: string, paths: string[], rejectOnFailure?: boolean) => Promise<void>;
   watchWorkspace: (root: string, onDocumentPathsChanged: (paths: string[]) => void) => () => void;
   removeMountedWorkspace: (path: string) => boolean;
   clearActiveWorkspace: () => void;
@@ -228,7 +228,7 @@ export function createWorkspaceSessionController(
     options.saveWorkspacePath(null);
   };
 
-  const refreshWorkspaceChanges = (root: string, paths: string[]): Promise<void> => {
+  const refreshWorkspaceChanges = (root: string, paths: string[], rejectOnFailure = false): Promise<void> => {
     if (disposed || !options.isNative || paths.length === 0) return Promise.resolve();
 
     const requestId = loadRequestId;
@@ -271,7 +271,10 @@ export function createWorkspaceSessionController(
           updateCachedWorkspace(cache, root, { revision: next });
           return next;
         });
-      } catch {
+      } catch (cause) {
+        // A foreground mutation owns localized, post-commit feedback. Watcher
+        // refreshes retain their existing recoverable status and resolved queue.
+        if (rejectOnFailure) throw cause;
         if (isActiveWorkspace(requestId, root)) {
           options.view.setWorkspaceWatchError("工作区增量刷新失败，目录仍可手动刷新。");
         }

@@ -26,6 +26,7 @@ async function loadFixture(page: Page, locale: "zh-CN" | "en-US" = "zh-CN", them
         calls: [] as string[],
         fail: false,
         failSave: false,
+        failRefresh: false,
         hold: false,
         release: null as (() => void) | null,
         emit(event: string, payload: unknown) {
@@ -106,6 +107,26 @@ async function loadFixture(page: Page, locale: "zh-CN" | "en-US" = "zh-CN", them
               fixture.calls.push(command);
               if (fixture.failSave) throw new Error("Private save details");
               return;
+            case "duplicate_workspace_entry": {
+              fixture.calls.push(command);
+              if (fixture.hold)
+                await new Promise<void>((resolve) => {
+                  fixture.release = resolve;
+                });
+              if (fixture.fail) throw new Error("private backend details");
+              const sourceFile = files.find((file) => file.relativePath === args!.entryPath);
+              const sourceFolder = folders.find((folder) => folder.relativePath === args!.entryPath);
+              const parent = args!.entryPath!.split("/").slice(0, -1).join("/");
+              const name = args!.name! + (sourceFile && args!.name!.lastIndexOf(".") <= 0 ? ".txt" : "");
+              const relativePath = parent ? `${parent}/${name}` : name;
+              if ([...files, ...folders].some((entry) => entry.relativePath === relativePath))
+                throw new Error("private existing target details");
+              const path = `${root}/${relativePath}`;
+              if (sourceFile) files.push({ ...sourceFile, path, name, relativePath });
+              else if (sourceFolder) folders.push({ ...sourceFolder, path, name, relativePath });
+              else throw new Error("private missing source details");
+              return path;
+            }
             case "create_workspace_note":
             case "create_workspace_folder":
             case "rename_workspace_entry": {
@@ -126,6 +147,7 @@ async function loadFixture(page: Page, locale: "zh-CN" | "en-US" = "zh-CN", them
               return path;
             }
             case "refresh_workspace":
+              if (fixture.failRefresh) throw new Error("private refresh details");
               return {
                 scopePaths: [root],
                 folderScopePaths: [root],
@@ -148,11 +170,12 @@ async function loadFixture(page: Page, locale: "zh-CN" | "en-US" = "zh-CN", them
   await expect(page.locator(".workspace-folder").filter({ hasText: "Projects" })).toBeVisible();
 }
 
-async function openName(page: Page, action: "note" | "folder" | "rename") {
+async function openName(page: Page, action: "note" | "folder" | "rename" | "copy-file" | "copy-folder") {
+  const file = action === "rename" || action === "copy-file";
   const row = page
-    .locator(action === "rename" ? ".workspace-file" : ".workspace-folder")
-    .filter({ hasText: action === "rename" ? "笔记.txt" : "Projects" });
-  if (action === "rename") {
+    .locator(file ? ".workspace-file" : ".workspace-folder")
+    .filter({ hasText: file ? "笔记.txt" : "Projects" });
+  if (file) {
     const folder = page.locator(".workspace-folder").filter({ hasText: "Projects" });
     if ((await folder.getAttribute("aria-expanded")) === "false") await folder.click();
   }
@@ -160,7 +183,16 @@ async function openName(page: Page, action: "note" | "folder" | "rename") {
   await page.keyboard.press("Shift+F10");
   await page
     .getByRole("menuitem", {
-      name: action === "note" ? "新建笔记" : action === "folder" ? "新建文件夹" : "重命名文件",
+      name:
+        action === "copy-file"
+          ? /^(复制文件|Copy file)$/
+          : action === "copy-folder"
+            ? /^(复制文件夹|Copy folder)$/
+            : action === "note"
+              ? "新建笔记"
+              : action === "folder"
+                ? "新建文件夹"
+                : "重命名文件",
       exact: true,
     })
     .click();
@@ -173,6 +205,43 @@ async function calls(page: Page) {
   return page.evaluate(
     () => (window as unknown as { __workspaceNameFixture: { calls: string[] } }).__workspaceNameFixture.calls,
   );
+}
+
+for (const width of [1240, 900, 720]) {
+  test(`copy input preserves focus and long paths at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 600 });
+    await loadFixture(page, width === 720 ? "en-US" : "zh-CN", width === 900 ? "ink" : "porcelain");
+    if (width === 900) await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+    const { row, dialog, input } = await openName(page, "copy-file");
+    await expect(input).toHaveValue(width === 720 ? "笔记 copy.txt" : "笔记 副本.txt");
+    await expect(dialog).toContainText(width === 720 ? "Destination folder" : "目标目录");
+    await expect(dialog).toContainText(width === 720 ? "unsaved edits" : "未保存的编辑");
+    await input.fill("CON");
+    await expect(dialog.getByTestId("workspace-name-submit")).toBeDisabled();
+    await input.fill("Safe copy.txt");
+    await page.keyboard.press("Shift+Tab");
+    await expect(dialog.getByTestId("workspace-name-submit")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(input).toBeFocused();
+    const metrics = await dialog.evaluate((node) => ({
+      box: node.getBoundingClientRect().toJSON(),
+      overflow: document.body.scrollWidth > innerWidth,
+      small: [...node.querySelectorAll("input,button")].some((item) => item.getBoundingClientRect().height < 32),
+    }));
+    expect(metrics.box.left).toBeGreaterThanOrEqual(0);
+    expect(metrics.box.right).toBeLessThanOrEqual(width);
+    expect(metrics.box.top).toBeGreaterThanOrEqual(0);
+    expect(metrics.box.bottom).toBeLessThanOrEqual(600);
+    expect(metrics.overflow).toBe(false);
+    expect(metrics.small).toBe(false);
+    const axe = await new AxeBuilder({ page }).include(".workspace-name-dialog").analyze();
+    expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual([]);
+    await dialog.screenshot({ path: `test-results/workspace-copy-${width}.png` });
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(row).toBeFocused();
+    expect(await calls(page)).toEqual([]);
+  });
 }
 
 for (const width of [1240, 900, 720]) {
@@ -345,6 +414,91 @@ test("invalidates a pending input when a native entry opens another library", as
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
   expect(await calls(page)).toEqual([]);
+});
+
+test("copy input retains collisions, rejects composition Enter and prevents duplicate submissions", async ({
+  page,
+}) => {
+  await loadFixture(page, "en-US");
+  const { dialog, input } = await openName(page, "copy-file");
+  await input.fill("笔记");
+  await input.evaluate((node) =>
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, cancelable: true }),
+    ),
+  );
+  expect(await calls(page)).toEqual([]);
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByRole("alert")).toContainText("existing name");
+  await expect(dialog).not.toContainText("private");
+  await expect(input).toHaveValue("笔记");
+  await page.evaluate(() => {
+    (window as unknown as { __workspaceNameFixture: { hold: boolean } }).__workspaceNameFixture.hold = true;
+  });
+  await input.fill("Safe copy");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveAttribute("aria-busy", "true");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  expect(await calls(page)).toEqual(["duplicate_workspace_entry", "duplicate_workspace_entry"]);
+  await page.evaluate(() =>
+    (window as unknown as { __workspaceNameFixture: { release: () => void } }).__workspaceNameFixture.release(),
+  );
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".workspace-file").filter({ hasText: "Safe copy.txt" })).toBeVisible();
+});
+
+test("folder copy closes after IO success even when refreshing its tree fails", async ({ page }) => {
+  await loadFixture(page);
+  const { dialog, input } = await openName(page, "copy-folder");
+  await expect(dialog).toContainText("不会覆盖已有目标");
+  await input.fill("Projects copy");
+  await page.evaluate(() => {
+    (window as unknown as { __workspaceNameFixture: { failRefresh: boolean } }).__workspaceNameFixture.failRefresh =
+      true;
+  });
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByText("副本已创建，但文件树未刷新。请刷新阅读库；不要重复复制。", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("private refresh details");
+  expect(await calls(page)).toEqual(["duplicate_workspace_entry"]);
+});
+
+test("a stale copy request never invokes disk IO in another library", async ({ page }) => {
+  await loadFixture(page);
+  const { dialog } = await openName(page, "copy-file");
+  await page.evaluate(() =>
+    (
+      window as unknown as { __workspaceNameFixture: { emit(event: string, payload: unknown): void } }
+    ).__workspaceNameFixture.emit("open-paths", [{ path: "C:/Archive", kind: "workspace" }]),
+  );
+  await expect(page.locator(".workspace-location")).toContainText("Archive");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  expect(await calls(page)).toEqual([]);
+});
+
+test("copy preserves a dirty source editor without saving or switching documents", async ({ page }) => {
+  await loadFixture(page);
+  const folder = page.locator(".workspace-folder").filter({ hasText: "Projects" });
+  if ((await folder.getAttribute("aria-expanded")) === "false") await folder.click();
+  await page.locator(".workspace-file").filter({ hasText: "笔记.txt" }).click();
+  await expect(page.locator(".document-title")).toHaveText("笔记.txt");
+  const editor = page.locator(".source-editor .cm-content");
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" unsaved edit");
+  const { dialog, input } = await openName(page, "copy-file");
+  await input.fill("Disk copy");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".document-title")).toHaveText("笔记.txt");
+  await expect(editor).toContainText("unsaved edit");
+  await expect(page.locator('[aria-labelledby="workspace-entry-confirm-title"]')).toHaveCount(0);
+  expect(await calls(page)).toEqual(["duplicate_workspace_entry"]);
 });
 
 test("cancels the dirty-document decision under a new-note input without creating", async ({ page }) => {

@@ -9,6 +9,19 @@ const request: WorkspaceNameInputRequest = {
   initialName: "Untitled",
 };
 describe("workspace name feedback", () => {
+  it("applies inherited file type and distinct-name feedback to copies, not folder suffixes", () => {
+    const copy: WorkspaceNameInputRequest = {
+      ...request,
+      action: "duplicate",
+      sourcePath: "C:/Notes/source.txt",
+      currentName: "source.txt",
+    };
+    expect(validateWorkspaceNameInput(copy, "source.txt")).toBe("unchanged");
+    expect(validateWorkspaceNameInput(copy, "new copy")).toBeNull();
+    expect(validateWorkspaceNameInput(copy, "copy.PDF")).toBeNull();
+    expect(validateWorkspaceNameInput(copy, "copy.exe")).toBe("unsupportedType");
+    expect(validateWorkspaceNameInput({ ...copy, kind: "folder" }, "Folder.exe")).toBeNull();
+  });
   it.each([
     ["", "empty"],
     ["  ..  ", "empty"],

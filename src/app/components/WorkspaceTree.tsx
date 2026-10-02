@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import type { WorkspaceDirectory, WorkspaceEntryDetails, WorkspaceFile } from "../types";
+import type { Locale } from "../i18n";
+import { workspaceNameText } from "../workspace-name-copy";
 import {
   buildWorkspaceTree,
   flattenWorkspaceTree,
@@ -34,6 +36,7 @@ type WorkspaceTreeContextTarget = {
 };
 
 type WorkspaceTreeProps = {
+  locale?: Locale;
   files: WorkspaceFile[];
   folders?: WorkspaceDirectory[];
   activePath: string | null;
@@ -441,6 +444,7 @@ function WorkspaceFolderButton({
 }
 
 export function WorkspaceTreeView({
+  locale = "zh-CN",
   files,
   folders = [],
   activePath,
@@ -840,7 +844,10 @@ export function WorkspaceTreeView({
                         ? [
                             {
                               id: "duplicate-entry",
-                              label: contextMenu.entryKind === "folder" ? "复制文件夹" : "复制文件",
+                              label: workspaceNameText(
+                                locale,
+                                contextMenu.entryKind === "folder" ? "duplicateFolder" : "duplicateFile",
+                              ),
                               onSelect: () => {
                                 if (isWorkspaceEntryKind(contextMenu.entryKind)) {
                                   onDuplicateEntry(contextMenu.entryPath, contextMenu.entryKind);

@@ -1,5 +1,5 @@
 import type { Locale } from "./i18n";
-import type { WorkspaceNameValidation } from "./workspace-name-input";
+import type { WorkspaceNameInputRequest, WorkspaceNameValidation } from "./workspace-name-input";
 import { ERROR_CODES, normalizeAppError } from "./error-contract";
 
 const zh = {
@@ -7,6 +7,17 @@ const zh = {
   createFolder: "新建文件夹",
   renameFile: "重命名文件",
   renameFolder: "重命名文件夹",
+  duplicateFile: "复制文件",
+  duplicateFolder: "复制文件夹",
+  duplicate: "创建副本",
+  source: "来源",
+  destination: "目标目录",
+  copyName: "副本名称",
+  copySuffix: " 副本",
+  copyFileHint: "复制磁盘中已保存的内容，未保存的编辑不会写入副本。省略扩展名时沿用原扩展名。",
+  copyFolderHint: "复制文件夹及磁盘中的子条目，未保存的编辑不会写入副本；不会覆盖已有目标。",
+  copyCreated: "已创建副本：{name}",
+  copyRefreshFailed: "副本已创建，但文件树未刷新。请刷新阅读库；不要重复复制。",
   create: "创建",
   rename: "重命名",
   cancel: "取消",
@@ -41,6 +52,18 @@ const en: Record<keyof typeof zh, string> = {
   createFolder: "New folder",
   renameFile: "Rename file",
   renameFolder: "Rename folder",
+  duplicateFile: "Copy file",
+  duplicateFolder: "Copy folder",
+  duplicate: "Create copy",
+  source: "Source",
+  destination: "Destination folder",
+  copyName: "Copy name",
+  copySuffix: " copy",
+  copyFileHint: "Copy the saved file on disk, not unsaved edits. Omit the extension to keep the original extension.",
+  copyFolderHint:
+    "Copy the folder and its saved contents, not unsaved edits. Existing targets will not be overwritten.",
+  copyCreated: "Copy created: {name}",
+  copyRefreshFailed: "The copy was created, but the tree did not refresh. Refresh the library; do not copy it again.",
   create: "Create",
   rename: "Rename",
   cancel: "Cancel",
@@ -86,7 +109,7 @@ export function workspaceNameText(
 export function workspaceNameError(
   locale: Locale,
   cause: unknown,
-  action: "rename" | "create-note" | "create-folder" = "rename",
+  action: WorkspaceNameInputRequest["action"] = "rename",
 ): string {
   const { code } = normalizeAppError(cause);
   const key =
