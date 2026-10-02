@@ -67,7 +67,10 @@ function setup() {
     getWorkspacePath: () => state.root,
     getCurrentDocument: () => state.current,
     getOpenTabs: () => state.tabs,
-    prompt: vi.fn((_message, value) => value),
+    requestName: vi.fn(async (request, submit) => (await submit(request.initialName)) === "done"),
+    confirmDocumentReplacement: vi.fn(async () => true),
+    createNote: vi.fn(async () => "C:\\Notes\\created.md"),
+    createFolder: vi.fn(async () => "C:\\Notes\\Created"),
     confirm: vi.fn(() => true),
     saveDocument: vi.fn(async () => true),
     openPath: vi.fn(async () => true),
@@ -99,6 +102,165 @@ function setup() {
 }
 
 describe("workspace entry operations", () => {
+  it("creates a note only after document replacement, then refreshes and opens it", async () => {
+    const { options } = setup();
+    const controller = createWorkspaceEntryOperationsController(options);
+    expect(await controller.createNote("Projects")).toBe(true);
+    expect(options.requestName).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "create-note", parentPath: "Projects" }),
+      expect.any(Function),
+    );
+    expect(options.confirmDocumentReplacement).toHaveBeenCalledOnce();
+    expect(options.createNote).toHaveBeenCalledExactlyOnceWith("C:\\Notes", "Projects", "未命名笔记");
+    expect(options.refreshWorkspaceChanges).toHaveBeenCalledWith("C:\\Notes", ["C:\\Notes\\created.md"]);
+    expect(options.openPath).toHaveBeenCalledWith("C:\\Notes\\created.md", false);
+  });
+
+  it("creates a folder without replacing or opening the current document", async () => {
+    const { options, state } = setup();
+    const current = state.current;
+    expect(await createWorkspaceEntryOperationsController(options).createFolder("")).toBe(true);
+    expect(options.createFolder).toHaveBeenCalledExactlyOnceWith("C:\\Notes", "", "新建文件夹");
+    expect(options.confirmDocumentReplacement).not.toHaveBeenCalled();
+    expect(options.openPath).not.toHaveBeenCalled();
+    expect(state.current).toBe(current);
+  });
+
+  it("does not create when the name input or replacement is cancelled", async () => {
+    const { options } = setup();
+    options.requestName = vi.fn(async () => false);
+    const controller = createWorkspaceEntryOperationsController(options);
+    expect(await controller.createNote("")).toBe(false);
+    expect(options.confirmDocumentReplacement).not.toHaveBeenCalled();
+    options.requestName = vi.fn(async (request, submit) => (await submit(request.initialName)) === "done");
+    options.confirmDocumentReplacement = vi.fn(async () => false);
+    expect(await controller.createNote("")).toBe(false);
+    expect(options.createNote).not.toHaveBeenCalled();
+    expect(options.refreshWorkspaceChanges).not.toHaveBeenCalled();
+  });
+
+  for (const change of ["root", "document", "dispose"] as const) {
+    it(`rejects ${change} changes while the name is pending`, async () => {
+      const { options, state } = setup();
+      let submitName!: Parameters<WorkspaceEntryOperationsOptions["requestName"]>[1];
+      let resolveName!: (accepted: boolean) => void;
+      options.requestName = vi.fn((_request, submit) => {
+        submitName = submit;
+        return new Promise<boolean>((resolve) => {
+          resolveName = resolve;
+        });
+      });
+      const controller = createWorkspaceEntryOperationsController(options);
+      const pending = controller.createNote("");
+      expect(await controller.createFolder("")).toBe(false);
+      if (change === "root") state.root = "D:\\Other";
+      if (change === "document") state.current = { path: "C:\\Notes\\other.md", modified: false };
+      if (change === "dispose") controller.dispose();
+      expect(await submitName("Next")).toBe("cancelled");
+      resolveName(false);
+      expect(await pending).toBe(false);
+      expect(options.createNote).not.toHaveBeenCalled();
+      expect(options.confirmDocumentReplacement).not.toHaveBeenCalled();
+    });
+  }
+
+  it("rechecks the workspace after an asynchronous replacement decision", async () => {
+    const { options, state } = setup();
+    options.confirmDocumentReplacement = vi.fn(async () => {
+      state.root = "D:\\Other";
+      return true;
+    });
+    expect(await createWorkspaceEntryOperationsController(options).createNote("")).toBe(false);
+    expect(options.createNote).not.toHaveBeenCalled();
+  });
+
+  for (const change of ["root", "document", "dispose"] as const) {
+    it(`rejects a rename after ${change} changes while input is pending`, async () => {
+      const { options, state, replaceOpenTabs } = setup();
+      let submitName!: Parameters<WorkspaceEntryOperationsOptions["requestName"]>[1];
+      let resolveName!: (accepted: boolean) => void;
+      options.requestName = vi.fn((_request, submit) => {
+        submitName = submit;
+        return new Promise<boolean>((resolve) => {
+          resolveName = resolve;
+        });
+      });
+      const controller = createWorkspaceEntryOperationsController(options);
+      const pending = controller.rename("Projects/one.md", "file");
+      if (change === "root") state.root = "D:\\Other";
+      if (change === "document") state.current = { path: "C:\\Notes\\other.md", modified: false };
+      if (change === "dispose") controller.dispose();
+      expect(await submitName("Next.md")).toBe("cancelled");
+      resolveName(false);
+      expect(await pending).toBe(false);
+      expect(options.renameEntry).not.toHaveBeenCalled();
+      expect(replaceOpenTabs).not.toHaveBeenCalled();
+    });
+  }
+
+  it("propagates failed IO to the input without updating view, tabs or session", async () => {
+    const { options, state, replaceOpenTabs, session } = setup();
+    const current = state.current;
+    const cause = new Error("disk unavailable");
+    options.createNote = vi.fn(async () => {
+      throw cause;
+    });
+    await expect(createWorkspaceEntryOperationsController(options).createNote("")).rejects.toBe(cause);
+    expect(options.refreshWorkspaceChanges).not.toHaveBeenCalled();
+    expect(options.openPath).not.toHaveBeenCalled();
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.updateCachedWorkspace).not.toHaveBeenCalled();
+    expect(state.current).toBe(current);
+  });
+
+  it("finishes a successful create despite refresh or open failures so retry cannot duplicate it", async () => {
+    const { options } = setup();
+    options.refreshWorkspaceChanges = vi.fn(async () => {
+      throw new Error();
+    });
+    options.openPath = vi.fn(async () => false);
+    expect(await createWorkspaceEntryOperationsController(options).createNote("")).toBe(true);
+    expect(options.createNote).toHaveBeenCalledOnce();
+    expect(options.setError).toHaveBeenCalledWith(expect.stringContaining("不要重复创建"));
+  });
+
+  it("does not open an old created note over a workspace changed during IO", async () => {
+    const { options, state } = setup();
+    options.createNote = vi.fn(async () => {
+      state.root = "D:\\Other";
+      return "C:\\Notes\\created.md";
+    });
+    expect(await createWorkspaceEntryOperationsController(options).createNote("")).toBe(true);
+    expect(options.openPath).not.toHaveBeenCalled();
+    expect(options.setError).not.toHaveBeenCalled();
+  });
+
+  it("returns save failure to the rename input without renaming or half updating", async () => {
+    const { options, state, replaceOpenTabs, session } = setup();
+    state.current!.modified = true;
+    options.requestName = vi.fn(async (_request, submit) => (await submit("Archive")) === "done");
+    options.saveDocument = vi.fn(async () => false);
+    await expect(createWorkspaceEntryOperationsController(options).rename("Projects", "folder")).rejects.toMatchObject({
+      code: "FILE_WRITE_FAILED",
+    });
+    expect(options.renameEntry).not.toHaveBeenCalled();
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.updateCachedWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("propagates a failed rename without half updating paths", async () => {
+    const { options, replaceOpenTabs, session } = setup();
+    options.requestName = vi.fn(async (_request, submit) => (await submit("Archive")) === "done");
+    options.renameEntry = vi.fn(async () => {
+      throw new Error("exists");
+    });
+    await expect(createWorkspaceEntryOperationsController(options).rename("Projects", "folder")).rejects.toThrow(
+      "exists",
+    );
+    expect(replaceOpenTabs).not.toHaveBeenCalled();
+    expect(session.updateCachedWorkspace).not.toHaveBeenCalled();
+  });
+
   it("waits for an asynchronous deletion decision and leaves state untouched on cancellation", async () => {
     const { state, options, replaceOpenTabs, session } = setup();
     let decide!: (accepted: boolean) => void;
@@ -145,7 +307,7 @@ describe("workspace entry operations", () => {
 
   it("rebases affected tabs, recent files, the cached session and current document after a folder rename", async () => {
     const { state, options, session, replaceOpenTabs } = setup();
-    options.prompt = vi.fn(() => "Archive");
+    options.requestName = vi.fn(async (_request, submit) => (await submit("Archive")) === "done");
 
     const controller = createWorkspaceEntryOperationsController(options);
     expect(await controller.rename("Projects", "folder")).toBe(true);
