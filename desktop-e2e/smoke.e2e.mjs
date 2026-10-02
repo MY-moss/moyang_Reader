@@ -1212,7 +1212,20 @@ describe("Moyang Reader desktop runtime", () => {
       await deleteDialog.waitForDisplayed({ reverse: true });
       assert.equal(fs.existsSync(renamedFilePath), true, "cancelled deletion must preserve the file");
       const renamedEntry = await findWorkspaceElement(".workspace-file", renamedFileName);
-      assert.ok(await renamedEntry.isFocused(), "cancel should restore the workspace row focus");
+      const focusDiagnostic = await browser.execute(
+        (entry) => ({
+          isFocused: document.activeElement === entry,
+          connected: entry.isConnected,
+          active: document.activeElement?.outerHTML?.slice(0, 400),
+          expected: entry.outerHTML?.slice(0, 400),
+          openDialogs: document.querySelectorAll('[role="dialog"]').length,
+        }),
+        renamedEntry,
+      );
+      assert.ok(
+        focusDiagnostic.isFocused,
+        `cancel should restore the workspace row focus: ${JSON.stringify(focusDiagnostic)}`,
+      );
       const retryDeleteMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
       await retryDeleteMenu.$("button=删除文件").click();
       deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');

@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkspaceNameInput } from "./use-workspace-name-input";
 import type { WorkspaceNameInputRequest } from "./workspace-name-input";
 import { workspaceNameMessages, workspaceNameError } from "./workspace-name-copy";
@@ -31,6 +31,8 @@ function mount() {
   };
 }
 describe("workspace name input boundary", () => {
+  beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
+  afterEach(() => vi.unstubAllGlobals());
   it("rejects concurrent requests, validates names and cancels once without IO", async () => {
     const harness = mount();
     const submit = vi.fn(async () => "done" as const);

@@ -278,6 +278,25 @@ test("creates a folder and renames a file through the shipped inputs", async ({ 
   await expect(opened.dialog).toHaveCount(0);
   await expect(page.locator(".workspace-file").filter({ hasText: "Renamed.txt" })).toBeVisible();
   await expect(page.locator(".workspace-tree")).toBeFocused();
+  await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  await expect(page.locator(".workspace-tree")).toBeFocused();
+  const renamed = page.locator(".workspace-file").filter({ hasText: "Renamed.txt" });
+  await renamed.focus();
+  await page.keyboard.press("Shift+F10");
+  await page.getByRole("menuitem", { name: "删除文件", exact: true }).click();
+  const confirmation = page.locator('[aria-labelledby="workspace-entry-confirm-title"]');
+  await expect(confirmation.getByTestId("workspace-entry-confirm-cancel")).toBeFocused();
+  await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  await expect(confirmation.getByTestId("workspace-entry-confirm-cancel")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
+  await expect(renamed).toBeFocused();
   expect(await calls(page)).toEqual(["create_workspace_folder", "rename_workspace_entry"]);
 });
 

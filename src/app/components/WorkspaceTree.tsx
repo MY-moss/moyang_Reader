@@ -501,11 +501,21 @@ export function WorkspaceTreeView({
   useLayoutEffect(() => {
     const pendingFocusKey = pendingFocusKeyRef.current;
     if (!pendingFocusKey) return;
+    // A refresh can arrive after a menu or modal has taken focus. The tree's
+    // fallback is not a newer user decision and must not steal that ownership.
+    if (document.activeElement?.closest('[aria-modal="true"], .moyang-context-menu')) return;
     const button = treeItemRefs.current.get(pendingFocusKey);
     if (!button) return;
     pendingFocusKeyRef.current = null;
     button.focus();
   }, [rows, treeWindow]);
+
+  const handleRowFocus = (key: string) => {
+    // Explicit focus (including a modal's return target) supersedes an old
+    // fallback queued when the previously roving row was renamed or removed.
+    pendingFocusKeyRef.current = null;
+    setRovingRowKey(key);
+  };
 
   useEffect(() => {
     if (!clipboard) return;
@@ -660,6 +670,9 @@ export function WorkspaceTreeView({
       aria-label="工作区文件树"
       aria-orientation="vertical"
       tabIndex={-1}
+      onFocus={(event) => {
+        if (event.target === event.currentTarget) pendingFocusKeyRef.current = null;
+      }}
       onContextMenu={(event) => {
         if (!canManage || event.target !== event.currentTarget) return;
         event.preventDefault();
@@ -689,7 +702,7 @@ export function WorkspaceTreeView({
                 activePath={activePath}
                 depth={row.depth}
                 tabIndex={workspaceTreeRowKey(row) === rovingRowKey ? 0 : -1}
-                onFocus={() => setRovingRowKey(workspaceTreeRowKey(row))}
+                onFocus={() => handleRowFocus(workspaceTreeRowKey(row))}
                 onRef={(element) => {
                   const rowKey = workspaceTreeRowKey(row);
                   if (element) treeItemRefs.current.set(rowKey, element);
@@ -705,7 +718,7 @@ export function WorkspaceTreeView({
                 depth={row.depth}
                 isOpen={row.expanded}
                 tabIndex={workspaceTreeRowKey(row) === rovingRowKey ? 0 : -1}
-                onFocus={() => setRovingRowKey(workspaceTreeRowKey(row))}
+                onFocus={() => handleRowFocus(workspaceTreeRowKey(row))}
                 onRef={(element) => {
                   const rowKey = workspaceTreeRowKey(row);
                   if (element) treeItemRefs.current.set(rowKey, element);
