@@ -217,7 +217,15 @@ export function EditorInsertPopover({
     if (!open) return;
     const owner = scrollContainerRef?.current;
     const target: Document | HTMLElement = owner?.closest<HTMLElement>(".content-area") ?? owner ?? document;
-    const handleScroll = () => onCancel();
+    const viewport = target instanceof Document ? (target.scrollingElement ?? target.documentElement) : target;
+    const openedScrollTop = viewport.scrollTop;
+    const openedScrollLeft = viewport.scrollLeft;
+    const handleScroll = () => {
+      // Focus/layout may queue a scroll event before opening and deliver it
+      // afterwards. Dismiss only if the anchor viewport actually moved since
+      // this popover opened, not merely because that queued event arrived.
+      if (viewport.scrollTop !== openedScrollTop || viewport.scrollLeft !== openedScrollLeft) onCancel();
+    };
     const options: AddEventListenerOptions = { capture: target === document, passive: true };
     target.addEventListener("scroll", handleScroll, options);
     return () => target.removeEventListener("scroll", handleScroll, options);

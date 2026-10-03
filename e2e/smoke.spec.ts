@@ -218,6 +218,9 @@ test("keeps editor tools usable in compact, standard, and wide desktop windows",
         const clear = toolbar.getByRole("button", { name: "清除格式" });
         await expect(insert).toBeVisible();
         await expect(clear).toBeVisible();
+        await expect(insert).toBeEnabled();
+        await expect(clear).toBeEnabled();
+        if (mode === "visual") await expect(page.locator(".wysiwyg-editor")).toHaveAttribute("aria-busy", "false");
         const metrics = await page.evaluate(() => {
           const toolbar = document.querySelector<HTMLElement>(".editor-format-toolbar")!;
           const insert = toolbar.querySelector<HTMLElement>(".editor-toolbar-insert-button")!;

@@ -8,6 +8,7 @@ type EditorToolbarProps = {
   locale?: Locale;
   canUndo: boolean;
   canRedo: boolean;
+  disabled?: boolean;
   onAction: (action: EditorContextAction) => void;
   onInsert: (kind: EditorInsertKind) => void;
 };
@@ -35,7 +36,14 @@ const formatButtons: readonly {
   { action: "inline-code", labelKey: "inlineCode", shortLabel: "<>" },
 ];
 
-export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, onInsert }: EditorToolbarProps) {
+export function EditorToolbar({
+  locale = "zh-CN",
+  canUndo,
+  canRedo,
+  disabled = false,
+  onAction,
+  onInsert,
+}: EditorToolbarProps) {
   const t = (key: Parameters<typeof editorText>[1]) => editorText(locale, key);
   return (
     <div className="editor-format-toolbar" role="toolbar" aria-label={t("toolbar")}>
@@ -45,7 +53,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
           className="editor-toolbar-button editor-toolbar-button-icon"
           aria-label={t("undo")}
           title={`${t("undo")} (Ctrl+Z)`}
-          disabled={!canUndo}
+          disabled={disabled || !canUndo}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("undo")}
         >
@@ -56,7 +64,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
           className="editor-toolbar-button editor-toolbar-button-icon"
           aria-label={t("redo")}
           title={`${t("redo")} (Ctrl+Y)`}
-          disabled={!canRedo}
+          disabled={disabled || !canRedo}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("redo")}
         >
@@ -74,6 +82,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
             className="editor-toolbar-button editor-toolbar-format-button"
             aria-label={t(item.labelKey)}
             title={t(item.labelKey)}
+            disabled={disabled}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onAction(item.action)}
           >
@@ -85,6 +94,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
           className="editor-toolbar-button editor-toolbar-button-wide"
           aria-label={t("clear")}
           title={t("clear")}
+          disabled={disabled}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onAction("clear-format")}
         >
@@ -100,6 +110,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
           className="editor-toolbar-select"
           aria-label={t("paragraphStyle")}
           defaultValue=""
+          disabled={disabled}
           onChange={(event) => {
             const selected = paragraphOptions.find((item) => item.action === event.target.value);
             if (selected) onAction(selected.action);
@@ -124,6 +135,7 @@ export function EditorToolbar({ locale = "zh-CN", canUndo, canRedo, onAction, on
         className="editor-toolbar-button editor-toolbar-insert-button"
         aria-label={t("insert")}
         title={t("insertHint")}
+        disabled={disabled}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => onInsert("link")}
       >

@@ -583,7 +583,11 @@ export function App() {
   const [workspaceExportNotice, setWorkspaceExportNotice] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [fileDropState, setFileDropState] = useState<FileDropState>(idleFileDropState);
-  const [requestedInsertKind, setRequestedInsertKind] = useState<EditorInsertKind | null>(null);
+  const [pendingEditorInsert, setPendingEditorInsert] = useState<{
+    kind: EditorInsertKind;
+    path: string;
+    mode: ReaderMode;
+  } | null>(null);
   const [guideOpen, setGuideOpen] = useState(() => isTauriRuntime() && !hasSeenGettingStarted());
   const [copyFeedback, setCopyFeedback] = useState(false);
   const workspaceExportAbortRef = useRef<AbortController | null>(null);
@@ -2490,14 +2494,26 @@ export function App() {
         notify("请先进入编辑模式，再使用插入工具。", "info");
         return;
       }
-      setRequestedInsertKind(kind);
+      setPendingEditorInsert({ kind, path: currentDocument.path, mode });
     },
     [mode, notify],
   );
 
   const handleEditorInsertRequestHandled = useCallback(() => {
-    setRequestedInsertKind(null);
+    setPendingEditorInsert(null);
   }, []);
+
+  // Deferred insertions belong to the document and editing mode that requested
+  // them, not a replacement surface that happens to finish loading later.
+  const requestedInsertKind =
+    pendingEditorInsert?.path === documentState?.path && pendingEditorInsert?.mode === mode
+      ? pendingEditorInsert.kind
+      : null;
+  useEffect(() => {
+    setPendingEditorInsert((pending) =>
+      pending && (pending.path !== documentState?.path || pending.mode !== mode) ? null : pending,
+    );
+  }, [documentState?.path, mode]);
 
   // Keep the mode transition in one place so toolbar and keyboard shortcuts cannot drift apart.
   const toggleDocumentMode = useCallback(() => {

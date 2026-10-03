@@ -326,12 +326,13 @@ function MilkdownSurface({
   }, [documentKey]);
 
   const [mountFailed, setMountFailed] = useState(false);
+  const [viewReady, setViewReady] = useState(false);
+  const editorReady = !loading && !mountFailed && viewReady;
+  const editorPreparing = loading || (!viewReady && !mountFailed);
 
   useEffect(() => {
     if (loading || !containerRef.current) return;
     const editable = containerRef.current.querySelector<HTMLElement>('[contenteditable="true"]');
-    // Surface editor bootstrap failures instead of silently showing a blank area.
-    setMountFailed(!editable);
     editable?.setAttribute("aria-label", ariaLabel);
     editable?.setAttribute("aria-multiline", "true");
   }, [ariaLabel, loading]);
@@ -366,9 +367,9 @@ function MilkdownSurface({
   const openInsert = useCallback(
     (kind: EditorInsertKind) => {
       const view = viewRef.current;
-      if (!view) {
+      if (!editorReady || !view) {
         onStatusMessageRef.current?.(editorText(locale, "editorPreparing"));
-        return;
+        return false;
       }
 
       const { from, to } = view.state.selection;
@@ -398,8 +399,9 @@ function MilkdownSurface({
       setContextMenu(null);
       completionRef.current = null;
       setCompletion(null);
+      return true;
     },
-    [locale],
+    [editorReady, locale],
   );
 
   const closeInsert = useCallback(
@@ -492,17 +494,6 @@ function MilkdownSurface({
     [closeInsert, focusEditorPreservingViewport, locale],
   );
 
-  useEffect(() => {
-    if (!requestedInsertKind) {
-      lastRequestedInsertRef.current = null;
-      return;
-    }
-    if (lastRequestedInsertRef.current === requestedInsertKind) return;
-    lastRequestedInsertRef.current = requestedInsertKind;
-    openInsert(requestedInsertKind);
-    onInsertRequestHandled?.();
-  }, [onInsertRequestHandled, openInsert, requestedInsertKind]);
-
   const applyCompletionItem = useCallback((item: WikiLinkCandidate | SlashCommand) => {
     const view = viewRef.current;
     const current = completionRef.current;
@@ -582,7 +573,7 @@ function MilkdownSurface({
     (action: EditorContextAction) => {
       const editor = getRef.current();
       const view = viewRef.current;
-      if (!editor || !view) return;
+      if (!editorReady || !editor || !view) return;
 
       if (action === "undo" || action === "redo") {
         (action === "undo" ? onUndoRef.current : onRedoRef.current)?.(containerRef.current);
@@ -713,7 +704,7 @@ function MilkdownSurface({
       view.focus();
       setContextMenu(null);
     },
-    [contextMenu, locale, openInsert, pasteFromClipboard],
+    [contextMenu, editorReady, locale, openInsert, pasteFromClipboard],
   );
 
   const editorContextGroups = localizedEditorContextMenuGroups(locale).map((group) => ({
@@ -735,7 +726,11 @@ function MilkdownSurface({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (loading || !container) return;
+    if (loading || !container) {
+      setViewReady(false);
+      setMountFailed(false);
+      return;
+    }
 
     // The tracker instance is created once per component lifetime, so a local
     // copy inside the effect stays valid for the cleanup below.
@@ -747,6 +742,13 @@ function MilkdownSurface({
     // silently yields undefined, which disabled the whole completion overlay.
     viewRef.current = editor ? (editor.ctx.get(editorViewCtx) as unknown as EditorViewInstance) : null;
     serializerRef.current = editor ? (editor.ctx.get(serializerCtx) as unknown as SerializerInstance) : null;
+    // Do not advertise interactive tools until both the live view and editable
+    // surface exist; the library's loading flag alone does not cover this gap.
+    const ready = Boolean(
+      viewRef.current && serializerRef.current && container.querySelector('[contenteditable="true"]'),
+    );
+    setViewReady(ready);
+    setMountFailed(!ready);
     if (viewRef.current && serializerRef.current && lastSyncedMarkdownRef.current === null) {
       lastSyncedMarkdownRef.current = serializerRef.current(viewRef.current.state.doc);
     }
@@ -933,17 +935,32 @@ function MilkdownSurface({
         delete window.__moyangDesktopE2e.insertWysiwygText;
       }
       viewRef.current = null;
+      setViewReady(false);
     };
   }, [applyCompletionItem, focusEditorPreservingViewport, loading, locale]);
+
+  // Run after the view connection effect, including its locale-driven reconnect.
+  useEffect(() => {
+    if (!requestedInsertKind) {
+      lastRequestedInsertRef.current = null;
+      return;
+    }
+    if (lastRequestedInsertRef.current === requestedInsertKind || !editorReady) return;
+    // A loading=false render precedes the effect that installs the live view.
+    // Acknowledge only an insertion that actually opened against that view.
+    if (!openInsert(requestedInsertKind)) return;
+    lastRequestedInsertRef.current = requestedInsertKind;
+    onInsertRequestHandled?.();
+  }, [editorReady, onInsertRequestHandled, openInsert, requestedInsertKind]);
 
   return (
     <div
       ref={containerRef}
-      className={`wysiwyg-editor${loading ? " is-loading" : ""}`}
-      aria-busy={loading}
+      className={`wysiwyg-editor${editorPreparing ? " is-loading" : ""}`}
+      aria-busy={editorPreparing}
       tabIndex={-1}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
-        if (loading || mountFailed) return;
+        if (!editorReady) return;
         event.preventDefault();
         completionRef.current = null;
         setCompletion(null);
@@ -957,7 +974,7 @@ function MilkdownSurface({
       }}
       onKeyDown={(event) => {
         if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
-          if (loading || mountFailed) return;
+          if (!editorReady) return;
           event.preventDefault();
           const rect = event.currentTarget.getBoundingClientRect();
           completionRef.current = null;
@@ -972,11 +989,12 @@ function MilkdownSurface({
           return;
         }
         if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
+        if (!editorReady) return;
         event.preventDefault();
         openInsert("link");
       }}
     >
-      {loading && <div className="wysiwyg-loading">{editorText(locale, "wysiwygLoading")}</div>}
+      {editorPreparing && <div className="wysiwyg-loading">{editorText(locale, "wysiwygLoading")}</div>}
       {mountFailed && (
         <div className="wysiwyg-error" role="alert">
           {editorText(locale, "wysiwygError")}
@@ -986,6 +1004,7 @@ function MilkdownSurface({
         locale={locale}
         canUndo={canUndo}
         canRedo={canRedo}
+        disabled={!editorReady}
         onAction={applyContextAction}
         onInsert={openInsert}
       />

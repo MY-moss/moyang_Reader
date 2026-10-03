@@ -1,8 +1,11 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditorInsertPopover } from "./EditorInsertPopover";
+
+beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
+afterEach(() => vi.unstubAllGlobals());
 
 function renderPopover(overrides: Record<string, unknown> = {}): {
   container: HTMLDivElement;
@@ -31,6 +34,30 @@ function cleanup(container: HTMLDivElement, root: ReturnType<typeof createRoot>)
 }
 
 describe("EditorInsertPopover", () => {
+  it("ignores a queued owner scroll without displacement, but cancels after the viewport really moves", () => {
+    const owner = document.createElement("main");
+    owner.className = "content-area";
+    document.body.appendChild(owner);
+    const onCancel = vi.fn();
+    const { container, root } = renderPopover({ onCancel, scrollContainerRef: { current: owner } });
+    try {
+      act(() => {
+        owner.dispatchEvent(new Event("scroll"));
+      });
+      expect
+        .soft(onCancel, "A queued pre-open scroll must not dismiss the newly mounted popover")
+        .not.toHaveBeenCalled();
+      owner.scrollTop = 20;
+      act(() => {
+        owner.dispatchEvent(new Event("scroll"));
+      });
+      expect(onCancel).toHaveBeenCalledOnce();
+    } finally {
+      cleanup(container, root);
+      owner.remove();
+    }
+  });
+
   it("uses roving tab focus and ArrowRight to move between insert kinds", () => {
     const { container, root } = renderPopover();
     const tabs = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
