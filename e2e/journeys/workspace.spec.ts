@@ -202,45 +202,88 @@ test("opens multiple browser-selected documents as tabs", async ({ page }) => {
   await expect(page.getByRole("button", { name: "second-note.md", exact: true })).toBeVisible();
 });
 
-test("returns to previously selected documents with the navigation history shortcut", async ({ page }) => {
-  await page.goto("/");
+for (const heldFile of [null, "history-first.md", "history-third.md"]) {
+  test(`returns to previously selected documents with the navigation history shortcut${heldFile ? ` (held ${heldFile})` : ""}`, async ({
+    page,
+  }) => {
+    if (heldFile)
+      await page.addInitScript((fileName) => {
+        const readText = File.prototype.text;
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const runtime = window as unknown as { __moyangHistoryRead: { held: boolean; release: () => void } };
+        runtime.__moyangHistoryRead = { held: false, release };
+        File.prototype.text = async function () {
+          if (this.name === fileName) {
+            runtime.__moyangHistoryRead.held = true;
+            await gate;
+          }
+          return readText.call(this);
+        };
+      }, heldFile);
+    await page.goto("/");
 
-  await page.locator('input[type="file"]').setInputFiles([
-    {
-      name: "history-first.md",
-      mimeType: "text/markdown",
-      buffer: Buffer.from("# History first"),
-    },
-    {
-      name: "history-second.md",
-      mimeType: "text/markdown",
-      buffer: Buffer.from("# History second"),
-    },
-    {
-      name: "history-third.md",
-      mimeType: "text/markdown",
-      buffer: Buffer.from("# History third"),
-    },
-  ]);
+    await page.locator('input[type="file"]').setInputFiles([
+      {
+        name: "history-first.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# History first"),
+      },
+      {
+        name: "history-second.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# History second"),
+      },
+      {
+        name: "history-third.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# History third"),
+      },
+    ]);
 
-  await switchToRenderedMode(page);
-  const tabs = page.getByRole("button", { name: /history-(?:first|second|third)\.md/ });
-  await tabs.filter({ hasText: "history-first.md" }).click();
-  await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
-  await tabs.filter({ hasText: "history-second.md" }).click();
-  await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
-  await tabs.filter({ hasText: "history-third.md" }).click();
-  await expect(page.getByRole("heading", { name: "History third" })).toBeVisible();
+    if (heldFile) {
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => (window as unknown as { __moyangHistoryRead: { held: boolean } }).__moyangHistoryRead.held,
+          ),
+        )
+        .toBe(true);
+      if (heldFile === "history-third.md") {
+        await expect(page.locator(".tab-item.active .tab-label")).toHaveText("history-second.md");
+        await expect(page.locator(".tab-item")).toHaveCount(2);
+      } else {
+        await expect(page.locator(".tab-item")).toHaveCount(0);
+      }
+      await page.evaluate(() => {
+        (window as unknown as { __moyangHistoryRead: { release: () => void } }).__moyangHistoryRead.release();
+      });
+    }
+    // Each file open can reset the mode. Do not cycle a middle document while
+    // the batch is still being submitted; wait for its actual final tab commit.
+    await expect(page.locator(".tab-item.active .tab-label")).toHaveText("history-third.md");
+    await expect(page.locator(".tab-item")).toHaveCount(3);
+    await switchToRenderedMode(page);
+    const tabs = page.getByRole("button", { name: /history-(?:first|second|third)\.md/ });
+    await tabs.filter({ hasText: "history-first.md" }).click();
+    await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
+    await tabs.filter({ hasText: "history-second.md" }).click();
+    await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
+    await tabs.filter({ hasText: "history-third.md" }).click();
+    await expect(page.getByRole("heading", { name: "History third" })).toBeVisible();
 
-  await page.keyboard.press("Control+Alt+ArrowLeft");
-  await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
+    await page.keyboard.press("Control+Alt+ArrowLeft");
+    await expect(page.getByRole("heading", { name: "History second" })).toBeVisible();
 
-  await page.keyboard.press("Control+Shift+P");
-  const backCommand = page.getByRole("option", { name: /返回上一文档/ });
-  await expect(backCommand).toBeEnabled();
-  await backCommand.click();
-  await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
-});
+    await page.keyboard.press("Control+Shift+P");
+    const backCommand = page.getByRole("option", { name: /返回上一文档/ });
+    await expect(backCommand).toBeEnabled();
+    await backCommand.click();
+    await expect(page.getByRole("heading", { name: "History first" })).toBeVisible();
+  });
+}
 
 test("keeps same-named browser documents in separate tabs", async ({ page }) => {
   await page.goto("/");
