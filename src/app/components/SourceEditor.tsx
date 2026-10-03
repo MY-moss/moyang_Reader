@@ -265,7 +265,7 @@ export function SourceEditor({
       const textarea = fallbackRef.current;
       if (!view && !textarea) {
         onStatusMessageRef.current?.(editorText(locale, "editorPreparing"));
-        return;
+        return false;
       }
       const selection = readCurrentSelection();
       let anchor: EditorInsertAnchor | null = null;
@@ -295,6 +295,7 @@ export function SourceEditor({
       setInsertAnchor(anchor);
       setInsertOpen(true);
       setContextMenu(null);
+      return true;
     },
     [locale, readCurrentSelection],
   );
@@ -362,10 +363,11 @@ export function SourceEditor({
       return;
     }
     if (lastRequestedInsertRef.current === requestedInsertKind) return;
+    if (!ready && !loadFailed) return;
+    if (!openInsert(requestedInsertKind)) return;
     lastRequestedInsertRef.current = requestedInsertKind;
-    openInsert(requestedInsertKind);
     onInsertRequestHandled?.();
-  }, [onInsertRequestHandled, openInsert, requestedInsertKind]);
+  }, [loadFailed, onInsertRequestHandled, openInsert, ready, requestedInsertKind]);
 
   const applyContextAction = (action: EditorContextAction) => {
     const target = contextMenu;
@@ -764,6 +766,7 @@ export function SourceEditor({
         locale={locale}
         canUndo={canUndo}
         canRedo={canRedo}
+        disabled={!ready}
         onAction={applyContextAction}
         onInsert={openInsert}
       />

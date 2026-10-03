@@ -1,10 +1,41 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditorToolbar } from "./EditorToolbar";
 
+beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
+afterEach(() => vi.unstubAllGlobals());
+
 describe("EditorToolbar", () => {
+  it("disables every editing control until the caller is ready, then preserves history availability", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const onAction = vi.fn();
+    const onInsert = vi.fn();
+    try {
+      act(() => root.render(<EditorToolbar disabled canUndo canRedo onAction={onAction} onInsert={onInsert} />));
+      const controls = container.querySelectorAll<HTMLButtonElement | HTMLSelectElement>("button, select");
+      expect(controls.length).toBeGreaterThan(0);
+      for (const control of controls) {
+        expect(control.disabled, control.getAttribute("aria-label") ?? "control").toBe(true);
+        if (control instanceof HTMLButtonElement) act(() => control.click());
+      }
+      expect(onAction).not.toHaveBeenCalled();
+      expect(onInsert).not.toHaveBeenCalled();
+
+      act(() => root.render(<EditorToolbar canUndo={false} canRedo onAction={onAction} onInsert={onInsert} />));
+      expect(container.querySelector<HTMLButtonElement>('button[aria-label="撤销"]')!.disabled).toBe(true);
+      expect(container.querySelector<HTMLButtonElement>('button[aria-label="重做"]')!.disabled).toBe(false);
+      expect(container.querySelector<HTMLButtonElement>('button[aria-label="插入"]')!.disabled).toBe(false);
+      expect(container.querySelector<HTMLSelectElement>("select")!.disabled).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
+  });
+
   it("uses accessible icon controls for undo and redo", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);

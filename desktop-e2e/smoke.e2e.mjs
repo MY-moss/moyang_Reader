@@ -49,6 +49,44 @@ async function ensureRenderedMode() {
   await browser.$(".reader-content").waitForDisplayed();
 }
 
+async function checkDesktopInsertPopover() {
+  const insert = await browser.$('.editor-format-toolbar button[aria-label="插入"]');
+  await insert.waitForDisplayed();
+  await browser.waitUntil(() => insert.isEnabled(), {
+    timeout: 15_000,
+    timeoutMsg: "the desktop editor insert tool did not become ready",
+  });
+  const before = await browser.execute(() => {
+    const insert = document.querySelector('.editor-format-toolbar button[aria-label="插入"]');
+    const bounds = insert.getBoundingClientRect();
+    return {
+      busy: document.querySelector(".code-mirror-editor, .wysiwyg-editor")?.getAttribute("aria-busy"),
+      hitClass: document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)?.className,
+      menuOpen: document.querySelector("details.toolbar-overflow")?.open,
+    };
+  });
+  await insert.click();
+  const dialog = await browser.$('.editor-insert-popover[role="dialog"]');
+  try {
+    await dialog.waitForDisplayed();
+  } catch (cause) {
+    const after = await browser.execute(() => ({
+      busy: document.querySelector(".code-mirror-editor, .wysiwyg-editor")?.getAttribute("aria-busy"),
+      active: document.activeElement?.tagName,
+      dialogCount: document.querySelectorAll('[role="dialog"]').length,
+      menuOpen: document.querySelector("details.toolbar-overflow")?.open,
+    }));
+    throw new Error(`${cause.message}; insert readiness: ${JSON.stringify({ before, after })}`, { cause });
+  }
+  assert.match(await dialog.getText(), /插入内容/);
+  assert.equal((await dialog.$$('[role="tab"]')).length, 4);
+  await dialog.$(".editor-insert-cancel").click();
+  await browser.waitUntil(() => dialog.isExisting().then((exists) => !exists), {
+    timeout: 5_000,
+    timeoutMsg: "the desktop insertion dialog did not close after cancellation",
+  });
+}
+
 async function clickWorkspaceExportAction(name) {
   const menu = await browser.$("details.workspace-manage-menu");
   if ((await menu.getAttribute("open")) === null) {
@@ -1457,6 +1495,14 @@ describe("Moyang Reader desktop runtime", () => {
   });
 
   it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
+    // Session resets intentionally clear onboarding storage. Dismiss the real
+    // guide before checking pointer actions, rather than clicking through it.
+    const closeGuide = await browser.$('button[aria-label="关闭使用教程"]');
+    if (await closeGuide.isExisting()) await closeGuide.click();
+    await browser.waitUntil(() => closeGuide.isExisting().then((exists) => !exists), {
+      timeout: 5_000,
+      timeoutMsg: "the first-use guide still covers the desktop editor controls",
+    });
     await waitForWorkspaceEntry(
       ".workspace-file",
       "wiki-target.md",
@@ -1464,6 +1510,7 @@ describe("Moyang Reader desktop runtime", () => {
       "the desktop wiki-link fixture was not indexed in the workspace",
     );
     const editable = await ensureWysiwygMode();
+    await checkDesktopInsertPopover();
     await editable.click();
     await browser.execute((text) => {
       const insert = window.__moyangDesktopE2e?.insertWysiwygText;
@@ -1499,6 +1546,7 @@ describe("Moyang Reader desktop runtime", () => {
     await clickToolbarAction("源文本");
     const editor = await browser.$('[aria-label="Markdown 源文本"]');
     await editor.waitForDisplayed();
+    await checkDesktopInsertPopover();
     await browser.waitUntil(
       () => editor.getText().then((text) => text.includes("[[wiki-target]]") || text.includes("\\[\\[wiki-target]]")),
       {
