@@ -63,6 +63,7 @@ async function checkDesktopInsertPopover() {
       busy: document.querySelector(".code-mirror-editor, .wysiwyg-editor")?.getAttribute("aria-busy"),
       hitClass: document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)?.className,
       menuOpen: document.querySelector("details.toolbar-overflow")?.open,
+      scrollTop: document.querySelector(".content-area")?.scrollTop,
     };
   });
   await insert.click();
