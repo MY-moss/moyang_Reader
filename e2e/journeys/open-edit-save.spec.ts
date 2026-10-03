@@ -1021,85 +1021,126 @@ test("keeps keyboard context menus contained and returns focus across tabs, read
   await expect(editable).toBeFocused();
 });
 
-test("serializes equivalent markdown styles to canonical forms", async ({ page }) => {
-  // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
-  // one canonical form. This test pins the exact output so a Milkdown/remark
-  // upgrade that changes the canonicalization fails loudly here instead of
-  // surfacing as mysterious diff noise in user files. Update
-  // docs/decisions/0004-serialization-normalization.md together with this
-  // expectation.
-  const corpus = [
-    "标题一",
-    "=====",
-    "",
-    "Setext 二级",
-    "-----------",
-    "",
-    "- 一级列表",
-    "  - 嵌套列表",
-    "",
-    "---",
-    "",
-    "|窄|表|",
-    "|---|---|",
-    "|A|B|",
-    "",
-    "普通 [[双链]] 与 [[别名|目标]]。",
-    "",
-    "> 引用一",
-    ">> 嵌套引用",
-    "",
-    "见 [引用文字][ref]。",
-    "",
-    "[ref]: https://example.com",
-  ].join("\n");
+for (const initialSelection of ["ordinary", "rule-node"] as const) {
+  test(`serializes equivalent markdown styles to canonical forms (${initialSelection})`, async ({ page }) => {
+    // Issue #157: the WYSIWYG serializer rewrites several equivalent styles to
+    // one canonical form. This test pins the exact output so a Milkdown/remark
+    // upgrade that changes the canonicalization fails loudly here instead of
+    // surfacing as mysterious diff noise in user files. Update
+    // docs/decisions/0004-serialization-normalization.md together with this
+    // expectation.
+    const corpus = [
+      "标题一",
+      "=====",
+      "",
+      "Setext 二级",
+      "-----------",
+      "",
+      "- 一级列表",
+      "  - 嵌套列表",
+      "",
+      "---",
+      "",
+      "|窄|表|",
+      "|---|---|",
+      "|A|B|",
+      "",
+      "普通 [[双链]] 与 [[别名|目标]]。",
+      "",
+      "> 引用一",
+      ">> 嵌套引用",
+      "",
+      "见 [引用文字][ref]。",
+      "",
+      "[ref]: https://example.com",
+    ].join("\n");
 
-  await page.goto("/");
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "serialization-normalization.md",
-    mimeType: "text/markdown",
-    buffer: Buffer.from(corpus),
+    await page.setViewportSize({ width: initialSelection === "rule-node" ? 720 : 1240, height: 600 });
+    await page.goto("/");
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "serialization-normalization.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(corpus),
+    });
+
+    await expect(page.locator(".wysiwyg-editor")).toBeVisible();
+    const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
+    await expect(editable).toBeVisible({ timeout: 15_000 });
+
+    // Issue #557: a generic block click can select a non-text node. Typing
+    // space then Backspace there is not a net-zero edit (e.g. hr becomes p).
+    // Seed that selection in the compact case, then explicitly edit ordinary
+    // text in both cases. Do not weaken the exact canonical output below.
+    if (initialSelection === "rule-node") {
+      await page.getByRole("button", { name: "隐藏上下文面板", exact: true }).click();
+      await expect(page.locator(".context-panel-backdrop")).toHaveCount(0);
+      await editable.locator("hr").click();
+      await expect(editable.locator("hr")).toHaveClass(/ProseMirror-selectednode/);
+    }
+    const paragraphText = "普通 [[双链]] 与 [[别名|目标]]。";
+    const paragraph = editable.locator("p", { hasText: paragraphText });
+    await expect(paragraph).toHaveText(paragraphText);
+    await paragraph.click();
+    await paragraph.evaluate((element) => {
+      const text = element.firstChild;
+      if (!(text instanceof Text)) throw new Error("Expected ordinary paragraph text");
+      window.getSelection()?.collapse(text, text.length);
+    });
+    await expect
+      .poll(() =>
+        paragraph.evaluate((element) => {
+          const selection = window.getSelection();
+          return Boolean(
+            selection?.isCollapsed &&
+            selection.anchorNode === element.firstChild &&
+            selection.anchorOffset === element.textContent?.length,
+          );
+        }),
+      )
+      .toBe(true);
+    const summary = page.locator(".statusbar-kind");
+    await expect(summary).toHaveText(/^\d+ 字符$/);
+    const characterCount = Number((await summary.innerText()).split(" ")[0]);
+    await page.keyboard.type("x");
+    await expect(paragraph).toHaveText(`${paragraphText}x`);
+    // StatusBar is driven by the app's rendered source, not the editable DOM:
+    // these two transitions observe serialization and render completion.
+    await expect(summary).toHaveText(`${characterCount + 1} 字符`);
+    await page.keyboard.press("Backspace");
+    await expect(paragraph).toHaveText(paragraphText);
+    await expect(editable.locator("h1")).toHaveText("标题一");
+    await expect(summary).toHaveText(`${characterCount} 字符`);
+
+    await clickToolbarAction(page, "源文本");
+
+    const expected = [
+      "# 标题一",
+      "",
+      "## Setext 二级",
+      "",
+      "* 一级列表",
+      "  * 嵌套列表",
+      "",
+      "***",
+      "",
+      "| 窄 | 表 |",
+      "| - | - |",
+      "| A | B |",
+      "",
+      "普通 \\[\\[双链]] 与 \\[\\[别名|目标]]。",
+      "",
+      "> 引用一",
+      ">",
+      "> > 嵌套引用",
+      "",
+      "见 [引用文字](https://example.com)。",
+      "",
+    ].join("\n");
+
+    const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
+    await expect.poll(() => readEditorText(editor), { timeout: 10_000 }).toBe(expected);
   });
-
-  await expect(page.locator(".wysiwyg-editor")).toBeVisible();
-  const editable = page.locator('.wysiwyg-editor [contenteditable="true"]');
-  await expect(editable).toBeVisible({ timeout: 15_000 });
-
-  // Net-zero edit so the editor serializes the document itself.
-  await editable.click();
-  await page.keyboard.type(" ");
-  await page.keyboard.press("Backspace");
-  await page.waitForTimeout(300);
-
-  await clickToolbarAction(page, "源文本");
-
-  const expected = [
-    "# 标题一",
-    "",
-    "## Setext 二级",
-    "",
-    "* 一级列表",
-    "  * 嵌套列表",
-    "",
-    "***",
-    "",
-    "| 窄 | 表 |",
-    "| - | - |",
-    "| A | B |",
-    "",
-    "普通 \\[\\[双链]] 与 \\[\\[别名|目标]]。",
-    "",
-    "> 引用一",
-    ">",
-    "> > 嵌套引用",
-    "",
-    "见 [引用文字](https://example.com)。",
-    "",
-  ].join("\n");
-
-  const editor = page.getByRole("textbox", { name: "Markdown 源文本" });
-  await expect.poll(() => readEditorText(editor), { timeout: 10_000 }).toBe(expected);
-});
+}
 
 test("downgrades a heading one level per Backspace at its start", async ({ page }) => {
   // Issue #156 investigation: Milkdown's heading keymap binds Backspace/Delete at
