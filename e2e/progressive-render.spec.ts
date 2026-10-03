@@ -58,23 +58,27 @@ test("loads KaTeX styles only when a formula is rendered", async ({ page }) => {
 
 test("mounts large reader content incrementally and eventually exposes every heading", async ({ page }) => {
   await page.addInitScript(() => {
-    const scheduledFrames = new Map<number, ReturnType<typeof setTimeout>>();
+    const scheduledFrames = new Map<number, FrameRequestCallback>();
     let nextFrame = 0;
     window.requestAnimationFrame = (callback: FrameRequestCallback) => {
       const frame = ++nextFrame;
-      scheduledFrames.set(
-        frame,
-        setTimeout(() => {
-          scheduledFrames.delete(frame);
-          callback(performance.now());
-        }, 50),
-      );
+      scheduledFrames.set(frame, callback);
       return frame;
     };
     window.cancelAnimationFrame = (frame) => {
-      const timer = scheduledFrames.get(frame);
-      if (timer !== undefined) clearTimeout(timer);
       scheduledFrames.delete(frame);
+    };
+    (window as unknown as { __moyangReaderFrames: { advance: () => void } }).__moyangReaderFrames = {
+      advance: () => {
+        // Callbacks scheduled by this batch belong to the next frame. Keep
+        // cancellation semantics when an earlier callback cancels a later one.
+        const frames = Array.from(scheduledFrames.keys());
+        for (const frame of frames) {
+          const callback = scheduledFrames.get(frame);
+          scheduledFrames.delete(frame);
+          callback?.(performance.now());
+        }
+      },
     };
   });
   await page.goto("/");
@@ -91,11 +95,40 @@ test("mounts large reader content incrementally and eventually exposes every hea
 
   const reader = page.locator('[data-progressive-reader="true"]');
   await expect(reader).toHaveAttribute("data-progressive-reader-ready", "false");
-  const mountedCount = Number(await reader.getAttribute("data-progressive-reader-mounted"));
-  const totalCount = Number(await reader.getAttribute("data-progressive-reader-total"));
-  expect(mountedCount).toBeGreaterThan(0);
-  expect(mountedCount).toBeLessThan(totalCount);
-  expect(totalCount).toBeGreaterThan(5);
+  const snapshot = () =>
+    reader.evaluate((element) => ({
+      ready: element.getAttribute("data-progressive-reader-ready"),
+      mounted: Number(element.getAttribute("data-progressive-reader-mounted")),
+      total: Number(element.getAttribute("data-progressive-reader-total")),
+      chunks: element.querySelectorAll(".progressive-reader-chunk").length,
+      headings: element.querySelectorAll("h2").length,
+    }));
+
+  // Timed rAF delays cannot protect separate ready/mounted/total reads from
+  // observing different renders. Hold frames and inspect one DOM snapshot.
+  const initial = await snapshot();
+  expect(initial.ready).toBe("false");
+  expect(initial.mounted).toBe(1);
+  expect(initial.mounted).toBeLessThan(initial.total);
+  expect(initial.total).toBeGreaterThan(5);
+  expect(initial.chunks).toBe(initial.mounted);
+  expect(initial.headings).toBeGreaterThan(0);
+  expect(initial.headings).toBeLessThan(120);
+
+  let previousHeadings = initial.headings;
+  for (let mounted = 2; mounted <= initial.total; mounted += 1) {
+    await page.evaluate(() => {
+      (window as unknown as { __moyangReaderFrames: { advance: () => void } }).__moyangReaderFrames.advance();
+    });
+    await expect(reader).toHaveAttribute("data-progressive-reader-mounted", String(mounted));
+    const current = await snapshot();
+    expect(current.mounted).toBe(mounted);
+    expect(current.chunks).toBe(mounted);
+    expect(current.total).toBe(initial.total);
+    expect(current.ready).toBe(mounted === initial.total ? "true" : "false");
+    expect(current.headings).toBeGreaterThan(previousHeadings);
+    previousHeadings = current.headings;
+  }
 
   await expect(reader).toHaveAttribute("data-progressive-reader-ready", "true", { timeout: 8_000 });
   await expect(page.locator(".reader-content h2")).toHaveCount(120);
