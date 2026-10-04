@@ -71,6 +71,7 @@
   --chrome-topbar-surface: rgba(255, 250, 241, 0.95);
   --chrome-sidebar-surface: #eee4d6;
   --chrome-statusbar-surface: #e8ddcf;
+  --statusbar-foreground: var(--muted-strong);
   --page-background: #f2ebdf;
   --shadow-primary: 0 6px 16px rgba(151, 81, 111, 0.2);
 }
