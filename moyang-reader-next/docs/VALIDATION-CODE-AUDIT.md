@@ -53,7 +53,7 @@
 | 400 KB / 323  | 450 ms    | 13.9 ms |
 | 1.6 MB / 1292 | 6608.3 ms | 26.9 ms |
 
-这是消除重复正文读取的单次对比，不是完整应用或真实嵌入模型的响应时间承诺。原始数据在本机 `.local/backend-review/semantic-performance.json`。真实中文模型的召回质量沿用单独评测报告；发布烟测继续调用随包模型验证。
+这是消除重复正文读取的单次对比，不是完整应用或真实嵌入模型的响应时间承诺。原始数据在本机 `.local/backend-review/semantic-performance.json`。优化后另用本机 qwen3-embedding:0.6b 复测现有 80 条中文用例，80/80 通过，中位 188 ms、P95 271 ms，复用已有索引。这是相同调优集的回归复测，不是独立盲测；完整分类结果保存在本机 artifacts/ai-evaluation/results.json。发布烟测也实际调用随包模型验证。
 
 ## 依赖检查
 
@@ -69,7 +69,7 @@
 
 新目录 CI 单独安装依赖并验证格式、架构、单元、MCP、浏览器与桌面；桌面/浏览器构建顺序执行。源码同步不触发旧 Release 渠道，不上传可执行包、模型、数据库、客户端配置备份或原始测试数据。
 
-已推送源码提交 `52b26fe`，远端文件树与本地逐项校验一致；候选版 PR：[GitHub #568](https://github.com/MY-moss/moyang_Reader/pull/568)。直接 Git 连接中断后，使用 GitHub 官方 Git API 同步，保留同一提交 SHA。云端检查已触发，最终结果以该 PR 的实际记录为准。
+已推送源码提交 `52b26fe`，远端文件树与本地逐项校验一致；候选版 PR：[GitHub #568](https://github.com/MY-moss/moyang_Reader/pull/568)。直接 Git 连接中断后，使用 GitHub 官方 Git API 同步，保留同一提交 SHA。新工程云端检查已触发，最终结果以该 PR 的实际记录为准。旧工程 Frontend dependency audit 检查未改动的根目录依赖，发现 13 项原有告警（含 3 high）；本 PR 新工程的锁文件已完成兼容更新，结果为 0 high/critical、3 moderate。未修改旧锁文件、降低审计阈值或跳过旧工程检查。
 
 ## 仍受外部条件限制
 
