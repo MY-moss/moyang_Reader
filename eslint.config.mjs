@@ -5,6 +5,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   {
     ignores: [
+      "moyang-reader-next/**", // Independent refactor uses its own lint and CI.
       "coverage/**",
       "dist/**",
       "node_modules/**",

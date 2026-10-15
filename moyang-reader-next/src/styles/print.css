@@ -1,0 +1,139 @@
+@media print {
+  @page {
+    size: auto;
+    margin: 18mm 16mm 20mm;
+  }
+  body {
+    min-width: 0;
+    background: white;
+  }
+  .app-shell {
+    display: block;
+  }
+  .topbar,
+  .navigation-strip,
+  .tab-strip,
+  .sidebar,
+  .pane-resize-handle,
+  .context-sidebar,
+  .statusbar,
+  .graph-backdrop,
+  .command-palette-backdrop,
+  .print-preview-backdrop,
+  .focus-exit {
+    display: none !important;
+  }
+  .content-area {
+    overflow: visible;
+    background: white;
+  }
+  .reader-content {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: white;
+    box-shadow: none;
+  }
+  .reader-content::before,
+  .reader-meta {
+    display: none;
+  }
+  .progressive-reader-chunk {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
+  }
+  .pdf-preview {
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+  }
+  .pdf-toolbar,
+  .pdf-frame {
+    display: none;
+  }
+  .image-preview {
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+  }
+  .image-toolbar,
+  .image-canvas {
+    display: none;
+  }
+  .markdown-body {
+    color: black;
+    font-size: 11pt;
+    line-height: 1.65;
+  }
+  .print-document-header {
+    display: block;
+    margin: 0 0 24pt;
+    padding: 0 0 12pt;
+    border-bottom: 1px solid #c9c9c9;
+    break-after: avoid;
+  }
+  .print-document-kicker {
+    display: block;
+    margin-bottom: 6pt;
+    color: #666;
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.12em;
+  }
+  .print-document-title {
+    color: black;
+    font-family: Georgia, "Songti SC", "STSong", serif;
+    font-size: 24pt;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .markdown-body pre.plain-text {
+    padding: 0;
+    color: black;
+    font-size: 10pt;
+  }
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    break-after: avoid;
+  }
+  .markdown-body p,
+  .markdown-body li {
+    orphans: 3;
+    widows: 3;
+  }
+  .markdown-body pre,
+  .markdown-body table,
+  .markdown-body img {
+    break-inside: avoid;
+  }
+  .markdown-body pre {
+    overflow: visible;
+    border: 1px solid #d0d0d0;
+    background: #f5f5f5;
+    color: #1f1f1f;
+    box-shadow: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .markdown-body blockquote {
+    background: #f6f6f6;
+    color: #444;
+  }
+  .markdown-body a {
+    color: black;
+  }
+  .source-editor {
+    display: none;
+  }
+  .wysiwyg-editor {
+    display: none;
+  }
+}

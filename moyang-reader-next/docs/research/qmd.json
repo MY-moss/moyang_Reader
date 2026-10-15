@@ -1,0 +1,13 @@
+{
+  "repo": "tobi/qmd",
+  "commit": "86d2365d17fc682e491c2c53d1e4a884aee8682a",
+  "candidateFiles": [
+    "LICENSE",
+    "test/eval-deep-research.jsonl",
+    "test/eval-deep-research.ts",
+    "test/mcp-stdio-lifecycle.test.ts",
+    "test/metadata-search.test.ts",
+    "test/structured-search.test.ts",
+    "tools/oxlint/anti-slop/LICENSE"
+  ]
+}

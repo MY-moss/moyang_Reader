@@ -1,0 +1,99 @@
+import type { ReadingFont, EditorFont, ExportTemplate } from "../../features/settings/appearance";
+import type { SettingsPersistenceStatus } from "../../features/settings/app-settings";
+import { type Locale } from "../../features/settings/i18n";
+import type { UpdateStatus } from "../../platform/updater";
+import type {
+  DocumentKind,
+  ExportMargin,
+  ExportOrientation,
+  ExportPaper,
+  ReaderMode,
+  ReadingWidth,
+  ThemeMode,
+} from "../../shared/types";
+export type TopBarProps = {
+  navigation?: import("react").ReactNode;
+  settingsOpen?: boolean;
+  onSettingsClose?: () => void;
+  fileName: string | null;
+  mode: ReaderMode;
+  documentKind: DocumentKind | null;
+  canEdit: boolean;
+  modified: boolean;
+  externallyModified: boolean;
+  onShowExternalChange: () => void;
+  searchOpen: boolean;
+  searchQuery: string;
+  searchResultCount: number;
+  searchResultIndex: number;
+  theme: ThemeMode;
+  locale: Locale;
+  readingZoom: number;
+  readingWidth: ReadingWidth;
+  readingFont: ReadingFont;
+  editorFont: EditorFont;
+  exportTemplate: ExportTemplate;
+  onReadingFontChange: (font: ReadingFont) => void;
+  onEditorFontChange: (font: EditorFont) => void;
+  onExportTemplateChange: (template: ExportTemplate) => void;
+  exportPaper: ExportPaper;
+  exportOrientation: ExportOrientation;
+  exportMargin: ExportMargin;
+  onReadingZoomChange: (zoom: number) => void;
+  onReadingWidthChange: (width: ReadingWidth) => void;
+  onExportPaperChange: (paper: ExportPaper) => void;
+  onExportOrientationChange: (orientation: ExportOrientation) => void;
+  onExportMarginChange: (margin: ExportMargin) => void;
+  onOpen: () => void;
+  onAddWorkspace: () => void;
+  onQuickOpen: () => void;
+  workspaceOpen: boolean;
+  workspaceLimitReached: boolean;
+  draftCount: number;
+  onOpenRecovery: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  focusMode: boolean;
+  onToggleFocusMode: () => void;
+  onToggleMode: () => void;
+  onCycleMode: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  rightPanelOpen: boolean;
+  onToggleRightPanel: () => void;
+  onOpenCommandPalette: () => void;
+  onSave: () => void;
+  onCopy: () => void;
+  copyFeedback: boolean;
+  canCopy: boolean;
+  onExport: () => void;
+  exportLabel?: string;
+  canPreviewPrint: boolean;
+  onPreviewPrint: () => void;
+  canExportMarkdown: boolean;
+  canExportHtml: boolean;
+  canExportDocx: boolean;
+  onExportMarkdown: () => void;
+  onExportHtml: () => void;
+  onExportDocx: () => void;
+  updateStatus: UpdateStatus;
+  updateVersion: string | null;
+  onCheckUpdates: () => void;
+  allowRemoteResources: boolean;
+  startupUpdateCheck: boolean;
+  onAllowRemoteResourcesChange: (allowed: boolean) => void;
+  onStartupUpdateCheckChange: (enabled: boolean) => void;
+  onExportSettings: () => void;
+  onImportSettings: () => void;
+  onOpenGuide: () => void;
+  settingsPersistenceStatus: SettingsPersistenceStatus;
+  onToggleSearch: () => void;
+  onSearchQueryChange: (query: string) => void;
+  onSearchPrevious: () => void;
+  onSearchNext: () => void;
+  onCloseSearch: () => void;
+  onCycleTheme: () => void;
+  onLocaleChange: (locale: Locale) => void;
+};

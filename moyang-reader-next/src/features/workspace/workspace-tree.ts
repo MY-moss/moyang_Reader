@@ -1,0 +1,78 @@
+import { normalizePathKey } from "../../platform/path-key";
+import type { WorkspaceDirectory, WorkspaceFile } from "../../shared/types";
+
+export type WorkspaceTreeFolder = {
+  name: string;
+  path: string;
+  files: WorkspaceFile[];
+  folders: WorkspaceTreeFolder[];
+  fileCount: number;
+};
+
+export type WorkspaceTree = {
+  files: WorkspaceFile[];
+  folders: WorkspaceTreeFolder[];
+};
+
+function compareNames(left: { name: string }, right: { name: string }): number {
+  return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function sortFolder(folder: WorkspaceTreeFolder): void {
+  folder.files.sort(compareNames);
+  folder.folders.sort(compareNames);
+  folder.folders.forEach(sortFolder);
+}
+
+export function buildWorkspaceTree(files: WorkspaceFile[], directories: WorkspaceDirectory[] = []): WorkspaceTree {
+  const root: WorkspaceTreeFolder = {
+    name: "",
+    path: "",
+    files: [],
+    folders: [],
+    fileCount: 0,
+  };
+  const foldersByPath = new Map<string, WorkspaceTreeFolder>([["", root]]);
+
+  const ensureFolder = (relativePath: string): WorkspaceTreeFolder => {
+    const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+    let current = root;
+    for (const part of parts) {
+      const folderPath = current.path ? `${current.path}/${part}` : part;
+      const folderKey = normalizePathKey(folderPath);
+      let folder = foldersByPath.get(folderKey);
+      if (!folder) {
+        folder = {
+          name: part,
+          path: folderPath,
+          files: [],
+          folders: [],
+          fileCount: 0,
+        };
+        current.folders.push(folder);
+        foldersByPath.set(folderKey, folder);
+      }
+      current = folder;
+    }
+    return current;
+  };
+
+  for (const directory of directories) ensureFolder(directory.relativePath);
+
+  for (const file of files) {
+    const parts = file.relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
+    const fileName = parts.pop() || file.name;
+    let current = root;
+    current.fileCount += 1;
+
+    for (const part of parts) {
+      current = ensureFolder(current.path ? `${current.path}/${part}` : part);
+      current.fileCount += 1;
+    }
+
+    current.files.push({ ...file, name: fileName });
+  }
+
+  sortFolder(root);
+  return { files: root.files, folders: root.folders };
+}
