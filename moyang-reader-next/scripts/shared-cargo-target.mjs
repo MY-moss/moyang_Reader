@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -45,7 +46,16 @@ function resolveBuildCacheRoot() {
 }
 
 function repositoryCacheKey(repositoryRoot) {
-  return crypto.createHash("sha256").update(path.resolve(repositoryRoot).toLowerCase()).digest("hex").slice(0, 12);
+  let identity = path.resolve(repositoryRoot);
+  try {
+    // Git can return a long path when the caller uses an 8.3 path or a junction.
+    // Both spellings must share one build cache for the same repository.
+    identity = fs.realpathSync.native(identity);
+  } catch {
+    // Keep deterministic paths for a checkout that has not been created yet.
+  }
+  if (process.platform === "win32") identity = identity.toLowerCase();
+  return crypto.createHash("sha256").update(identity).digest("hex").slice(0, 12);
 }
 
 export function resolveDefaultSharedCargoTargetDir(projectRoot = defaultProjectRoot) {

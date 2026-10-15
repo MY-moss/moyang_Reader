@@ -60,6 +60,7 @@ test("linked worktrees resolve to the same repository target directory", () => {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-cargo-worktree-"));
   const repositoryRoot = path.join(fixture, "repository");
   const linkedWorktree = path.join(fixture, "linked");
+  const alias = path.join(fixture, "repository-alias");
   const hooks = path.join(fixture, "empty-hooks");
   fs.mkdirSync(repositoryRoot);
   fs.mkdirSync(hooks);
@@ -85,12 +86,14 @@ test("linked worktrees resolve to the same repository target directory", () => {
       "fixture",
     );
     git("worktree", "add", "--quiet", "--detach", linkedWorktree, "HEAD");
+    fs.symlinkSync(repositoryRoot, alias, process.platform === "win32" ? "junction" : "dir");
     withEnvironment({ CARGO_TARGET_DIR: undefined, MOYANG_BUILD_CACHE_DIR: path.join(fixture, "cache") }, () => {
       assert.equal(
         fs.realpathSync.native(resolveRepositoryRoot(linkedWorktree)),
         fs.realpathSync.native(repositoryRoot),
       );
       assert.equal(resolveSharedCargoTargetDir(linkedWorktree), resolveSharedCargoTargetDir(repositoryRoot));
+      assert.equal(resolveSharedCargoTargetDir(alias), resolveSharedCargoTargetDir(repositoryRoot));
     });
   } finally {
     assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
