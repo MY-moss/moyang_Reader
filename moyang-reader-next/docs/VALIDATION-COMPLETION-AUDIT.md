@@ -42,13 +42,15 @@
 - MCP：10,656,256 字节，SHA256 `4d06f8f2223f6f66bdb86b6a45ccdc7d55beb7fee775fb46c79003760616e674`。
 - 包内 MCP 真实完成写入、召回、更正、恢复；单独启动随包 Ollama，中文嵌入返回 1024 维向量。
 - 最终程序在 Windows 150% 缩放下渲染、无横向溢出、找到同目录 MCP，并以退出码 0 正常关闭。测试隔离设置、书房、AI 数据、WebView 和端口。
-- 原始校验结果在 `artifacts/workbench/release-smoke.json`，截图在 `artifacts/workbench/release-desktop.png`。启用新版 MCP 时，从新应用接入页重新安装连接并重启客户端；旧客户端进程不会自动切换到新程序。
+- 原始校验结果在 `artifacts/workbench/release-smoke.json`，截图在 `artifacts/workbench/release-desktop.png`。本机 Codex 与 Claude 的本应用连接和四项钩子已合并更新到该包，四份原配置已备份；结构化对比确认其他服务、钩子、设置及数字值保持不变，记录在 `artifacts/agent-clients/candidate-install.json`。仍需重启客户端并完成客户端信任；旧客户端进程不会自动切换到新程序。
 
 ## GitHub 验证
 
 上次提交 `32ca7c2` 的 Reader Next 工作流在安装、格式、前端检查、AI、原生与浏览器阶段通过，真实桌面阶段有 3 项失败：大目录测试的返回步骤超时、属性入口未显式展开、重命名测试过早读取仍在更新的引用文件。现已改为点击实际候选、显式打开属性面板、等待重命名完成状态，保留原有文件内容与链接断言。另修复保存队列的真实竞态，并用可控制的保存/渲染时序回归验证。云端结果须以新提交的运行记录为准。
 
 新工作流补充 Rust 缓存及失败时的测试截图/状态/浏览器 trace，缩短后续验证时间并保留诊断证据。缓存用法依据 [rust-cache 官方说明](https://github.com/Swatinem/rust-cache)，固定到仓库已核对的版本提交。
+
+提交 `50dbf16` 的云端格式、架构、lint 和 273 项前端单元通过；脚本阶段因显式 `CARGO_TARGET_DIR` 影响“默认缓存位置”测试而失败。已将该用例的环境隔离，显式缓存配置另行验证；原本依赖本机历史路径而在 CI 跳过的工作区用例，改为临时创建真实 Git 工作区。携带 CI 同样的缓存环境重跑，脚本 11/11 通过且零跳过。此次仅改变测试与文档，便携包中的程序代码保持一致；云端后续阶段需在修订提交上重新运行。
 
 旧根工程的 CI 与 Frontend dependency audit 均被原有依赖告警阻止；未修改旧项目锁文件或降低阈值。新工程高危依赖修复及剩余 moderate 说明沿用首轮报告。
 
