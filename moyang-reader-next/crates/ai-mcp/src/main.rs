@@ -1,8 +1,8 @@
 use moyang_ai_core::{
     ActivityRequest, AssetRequest, CheckpointRequest, ConcludeRequest, ContextRequest,
-    DeleteRequest, FeedbackRequest, IdRequest, MergeRequest, Record, ResolveConflictRequest,
+    DeleteRequest, FeedbackRequest, HistoryRequest, IdRequest, MergeRequest, ResolveConflictRequest,
     RestoreRequest, Result as CoreResult, RevisionRequest, SaveRequest, SearchQuery, StateRequest,
-    Store,
+    view_record, Store,
 };
 use rmcp::{
     handler::server::wrapper::Parameters,
@@ -16,18 +16,6 @@ use std::{path::PathBuf, sync::Arc};
 #[derive(Clone)]
 struct MemoryService {
     directory: Arc<PathBuf>,
-}
-fn view_record(r: Record) -> CoreResult<serde_json::Value> {
-    let resources = r
-        .fields
-        .assets
-        .iter()
-        .map(|a| serde_json::json!({"path":a.path,"encoding":a.encoding,"size":a.content.len()}))
-        .collect::<Vec<_>>();
-    let mut value = serde_json::to_value(r)?;
-    value.as_object_mut().unwrap().remove("assets");
-    value["resources"] = serde_json::json!(resources);
-    Ok(value)
 }
 impl MemoryService {
     async fn run<T, F>(&self, f: F) -> CallToolResult
@@ -99,7 +87,7 @@ impl MemoryService {
         description = "Archive an outdated record or restore an archived record. History is retained. Provide expected_revision from get_record."
     )]
     async fn set_record_state(&self, Parameters(q): Parameters<StateRequest>) -> CallToolResult {
-        self.run(move |s| s.change_state(q)).await
+        self.run(move |s| view_record(s.change_state(q)?)).await
     }
     #[tool(
         description = "Permanently forget one record and its entire revision history. Use only when deletion is intended; use set_record_state to archive reversibly. Requires current revision.",
@@ -114,7 +102,7 @@ impl MemoryService {
             .await
     }
     #[tool(
-        description = "Read past revisions and reasons for a record. Use when resolving conflicting memories or reviewing an update.",
+        description = "List revision summaries and reasons, without bodies or resources. Returns items and next_before; pass next_before as before_revision for the next page. Default 20, maximum 50. Use revision_detail for a selected version.",
         annotations(
             read_only_hint = true,
             destructive_hint = false,
@@ -122,20 +110,20 @@ impl MemoryService {
             open_world_hint = false
         )
     )]
-    async fn record_history(&self, Parameters(q): Parameters<IdRequest>) -> CallToolResult {
-        self.run(move |s| s.history(&q.id)?.into_iter().map(|h|Ok(serde_json::json!({"record":view_record(h.record)?,"reason":h.reason,"recorded_at":h.recorded_at}))).collect::<CoreResult<Vec<_>>>()).await
+    async fn record_history(&self, Parameters(q): Parameters<HistoryRequest>) -> CallToolResult {
+        self.run(move |s| s.history_page(q)).await
     }
     #[tool(
         description = "Restore a prior record revision as a new revision, retaining history. Requires current expected_revision."
     )]
     async fn restore_revision(&self, Parameters(q): Parameters<RestoreRequest>) -> CallToolResult {
-        self.run(move |s| s.restore(q)).await
+        self.run(move |s| view_record(s.restore(q)?)).await
     }
     #[tool(
         description = "Consolidate 2–20 active memories in the same scope into one carefully written summary. Supply original IDs and revisions; the originals are archived atomically and linked from the new memory."
     )]
     async fn merge_memories(&self, Parameters(q): Parameters<MergeRequest>) -> CallToolResult {
-        self.run(move |s| s.merge(q)).await
+        self.run(move |s| view_record(s.merge(q)?)).await
     }
     #[tool(
         description = "Mark a retrieved entry useful or not useful after applying it. Feedback gently adjusts future lexical ranking; it never deletes or invents facts."
@@ -156,7 +144,7 @@ impl MemoryService {
         self.run(move |s| s.context(q)).await
     }
     #[tool(
-        description = "Read one skill resource on demand by relative path. Returns utf8 or base64 content. No scripts are executed by this server.",
+        description = "Read one skill resource on demand by relative path. Omit revision for the current resource; supply revision to read historical bytes for comparison. Returns utf8 or base64 content. No scripts are executed by this server.",
         annotations(
             read_only_hint = true,
             destructive_hint = false,
@@ -226,7 +214,7 @@ impl MemoryService {
         self.run(move |s| s.undo_activity(q)).await
     }
     #[tool(
-        description = "Read one historical revision and its reason. Returns resource metadata; use read_skill_resource for current resource bytes.",
+        description = "Read one historical revision and its reason. Resource metadata includes fingerprints to detect changes. Use read_skill_resource with the same revision for historical resource bytes.",
         annotations(read_only_hint = true)
     )]
     async fn revision_detail(&self, Parameters(q): Parameters<RevisionRequest>) -> CallToolResult {

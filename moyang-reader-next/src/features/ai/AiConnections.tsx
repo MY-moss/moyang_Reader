@@ -56,8 +56,29 @@ export function AiConnections({
     stop.current = false;
     try {
       await aiRequest("semantic_config", config);
+      if (stop.current) return;
+      await aiRequest("semantic_resume");
+      setProgress("");
+      refresh();
+      if (stop.current) {
+        await aiRequest("semantic_pause");
+        return;
+      }
       while (!stop.current) {
-        const result = await aiRequest<{ processed: number; remaining: number }>("semantic_index");
+        const result = await aiRequest<{
+          processed: number;
+          remaining: number;
+          busy?: boolean;
+          paused?: boolean;
+          changed?: boolean;
+        }>("semantic_index");
+        if (stop.current) break;
+        if (result.paused || result.changed) break;
+        if (result.busy) {
+          setProgress(`后台正在建立索引，剩余 ${result.remaining} 段`);
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          continue;
+        }
         setProgress(`本批完成 ${result.processed} 段，剩余 ${result.remaining} 段`);
         refresh();
         if (!result.remaining) {
@@ -192,18 +213,25 @@ export function AiConnections({
             </button>
           </div>
         </fieldset>
-        {busy && (
+        {config.enabled && (
           <button
             onClick={() => {
               stop.current = true;
-              setProgress("当前批次完成后停止。");
+              void aiRequest("semantic_pause")
+                .then(() => {
+                  setProgress("已暂停索引；当前批次完成后停止。点击建立 / 补齐索引继续。");
+                  refresh();
+                })
+                .catch((e) => notify(String(e), true));
             }}
           >
             停止后续批次
           </button>
         )}
         <p aria-live="polite">
-          {progress || `当前模型已索引 ${stats?.embedded_chunks ?? 0} / ${stats?.indexed_chunks ?? 0} 段`}
+          {!busy && stats?.semantic_paused
+            ? "已暂停自动索引；点击建立 / 补齐索引继续。"
+            : progress || `当前模型已索引 ${stats?.embedded_chunks ?? 0} / ${stats?.indexed_chunks ?? 0} 段`}
         </p>
         <p className="ai-muted">
           编辑后自动补齐语义索引，也可以手动检查；未索引内容仍能通过关键词找到。本地模型与关键词检索均可离线使用。

@@ -26,9 +26,18 @@ export function ReaderPane({
   );
   const session = pane.activePath ? model.documentSessions.get(pane.activePath) : undefined;
   const document = session?.document;
+  const hasSourceTarget = Boolean(
+    active &&
+    model.sourceLocation?.path === pane.activePath &&
+    (model.sourceLocation.quote || model.sourceLocation.paragraph || model.sourceLocation.offset !== undefined),
+  );
   const container = useRef<HTMLDivElement>(null);
   const [pdfPage, setPdfPage] = useState(() => readPaneView(pane.id, pane.activePath ?? "").page);
   const [pdfZoom, setPdfZoom] = useState(() => readPaneView(pane.id, pane.activePath ?? "").zoom);
+  const changePdfPage = (page: number) => {
+    setPdfPage(page);
+    if (pane.activePath) savePaneView(pane.id, pane.activePath, { page });
+  };
   const changePdfZoom = (zoom: number) => {
     setPdfZoom(zoom);
     if (pane.activePath) savePaneView(pane.id, pane.activePath, { zoom });
@@ -39,6 +48,8 @@ export function ReaderPane({
     setPdfZoom(view.zoom);
   }, [pane.id, pane.activePath]);
   useEffect(() => {
+    if (active && matchesDocument && document?.kind === "pdf" && model.sourceLocation?.path === pane.activePath)
+      setPdfPage(model.sourceLocation.page ?? 1);
     if (active && matchesDocument && pane.activePath)
       savePaneView(pane.id, pane.activePath, {
         mode: model.mode,
@@ -53,6 +64,7 @@ export function ReaderPane({
     pane.activePath,
     model.documentState?.path,
     model.documentState?.kind,
+    document?.kind,
     model.mode,
     model.sourceLocation,
   ]);
@@ -71,7 +83,8 @@ export function ReaderPane({
         frame = requestAnimationFrame(restore);
         return;
       }
-      element.scrollTop = stored;
+      // An explicit search/bookmark target owns the next scroll position.
+      if (!hasSourceTarget) element.scrollTop = stored;
       restoring = false;
       lastTop = element.scrollTop;
     };
@@ -90,7 +103,7 @@ export function ReaderPane({
       if (!restoring) persist();
       element.removeEventListener("scroll", save);
     };
-  }, [pane.id, pane.activePath, active, model.loading]);
+  }, [pane.id, pane.activePath, active, model.loading, hasSourceTarget]);
   const tabs = pane.paths
     .map((path) => model.openTabs.find((tab) => isSameDocumentPath(tab.path, path)))
     .filter((tab) => tab !== undefined);
@@ -128,7 +141,13 @@ export function ReaderPane({
             </div>
           )}
           <DocumentActions model={model}>{tools}</DocumentActions>
-          <DocumentViewport model={model} pdfZoom={pdfZoom} onPdfZoomChange={changePdfZoom} />
+          <DocumentViewport
+            model={model}
+            pdfPage={pdfPage}
+            onPdfPageChange={changePdfPage}
+            pdfZoom={pdfZoom}
+            onPdfZoomChange={changePdfZoom}
+          />
         </>
       ) : (
         <>
@@ -147,10 +166,7 @@ export function ReaderPane({
                 page={pdfPage}
                 zoom={pdfZoom}
                 onZoomChange={changePdfZoom}
-                onPageChange={(page) => {
-                  setPdfPage(page);
-                  savePaneView(pane.id, pane.activePath!, { page });
-                }}
+                onPageChange={changePdfPage}
               />
             ) : (
               <p>切换到此窗格后，从侧栏选择文档。</p>

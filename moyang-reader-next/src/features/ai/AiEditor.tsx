@@ -25,6 +25,7 @@ export function AiEditor({
   onSave,
   onCancel,
   onComposition,
+  onResourceLoading,
 }: {
   draft: AiDraft;
   busy: boolean;
@@ -32,6 +33,7 @@ export function AiEditor({
   onSave: () => void;
   onCancel: () => void;
   onComposition?: (value: boolean) => void;
+  onResourceLoading?: (value: boolean) => void;
 }) {
   const f = draft.fields,
     [source, setSource] = useState(false),
@@ -39,6 +41,7 @@ export function AiEditor({
     [status, setStatus] = useState("");
   const [safety] = useState(() => checkMarkdownEditorSafety(f.body));
   const [related, setRelated] = useState<AiRecord | null>(null);
+  const [resourceLoading, setResourceLoading] = useState(false);
   const linkTarget = useRef<{ context?: SourceEditorLinkContext; range?: Range }>({});
   const beginLink = (context?: SourceEditorLinkContext) => {
     const selection = window.getSelection();
@@ -70,14 +73,14 @@ export function AiEditor({
       className="ai-editor ai-page-editor"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave();
+        if (!resourceLoading) onSave();
       }}
       onCompositionStart={() => onComposition?.(true)}
       onCompositionEnd={() => onComposition?.(false)}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
           e.preventDefault();
-          if (!busy) onSave();
+          if (!busy && !resourceLoading) onSave();
         }
       }}
     >
@@ -92,7 +95,7 @@ export function AiEditor({
           <button type="button" onClick={onCancel} disabled={busy}>
             放弃草稿
           </button>
-          <button className="ai-primary" type="submit" disabled={busy}>
+          <button className="ai-primary" type="submit" disabled={busy || resourceLoading}>
             保存内容
           </button>
         </div>
@@ -285,7 +288,16 @@ export function AiEditor({
             <pre>{related.body}</pre>
           </aside>
         )}
-        {f.kind === "skill" && <AiResources assets={f.assets} onChange={(assets) => change({ assets })} />}
+        {f.kind === "skill" && (
+          <AiResources
+            assets={f.assets}
+            onChange={(assets) => change({ assets })}
+            onLoading={(value) => {
+              setResourceLoading(value);
+              onResourceLoading?.(value);
+            }}
+          />
+        )}
         <p className="ai-muted">
           停止输入后自动保存，中文组词期间保留草稿。
           {draft.merge ? "合并需点击保存，原记忆将归档并保留历史。" : "Ctrl+S 立即保存。"}

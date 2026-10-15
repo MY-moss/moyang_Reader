@@ -156,6 +156,23 @@ fn merge_hooks(config: &mut Value, owned: &Value, add: bool) -> Result<()> {
     }
     Ok(())
 }
+fn contains_hooks(config: &Value, desired: &Value) -> bool {
+    desired.as_object().unwrap().iter().all(|(event, groups)| {
+        groups.as_array().unwrap().iter().all(|group| {
+            config["hooks"][event].as_array().is_some_and(|existing| {
+                existing.iter().any(|item| {
+                    item["hooks"].as_array().is_some_and(|handlers| {
+                        group["hooks"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .all(|handler| handlers.contains(handler))
+                    })
+                })
+            })
+        })
+    })
+}
 /// Exact merge with a per-application ownership manifest. Other services and hook groups survive.
 pub fn configure_client(
     store: &Store,
@@ -212,6 +229,7 @@ pub fn configure_client(
     };
     let mut hook_config = object(&hook_before)?;
     let desired_hooks = hooks(exe, data, client);
+    let connection_changed = current != desired || !contains_hooks(&hook_config, &desired_hooks);
     if action != "status" {
         if action == "install" && !exe.is_file() {
             return Err(invalid("MCP 程序不存在，请先完成桌面打包。"));
@@ -279,7 +297,22 @@ pub fn configure_client(
             serde_json::to_string_pretty(&config)?
         };
         let hook_after = serde_json::to_string_pretty(&hook_config)?;
-        let installation = json!({"server":desired,"hooks":desired_hooks,"config":config_path,"hook_config":hook_path});
+        // Retry the same interrupted installation without creating a new generation.
+        // An idempotent repair must keep receipts from the already working connection.
+        let pending_since = manifest["pending"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|entry| entry["server"] == desired && entry["hooks"] == desired_hooks)
+            .and_then(|entry| entry["installed_at"].as_i64());
+        let installed_at = if connection_changed {
+            pending_since.unwrap_or_else(now)
+        } else {
+            pending_since
+                .or_else(|| manifest["installed_at"].as_i64())
+                .unwrap_or(0)
+        };
+        let installation = json!({"server":desired,"hooks":desired_hooks,"config":config_path,"hook_config":hook_path,"installed_at":installed_at});
         // Record intent without discarding the previous ownership. A failure can leave
         // either the old server or old hooks on disk, both of which a retry must recognize.
         if action == "install" {
@@ -287,7 +320,11 @@ pub fn configure_client(
             if !pending.contains(&installation) {
                 pending.push(installation.clone());
             }
-            let mut recoverable = if manifest.is_object() { manifest.clone() } else { json!({}) };
+            let mut recoverable = if manifest.is_object() {
+                manifest.clone()
+            } else {
+                json!({})
+            };
             recoverable["pending"] = json!(pending);
             store.set_setting_value(&key, &recoverable)?;
         }
@@ -301,29 +338,109 @@ pub fn configure_client(
         return configure_client(store, paths, exe, client, "status");
     }
     let configured = current == desired;
-    let hooks_configured = desired_hooks
-        .as_object()
-        .unwrap()
+    let hooks_configured = contains_hooks(&hook_config, &desired_hooks);
+    let historical_receipts = store.client_receipts(client)?;
+    let mut receipts = historical_receipts.clone();
+    let installed_at = owned
         .iter()
-        .all(|(event, groups)| {
-            groups.as_array().unwrap().iter().all(|g| {
-                hook_config["hooks"][event].as_array().is_some_and(|a| {
-                    a.iter().any(|x| {
-                        x["hooks"].as_array().is_some_and(|h| {
-                            g["hooks"].as_array().unwrap().iter().all(|v| h.contains(v))
-                        })
-                    })
-                })
-            })
+        .rev()
+        .find(|entry| entry["server"] == desired && entry["hooks"] == desired_hooks)
+        .and_then(|entry| entry["installed_at"].as_i64())
+        .unwrap_or(0);
+    for kind in ["mcp", "hook", "completed"] {
+        let field = format!("{kind}_at");
+        let source = store.setting_value(&format!("connection-source:{client}:{kind}"))?;
+        let from_executable = source["executable"].as_str().is_some_and(|path| {
+            fs::canonicalize(path)
+                .ok()
+                .zip(fs::canonicalize(exe).ok())
+                .is_some_and(|(actual, expected)| actual == expected)
         });
+        if (installed_at > 0
+            && (receipts[&field].as_i64().unwrap_or(0) <= installed_at
+                || source["at"] != receipts[&field]
+                || !from_executable))
+            || (kind == "mcp" && !configured)
+            || (kind != "mcp" && !hooks_configured)
+        {
+            receipts[&field] = Value::Null;
+        }
+    }
     Ok(
-        json!({"client":client,"configured":configured,"hooks_configured":hooks_configured,"config_path":config_path,"hook_path":hook_path,"receipts":store.client_receipts(client)?,"trust_hint":if client=="codex"{"在 Codex 输入 /hooks，检查并信任 Moyang 的四项钩子。"}else{"重启 Claude Code；若客户端要求确认钩子，请在客户端完成。"}}),
+        json!({"client":client,"configured":configured,"hooks_configured":hooks_configured,"config_path":config_path,"hook_path":hook_path,"receipts":receipts,"historical_receipts":historical_receipts,"trust_hint":if client=="codex"{"在 Codex 输入 /hooks，检查并信任 Moyang 的四项钩子。"}else{"重启 Claude Code；若客户端要求确认钩子，请在客户端完成。"}}),
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn receipts_belong_to_the_installed_connection_and_reinstall_is_idempotent() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = ClientPaths {
+            codex: root.path().join("codex"),
+            claude_settings: root.path().join("claude/settings.json"),
+            claude_mcp: root.path().join("claude.json"),
+        };
+        let old_exe = root.path().join("old.exe");
+        let new_exe = root.path().join("new.exe");
+        fs::write(&old_exe, "").unwrap();
+        fs::write(&new_exe, "").unwrap();
+        let store = Store::open(root.path().join("data")).unwrap();
+        for client in ["codex", "claude"] {
+            let record_receipts = |exe: &Path| {
+                // A real client process takes longer than a timestamp tick to restart.
+                std::thread::sleep(std::time::Duration::from_millis(3));
+                let at = now();
+                for kind in ["mcp", "hook", "completed"] {
+                    store
+                        .set_setting_value(&format!("connection:{client}:{kind}"), &json!(at))
+                        .unwrap();
+                    store
+                        .set_setting_value(
+                            &format!("connection-source:{client}:{kind}"),
+                            &json!({"at":at,"executable":exe}),
+                        )
+                        .unwrap();
+                }
+                at
+            };
+            configure_client(&store, &paths, &old_exe, client, "install").unwrap();
+            let old_at = record_receipts(&old_exe);
+            let same = configure_client(&store, &paths, &old_exe, client, "install").unwrap();
+            assert_eq!(same["receipts"]["mcp_at"], old_at);
+            assert_eq!(same["receipts"]["hook_at"], old_at);
+            let moved = configure_client(&store, &paths, &new_exe, client, "install").unwrap();
+            assert!(moved["receipts"]["mcp_at"].is_null());
+            assert!(moved["receipts"]["hook_at"].is_null());
+            assert_eq!(moved["historical_receipts"]["completed_at"], old_at);
+            record_receipts(&old_exe);
+            let old_running = configure_client(&store, &paths, &new_exe, client, "status").unwrap();
+            assert!(old_running["receipts"]["hook_at"].is_null());
+            let fresh_at = record_receipts(&new_exe);
+            let fresh = configure_client(&store, &paths, &new_exe, client, "status").unwrap();
+            assert_eq!(fresh["receipts"]["mcp_at"], fresh_at);
+            assert_eq!(fresh["receipts"]["hook_at"], fresh_at);
+            let same = configure_client(&store, &paths, &new_exe, client, "install").unwrap();
+            assert_eq!(same["receipts"]["completed_at"], fresh_at);
+            let hook_path = if client == "codex" {
+                paths.codex.join("hooks.json")
+            } else {
+                paths.claude_settings.clone()
+            };
+            let mut changed = object(&read(&hook_path).unwrap()).unwrap();
+            changed["hooks"]["Stop"] = json!([]);
+            fs::write(&hook_path, serde_json::to_string(&changed).unwrap()).unwrap();
+            let repaired = configure_client(&store, &paths, &new_exe, client, "install").unwrap();
+            assert!(repaired["receipts"]["hook_at"].is_null());
+        }
+        let actual = std::env::current_exe().unwrap();
+        configure_client(&store, &paths, &actual, "codex", "install").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        store.connection_receipt("codex", "mcp").unwrap();
+        let status = configure_client(&store, &paths, &actual, "codex", "status").unwrap();
+        assert!(status["receipts"]["mcp_at"].is_number());
+    }
     #[cfg(windows)]
     #[test]
     fn relocated_install_can_retry_after_either_config_file_is_locked() {
@@ -341,9 +458,17 @@ mod tests {
             fs::write(&new_exe, "").unwrap();
             let store = Store::open(root.path().join("data")).unwrap();
             configure_client(&store, &paths, &old_exe, "codex", "install").unwrap();
-            let locked_path = paths.codex.join(if locked_hooks { "hooks.json" } else { "config.toml" });
+            let locked_path = paths.codex.join(if locked_hooks {
+                "hooks.json"
+            } else {
+                "config.toml"
+            });
             // Permit reads and writes but deny deletion/replacement, as a client holding a file can do.
-            let lock = fs::OpenOptions::new().read(true).share_mode(3).open(locked_path).unwrap();
+            let lock = fs::OpenOptions::new()
+                .read(true)
+                .share_mode(3)
+                .open(locked_path)
+                .unwrap();
             assert!(configure_client(&store, &paths, &new_exe, "codex", "install").is_err());
             drop(lock);
             let status = configure_client(&store, &paths, &new_exe, "codex", "install").unwrap();
@@ -355,7 +480,11 @@ mod tests {
             }
             configure_client(&store, &paths, &new_exe, "codex", "uninstall").unwrap();
             let config = object(&read(&paths.codex.join("hooks.json")).unwrap()).unwrap();
-            assert!(config["hooks"].as_object().unwrap().values().all(|v| v.as_array().unwrap().is_empty()));
+            assert!(config["hooks"]
+                .as_object()
+                .unwrap()
+                .values()
+                .all(|v| v.as_array().unwrap().is_empty()));
         }
     }
     #[test]

@@ -1,5 +1,31 @@
 import { expect, test } from "@playwright/test";
 
+for (const width of [900, 1440]) {
+  test(`opens hidden document properties at ${width}px and preserves the edited body`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: "hidden-properties.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Body remains\n\nOriginal paragraph."),
+      });
+    await expect(page.locator(".document-title")).toContainText("hidden-properties.md");
+    const hide = page.getByRole("button", { name: "隐藏上下文", exact: true });
+    if (await hide.isVisible()) await hide.click();
+    await expect(page.getByRole("tab", { name: "属性", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "显示上下文", exact: true }).click();
+    await page.getByRole("tab", { name: "属性", exact: true }).click();
+    await page.getByRole("button", { name: "编辑文档属性", exact: true }).click();
+    await page.getByPlaceholder("文档的显示标题").fill("Visible properties");
+    await page.getByRole("button", { name: "应用到文档", exact: true }).click();
+    await expect(page.locator(".source-editor")).toContainText("title: Visible properties");
+    await expect(page.locator(".source-editor")).toContainText("Original paragraph.");
+  });
+}
+
 test("edits nested document properties with validation and preserves the body", async ({ page }) => {
   await page.goto("/");
   await page

@@ -39,6 +39,7 @@ export function useAiSpace(active: boolean) {
   const [conflict, setConflict] = useState<{ key: string; remote: AiRecord } | null>(null),
     [discarded, setDiscarded] = useState<AiDraft | null>(null),
     [composing, setComposing] = useState(false);
+  const [resourceLoading, setResourceLoading] = useState(false);
   const all = useRef(drafts),
     activeKey = useRef(activeDraft),
     pending = useRef<Promise<unknown>>(Promise.resolve()),
@@ -212,12 +213,13 @@ export function useAiSpace(active: boolean) {
     [notify, setConnections, setActivity],
   );
   const selectedId = selected?.id;
+  const selectedRevision = selected?.revision;
   useEffect(() => {
-    if (!active || !selectedId || draft) return;
+    if (!active || !selectedId || selectedRevision == null || draft) return;
     let cancelled = false;
-    void aiRequest<AiRecord>("get", { id: selectedId })
+    void aiRequest<AiRecord | null>("get_if_changed", { id: selectedId, revision: selectedRevision })
       .then((r) => {
-        if (!cancelled) setSelected(r);
+        if (!cancelled && r) setSelected(r);
       })
       .catch((e) => {
         if (!cancelled) notify(`更新内容失败，已保留当前页面：${String(e)}`, true);
@@ -225,7 +227,7 @@ export function useAiSpace(active: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [active, selectedId, draft, tick, notify]);
+  }, [active, selectedId, selectedRevision, draft, tick, notify]);
   const save = useCallback(
     async (manual = true, override?: AiDraft) => {
       flushLiveEditors();
@@ -298,6 +300,7 @@ export function useAiSpace(active: boolean) {
       draft.merge ||
       busy ||
       composing ||
+      resourceLoading ||
       conflict ||
       !draft.fields.title.trim() ||
       !draft.fields.body.trim() ||
@@ -306,7 +309,7 @@ export function useAiSpace(active: boolean) {
       return;
     const timer = window.setTimeout(() => void save(false), 1200);
     return () => window.clearTimeout(timer);
-  }, [draft, busy, composing, conflict, save]);
+  }, [draft, busy, composing, resourceLoading, conflict, save]);
   const newEntry = () =>
     setDraft({ fields: { ...emptyAiFields(kind), project, agent, sharing: project ? "project" : "global" } });
   const merge = async () => {
@@ -397,6 +400,7 @@ export function useAiSpace(active: boolean) {
     resolve,
     composing,
     setComposing,
+    setResourceLoading,
     discarded,
     restoreDiscarded: () => {
       if (discarded) {

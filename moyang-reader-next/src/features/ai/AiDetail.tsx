@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
 import { openExternalUrl } from "../../platform/bridge";
-import type { AiRecord, AiRevision } from "../../shared/ai-types";
+import type { AiRecord } from "../../shared/ai-types";
 import { exportAiRecord } from "./transfers";
 import { AiSource } from "./AiSource";
 import { AiResources } from "./AiResources";
 import { AiRelations } from "./AiRelations";
+import { AiHistory } from "./AiHistory";
 export function AiDetail({
   record: r,
   onEdit,
@@ -19,7 +20,7 @@ export function AiDetail({
   onChange: (record: AiRecord | null) => void;
   notify: (message: string, error?: boolean) => void;
 }) {
-  const [history, setHistory] = useState<AiRevision[] | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [html, setHtml] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -43,7 +44,7 @@ export function AiDetail({
     setBusy(true);
     try {
       const next = await aiRequest<AiRecord | null>(operation, payload);
-      setHistory(null);
+      setShowHistory(false);
       onChange(next);
       notify(operation === "delete" ? "已永久删除。" : "已保存变更。");
     } catch (e) {
@@ -140,15 +141,7 @@ export function AiDetail({
           >
             {r.state === "active" ? "归档" : "恢复使用"}
           </button>
-          <button
-            onClick={() => {
-              void aiRequest<AiRevision[]>("history", { id: r.id })
-                .then(setHistory)
-                .catch((e) => notify(String(e), true));
-            }}
-          >
-            查看历史
-          </button>
+          <button onClick={() => setShowHistory((open) => !open)}>查看历史</button>
           <button
             onClick={() =>
               void navigator.clipboard
@@ -187,40 +180,13 @@ export function AiDetail({
             </button>
           </div>
         )}
-        {history && (
-          <section className="ai-history">
-            <h2>修订历史</h2>
-            {history.map((h) => (
-              <details key={h.record.revision}>
-                <summary>
-                  版本 {h.record.revision} · {new Date(h.recorded_at).toLocaleString()} · {h.reason || "保存"}
-                </summary>
-                <div className="version-compare">
-                  <section>
-                    <h3>版本 {h.record.revision}</h3>
-                    <pre className="ai-source-preview">{h.record.body}</pre>
-                  </section>
-                  <section>
-                    <h3>当前版本</h3>
-                    <pre className="ai-source-preview">{r.body}</pre>
-                  </section>
-                </div>
-                <p>
-                  标题：{h.record.title} · 来源：{h.record.source} · 资源 {h.record.assets.length} 个
-                </p>
-                {h.record.revision !== r.revision && (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void act("restore", { id: r.id, expected_revision: r.revision, revision: h.record.revision })
-                    }
-                  >
-                    恢复这个版本
-                  </button>
-                )}
-              </details>
-            ))}
-          </section>
+        {showHistory && (
+          <AiHistory
+            key={`${r.id}:${r.revision}`}
+            record={r}
+            busy={busy}
+            onRestore={(revision) => void act("restore", { id: r.id, expected_revision: r.revision, revision })}
+          />
         )}
       </div>
     </article>

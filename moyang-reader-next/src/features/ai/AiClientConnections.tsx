@@ -9,6 +9,7 @@ interface ClientStatus {
   hook_path: string;
   trust_hint: string;
   receipts: { mcp_at: number | null; hook_at: number | null; completed_at: number | null };
+  historical_receipts?: { completed_at: number | null };
 }
 export function AiClientConnections({
   available,
@@ -87,7 +88,9 @@ export function AiClientConnections({
               <dd>
                 {client.receipts.completed_at
                   ? new Date(client.receipts.completed_at).toLocaleString()
-                  : "尚无完成记录"}
+                  : client.historical_receipts?.completed_at
+                    ? `旧连接 · ${new Date(client.historical_receipts.completed_at).toLocaleString()}`
+                    : "尚无完成记录"}
               </dd>
             </div>
           </dl>

@@ -67,6 +67,44 @@ async function ensureRenderedMode() {
   }
 }
 
+async function restoreInitialDocument() {
+  const name = path.basename(documentPath);
+  try {
+    await browser.$('button[aria-label="快速打开"]').click();
+    const input = await browser.$(".quick-open-dialog input");
+    await input.waitForDisplayed();
+    await input.setValue(name);
+    await browser.waitUntil(() => browser.execute((name) =>
+      [...document.querySelectorAll(".quick-open-item")].some((item) => item.querySelector("strong")?.textContent === name), name),
+      { timeoutMsg: `quick open did not offer the cleanup target ${name}` });
+    // Cleanup must select the intended UI result. The embedded driver can send
+    // WebDriver's Enter token as text, leaving this modal open across tests.
+    await browser.execute((name) => {
+      [...document.querySelectorAll(".quick-open-item")].find((item) => item.querySelector("strong")?.textContent === name).click();
+    }, name);
+    await browser.waitUntil(() => browser.execute((name) =>
+      !document.querySelector(".quick-open-dialog") && document.querySelector(".document-title")?.textContent.includes(name), name),
+      { timeoutMsg: `cleanup did not return to ${name}` });
+  } finally {
+    // Even a failed restoration must not leave an input modal over the next test.
+    await browser.execute(() => {
+      document.querySelector(".quick-open-dialog input")?.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }),
+      );
+    });
+  }
+}
+
+async function showDocumentProperties() {
+  await browser.execute(() => document.querySelector('button[aria-label="显示上下文"]')?.click());
+  const panel = await browser.$('.context-sidebar[aria-label="当前文档上下文"]');
+  await panel.waitForDisplayed();
+  const tab = await panel.$("button=属性");
+  assert.equal(await tab.getAttribute("role"), "tab");
+  await tab.click();
+  await browser.$("button=编辑文档属性").waitForDisplayed();
+}
+
 async function clickWorkspaceExportAction(name) {
   const menu = await browser.$("details.workspace-export-menu");
   if ((await menu.getAttribute("open")) === null) {
@@ -518,11 +556,7 @@ describe("Moyang Reader desktop runtime", () => {
       assert.match(await readerText(), /Bulk 349/);
     } finally {
       try {
-        await browser.$('button[aria-label="快速打开"]').click();
-        const input = await browser.$(".quick-open-dialog input");
-        await input.setValue("desktop-e2e");
-        await browser.keys("Enter");
-        await browser.waitUntil(async () => (await browser.$(".document-title").getText()).includes("desktop-e2e"));
+        await restoreInitialDocument();
       } finally {
         assert.equal(path.dirname(path.resolve(bulkPath)), path.resolve(root));
         fs.rmSync(bulkPath, { recursive: true, force: true });
@@ -548,21 +582,23 @@ describe("Moyang Reader desktop runtime", () => {
       await clickWorkspaceFile("properties-roundtrip.md");
       await ensureRenderedMode();
       await browser.waitUntil(() => browser.execute(() => document.querySelector(".reader-pane.is-active .document-embed")?.textContent?.includes("来自另一个文档的原文")), {timeout:15000});
-      await browser.$("button=属性").click();
+      await showDocumentProperties();
       await browser.$("button=编辑文档属性").click();
       await browser.$('input[placeholder="文档的显示标题"]').setValue("桌面属性测试");
       await browser.$('input[placeholder="阅读, 工作, 灵感"]').setValue("阅读, 测试");
       await browser.$("button=应用到文档").click();
-      await (await browser.$(".document-actions")).$("button=保存").click();
+      // Save through the actual shortcut; autosave may already have removed the
+      // conditional Save button while the driver was locating the next element.
+      await browser.execute(() => window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "s", ctrlKey: true, bubbles: true, cancelable: true })));
       await browser.waitUntil(() => fs.readFileSync(note, "utf8").includes("title: 桌面属性测试"));
       assert.ok(fs.readFileSync(note, "utf8").endsWith(body), "property form changed the body");
     } finally {
-      await browser.$('button[aria-label="快速打开"]').click();
-      await browser.$(".quick-open-dialog input").setValue("desktop-e2e");
-      await browser.keys("Enter");
-      await browser.waitUntil(async () => (await browser.$(".document-title").getText()).includes("desktop-e2e"));
-      fs.rmSync(source, { force: true });
-      fs.rmSync(note, { force: true });
+      try {
+        await restoreInitialDocument();
+      } finally {
+        fs.rmSync(source, { force: true });
+        fs.rmSync(note, { force: true });
+      }
     }
   });
 

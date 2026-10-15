@@ -4,6 +4,7 @@ import { ContextMenu } from "../../../shared/components/ContextMenu";
 import { applySourceEditorAction } from "../editor-context-actions";
 import { editorContextMenuGroups, type EditorContextAction } from "../editor-context-menu";
 import { captureEditorViewport, restoreEditorViewport } from "../editor-history-viewport";
+import { registerSourceSelection } from "../source-selection";
 import { filterSlashCommands, matchSlashTrigger, slashCaretOffset, slashCommands } from "../slash-command-menu";
 import {
   filterWikiLinkCandidates,
@@ -72,6 +73,28 @@ export function SourceEditor({
   const wikiCompletionsRef = useRef<readonly WikiLinkCandidate[]>(wikiCompletions ?? []);
   const [loadFailed, setLoadFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const element = loadFailed ? fallbackRef.current : containerRef.current;
+    if (!element || (!loadFailed && !ready)) return;
+    return registerSourceSelection(element, {
+      read: () => ({
+        text: viewRef.current?.state.doc.toString() ?? fallbackRef.current?.value ?? valueRef.current,
+        from: viewRef.current?.state.selection.main.from ?? fallbackRef.current?.selectionStart ?? 0,
+        to: viewRef.current?.state.selection.main.to ?? fallbackRef.current?.selectionEnd ?? 0,
+      }),
+      reveal: (from, to) => {
+        const view = viewRef.current;
+        if (view) {
+          const end = view.state.doc.length;
+          view.dispatch({ selection: { anchor: Math.min(from, end), head: Math.min(to, end) }, scrollIntoView: true });
+          view.focus();
+        } else {
+          fallbackRef.current?.focus();
+          fallbackRef.current?.setSelectionRange(from, to);
+        }
+      },
+    });
+  }, [ready, loadFailed]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;

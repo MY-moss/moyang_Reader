@@ -175,8 +175,11 @@ export function useWorkspaceActions({
       const currentIsAffected = Boolean(current && isPathWithinEntry(current.path, oldAbsolutePath));
       try {
         for (const session of documentSessions.getSnapshot().sessions.values()) {
+          const latest = documentSessions.get(session.document.path);
           if (
-            session.document.modified &&
+            // A completed disk write can still have a queued preview/baseline update.
+            // Join that save before rebasing, even when modified is already false.
+            (latest?.document.modified || latest?.saveStatus === "saving") &&
             pathBelongsToWorkspace(session.document.path, root) &&
             !(await saveDocument(false, session.document.path))
           )

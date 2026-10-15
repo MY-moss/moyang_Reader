@@ -15,11 +15,20 @@ export function textChunks(path: string, text: string, hash: string, page?: numb
     const start = text.indexOf(line, offset);
     offset = start + line.length;
     for (let i = 0; i < line.length; i += 1000) {
-      const part = line.slice(i, i + 1120).trim();
+      const slice = line.slice(i, i + 1120);
+      const part = slice.trim();
+      const leadingWhitespace = slice.length - slice.trimStart().length;
       if (part)
         result.push({
           text: part,
-          location: { path, hash, page, paragraph: paragraph + 1, offset: start + i, quote: part.slice(0, 120) },
+          location: {
+            path,
+            hash,
+            page,
+            paragraph: paragraph + 1,
+            offset: start + i + leadingWhitespace,
+            quote: part.slice(0, 120),
+          },
         });
     }
   }

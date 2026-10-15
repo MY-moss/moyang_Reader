@@ -119,6 +119,19 @@ async fn real_stdio_client_roundtrip_restart_and_cross_process_revision() {
     )
     .await;
     assert_eq!(resource["content"], "核对来源");
+    let history = call(&c,"record_history",json!({"id":skill_id,"limit":1})).await;
+    assert_eq!(history["items"].as_array().unwrap().len(),1);
+    assert_eq!(history["next_before"],2);
+    assert!(history["items"][0].get("body").is_none());
+    assert!(history["items"][0].get("record").is_none());
+    let old_resource = call(&c,"read_skill_resource",json!({"id":skill_id,"path":"references/check.md","revision":1})).await;
+    assert_eq!(old_resource["content"],"核对来源");
+    let archived = call(&c,"set_record_state",json!({"id":skill_id,"state":"archived","expected_revision":2})).await;
+    assert!(archived.get("assets").is_none());
+    assert_eq!(archived["resources"][0]["fingerprint"].as_str().unwrap().len(),64);
+    let restored = call(&c,"restore_revision",json!({"id":skill_id,"revision":1,"expected_revision":3})).await;
+    assert!(restored.get("assets").is_none());
+    assert!(restored["resources"][0].get("content").is_none());
     c.cancel().await.unwrap();
     let restarted = client(dir.path()).await;
     let read = call(&restarted, "get_record", json!({"id":id})).await;

@@ -17,13 +17,13 @@
 | save_record             | 新建需 kind/title/body；更新还需 id/expected_revision；source/reason 记录依据                              |
 | set_record_state        | id/expected_revision/state；active 或 archived                                                             |
 | delete_record           | id/expected_revision；永久删除前优先考虑归档                                                               |
-| record_history          | id；修订清单                                                                                               |
+| record_history          | id、limit（默认 20，最多 50）、before_revision；返回 items 摘要与 next_before 分页游标                     |
 | revision_detail         | id/revision；指定修订正文与资源目录                                                                        |
 | restore_revision        | id/expected_revision/revision；恢复会形成新修订                                                            |
 | merge_memories          | ids/revisions/title/body；合并记忆并保留可追溯历史                                                         |
 | memory_feedback         | 对实际使用结果提供反馈，以工具 schema 为准                                                                 |
 | recall_context          | 按任务、项目与 Agent 范围召回，默认限制为 8000 Unicode 字符                                                |
-| read_skill_resource     | 按条目和资源路径读取单个资源，不执行脚本                                                                   |
+| read_skill_resource     | id、path，选填 revision；按需读取当前或历史资源，不执行脚本                                                |
 | library_status          | 查看条目、索引与当前模型状态                                                                               |
 | index_semantic          | 补齐当前模型缺失向量；已有内容向量复用                                                                     |
 | task_checkpoint         | client/session/turn，选填 project/agent；重复原始轮次返回同一检查点                                        |
@@ -33,6 +33,8 @@
 | undo_memory_activity    | 撤回或恢复一次沉淀，验证目标修订未被后续改写                                                               |
 
 新内容显式选择 sharing="global" 或 "project"。project 范围必须提供项目；agent 记录来源。旧数据的 legacy 范围保留原语义，迁移不会自动扩大共享。检索时传项目范围；不要省略范围后假定结果只来自当前项目。
+
+历史列表只返回版本、标题、时间、原因、正文字数与资源数量。需要比较时再调用 `revision_detail`；资源清单提供 `fingerprint`，同路径、同长度的内容修改也能识别。需要旧资源正文时，把该版本号传给 `read_skill_resource`。归档、恢复和合并的响应也不会附带全部资源。`record_history` 的输出现为分页对象，客户端应使用 `items`，并将 `next_before` 传入下一页的 `before_revision`；`null` 表示结束。
 
 ## 一轮任务
 
@@ -72,5 +74,7 @@
 SessionStart 提供约定与未完成任务；UserPromptSubmit 登记原始轮次；Stop 检查沉淀结果，最多请求一次补充；SessionEnd 保留未完成状态。补充轮次继续沿用原检查点，不能把补充提示登记为新任务导致循环。
 
 Codex 的钩子需要客户端信任；MCP 写入也可能需要批准。Claude Code 需要可用的模型服务。应用分别显示配置、MCP 初始化、钩子运行和最近完成回执。这些状态不相互替代。通用 MCP 能调用工具，但自动结束依赖客户端生命周期支持。
+
+Codex 可以在 `/hooks` 检查并信任应用安装的四项钩子；新钩子或定义变化后需要重新检查，这是 [Codex 的钩子信任机制](https://learn.chatgpt.com/docs/hooks)。配置写入完成不代表已经获准运行。Claude Code 的事件和执行形式依据[官方钩子说明](https://code.claude.com/docs/en/hooks)。
 
 版本冲突时重新读取最新正文，保留本轮拟稿，比较后合并或另存；禁止原样重试覆盖。失败通过 MCP isError 返回，stdout 只用于协议。完整备份恢复与旧版本迁移见 [迁移手册](MIGRATION.md)，本机真实客户端待验收项见 [验证报告](VALIDATION-WORKBENCH.md)。

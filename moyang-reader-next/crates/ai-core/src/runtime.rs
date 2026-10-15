@@ -101,7 +101,7 @@ pub fn maintain_semantic(directory: &std::path::Path) {
         let run = || -> Result<()> {
             let mut store = Store::open(&directory)?;
             let config = store.semantic_config()?;
-            if !config.enabled {
+            if !config.enabled || store.semantic_paused()? {
                 return Ok(());
             }
             if config.endpoint.trim_end_matches('/') == "http://127.0.0.1:11434"
@@ -117,7 +117,11 @@ pub fn maintain_semantic(directory: &std::path::Path) {
                     "semantic_background",
                     &serde_json::json!({"at":now(),"remaining":result["remaining"]}),
                 )?;
-                if result["remaining"].as_u64().unwrap_or(0) == 0 {
+                if result["remaining"].as_u64().unwrap_or(0) == 0
+                    || result["paused"] == true
+                    || result["busy"] == true
+                    || result["changed"] == true
+                {
                     break;
                 }
             }

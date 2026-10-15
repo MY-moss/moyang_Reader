@@ -15,9 +15,13 @@ import type { ReaderApplication } from "../useReaderApplication";
 export function DocumentViewport({
   model,
   pdfZoom,
+  pdfPage,
+  onPdfPageChange,
   onPdfZoomChange,
 }: {
   pdfZoom?: number;
+  pdfPage?: number;
+  onPdfPageChange?: (page: number) => void;
   onPdfZoomChange?: (zoom: number) => void;
   model: Pick<
     ReaderApplication,
@@ -188,8 +192,11 @@ export function DocumentViewport({
           <PdfPreview
             name={documentState.name}
             src={documentState.previewUrl}
-            page={model.sourceLocation?.path === documentState.path ? model.sourceLocation.page : 1}
-            onPageChange={(page) => model.setSourceLocation({ path: documentState.path, page })}
+            page={pdfPage ?? (model.sourceLocation?.path === documentState.path ? model.sourceLocation.page : 1)}
+            onPageChange={(page) => {
+              onPdfPageChange?.(page);
+              model.setSourceLocation({ path: documentState.path, page });
+            }}
             zoom={pdfZoom}
             onZoomChange={onPdfZoomChange}
           />

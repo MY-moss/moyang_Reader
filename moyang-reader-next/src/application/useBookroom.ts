@@ -1,6 +1,19 @@
 import { isSameDocumentPath } from "../features/recovery/document-transition";
-import { useCallback, useEffect, useState } from "react";
-import { locateSource, sourceBlocks } from "../features/reader/source-locator";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  locateSource,
+  locateText,
+  scrollToSource,
+  selectionSourceLocation,
+  sourceBlocks,
+} from "../features/reader/source-locator";
+import {
+  readSourceSelection,
+  revealSourceSelection,
+  sourceSelectionLocation,
+  subscribeSourceSelection,
+} from "../features/editor/source-selection";
+import { relocatePdfSource } from "../features/reader/pdf-source-location";
 import { bookroomRequest } from "../platform/bookroom-bridge";
 import { fileMetadata, isTauriRuntime, readBinaryFile, readTextFile } from "../platform/bridge";
 import { contentHash, extractSourceChunks } from "../features/documents/source-chunks";
@@ -16,6 +29,7 @@ import type {
 } from "../shared/bookroom-types";
 import type { ReaderApplication } from "./useReaderApplication";
 import type { WorkbenchPanes } from "./useWorkbenchPanes";
+import { flushLiveEditors } from "../shared/pending-work";
 
 export type BookroomPage = "document" | "recent" | "search" | "bookmarks" | "annotations" | "views" | "recovery";
 export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
@@ -38,6 +52,7 @@ export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
   const [indexProgress, setIndexProgress] = useState("");
   const [indexErrors, setIndexErrors] = useState<string[]>([]);
   const [indexRevision, setIndexRevision] = useState(0);
+  const appliedSourceLocation = useRef<SourceLocation | null>(null);
   const {
     sourceLocation,
     mode,
@@ -209,57 +224,112 @@ export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
     const location = sourceLocation;
     if (
       page !== "document" ||
-      mode !== "rendered" ||
       !documentState ||
       !location ||
       location.path !== documentState.path ||
-      location.page ||
-      (!location.quote && !location.paragraph)
+      (location.source ? mode !== "source" : mode !== "rendered") ||
+      (!location.quote && !location.paragraph && !location.page && location.offset === undefined)
     )
       return;
     let active = true;
-    void (documentState.sourceHash ? Promise.resolve(documentState.sourceHash) : contentHash(sourceDraft))
-      .then((hash) => {
+    const report = (status: string) => {
+      if (status === "moved") setSettingsNotice("来源已变化，已根据引用文字重新定位。");
+      if (status === "changed") setSettingsNotice("PDF 来源已变化，原页码可能不再对应原文。已保留摘录，请核对来源。");
+      if (status === "missing" || status === "ambiguous")
+        setSettingsNotice(
+          status === "ambiguous"
+            ? "原文中存在多处相同文字，无法唯一定位。已保留原摘录，请在文档中核对。"
+            : "原文已经变化，未能找到原位置。已保留原摘录，请在文档中核对。",
+        );
+    };
+    const locate = async () => {
+      if (location.source && appliedSourceLocation.current === location) return;
+      if (location.source) {
+        const pane = document.querySelector(".reader-pane.is-active");
+        const selection = pane && readSourceSelection(pane);
+        if (!pane || !selection) return;
+        const hash = await contentHash(selection.text);
+        if (!active) return;
+        const found = locateText(selection.text, location, location.hash === hash);
+        if (found.from !== undefined && revealSourceSelection(pane, found.from, found.to!))
+          appliedSourceLocation.current = location;
+        report(found.status);
+        return;
+      }
+      const hash = documentState.sourceHash ?? (await contentHash(sourceDraft));
+      if (!active) return;
+      if (location.page && documentState.kind === "pdf") {
+        if (!location.hash || location.hash === hash) return;
+        let chunks: import("../shared/bookroom-types").SourceChunk[] = [];
+        if (location.quote?.trim()) {
+          const bytes = documentState.previewUrl
+            ? new Uint8Array(await (await fetch(documentState.previewUrl)).arrayBuffer())
+            : await readBinaryFile(documentState.path);
+          chunks = (await extractSourceChunks(documentState.path, "pdf", bytes)).chunks;
+        }
+        if (!active) return;
+        const found = relocatePdfSource(location, hash, chunks);
+        report(found.status);
+        if (found.status === "moved") setSourceLocation({ ...location, hash, page: found.page });
+        return;
+      }
+      {
         if (!active) return;
         const body = articleRef.current?.querySelector("[data-source-body]");
         if (!body) return;
         const found = locateSource(body, location, location.hash === hash);
         body.querySelectorAll("[data-source-target]").forEach((node) => node.removeAttribute("data-source-target"));
         if (found.element) {
-          found.element.dataset.sourceTarget = "true";
-          found.element.scrollIntoView({ block: "center" });
+          scrollToSource(found.element, found.range);
         }
-        if (found.status === "moved") setSettingsNotice("来源已变化，已根据引用文字重新定位。");
-        if (found.status === "missing" || found.status === "ambiguous")
-          setSettingsNotice(
-            found.status === "ambiguous"
-              ? "原文中存在多处相同文字，无法唯一定位。已保留原摘录，请在文档中核对。"
-              : "原文已经变化，未能找到原位置。已保留原摘录，请在文档中核对。",
-          );
-      })
-      .catch((cause) => setError(String(cause)));
+        report(found.status);
+      }
+    };
+    const run = () => {
+      void locate().catch((cause) => {
+        if (active) setError(String(cause));
+      });
+    };
+    const unsubscribe = location.source ? subscribeSourceSelection(run) : undefined;
+    run();
     return () => {
       active = false;
+      unsubscribe?.();
     };
-  }, [page, documentState, sourceLocation, mode, sourceDraft, articleRef, setSettingsNotice]);
+  }, [page, documentState, sourceLocation, mode, sourceDraft, articleRef, setSettingsNotice, setSourceLocation]);
   const navigate = async (location: SourceLocation) => {
     await panes.openFile(location.path, false);
     const opened = model.documentSessions.active()?.document.path;
     if (!opened || !isSameDocumentPath(opened, location.path)) return;
     setPage("document");
     setSourceLocation({ ...location, path: opened });
-    setMode("rendered");
+    setMode(location.source ? "source" : "rendered");
     setSearchOpen(false);
     setSearchQuery("");
   };
   const currentLocation = async (): Promise<SourceLocation | null> => {
     if (!documentState) return null;
+    flushLiveEditors();
+    const pane = document.querySelector(".reader-pane.is-active");
+    const sourceSelection = mode === "source" && pane ? readSourceSelection(pane) : undefined;
+    if (sourceSelection)
+      return {
+        path: documentState.path,
+        hash: await contentHash(sourceSelection.text),
+        ...sourceSelectionLocation(sourceSelection),
+      };
     const selection = window.getSelection();
     const body =
       articleRef.current?.querySelector("[data-source-body]") ??
       document.querySelector(".reader-pane.is-active .ProseMirror");
     const anchor = selection?.anchorNode;
-    const selectedHere = !!(anchor && body?.contains(anchor));
+    const selectedHere = !!(
+      anchor &&
+      selection?.focusNode &&
+      body?.contains(anchor) &&
+      body.contains(selection.focusNode)
+    );
+    const selectedLocation = body ? selectionSourceLocation(body, selection) : null;
     const blocks = body ? sourceBlocks(body) : [];
     const viewport = body?.closest(".content-area")?.getBoundingClientRect();
     const selectedBlock = selectedHere ? blocks.find((node) => node.contains(anchor)) : undefined;
@@ -280,8 +350,11 @@ export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
       ...(documentState.kind === "pdf"
         ? { page: sourceLocation?.path === documentState.path ? (sourceLocation.page ?? 1) : 1 }
         : {}),
-      hash: documentState.sourceHash ?? (await contentHash(sourceDraft)),
+      hash:
+        documentState.sourceHash ??
+        (await contentHash(model.documentSessions.get(documentState.path)?.draft ?? sourceDraft)),
       quote,
+      ...selectedLocation,
     };
   };
   const bookmark = async () => {

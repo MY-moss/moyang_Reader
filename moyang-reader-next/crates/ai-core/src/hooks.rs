@@ -26,7 +26,15 @@ impl Store {
         if !["codex", "claude", "generic"].contains(&client) {
             return Err(invalid("未知客户端。"));
         }
-        self.set_setting_value(&format!("connection:{client}:{kind}"), &json!(now()))
+        let at = now();
+        let tx = self.conn.unchecked_transaction()?;
+        self.set_setting_value(
+            &format!("connection-source:{client}:{kind}"),
+            &json!({"at":at,"executable":std::env::current_exe()?}),
+        )?;
+        self.set_setting_value(&format!("connection:{client}:{kind}"), &json!(at))?;
+        tx.commit()?;
+        Ok(())
     }
     pub fn client_receipts(&self, client: &str) -> Result<Value> {
         Ok(

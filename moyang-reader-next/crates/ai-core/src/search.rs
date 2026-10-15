@@ -313,6 +313,7 @@ impl Store {
             )? as usize,
             indexed_chunks: count("SELECT COUNT(*) FROM chunks")?,
             embedded_chunks,
+            semantic_paused: self.semantic_paused()?,
             projects: distinct("project")?,
             agents: distinct("agent")?,
             database_path: self.path.display().to_string(),

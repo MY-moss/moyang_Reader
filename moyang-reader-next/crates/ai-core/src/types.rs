@@ -158,6 +158,30 @@ pub struct Revision {
     pub recorded_at: i64,
 }
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
+pub struct HistoryRequest {
+    pub id: String,
+    /// Continue before this revision; omit for the newest page.
+    #[serde(default)]
+    pub before_revision: Option<i64>,
+    /// Defaults to 20; maximum 50 revisions per page.
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct RevisionSummary {
+    pub revision: i64,
+    pub title: String,
+    pub reason: String,
+    pub recorded_at: i64,
+    pub body_chars: usize,
+    pub resource_count: usize,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct HistoryPage {
+    pub items: Vec<RevisionSummary>,
+    pub next_before: Option<i64>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct SearchQuery {
     #[serde(default)]
     pub request_id: Option<String>,
@@ -257,6 +281,7 @@ pub struct Stats {
     pub expired: usize,
     pub indexed_chunks: usize,
     pub embedded_chunks: usize,
+    pub semantic_paused: bool,
     pub projects: Vec<String>,
     pub agents: Vec<String>,
     pub database_path: String,
@@ -305,6 +330,9 @@ pub struct FeedbackRequest {
 pub struct AssetRequest {
     pub id: String,
     pub path: String,
+    /// Omit for the current resource, or supply a historical revision.
+    #[serde(default)]
+    pub revision: Option<i64>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct ContextRequest {
@@ -318,12 +346,20 @@ pub struct ContextRequest {
     pub max_chars: Option<usize>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupFeedback {
+    pub id: String,
+    pub score: i64,
+    pub uses: i64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Backup {
     pub format: String,
     pub version: u32,
     pub exported_at: i64,
     pub records: Vec<Record>,
     pub history: Vec<Revision>,
+    #[serde(default)]
+    pub feedback: Vec<BackupFeedback>,
     #[serde(default)]
     pub settings: std::collections::BTreeMap<String, String>,
     #[serde(default)]

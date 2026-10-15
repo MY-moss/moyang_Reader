@@ -4,6 +4,8 @@ export type SourceLocation = {
   page?: number;
   paragraph?: number;
   offset?: number;
+  endOffset?: number;
+  source?: boolean;
   quote?: string;
 };
 export type SourceChunk = { text: string; location: SourceLocation };

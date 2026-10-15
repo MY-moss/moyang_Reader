@@ -43,6 +43,18 @@ export type AiRecord = AiFields & {
   state: "active" | "archived";
 };
 export type AiRevision = { record: AiRecord; reason: string; recorded_at: number };
+export type AiResourceInfo = Omit<AiAsset, "content"> & { size: number; fingerprint: string };
+export type AiRecordView = Omit<AiRecord, "assets"> & { resources: AiResourceInfo[] };
+export type AiRevisionView = { record: AiRecordView; reason: string; recorded_at: number };
+export type AiRevisionSummary = {
+  revision: number;
+  title: string;
+  reason: string;
+  recorded_at: number;
+  body_chars: number;
+  resource_count: number;
+};
+export type AiHistoryPage = { items: AiRevisionSummary[]; next_before: number | null };
 export type AiHit = Pick<
   AiRecord,
   | "id"
@@ -68,6 +80,7 @@ export type AiStats = {
   expired: number;
   indexed_chunks: number;
   embedded_chunks: number;
+  semantic_paused?: boolean;
   projects: string[];
   agents: string[];
   database_path: string;
@@ -83,6 +96,7 @@ export type AiBackup = {
   checkpoints?: unknown[];
   conflicts?: unknown[];
   activities?: unknown[];
+  feedback?: Array<{ id: string; score: number; uses: number }>;
 };
 export type AiConnection = { directory: string; executable: string; available: boolean; native: boolean };
 export const aiKinds: { key: AiKind; label: string; description: string }[] = [

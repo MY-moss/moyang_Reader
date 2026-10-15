@@ -1,5 +1,6 @@
 // Browser-only preview storage. Native desktop and MCP always use the shared Rust/SQLite engine.
 import { emptyAiFields, type AiBackup, type AiRecord, type AiRevision } from "../shared/ai-types";
+import { previewRecordView } from "../shared/ai-resource-metadata";
 const key = "moyang-ai-preview-v1";
 export function previewRequest(operation: string, payload: any): unknown {
   const raw = localStorage.getItem(key);
@@ -55,6 +56,10 @@ export function previewRequest(operation: string, payload: any): unknown {
       return null;
     case "get":
       return structuredClone(get(payload.id));
+    case "get_if_changed": {
+      const record = get(payload.id);
+      return record.revision === payload.revision ? null : structuredClone(record);
+    }
     case "stats":
       return {
         knowledge: db.records.filter((r) => r.kind === "knowledge" && r.state === "active").length,
@@ -109,6 +114,31 @@ export function previewRequest(operation: string, payload: any): unknown {
     }
     case "history":
       return db.history.filter((h) => h.record.id === payload.id).sort((a, b) => b.record.revision - a.record.revision);
+    case "history_page": {
+      get(payload.id);
+      const limit = Math.max(1, Math.min(50, payload.limit ?? 20));
+      const revisions = db.history
+        .filter(
+          (h) =>
+            h.record.id === payload.id &&
+            (payload.before_revision == null || h.record.revision < payload.before_revision),
+        )
+        .sort((a, b) => b.record.revision - a.record.revision);
+      const items = revisions.slice(0, limit).map((h) => ({
+        revision: h.record.revision,
+        title: h.record.title,
+        reason: h.reason,
+        recorded_at: h.recorded_at,
+        body_chars: [...h.record.body].length,
+        resource_count: h.record.assets.length,
+      }));
+      return { items, next_before: revisions.length > limit ? items.at(-1)!.revision : null };
+    }
+    case "revision_view": {
+      const h = db.history.find((h) => h.record.id === payload.id && h.record.revision === payload.revision);
+      if (!h) throw new Error("历史版本不存在。");
+      return previewRecordView(h.record).then((record) => ({ ...h, record }));
+    }
     case "activity":
       return {
         checkpoints: db.checkpoints ?? [],
@@ -116,8 +146,15 @@ export function previewRequest(operation: string, payload: any): unknown {
         conflicts: db.conflicts ?? [],
         activities: db.activities ?? [],
       };
-    case "asset":
-      return structuredClone(get(payload.id).assets.find((a) => a.path === payload.path));
+    case "asset": {
+      const record =
+        payload.revision == null
+          ? get(payload.id)
+          : db.history.find((h) => h.record.id === payload.id && h.record.revision === payload.revision)?.record;
+      const asset = record?.assets.find((a) => a.path === payload.path);
+      if (!asset) throw new Error("技能资源不存在。");
+      return structuredClone(asset);
+    }
     case "revision_detail":
       return db.history.find((h) => h.record.id === payload.id && h.record.revision === payload.revision);
     case "restore": {
@@ -184,6 +221,10 @@ export function previewRequest(operation: string, payload: any): unknown {
         }
       }
       db.history.push(...(payload.history as AiRevision[]).filter((h) => imported.includes(h.record.id)));
+      db.feedback = [
+        ...(db.feedback ?? []),
+        ...(payload.feedback ?? []).filter((f: { id: string }) => imported.includes(f.id)),
+      ];
       result = { imported: imported.length, skipped: payload.records.length - imported.length };
       break;
     }

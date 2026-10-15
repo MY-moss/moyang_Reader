@@ -26,6 +26,31 @@ fn restart_keeps_records_and_history() {
     assert_eq!(s.get(&r.id).unwrap().fields.body, "喜欢中文回答");
     assert_eq!(s.history(&r.id).unwrap().len(), 1);
 }
+
+#[test]
+fn conditional_get_omits_unchanged_payload_and_observes_updates_and_deletion() {
+    let (directory, mut writer) = setup();
+    let mut fields = request("refresh-check", "Original body");
+    fields.fields.kind = Kind::Skill;
+    fields.fields.summary = "Check refreshes".into();
+    fields.fields.assets = vec![Asset { path: "sample.txt".into(), encoding: "utf8".into(), content: "large fixture ".repeat(20000) }];
+    let original = writer.save(fields).unwrap();
+    let mut reader = Store::open(directory.path()).unwrap();
+    let payload = serde_json::json!({"id":original.id,"revision":original.revision});
+    assert!(dispatch(&mut reader, "get_if_changed", payload.clone()).unwrap().is_null());
+    assert_eq!(reader.get(&original.id).unwrap().fields.assets[0].content.len(), 280000);
+    let mut fields = original.fields;
+    fields.body = "Changed body".into();
+    fields.assets[0].content = "Changed resource".into();
+    let updated = writer.save(SaveRequest { id: Some(original.id.clone()), expected_revision: Some(original.revision), fields, reason: "change fixture".into() }).unwrap();
+    let changed = dispatch(&mut reader, "get_if_changed", payload).unwrap();
+    assert_eq!(changed["revision"], updated.revision);
+    assert_eq!(changed["body"], "Changed body");
+    assert_eq!(changed["assets"][0]["content"], "Changed resource");
+    assert!(reader.get_if_changed(&updated.id, updated.revision).unwrap().is_none());
+    writer.delete(&updated.id, updated.revision).unwrap();
+    assert!(reader.get_if_changed(&updated.id, updated.revision).unwrap_err().to_string().contains("记录不存在"));
+}
 #[test]
 fn pinned_preferences_are_recalled_across_task_vocabulary_without_crossing_scope() {
     let (_, mut s) = setup();
@@ -212,7 +237,8 @@ fn skills_keep_resources_and_validate_portable_paths() {
     assert_eq!(
         s.asset(AssetRequest {
             id: r.id,
-            path: "scripts/check.py".into()
+            path: "scripts/check.py".into(),
+            revision: None,
         })
         .unwrap()
         .content,
@@ -314,6 +340,9 @@ fn semantic_service_indexes_retrieves_and_falls_back() {
     })
     .unwrap();
     assert_eq!(s.index_semantic().unwrap()["remaining"], 0);
+    let mut later = request("未索引的其他项目", "不应阻止当前项目使用已完成的语义索引");
+    later.fields.project = "other".into();
+    s.save(later).unwrap();
     let mut q = query("quiet feline");
     q.semantic = true;
     q.project = Some("book".into());
@@ -329,4 +358,34 @@ fn semantic_service_indexes_retrieves_and_falls_back() {
     let fallback = s.search(&q).unwrap();
     assert_eq!(fallback.items.len(), 1);
     assert!(fallback.warning.is_some());
+}
+
+#[test]
+fn incomplete_semantic_index_preserves_keyword_results_and_pagination() {
+    let (_, mut s) = setup();
+    for i in 0..125 {
+        s.save(request(&format!("Note {i}"), &format!("alpha reference {i}"))).unwrap();
+    }
+    let config = SemanticConfig {
+        enabled: true,
+        endpoint: "http://127.0.0.1:9".into(),
+        model: "incomplete-fixture".into(),
+    };
+    s.configure_semantic(config.clone()).unwrap();
+    let mut q = query("alpha bravo charlie delta echo");
+    q.limit = 7;
+    q.offset = 105;
+    let lexical = s.search(&q).unwrap();
+    assert_eq!(lexical.total, 125);
+    assert_eq!(lexical.items.len(), 7);
+    q.semantic = true;
+    for partial in [false, true] {
+        if partial {
+            s.conn.execute("INSERT INTO embeddings(chunk_id,model,vector) SELECT id,?,'[1.0,0.0]' FROM chunks LIMIT 1", [crate::semantic::model_key(&config)]).unwrap();
+        }
+        let result = s.search(&q).unwrap();
+        assert_eq!(result.total, lexical.total);
+        assert_eq!(result.items.iter().map(|h| &h.id).collect::<Vec<_>>(), lexical.items.iter().map(|h| &h.id).collect::<Vec<_>>());
+        assert!(result.warning.unwrap().contains("尚未"));
+    }
 }

@@ -21,4 +21,6 @@
 
 ## 结果
 
-代码与本地运行验证已完成，已同步 [GitHub PR #568](https://github.com/MY-moss/moyang_Reader/pull/568)。实测结果与外部条件记录在 `docs/VALIDATION-CODE-AUDIT.md`。
+首轮代码与本地运行验证已完成，已同步 [GitHub PR #568](https://github.com/MY-moss/moyang_Reader/pull/568)。首轮结果记录在 `docs/VALIDATION-CODE-AUDIT.md`；沿原方案继续复查的最新结果、云端失败修复及外部条件见 `docs/VALIDATION-COMPLETION-AUDIT.md`。
+
+追加复查覆盖来源定位、保存与重命名竞态、AI 历史与资源按需读取、未变内容条件刷新、跨进程索引协调、备份反馈和新版连接回执。每项修复对应回归用例，不把本机测试通过等同于两个真实 Agent 的生命周期验收。

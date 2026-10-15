@@ -6,6 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(test)]
+#[path = "semantic_index_tests.rs"]
+mod tests;
+
 pub(crate) fn model_key(c: &SemanticConfig) -> String {
     format!("{}|{}|body-v2", c.endpoint.trim_end_matches('/'), c.model)
 }
@@ -109,7 +113,41 @@ fn cosine(a: &[f64], b: &[f64]) -> Option<f64> {
         Some(dot / norm)
     }
 }
+fn index_lock(path: &std::path::Path) -> Result<Option<std::fs::File>> {
+    // Keep one stable file: unlinking it would allow two different inodes to be locked.
+    // The OS releases the lock even when a desktop/MCP process is terminated.
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path.with_extension("semantic.lock"))?;
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+        Err(std::fs::TryLockError::Error(error)) => Err(error.into()),
+    }
+}
 impl Store {
+    pub fn pause_semantic(&self, paused: bool) -> Result<()> {
+        self.conn.execute("INSERT INTO settings(key,value) VALUES('semantic_paused',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [if paused { "true" } else { "false" }])?;
+        Ok(())
+    }
+    pub(crate) fn semantic_paused(&self) -> Result<bool> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT value FROM settings WHERE key='semantic_paused'",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?
+            .as_deref()
+            == Some("true"))
+    }
+    fn semantic_remaining(&self, key: &str) -> Result<i64> {
+        Ok(self.conn.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active'", [key], |r| r.get(0))?)
+    }
     pub fn configure_semantic(&self, mut c: SemanticConfig) -> Result<SemanticConfig> {
         c.endpoint = c.endpoint.trim().trim_end_matches('/').into();
         c.model = c.model.trim().into();
@@ -125,11 +163,18 @@ impl Store {
     }
     /// One bounded batch. UI repeats until remaining=0, allowing cancellation between batches.
     pub fn index_semantic(&mut self) -> Result<serde_json::Value> {
+        let guard = index_lock(&self.path)?;
         let c = self.semantic_config()?;
         if !c.enabled {
             return Err(invalid("请先启用语义检索。"));
         }
         let key = model_key(&c);
+        let paused = self.semantic_paused()?;
+        if paused || guard.is_none() {
+            return Ok(
+                serde_json::json!({"processed":0,"remaining":self.semantic_remaining(&key)?,"busy":guard.is_none(),"paused":paused}),
+            );
+        }
         let pending: Vec<(i64, String)> = {
             let mut stmt=self.conn.prepare("SELECT c.id,c.text FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active' LIMIT 16")?;
             let rows = stmt
@@ -141,19 +186,40 @@ impl Store {
             let texts: Vec<String> = pending.iter().map(|(_, text)| text.clone()).collect();
             let vectors = embed(&c, &texts, None)?;
             let tx = self.conn.transaction()?;
+            // A settings change must not let an old request replace newer-model vectors.
+            let current: String =
+                tx.query_row("SELECT value FROM settings WHERE key='semantic'", [], |r| {
+                    r.get(0)
+                })?;
+            let current: SemanticConfig = serde_json::from_str(&current)?;
+            if !current.enabled || model_key(&current) != key {
+                return Ok(
+                    serde_json::json!({"processed":0,"remaining":pending.len(),"changed":true}),
+                );
+            }
             for ((id, text), vector) in pending.iter().zip(vectors) {
                 // Another process may have replaced the chunk while the network call was in flight.
                 tx.execute("INSERT INTO embeddings(chunk_id,model,vector) SELECT c.id,?2,?3 FROM chunks c WHERE c.id=?1 AND c.text=?4 ON CONFLICT(chunk_id) DO UPDATE SET model=excluded.model,vector=excluded.vector",params![id,key,serde_json::to_string(&vector)?,text])?;
             }
             tx.commit()?;
         }
-        let remaining:i64=self.conn.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active'",[&key],|r|r.get(0))?;
+        let remaining = self.semantic_remaining(&key)?;
         Ok(serde_json::json!({"processed":pending.len(),"remaining":remaining}))
     }
     pub(crate) fn hybrid(&self, q: &SearchQuery) -> Result<SearchResult> {
         let c = self.semantic_config()?;
         if !c.enabled {
             return self.lexical(q);
+        }
+        // Partial vectors cannot prove that an unindexed keyword match is irrelevant.
+        // Preserve full lexical pagination until this search scope is ready, and avoid
+        // paying for a query embedding that could only produce an incomplete ranking.
+        let missing: bool = self.conn.query_row(&format!("SELECT EXISTS(SELECT 1 FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=:model WHERE v.chunk_id IS NULL AND {})", crate::search::FILTER),
+            named_params!{":model":model_key(&c),":state":q.state.key(),":kind":q.kind.map(Kind::key),":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":now()}, |r| r.get(0))?;
+        if missing {
+            let mut fallback = self.lexical(q)?;
+            fallback.warning = Some("当前范围的语义索引尚未就绪；已显示完整关键词结果。".into());
+            return Ok(fallback);
         }
         let mut broad = q.clone();
         broad.limit = 100;
@@ -170,6 +236,13 @@ impl Store {
                 Ok(fallback)
             }
             Ok((vectors, missing)) => {
+                // A write may have introduced missing chunks after the readiness check.
+                if missing {
+                    let mut fallback = self.lexical(q)?;
+                    fallback.warning =
+                        Some("当前范围的语义索引尚未就绪；已显示完整关键词结果。".into());
+                    return Ok(fallback);
+                }
                 let mut scores: HashMap<String, (Hit, f64)> = HashMap::new();
                 for h in lexical.items {
                     let coverage = crate::search::coverage(&q.query, &h);
@@ -226,13 +299,7 @@ impl Store {
                 Ok(SearchResult {
                     items,
                     total,
-                    warning: if missing {
-                        Some(
-                            "部分内容尚未建立当前模型的语义索引；关键词检索仍覆盖全部资料。".into(),
-                        )
-                    } else {
-                        None
-                    },
+                    warning: None,
                 })
             }
         }
@@ -287,25 +354,35 @@ impl Store {
             candidates.sort_by(|a,b|b.2.total_cmp(&a.2));
             candidates.truncate(4);
         }
-        let missing:i64=read_tx.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE e.state='active' AND v.chunk_id IS NULL",[&key],|r|r.get(0))?;
+        let missing: bool = read_tx.query_row(&format!("SELECT EXISTS(SELECT 1 FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=:model WHERE v.chunk_id IS NULL AND {})", crate::search::FILTER),
+            named_params!{":model":key,":state":q.state.key(),":kind":q.kind.map(Kind::key),":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":now()}, |r| r.get(0))?;
         let mut ranked: Vec<_> = best.into_iter().collect();
         ranked.sort_by(|a, b| b.1[0].2.total_cmp(&a.1[0].2).then(a.0.cmp(&b.0)));
         ranked.truncate(100);
         let mut hits = Vec::with_capacity(ranked.len());
-        let mut record_query = read_tx.prepare("SELECT json_remove(payload,'$.assets') FROM records WHERE id=?")?;
+        let mut record_query =
+            read_tx.prepare("SELECT json_remove(payload,'$.assets') FROM records WHERE id=?")?;
         for (id, candidates) in ranked {
             crate::cancellation::check_cancelled(q.request_id.as_deref())?;
-            let Some(payload) = record_query.query_row([id], |r| r.get::<_, String>(0)).optional()? else {
+            let Some(payload) = record_query
+                .query_row([id], |r| r.get::<_, String>(0))
+                .optional()?
+            else {
                 continue;
             };
             let record: Record = serde_json::from_str(&payload)?;
-            if !crate::search::allowed(&record, q) { continue; }
+            if !crate::search::allowed(&record, q) {
+                continue;
+            }
             let mut hit = Hit::from_record(&record, candidates[0].1.clone(), candidates[0].2);
-            hit.fragments = candidates.into_iter().map(|(ordinal, text, score)| {
-                crate::search::fragment(&record, ordinal, text, score)
-            }).collect();
+            hit.fragments = candidates
+                .into_iter()
+                .map(|(ordinal, text, score)| {
+                    crate::search::fragment(&record, ordinal, text, score)
+                })
+                .collect();
             hits.push(hit);
         }
-        Ok((hits, missing > 0 || mismatch))
+        Ok((hits, missing || mismatch))
     }
 }

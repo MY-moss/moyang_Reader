@@ -391,6 +391,7 @@ export default function AiSpace({ active, sidebarTarget }: { active: boolean; si
                     onSave={() => void m.save()}
                     onCancel={() => m.setDraft(null)}
                     onComposition={m.setComposing}
+                    onResourceLoading={m.setResourceLoading}
                   />
                 ) : m.selected ? (
                   <AiDetail

@@ -155,7 +155,10 @@ describe("Reader workbench acceptance", () => {
       await browser.execute(() => { const target=document.querySelector('.workspace-file[title*="链接目标.md"]'); const rect=target.getBoundingClientRect(); target.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:rect.left+20,clientY:rect.top+10})); });
       await browser.$("button=重命名文件").waitForDisplayed();
       await browser.$("button=重命名文件").click();
-      await browser.waitUntil(() => fs.existsSync(path.join(root,"链接新目标.md")));
+      // The native operation moves the target before writing reference patches.
+      // Wait for its completed UI receipt, not an intermediate filesystem state.
+      await browser.waitUntil(() => browser.execute(() => [...document.querySelectorAll(".settings-notice")].some((notice) => notice.textContent.includes("已重命名：链接新目标.md，更新"))), {timeout:30000,timeoutMsg:"重命名及引用更新尚未完成"});
+      assert.equal(fs.existsSync(path.join(root,"链接新目标.md")),true);
       const contents = fs.readFileSync(ref,"utf8");
       assert.match(contents,/\[\[链接新目标#章节\|别名\]\]/);
       assert.match(contents,/\[相对引用\]\(链接新目标\.md#章节\)/);
@@ -164,4 +167,112 @@ describe("Reader workbench acceptance", () => {
       await browser.waitUntil(() => browser.execute(() => document.querySelector('.reader-pane.is-active [aria-label="Markdown 源文本"]')?.textContent.includes("链接新目标")));
     } finally { await browser.execute(() => { window.prompt=window.__renamePrompt; delete window.__renamePrompt; }); }
   });
+
+  it("scrolls a deep TXT search fragment into view instead of the full pre element's beginning", async () => {
+    const name = "deep-source.txt";
+    fs.writeFileSync(path.join(root, name), Array.from({ length: 500 }, (_, i) => `background paragraph ${i} ${"background ".repeat(8)}`).join("\n\n") + "\n\nDeepTXTNeedle unique evidence");
+    await search("DeepTXTNeedle");
+    await browser.waitUntil(() => browser.execute((name) => document.querySelector(".bookroom-results")?.textContent.includes(name), name), { timeout: 30000 });
+    await openHit(name);
+    await browser.waitUntil(() => browser.execute(() => {
+      const selection = window.getSelection();
+      return selection?.rangeCount && selection.getRangeAt(0).toString().includes("DeepTXTNeedle");
+    }));
+    const position = await browser.execute(() => {
+      const content = document.querySelector(".reader-pane.is-active .content-area");
+      const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+      const viewport = content.getBoundingClientRect();
+      return { scroll: content.scrollTop, visible: rect.bottom > viewport.top && rect.top < viewport.bottom };
+    });
+    assert.ok(position.scroll > 1000, "TXT source navigation must scroll past the beginning");
+    assert.equal(position.visible, true, "the matching text range must be on screen");
+  });
+
+  it("relocates changed PDF quote evidence and warns for old page-only bookmarks", async () => {
+    const name = "source-relocation.pdf", file = path.join(root, name);
+    fs.writeFileSync(file, sourcePdfFixture(["first page", "PDFRelocationNeedle unique evidence"]));
+    await search("PDFRelocationNeedle");
+    await browser.waitUntil(() => browser.execute((name) => document.querySelector(".bookroom-results")?.textContent.includes(name), name), { timeout: 30000 });
+    await openHit(name);
+    await browser.$('.reader-pane.is-active .pdf-canvas-stage[aria-busy="false"]').waitForDisplayed();
+    assert.equal(await browser.$('.reader-pane.is-active input[aria-label="PDF 页码"]').getValue(), "2");
+    await browser.$('button[aria-label="收藏当前位置"]').click();
+    await browser.waitUntil(async () => (await invoke("bookroom_request", { request: { action: "metadata.list", category: "bookmark" } })).some((item) => item.location.path.endsWith(name) && item.location.page === 2));
+    const saved = (await invoke("bookroom_request", { request: { action: "metadata.list", category: "bookmark" } })).find((item) => item.location.path.endsWith(name) && item.location.page === 2);
+    await browser.$('button[aria-label="添加摘录"]').click();
+    const fields = await browser.$$(".excerpt-composer textarea");
+    await fields[0].setValue("PDFRelocationNeedle unique evidence");
+    await fields[1].setValue("PDF changed-source regression");
+    await browser.$("button=保存摘录").click();
+    await browser.waitUntil(async () => (await invoke("bookroom_request", { request: { action: "metadata.list", category: "annotation" } })).some((item) => item.comment === "PDF changed-source regression"));
+    fs.writeFileSync(file, sourcePdfFixture(["inserted introduction", "first page", "PDFRelocationNeedle unique evidence"]));
+    await browser.$("button=摘录与批注").click();
+    await browser.execute(() => {
+      const section = [...document.querySelectorAll(".bookroom-rows section")].find((item) => item.textContent.includes("PDF changed-source regression"));
+      [...section.querySelectorAll("button")].find((button) => button.textContent === "查看来源").click();
+    });
+    await browser.waitUntil(() => browser.execute(() => document.querySelector('.reader-pane.is-active input[aria-label="PDF 页码"]')?.value === "3"), { timeout: 30000 });
+    assert.ok((await browser.$(".reader-pane.is-active .settings-notice").getText()).includes("重新定位"));
+    await browser.$("button=收藏").click();
+    await browser.execute((title) => [...document.querySelectorAll(".bookroom-rows section")].find((item) => item.querySelector("strong")?.textContent === title).querySelector("button").click(), saved.title);
+    await browser.waitUntil(() => browser.execute(() => document.querySelector(".reader-pane.is-active .settings-notice")?.textContent.includes("原页码可能不再对应")));
+    assert.equal(await browser.$('.reader-pane.is-active input[aria-label="PDF 页码"]').getValue(), "2");
+  });
 });
+
+describe("Saved search acceptance", () => {
+  it("restores a saved view and a bookmarked search after a native page reload", async () => {
+    const file = path.join(root,"saved-view.md");
+    fs.writeFileSync(file,"# Saved view\n\nsaved-view-evidence\n");
+    await search("saved-view-evidence");
+    // The embedded driver does not emit a select change when clicking an option.
+    // Dispatch the DOM event used by the other native select acceptance flows.
+    await browser.execute(() => {
+      const filters = document.querySelectorAll(".bookroom-search-controls select");
+      filters[0].value = "markdown";
+      filters[0].dispatchEvent(new window.Event("change", { bubbles: true }));
+      filters[2].value = "name";
+      filters[2].dispatchEvent(new window.Event("change", { bubbles: true }));
+    });
+    await browser.waitUntil(() => browser.execute(() => document.querySelector(".bookroom-results")?.textContent.includes("saved-view-evidence")));
+    await browser.$('input[aria-label="视图名称"]').setValue("My saved view");
+    await browser.$("button=保存视图").click();
+    await browser.waitUntil(() => browser.execute(() => document.body.textContent.includes("已保存当前视图")));
+    await browser.$("button=收藏此搜索").click();
+    await browser.waitUntil(() => browser.execute(() => document.body.textContent.includes("已收藏当前搜索与筛选")));
+    await browser.refresh();
+    await browser.$('select[aria-label="工作空间"]').waitForExist();
+    await reader();
+    await browser.$("button=保存的视图").click();
+    const view = await browser.$("//div[@class='bookroom-rows']//button[strong[.='My saved view']]");
+    await view.waitForDisplayed();
+    await view.click();
+    await browser.$('input[aria-label="全文搜索阅读库"]').waitForDisplayed();
+    const state = () => browser.execute(() => ({query:document.querySelector('input[aria-label="全文搜索阅读库"]')?.value,filters:[...document.querySelectorAll(".bookroom-search-controls select")].map((v)=>v.value)}));
+    assert.deepEqual(await state(),{query:"saved-view-evidence",filters:["markdown","","name"]});
+    await browser.$('input[aria-label="全文搜索阅读库"]').setValue("unrelated");
+    await browser.$("button=收藏").click();
+    const bookmark = await browser.$("//div[@class='bookroom-rows']//button[strong[contains(., 'saved-view-evidence')]]");
+    await bookmark.waitForDisplayed();
+    await bookmark.click();
+    await browser.$('input[aria-label="全文搜索阅读库"]').waitForDisplayed();
+    assert.deepEqual(await state(),{query:"saved-view-evidence",filters:["markdown","","name"]});
+  });
+});
+
+function sourcePdfFixture(texts) {
+  const font = 3 + texts.length * 2;
+  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", `<< /Type /Pages /Kids [${texts.map((_, i) => `${3 + i * 2} 0 R`).join(" ")}] /Count ${texts.length} >>`];
+  for (const [i, text] of texts.entries()) {
+    const stream = `BT /F1 18 Tf 50 700 Td (${text}) Tj ET`;
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${4 + i * 2} 0 R >>`);
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  }
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, i) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` + offsets.slice(1).map((offset) => String(offset).padStart(10, "0") + " 00000 n \n").join("");
+  return Buffer.from(pdf + `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+}

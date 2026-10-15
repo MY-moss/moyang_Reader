@@ -1,15 +1,33 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AiAsset } from "../../shared/ai-types";
 import { downloadAi } from "./transfers";
-export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?: (assets: AiAsset[]) => void }) {
-  const [preview, setPreview] = useState<AiAsset | null>(null),
+export function AiResources({
+  assets,
+  onChange,
+  onLoading,
+}: {
+  assets: AiAsset[];
+  onChange?: (assets: AiAsset[]) => void;
+  onLoading?: (value: boolean) => void;
+}) {
+  const [previewPath, setPreviewPath] = useState<string | null>(null),
     [error, setError] = useState(""),
     target = useRef<string | null>(null),
     input = useRef<HTMLInputElement>(null);
-  const latest = useRef({ assets, onChange });
+  const latest = useRef({ assets, onChange, onLoading });
+  const mounted = useRef(false);
+  const [loading, setLoading] = useState(false);
+  const preview = assets.find((asset) => asset.path === previewPath);
   useLayoutEffect(() => {
-    latest.current = { assets, onChange };
-  }, [assets, onChange]);
+    latest.current = { assets, onChange, onLoading };
+  }, [assets, onChange, onLoading]);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      latest.current.onLoading?.(false);
+    };
+  }, []);
   return (
     <section className="ai-resources">
       <h2>
@@ -18,6 +36,7 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
       {onChange && (
         <button
           type="button"
+          disabled={loading}
           onClick={() => {
             target.current = null;
             input.current?.click();
@@ -35,9 +54,12 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
           e.target.value = "";
           if (!file || !onChange) return;
           const path = target.current ?? file.name;
+          setLoading(true);
+          latest.current.onLoading?.(true);
           try {
             if (file.size > 25_000_000) throw new Error("资源不能超过 25 MB。");
             const bytes = new Uint8Array(await file.arrayBuffer());
+            if (!mounted.current) return;
             let encoding: AiAsset["encoding"] = "utf8",
               content = "";
             try {
@@ -54,13 +76,18 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
             current.onChange?.(next);
             setError("");
           } catch (e) {
-            setError(String(e));
+            if (mounted.current) setError(String(e));
+          } finally {
+            if (mounted.current) {
+              setLoading(false);
+              latest.current.onLoading?.(false);
+            }
           }
         }}
       />
       {assets.map((a) => (
         <div key={a.path} className="ai-resource-row">
-          <button type="button" onClick={() => setPreview(a)}>
+          <button type="button" onClick={() => setPreviewPath(a.path)}>
             {a.path}
           </button>
           <div>
@@ -80,6 +107,7 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
               <>
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => {
                     target.current = a.path;
                     input.current?.click();
@@ -89,9 +117,10 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
                 </button>
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => {
                     onChange(assets.filter((v) => v.path !== a.path));
-                    if (preview?.path === a.path) setPreview(null);
+                    if (previewPath === a.path) setPreviewPath(null);
                   }}
                 >
                   移除
@@ -101,11 +130,12 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
           </div>
         </div>
       ))}
+      {loading && <p role="status">正在读取资源，完成后即可保存。</p>}
       {preview && (
         <aside className="ai-resource-preview" aria-label="资源预览">
           <div>
             <strong>{preview.path}</strong>
-            <button type="button" aria-label="关闭资源预览" onClick={() => setPreview(null)}>
+            <button type="button" aria-label="关闭资源预览" onClick={() => setPreviewPath(null)}>
               关闭
             </button>
           </div>
@@ -117,9 +147,10 @@ export function AiResources({ assets, onChange }: { assets: AiAsset[]; onChange?
   );
 }
 
-function ResourcePreview({ asset }: { asset: AiAsset }) {
+export function ResourcePreview({ asset }: { asset: AiAsset }) {
   const [url, setUrl] = useState("");
   const extension = asset.path.split(".").pop()?.toLowerCase() ?? "";
+  const { encoding, content } = asset;
   const mime = (
     {
       png: "image/png",
@@ -134,13 +165,11 @@ function ResourcePreview({ asset }: { asset: AiAsset }) {
   useEffect(() => {
     if (!mime) return;
     const bytes =
-      asset.encoding === "utf8"
-        ? new TextEncoder().encode(asset.content)
-        : Uint8Array.from(atob(asset.content), (c) => c.charCodeAt(0));
+      encoding === "utf8" ? new TextEncoder().encode(content) : Uint8Array.from(atob(content), (c) => c.charCodeAt(0));
     const next = URL.createObjectURL(new Blob([bytes], { type: mime }));
     setUrl(next);
     return () => URL.revokeObjectURL(next);
-  }, [asset, mime]);
+  }, [encoding, content, mime]);
   if (mime?.startsWith("image/") && url) return <img className="ai-resource-image" src={url} alt={asset.path} />;
   if (mime === "application/pdf" && url)
     return <iframe title={`预览 ${asset.path}`} className="ai-resource-pdf" src={url} />;

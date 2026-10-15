@@ -47,6 +47,16 @@ impl Store {
     pub fn get(&self, id: &str) -> Result<Record> {
         read_record(&self.conn, id)
     }
+    pub fn get_if_changed(&self, id: &str, revision: i64) -> Result<Option<Record>> {
+        // The revision primary key is a covering index; unchanged polls need not
+        // load or parse the potentially large body/resource JSON. One statement
+        // keeps the version check and returned payload on the same read snapshot.
+        let payload: Option<String> = self.conn.query_row(
+            "SELECT CASE WHEN (SELECT MAX(revision) FROM revisions WHERE id=r.id)=?2 THEN NULL ELSE r.payload END FROM records r WHERE r.id=?1",
+            params![id, revision], |r| r.get(0),
+        ).optional()?.ok_or_else(|| invalid("记录不存在，可能已被删除。"))?;
+        payload.map(|raw| serde_json::from_str(&raw).map_err(Error::from)).transpose()
+    }
     pub fn save(&mut self, mut request: SaveRequest) -> Result<Record> {
         validate(&mut request.fields)?;
         let tx = self
@@ -91,6 +101,19 @@ impl Store {
         })
         .collect()
     }
+    pub fn history_page(&self, q: HistoryRequest) -> Result<HistoryPage> {
+        let exists: bool = self.conn.query_row("SELECT EXISTS(SELECT 1 FROM records WHERE id=?)", [&q.id], |r| r.get(0))?;
+        if !exists { return Err(invalid("记录不存在，可能已被删除。")); }
+        let limit = q.limit.unwrap_or(20).clamp(1, 50);
+        // Project only metadata: never deserialize every historical body/resource.
+        let mut stmt = self.conn.prepare("SELECT revision,json_extract(payload,'$.title'),reason,recorded,length(json_extract(payload,'$.body')),json_array_length(payload,'$.assets') FROM revisions WHERE id=?1 AND (?2 IS NULL OR revision<?2) ORDER BY revision DESC LIMIT ?3")?;
+        let rows = stmt.query_map(params![q.id,q.before_revision,(limit+1) as i64], |r| Ok(RevisionSummary {
+            revision:r.get(0)?,title:r.get(1)?,reason:r.get(2)?,recorded_at:r.get(3)?,body_chars:r.get::<_,i64>(4)? as usize,resource_count:r.get::<_,Option<i64>>(5)?.unwrap_or(0) as usize
+        }))?;
+        let mut items = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        let next_before = if items.len()>limit { items.truncate(limit);items.last().map(|r|r.revision) } else {None};
+        Ok(HistoryPage {items,next_before})
+    }
     pub fn restore(&mut self, q: RestoreRequest) -> Result<Record> {
         let tx = self
             .conn
@@ -129,7 +152,10 @@ impl Store {
         Ok(())
     }
     pub fn asset(&self, q: AssetRequest) -> Result<Asset> {
-        let r = self.get(&q.id)?;
+        let r = match q.revision {
+            Some(revision) => self.revision_detail(&q.id, revision)?.record,
+            None => self.get(&q.id)?,
+        };
         r.fields
             .assets
             .into_iter()
@@ -192,6 +218,20 @@ impl Store {
         tx.commit()?;
         Ok(result)
     }
+}
+/// Body and metadata only; resource bytes are requested separately by path/version.
+pub fn view_record(r: Record) -> Result<serde_json::Value> {
+    let resources = r.fields.assets.iter().map(|a| {
+        let mut hasher = Sha256::new();
+        hasher.update(a.encoding.as_bytes());
+        hasher.update([0]);
+        hasher.update(a.content.as_bytes());
+        serde_json::json!({"path":a.path,"encoding":a.encoding,"size":a.content.len(),"fingerprint":format!("{:x}",hasher.finalize())})
+    }).collect::<Vec<_>>();
+    let mut value = serde_json::to_value(r)?;
+    value.as_object_mut().unwrap().remove("assets");
+    value["resources"] = serde_json::json!(resources);
+    Ok(value)
 }
 pub(crate) fn read_record(conn: &Connection, id: &str) -> Result<Record> {
     let payload: Option<String> = conn

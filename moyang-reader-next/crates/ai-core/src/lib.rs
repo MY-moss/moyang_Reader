@@ -17,7 +17,7 @@ mod semantic;
 mod store;
 mod types;
 pub use dispatch::dispatch;
-pub use store::Store;
+pub use store::{view_record, Store};
 pub use types::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -46,3 +46,5 @@ pub fn now() -> i64 {
 mod lifecycle_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod history_tests;
