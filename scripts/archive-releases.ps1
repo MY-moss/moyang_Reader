@@ -50,7 +50,8 @@ $modelRoot = Join-Path $project '.local/ollama'
 Assert-PlainPath $modelRoot
 $modelHashes = @{}
 $indexPath = Join-Path $archive 'release-archive-index.json'
-$receipts = if (Test-Path -LiteralPath $indexPath) { @(Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json) } else { @() }
+$receipts = @()
+if (Test-Path -LiteralPath $indexPath) { $receipts = @(Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json) }
 foreach ($item in $targets) {
     $files = @(Get-PlainFiles $item.FullName)
     $zipPath = Join-Path $archive ($item.Name + '-' + [guid]::NewGuid().ToString('N').Substring(0,8) + '.zip')
@@ -95,8 +96,8 @@ foreach ($item in $targets) {
     } finally { $zip.Dispose() }
     $absolute = [IO.Path]::GetFullPath($item.FullName)
     if (-not $absolute.StartsWith($release + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Removal outside release directory.' }
-    Remove-Item -LiteralPath $absolute -Recurse -Force
     $receipts += [PSCustomObject]@{source=$absolute;archive=$zipPath;files=$manifest.Count;sourceBytes=($files | Measure-Object Length -Sum).Sum;archiveBytes=(Get-Item -LiteralPath $zipPath).Length;sha256=(Get-Sha256 $zipPath)}
     $receipts | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $indexPath -Encoding UTF8
+    Remove-Item -LiteralPath $absolute -Recurse -Force
     Write-Output "Archived and verified: $($item.Name)"
 }
