@@ -1203,6 +1203,20 @@
 .ai-source {
   overflow-wrap: anywhere;
 }
+.ai-source-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 22px 0 12px;
+}
+.ai-source-uri,
+.ai-source-error {
+  overflow-wrap: anywhere;
+}
+.ai-source-error {
+  color: var(--danger);
+}
 .ai-source-update {
   width: 100%;
 }

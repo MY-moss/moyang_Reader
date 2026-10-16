@@ -52,3 +52,7 @@
 最终路径比较沿用 `normalizePathKey`，处理大小写、Windows命名空间与尾分隔符；此前原生图中的重复说明仍属旧证据，最终便携烟测会核对当前源码。
 
 2026-10-16 15:10（Asia/Shanghai），最终 0.13.0 便携包 `07-10-26.600Z-95e9de` 的 `artifacts/workbench/release-storage.png` 已由主任务查看：真实 Windows WebView、150% 缩放、隔离 D 盘测试资料；无迁移时不再显示重复的兼容路径说明。`release-desktop.png` 同批来源为隔离空 AI 库。实际保存/读取/正常退出结果见同目录 `release-smoke.json`。聊天并发首次初始化与失败重试另有原生和 Hook 回归；不将截图当成所有并发情况的证明。
+
+## 0.16 来源核对
+
+`artifacts/source-review/1440-light.png`、`1440-dark.png`、`720-light.png`、`720-dark.png` 来自 `e2e/ai-sources.spec.ts` 的浏览器隔离存储，使用虚构“来源样例.txt”。它们展示来源列表、项目筛选和结果筛选；宽窗浅色与窄窗深色已实际查看。四个状态的横向溢出与 Axe 检查通过。真实文件/网页读取、并发保存与历史由独立桌面测试证明，不用这些浏览器截图替代。

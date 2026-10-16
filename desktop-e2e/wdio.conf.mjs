@@ -56,7 +56,7 @@ process.once("exit", cleanupFixture);
 
 export const config = {
   runner: "local",
-  specs: [[path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs"), path.join(projectRoot, "desktop-e2e", "bookroom.e2e.mjs"), path.join(projectRoot,"desktop-e2e","extensions.e2e.mjs"), path.join(projectRoot,"desktop-e2e","chat-updates.e2e.mjs"), path.join(projectRoot,"desktop-e2e","memory-health.e2e.mjs")]],
+  specs: [[path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs"), path.join(projectRoot, "desktop-e2e", "bookroom.e2e.mjs"), path.join(projectRoot,"desktop-e2e","extensions.e2e.mjs"), path.join(projectRoot,"desktop-e2e","chat-updates.e2e.mjs"), path.join(projectRoot,"desktop-e2e","memory-health.e2e.mjs"), path.join(projectRoot,"desktop-e2e","source-review.e2e.mjs")]],
   maxInstances: 1,
   capabilities: [
     {

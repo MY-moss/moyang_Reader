@@ -7,10 +7,12 @@ export function AiSource({
   record,
   onChange,
   notify,
+  initialIncoming,
 }: {
   record: AiRecord;
   onChange: (r: AiRecord) => void;
   notify: (message: string, error?: boolean) => void;
+  initialIncoming?: AiFields | null;
 }) {
   const [incoming, setIncoming] = useState<AiFields | null>(null),
     [busy, setBusy] = useState(false);
@@ -19,19 +21,21 @@ export function AiSource({
   useLayoutEffect(() => {
     const epoch = request.current;
     epoch.sequence++;
-    setIncoming(null);
+    setIncoming(initialIncoming ?? null);
     setBusy(false);
     return () => {
       epoch.sequence++;
     };
-  }, [record.id, record.revision]);
+  }, [record.id, record.revision, initialIncoming]);
   const check = async (load: () => Promise<AiFields>) => {
     const sequence = ++request.current.sequence;
     setBusy(true);
     try {
       const next = await load();
       if (sequence !== request.current.sequence) return;
-      if (next.snapshot?.fingerprint === record.snapshot?.fingerprint) notify("来源内容没有变化。");
+      if (!next.body.trim()) throw new Error("来源没有可读取的正文，已保留现有快照。");
+      if (next.snapshot?.fingerprint && next.snapshot.fingerprint === record.snapshot?.fingerprint)
+        notify("来源内容没有变化。");
       else setIncoming(next);
     } catch (e) {
       if (sequence === request.current.sequence) notify(String(e), true);
@@ -107,7 +111,7 @@ export function AiSource({
                   ...record,
                   body: incoming.body,
                   source: incoming.source,
-                  snapshot: incoming.snapshot,
+                  snapshot: incoming.snapshot ? { ...incoming.snapshot, checked_at: Date.now() } : null,
                   expected_revision: record.revision,
                   reason: "检查差异后更新来源快照",
                 });

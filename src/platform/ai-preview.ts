@@ -2,6 +2,7 @@
 import { emptyAiFields, type AiBackup, type AiRecord, type AiRevision } from "../shared/ai-types";
 import { previewRecordView } from "../shared/ai-resource-metadata";
 import { previewHealth } from "../shared/ai-health";
+import { previewSourceInventory } from "../shared/ai-sources";
 const key = "moyang-ai-preview-v1";
 let previousRaw: string | null | undefined;
 let changeGeneration = 0;
@@ -71,6 +72,8 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "source_inventory":
+      return previewSourceInventory(db.records, payload);
     case "health":
       return previewHealth(db.records, payload);
     case "context": {

@@ -2,6 +2,21 @@ use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceEx
 use serde_json::{json, Value};
 use tokio::process::Command;
 
+#[tokio::test]
+async fn source_inventory_through_stdio_is_scoped_and_metadata_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = client(dir.path()).await;
+    let imported = call(&c,"save_record",json!({"kind":"knowledge","title":"来源目录","body":"不得放入清单的完整正文","project":"sources","snapshot":{"uri":"D:/source.md","format":"markdown","fingerprint":"fingerprint","imported_at":1,"locations":[]}})).await;
+    call(&c,"save_record",json!({"kind":"knowledge","title":"其他范围","body":"其他项目正文","project":"other","snapshot":{"uri":"D:/other.md","format":"markdown","fingerprint":"other","imported_at":1,"locations":[]}})).await;
+    let list = call(&c,"list_knowledge_sources",json!({"project":"sources","limit":1})).await;
+    assert_eq!(list["total"],1);
+    assert_eq!(list["items"][0]["id"],imported["id"]);
+    assert!(list["items"][0].get("body").is_none());
+    assert!(list["items"][0].get("assets").is_none());
+    assert_eq!(call(&c,"get_record",json!({"id":imported["id"]})).await["revision"],1);
+    c.cancel().await.unwrap();
+}
+
 #[test]
 fn request_mode_supports_semantic_search_and_web_fetch_without_runtime_panics() {
     use std::io::{Read, Write};
@@ -127,6 +142,7 @@ async fn real_stdio_client_roundtrip_restart_and_cross_process_revision() {
     assert!(tools.iter().any(|t| t.name == "recall_context"));
     assert!(tools.iter().any(|t| t.name == "read_skill_resource"));
     assert!(tools.iter().any(|t| t.name == "library_health"));
+    assert!(tools.iter().any(|t| t.name == "list_knowledge_sources"));
     let memory=call(&c,"save_record",json!({"kind":"memory","title":"写作偏好","body":"偏好简洁中文回答","project":"book","source":"用户确认"})).await;
     let id = memory["id"].as_str().unwrap();
     let found = call(&c, "search", json!({"query":"中文","project":"book"})).await;
