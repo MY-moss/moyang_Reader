@@ -37,7 +37,7 @@
     "@milkdown/kit": "7.22.1",
     "@milkdown/react": "7.22.1",
     "@mozilla/readability": "^0.6.0",
-    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.7.2",
     "@tauri-apps/plugin-process": "^2.3.1",
