@@ -23,7 +23,7 @@ updates:
           - patch
 
   - package-ecosystem: cargo
-    directory: "/src-tauri"
+    directories: ["/", "/src-tauri"]
     schedule:
       interval: weekly
     open-pull-requests-limit: 3

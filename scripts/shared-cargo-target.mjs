@@ -1,9 +1,36 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepositoryRoot } from "./repository-root.mjs";
 
 const defaultProjectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const gitCommand = process.platform === "win32" ? "git.exe" : "git";
+
+export function resolveRepositoryRoot(projectRoot = defaultProjectRoot) {
+  try {
+    const commonDir = execFileSync(gitCommand, ["rev-parse", "--git-common-dir"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (commonDir) {
+      const resolvedCommonDir = path.resolve(projectRoot, commonDir);
+      if (path.basename(resolvedCommonDir).toLowerCase() === ".git") {
+        return path.dirname(resolvedCommonDir);
+      }
+    }
+  } catch {
+    // Fall back to the conventional Codex worktree layout when Git is unavailable.
+  }
+
+  const parent = path.dirname(projectRoot);
+  if (path.basename(parent).toLowerCase() === ".codex-worktrees") {
+    return path.dirname(parent);
+  }
+  return projectRoot;
+}
 
 function resolveBuildCacheRoot() {
   const configuredRoot = process.env.MOYANG_BUILD_CACHE_DIR?.trim();
@@ -18,38 +45,35 @@ function resolveBuildCacheRoot() {
   return path.join(os.tmpdir(), "moyang-reader-build-cache");
 }
 
-function isInside(candidate, root) {
-  const relative = path.relative(path.resolve(root), path.resolve(candidate));
-  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
+function repositoryCacheKey(repositoryRoot) {
+  let identity = path.resolve(repositoryRoot);
+  try {
+    // Git can return a long path when the caller uses an 8.3 path or a junction.
+    // Both spellings must share one build cache for the same repository.
+    identity = fs.realpathSync.native(identity);
+  } catch {
+    // Keep deterministic paths for a checkout that has not been created yet.
+  }
+  if (process.platform === "win32") identity = identity.toLowerCase();
+  return crypto.createHash("sha256").update(identity).digest("hex").slice(0, 12);
 }
 
 export function resolveDefaultSharedCargoTargetDir(projectRoot = defaultProjectRoot) {
   const repositoryRoot = resolveRepositoryRoot(projectRoot);
-  const configuredRoot = resolveBuildCacheRoot();
-  const cacheRoot = isInside(configuredRoot, repositoryRoot)
-    ? path.join(os.tmpdir(), "moyang-reader-build-cache")
-    : configuredRoot;
-  return path.join(cacheRoot, "cargo-target");
+  return path.join(resolveBuildCacheRoot(), repositoryCacheKey(repositoryRoot), "cargo-target");
 }
 
 export function resolveSharedCargoTargetDir(projectRoot = defaultProjectRoot) {
-  const repositoryRoot = resolveRepositoryRoot(projectRoot);
   const configuredTarget = process.env.CARGO_TARGET_DIR?.trim();
+  if (configuredTarget) return path.resolve(projectRoot, configuredTarget);
 
-  if (configuredTarget) {
-    const resolvedTarget = path.resolve(projectRoot, configuredTarget);
-    if (!isInside(resolvedTarget, repositoryRoot)) return resolvedTarget;
-  }
-
-  // A repository-local target can grow by several GiB and is duplicated by
-  // every worktree. Always redirect it to one user-level cache instead.
   return resolveDefaultSharedCargoTargetDir(projectRoot);
 }
 
 export function createBuildEnvironment(projectRoot = defaultProjectRoot, overrides = {}) {
   return {
     ...process.env,
-    ...overrides,
     CARGO_TARGET_DIR: resolveSharedCargoTargetDir(projectRoot),
+    ...overrides,
   };
 }

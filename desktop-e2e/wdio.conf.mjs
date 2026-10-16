@@ -2,8 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveSharedCargoTargetDir } from "../scripts/shared-cargo-target.mjs";
-import { LARGE_DOCUMENT_CASES, createLargeMarkdown } from "./large-document-fixture.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configuredDocumentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
@@ -17,13 +15,8 @@ const workspacePath = fixtureRoot;
 const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
 const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
 const ownsExportRoot = !configuredExportRoot;
-const skipPerformanceBenchmark = process.env.MOYANG_DESKTOP_E2E_SKIP_BENCHMARK === "1";
-const benchmarkMode = process.env.MOYANG_DESKTOP_E2E_BENCHMARK ?? "";
-const benchmarkTitle = "measures a 96-document batch Word export matrix across three runs";
-const largeDocumentBenchmarkTitle =
-  "measures 1MB and 10MB Markdown reading, editing, search, save, memory, and responsiveness";
 const applicationPath = path.join(
-  resolveSharedCargoTargetDir(projectRoot),
+  process.env.CARGO_TARGET_DIR || path.join(projectRoot, "src-tauri", "target"),
   "debug",
   process.platform === "win32" ? "moyang-reader.exe" : "moyang-reader",
 );
@@ -34,38 +27,35 @@ if (!configuredDocumentPath) {
 if (ownsWikiTarget) {
   fs.writeFileSync(wikiTargetPath, "# Wiki target\n\n桌面双链候选文档。\n", "utf8");
 }
-if (benchmarkMode === "large-document") {
-  for (const definition of LARGE_DOCUMENT_CASES) {
-    fs.writeFileSync(
-      path.join(fixtureRoot, definition.fileName),
-      createLargeMarkdown(definition.targetBytes, definition.id),
-      "utf8",
-    );
-  }
-}
 process.env.MOYANG_DESKTOP_E2E_DOCUMENT = documentPath;
 process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT = exportRoot;
+process.env.MOYANG_AI_DATA_DIR = path.join(exportRoot, "ai-space");
+process.env.MOYANG_DATA_DIR = path.join(exportRoot, "desktop-state");
+process.env.WEBVIEW2_USER_DATA_FOLDER = path.join(exportRoot, "webview");
 
 function cleanupFixture() {
-  if (ownsExportRoot) fs.rmSync(exportRoot, { recursive: true, force: true });
-  if (ownsWikiTarget) fs.rmSync(wikiTargetPath, { force: true });
-  if (benchmarkMode === "large-document") {
-    for (const definition of LARGE_DOCUMENT_CASES) {
-      fs.rmSync(path.join(fixtureRoot, definition.fileName), { force: true });
+  const removeTemporary = (directory, prefix) => {
+    const resolved=path.resolve(directory);
+    if(path.dirname(resolved)!==path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith(prefix)) throw new Error(`Refusing to clean an unexpected fixture directory: ${resolved}`);
+    try { fs.rmSync(resolved,{recursive:true,force:true,maxRetries:6,retryDelay:200}); }
+    catch(error) {
+      // WebView2 may release its Crashpad files after WDIO's onComplete hook.
+      // The exit hook retries; do not turn a busy test cache into a failed assertion.
+      if(!["EBUSY","EPERM","ENOTEMPTY"].includes(error.code)) throw error;
+      console.warn(`Test cache still in use; retained at ${resolved}`);
     }
-  }
+  };
+  if (ownsExportRoot) removeTemporary(exportRoot, "moyang-reader-desktop-e2e-export-");
+  if (ownsWikiTarget) fs.rmSync(wikiTargetPath, { force: true });
   if (configuredDocumentPath) return;
-  fs.rmSync(fixtureRoot, { recursive: true, force: true });
+  removeTemporary(fixtureRoot, "moyang-reader-desktop-e2e-");
 }
 
 process.once("exit", cleanupFixture);
 
 export const config = {
   runner: "local",
-  specs:
-    benchmarkMode === "large-document"
-      ? [path.join(projectRoot, "desktop-e2e", "large-document-benchmark.e2e.mjs")]
-      : [path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs")],
+  specs: [[path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs"), path.join(projectRoot, "desktop-e2e", "bookroom.e2e.mjs"), path.join(projectRoot,"desktop-e2e","extensions.e2e.mjs")]],
   maxInstances: 1,
   capabilities: [
     {
@@ -79,6 +69,7 @@ export const config = {
         appArgs: [workspacePath, documentPath],
         driverProvider: "embedded",
         embeddedPort: 4445,
+        captureBackendLogs: true,
       },
     },
   ],
@@ -90,6 +81,7 @@ export const config = {
         appArgs: [workspacePath, documentPath],
         driverProvider: "embedded",
         embeddedPort: 4445,
+        captureBackendLogs: true,
       },
     ],
   ],
@@ -100,12 +92,18 @@ export const config = {
   connectionRetryTimeout: 90_000,
   connectionRetryCount: 3,
   mochaOpts: {
-    timeout: 600_000,
-    ...(benchmarkMode === "large-document"
-      ? { grep: largeDocumentBenchmarkTitle }
-      : skipPerformanceBenchmark
-        ? { grep: benchmarkTitle, invert: true }
-        : {}),
+    ...(process.env.MOYANG_DESKTOP_E2E_GREP ? { grep: process.env.MOYANG_DESKTOP_E2E_GREP } : {}),
+    timeout: 60_000,
+  },
+  afterTest: async function (test, _context, result) {
+    if (!result.error) return;
+    const directory = path.join(projectRoot, "artifacts", "desktop-failures"); fs.mkdirSync(directory, { recursive: true });
+    const name = test.title.replace(/[^a-z0-9]+/gi, "-").slice(0,100);
+    try {
+      const state = await browser.execute(() => ({ title: document.querySelector(".document-title")?.textContent, tabs: [...document.querySelectorAll(".pane-tabs")].map((x) => x.textContent), panes: [...document.querySelectorAll(".reader-pane")].map((x) => ({ label: x.getAttribute("aria-label"), text: x.innerText.slice(0,3000) })), alerts: [...document.querySelectorAll('[role="alert"]')].map((x) => x.textContent), body: document.body.innerText.slice(0,5000) }));
+      fs.writeFileSync(path.join(directory, name + ".json"), JSON.stringify(state,null,2));
+      await browser.saveScreenshot(path.join(directory, name + ".png"));
+    } catch { /* Preserve the original assertion. */ }
   },
   onComplete: cleanupFixture,
 };

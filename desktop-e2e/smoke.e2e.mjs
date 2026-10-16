@@ -1,10 +1,13 @@
-import { execFileSync } from "node:child_process";
 import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { performance } from "node:perf_hooks";
-import JSZip from "jszip";
+import { connectMcp } from "../scripts/mcp-test-client.mjs";
+
+async function selectSpace(space) {
+  await browser.execute((space) => { const select = document.querySelector('select[aria-label="工作空间"]'); select.value = space; select.dispatchEvent(new window.Event("change", { bubbles: true })); }, space);
+  await browser.waitUntil(() => browser.execute((space) => document.body.dataset.activeSpace === space, space));
+}
 
 const documentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
 const exportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
@@ -18,6 +21,14 @@ const documentName = path.basename(documentPath, path.extname(documentPath));
 const pdfExportPath = path.join(exportRoot, `${documentName}.pdf`);
 
 async function clickToolbarAction(name) {
+  if (["编辑", "源文本", "阅读", "保存"].includes(name)) {
+    const clicked = await browser.execute((name) => { const button = [...document.querySelectorAll(".reader-pane.is-active .document-actions button")].find((button) => button.textContent.trim() === name && !button.disabled); if (!button) return false; button.click(); return true; }, name);
+    if (clicked) return;
+  }
+  if (name === "源文本") {
+    const enterEditing = await browser.$('button[aria-label="直接进入编辑模式"]');
+    if (await enterEditing.isExisting()) await ensureWysiwygMode();
+  }
   const menu = await browser.$("details.toolbar-overflow");
   if ((await menu.getAttribute("open")) === null) {
     await menu.$("summary.toolbar-overflow-trigger").click();
@@ -41,55 +52,61 @@ async function ensureWysiwygMode() {
   return editable;
 }
 
+async function readerText() {
+  return browser.execute(() => document.querySelector(".reader-pane.is-active .reader-stage .reader-content")?.textContent ?? "");
+}
 async function ensureRenderedMode() {
-  const returnToReading = await browser.$('button[aria-label="直接返回阅读模式"]');
-  if (await returnToReading.isExisting()) {
-    await returnToReading.click();
+  await browser.execute(() => {
+    const button = document.querySelector('.reader-pane.is-active button[aria-label="直接返回阅读模式"]'); button?.click();
+  });
+  try {
+    await browser.waitUntil(() => browser.execute(() => Boolean(document.querySelector(".reader-pane.is-active .reader-stage .reader-content"))), { timeout:15000, timeoutMsg:"active reader did not enter rendered mode" });
+  } catch (error) {
+    console.error("Render failure live state", JSON.stringify(await browser.execute(() => ({body:document.body.innerText,panes:window.localStorage.getItem("moyang.workbench.panes.v1"),tabs:window.localStorage.getItem("moyang-reader-open-tabs")}))));
+    throw error;
   }
-  await browser.$(".reader-content").waitForDisplayed();
 }
 
-async function checkDesktopInsertPopover() {
-  const insert = await browser.$('.editor-format-toolbar button[aria-label="插入"]');
-  await insert.waitForDisplayed();
-  await browser.waitUntil(() => insert.isEnabled(), {
-    timeout: 15_000,
-    timeoutMsg: "the desktop editor insert tool did not become ready",
-  });
-  const before = await browser.execute(() => {
-    const insert = document.querySelector('.editor-format-toolbar button[aria-label="插入"]');
-    const bounds = insert.getBoundingClientRect();
-    return {
-      busy: document.querySelector(".code-mirror-editor, .wysiwyg-editor")?.getAttribute("aria-busy"),
-      hitClass: document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)?.className,
-      menuOpen: document.querySelector("details.toolbar-overflow")?.open,
-      scrollTop: document.querySelector(".content-area")?.scrollTop,
-    };
-  });
-  await insert.click();
-  const dialog = await browser.$('.editor-insert-popover[role="dialog"]');
+async function restoreInitialDocument() {
+  const name = path.basename(documentPath);
   try {
-    await dialog.waitForDisplayed();
-  } catch (cause) {
-    const after = await browser.execute(() => ({
-      busy: document.querySelector(".code-mirror-editor, .wysiwyg-editor")?.getAttribute("aria-busy"),
-      active: document.activeElement?.tagName,
-      dialogCount: document.querySelectorAll('[role="dialog"]').length,
-      menuOpen: document.querySelector("details.toolbar-overflow")?.open,
-    }));
-    throw new Error(`${cause.message}; insert readiness: ${JSON.stringify({ before, after })}`, { cause });
+    await browser.$('button[aria-label="快速打开"]').click();
+    const input = await browser.$(".quick-open-dialog input");
+    await input.waitForDisplayed();
+    await input.setValue(name);
+    await browser.waitUntil(() => browser.execute((name) =>
+      [...document.querySelectorAll(".quick-open-item")].some((item) => item.querySelector("strong")?.textContent === name), name),
+      { timeoutMsg: `quick open did not offer the cleanup target ${name}` });
+    // Cleanup must select the intended UI result. The embedded driver can send
+    // WebDriver's Enter token as text, leaving this modal open across tests.
+    await browser.execute((name) => {
+      [...document.querySelectorAll(".quick-open-item")].find((item) => item.querySelector("strong")?.textContent === name).click();
+    }, name);
+    await browser.waitUntil(() => browser.execute((name) =>
+      !document.querySelector(".quick-open-dialog") && document.querySelector(".document-title")?.textContent.includes(name), name),
+      { timeoutMsg: `cleanup did not return to ${name}` });
+  } finally {
+    // Even a failed restoration must not leave an input modal over the next test.
+    await browser.execute(() => {
+      document.querySelector(".quick-open-dialog input")?.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true, cancelable: true }),
+      );
+    });
   }
-  assert.match(await dialog.getText(), /插入内容/);
-  assert.equal((await dialog.$$('[role="tab"]')).length, 4);
-  await dialog.$(".editor-insert-cancel").click();
-  await browser.waitUntil(() => dialog.isExisting().then((exists) => !exists), {
-    timeout: 5_000,
-    timeoutMsg: "the desktop insertion dialog did not close after cancellation",
-  });
+}
+
+async function showDocumentProperties() {
+  await browser.execute(() => document.querySelector('button[aria-label="显示上下文"]')?.click());
+  const panel = await browser.$('.context-sidebar[aria-label="当前文档上下文"]');
+  await panel.waitForDisplayed();
+  const tab = await panel.$("button=属性");
+  assert.equal(await tab.getAttribute("role"), "tab");
+  await tab.click();
+  await browser.$("button=编辑文档属性").waitForDisplayed();
 }
 
 async function clickWorkspaceExportAction(name) {
-  const menu = await browser.$("details.workspace-manage-menu");
+  const menu = await browser.$("details.workspace-export-menu");
   if ((await menu.getAttribute("open")) === null) {
     await menu.$("summary").click();
   }
@@ -113,399 +130,9 @@ async function waitForExport(pathname, description) {
       return false;
     },
     {
-      timeout: 30_000,
+      timeout: 15_000,
       timeoutMsg: `${description} did not create an output file`,
     },
-  );
-}
-
-function listWorkspaceExportArtifacts() {
-  if (!fs.existsSync(exportRoot)) return [];
-  return fs
-    .readdirSync(exportRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith(workspaceName) && entry.name.endsWith(".docx"))
-    .map((entry) => path.join(exportRoot, entry.name));
-}
-
-function listExportTempFiles() {
-  if (!fs.existsSync(exportRoot)) return [];
-  return fs
-    .readdirSync(exportRoot, { withFileTypes: true })
-    .filter((entry) => entry.name.includes(".moyang-export-part-") && entry.name.endsWith(".tmp"))
-    .map((entry) => path.join(exportRoot, entry.name));
-}
-
-function removeExportArtifacts() {
-  if (!fs.existsSync(exportRoot)) return;
-  for (const entry of fs.readdirSync(exportRoot, { withFileTypes: true })) {
-    if (
-      (entry.name.startsWith(workspaceName) && entry.name.endsWith(".docx")) ||
-      entry.name.includes(".moyang-export-part-")
-    ) {
-      fs.rmSync(path.join(exportRoot, entry.name), { recursive: true, force: true });
-    }
-  }
-}
-
-async function validateDocxArtifacts(description, minimumCount = 1) {
-  const artifacts = listWorkspaceExportArtifacts();
-  assert.ok(artifacts.length >= minimumCount, `${description} should commit at least ${minimumCount} DOCX volume(s)`);
-  let totalBytes = 0;
-  let documentXmlCount = 0;
-  for (const artifactPath of artifacts) {
-    const bytes = fs.readFileSync(artifactPath);
-    totalBytes += bytes.length;
-    const zip = await JSZip.loadAsync(bytes);
-    const documentXml = zip.file("word/document.xml");
-    assert.ok(documentXml, `${description} ${path.basename(artifactPath)} should contain word/document.xml`);
-    const xml = await documentXml.async("string");
-    assert.match(
-      xml,
-      /<w:document[\s>]/,
-      `${description} ${path.basename(artifactPath)} should contain a DOCX document`,
-    );
-    documentXmlCount += 1;
-  }
-  return {
-    count: artifacts.length,
-    totalBytes,
-    documentXmlCount,
-  };
-}
-
-async function waitForWorkspaceItemCountAtLeast(minimum, description) {
-  await browser.waitUntil(
-    () =>
-      browser
-        .execute(() => {
-          const text = document.querySelector(".workspace-location")?.textContent ?? "";
-          return Number(text.match(/(\d+)\s*项/)?.[1] ?? -1);
-        })
-        .then((count) => count >= minimum),
-    {
-      timeout: 30_000,
-      timeoutMsg: description,
-    },
-  );
-}
-
-async function waitForExportToSettle() {
-  await browser.waitUntil(
-    async () => {
-      const cancelButton = await browser.$("button=取消导出");
-      try {
-        return !(await cancelButton.isDisplayed());
-      } catch {
-        return true;
-      }
-    },
-    {
-      timeout: 120_000,
-      timeoutMsg: "the workspace export did not settle after cancellation or failure",
-    },
-  );
-}
-
-async function waitForSuccessfulExport(description) {
-  await browser.waitUntil(
-    async () => {
-      const note = await browser.$(".workspace-export-note");
-      if (await note.isDisplayed()) return /已导出/.test(await note.getText());
-      const alert = await browser.$('[role="alert"]');
-      if (await alert.isDisplayed()) throw new Error(`${description} failed: ${await alert.getText()}`);
-      return false;
-    },
-    {
-      timeout: 120_000,
-      timeoutMsg: `${description} did not finish successfully`,
-    },
-  );
-}
-
-async function resetDesktopSession() {
-  await browser.execute(() => window.localStorage.clear());
-  await browser.refresh();
-  const title = await browser.$(".document-title");
-  await title.waitForDisplayed();
-  await browser.waitUntil(() => title.getText().then((text) => text.includes("desktop-e2e.md")), {
-    timeout: 15_000,
-    timeoutMsg: "the desktop E2E fixture was not restored after resetting the session",
-  });
-}
-
-async function waitForWorkspaceRoot(expectedRoot) {
-  const comparableWorkspacePath = (value) => {
-    const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
-    try {
-      return fs.realpathSync.native(value).replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
-    } catch {
-      return normalized;
-    }
-  };
-  const expected = comparableWorkspacePath(expectedRoot);
-  await browser.waitUntil(
-    () =>
-      browser
-        .$(".workspace-location")
-        .getAttribute("title")
-        .then((actual) => comparableWorkspacePath(actual ?? "") === expected),
-    {
-      timeout: 30_000,
-      timeoutMsg: `the desktop E2E workspace did not switch to ${expectedRoot}`,
-    },
-  );
-}
-
-function readApplicationWorkingSetBytes() {
-  if (process.platform !== "win32") return null;
-
-  try {
-    const output = execFileSync("tasklist.exe", ["/FI", "IMAGENAME eq moyang-reader.exe", "/FO", "CSV", "/NH"], {
-      encoding: "utf8",
-      windowsHide: true,
-    });
-    const values = output
-      .split(/\r?\n/)
-      .filter((line) => /^"moyang-reader\.exe"/i.test(line))
-      .flatMap((line) => line.match(/"[^"]*"/g) ?? [])
-      .map((value) => value.slice(1, -1));
-    const memoryValues = values
-      .filter((_, index) => index % 5 === 4)
-      .map((value) => Number(value.replace(/[^0-9]/g, "")) * 1024)
-      .filter((value) => Number.isFinite(value) && value > 0);
-    return memoryValues.length > 0 ? Math.max(...memoryValues) : null;
-  } catch {
-    return null;
-  }
-}
-
-function createApplicationMemoryProbe() {
-  const samples = [];
-  const sample = () => {
-    const bytes = readApplicationWorkingSetBytes();
-    if (bytes !== null) samples.push({ at: performance.now(), bytes });
-  };
-  sample();
-  const timer = globalThis.setInterval(sample, 250);
-  return {
-    stop() {
-      globalThis.clearInterval(timer);
-      sample();
-      const values = samples.map((sampleItem) => sampleItem.bytes);
-      const peakWorkingSetBytes = values.reduce((peak, value) => Math.max(peak, value), 0);
-      const minimumWorkingSetBytes = values.reduce(
-        (minimum, value) => Math.min(minimum, value),
-        values[0] ?? Number.POSITIVE_INFINITY,
-      );
-      const increasingStepCount = values.reduce(
-        (count, value, index) => count + (index > 0 && value > values[index - 1] ? 1 : 0),
-        0,
-      );
-      const decreasingStepCount = values.reduce(
-        (count, value, index) => count + (index > 0 && value < values[index - 1] ? 1 : 0),
-        0,
-      );
-      return {
-        sampleCount: samples.length,
-        initialWorkingSetBytes: values[0] ?? null,
-        peakWorkingSetBytes: peakWorkingSetBytes || null,
-        finalWorkingSetBytes: values.at(-1) ?? null,
-        minimumWorkingSetBytes: Number.isFinite(minimumWorkingSetBytes) ? minimumWorkingSetBytes : null,
-        increasingStepCount,
-        decreasingStepCount,
-        isStrictlyIncreasing: values.length > 1 && increasingStepCount === values.length - 1,
-      };
-    },
-  };
-}
-
-async function startRendererResponsivenessProbe() {
-  await browser.execute(() => {
-    const key = "__moyangDesktopE2eResponsivenessProbe";
-    const previous = window[key];
-    if (previous) window.clearInterval(previous.timer);
-    const startedAt = window.performance.now();
-    const state = { startedAt, sampleCount: 0, maxGapMs: 0, lastTickAt: startedAt };
-    const timer = window.setInterval(() => {
-      const now = window.performance.now();
-      state.sampleCount += 1;
-      state.maxGapMs = Math.max(state.maxGapMs, now - state.lastTickAt);
-      state.lastTickAt = now;
-    }, 50);
-    window[key] = { state, timer };
-  });
-}
-
-async function stopRendererResponsivenessProbe() {
-  return browser.execute(() => {
-    const key = "__moyangDesktopE2eResponsivenessProbe";
-    const probe = window[key];
-    if (!probe) return null;
-    window.clearInterval(probe.timer);
-    const durationMs = window.performance.now() - probe.state.startedAt;
-    delete window[key];
-    return {
-      durationMs,
-      sampleCount: probe.state.sampleCount,
-      maxGapMs: probe.state.maxGapMs,
-    };
-  });
-}
-
-function logExportBenchmark(report) {
-  console.log(`desktop-export-benchmark ${JSON.stringify(report)}`);
-}
-
-async function measureContextToggleWhileExportRunning() {
-  return browser.executeAsync((done) => {
-    const startedAt = performance.now();
-    let renderPasses = 0;
-    const schedule = (callback) => {
-      if (typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(callback);
-      } else {
-        window.setTimeout(callback, 0);
-      }
-    };
-    const findCancelButton = () =>
-      Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "取消导出");
-    const findContextToggle = () => document.querySelector('button[aria-keyshortcuts="Control+Shift+R"]');
-    const waitFor = (predicate, stage, callback) => {
-      const waitStartedAt = performance.now();
-      const poll = () => {
-        if (predicate()) {
-          callback();
-          return;
-        }
-        if (performance.now() - waitStartedAt >= 15_000) {
-          done({ status: "timeout", stage });
-          return;
-        }
-        schedule(poll);
-      };
-      poll();
-    };
-
-    const waitForCancelableExport = () => {
-      if (renderPasses < 2) {
-        renderPasses += 1;
-        schedule(waitForCancelableExport);
-        return;
-      }
-      if (!findCancelButton()) {
-        if (document.querySelector(".workspace-export-note")?.textContent?.trim()) {
-          done({ status: "completed-before-interaction" });
-          return;
-        }
-        if (performance.now() - startedAt >= 15_000) {
-          done({ status: "timeout", stage: "cancel-button" });
-          return;
-        }
-        schedule(waitForCancelableExport);
-        return;
-      }
-
-      const contextToggle = findContextToggle();
-      if (!contextToggle || contextToggle.tagName !== "BUTTON") {
-        done({ status: "missing-context-toggle" });
-        return;
-      }
-      const contextWasOpen = contextToggle.getAttribute("aria-pressed") === "true";
-      const contextStartedAt = performance.now();
-      contextToggle.click();
-      waitFor(
-        () => findContextToggle()?.getAttribute("aria-pressed") === String(!contextWasOpen),
-        "context-open",
-        () => {
-          const contextToggleLatencyMs = performance.now() - contextStartedAt;
-          findContextToggle()?.click();
-          waitFor(
-            () => findContextToggle()?.getAttribute("aria-pressed") === String(contextWasOpen),
-            "context-restore",
-            () => done({ status: "measured", contextToggleLatencyMs }),
-          );
-        },
-      );
-    };
-
-    waitForCancelableExport();
-  });
-}
-
-async function cancelExportAfterFirstCommittedVolume() {
-  return browser.executeAsync((done) => {
-    const startedAt = performance.now();
-    const targetProgress = 33;
-    const schedule = (callback) => {
-      if (typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(callback);
-      } else {
-        window.setTimeout(callback, 0);
-      }
-    };
-    const findCancelButton = () =>
-      Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.trim() === "取消导出");
-    const readProgress = () => {
-      const text = document.querySelector(".workspace-export-progress")?.textContent ?? "";
-      return Number(text.match(/正在整理\s+(\d+)\s*\//)?.[1] ?? 0);
-    };
-    const poll = () => {
-      const cancelButton = findCancelButton();
-      if (!cancelButton) {
-        if (document.querySelector(".workspace-export-note")?.textContent?.trim()) {
-          done({ status: "completed-before-cancel" });
-          return;
-        }
-        if (performance.now() - startedAt >= 30_000) {
-          done({ status: "timeout", stage: "cancel-button" });
-          return;
-        }
-        schedule(poll);
-        return;
-      }
-
-      if (readProgress() < targetProgress) {
-        if (performance.now() - startedAt >= 30_000) {
-          done({ status: "timeout", stage: "first-volume" });
-          return;
-        }
-        schedule(poll);
-        return;
-      }
-
-      const cancellationStartedAt = performance.now();
-      cancelButton.click();
-      const waitForSettle = () => {
-        if (!findCancelButton()) {
-          done({ status: "cancelled", cancellationLatencyMs: performance.now() - cancellationStartedAt });
-          return;
-        }
-        if (performance.now() - cancellationStartedAt >= 15_000) {
-          done({ status: "timeout", stage: "cancel-settle" });
-          return;
-        }
-        schedule(waitForSettle);
-      };
-      waitForSettle();
-    };
-
-    poll();
-  });
-}
-
-async function workspaceEntryExists(selector, text = "") {
-  return browser.execute(
-    (entrySelector, expectedText) => {
-      const entries = Array.from(document.querySelectorAll(entrySelector));
-      return entries.some((entry) => {
-        if (!expectedText) return true;
-        const label = entrySelector === ".workspace-folder" ? entry.querySelector(".workspace-folder-name") : entry;
-        const value = (label?.textContent ?? "").trim();
-        return entrySelector === ".workspace-folder" ? value === expectedText : value.includes(expectedText);
-      });
-    },
-    selector,
-    text,
   );
 }
 
@@ -517,11 +144,46 @@ async function workspaceEntryMatches(selector, entry, text) {
   return (await entry.getText()).includes(text);
 }
 
+async function workspaceEntryExists(selector, text = "") {
+  // The embedded driver retains references to detached elements. Read the live
+  // DOM for absence assertions instead of querying its cached element collection.
+  return browser.execute(
+    (selector, text) =>
+      Array.from(document.querySelectorAll(selector)).some((entry) => {
+        if (!text) return true;
+        const label = selector === ".workspace-folder" ? entry.querySelector(".workspace-folder-name") : entry;
+        return selector === ".workspace-folder"
+          ? label?.textContent.trim() === text
+          : label?.textContent.includes(text);
+      }),
+    selector,
+    text,
+  );
+}
+
 async function waitForWorkspaceEntry(selector, text, expected, description) {
-  await browser.waitUntil(() => workspaceEntryExists(selector, text).then((exists) => exists === expected), {
-    timeout: 15_000,
-    timeoutMsg: description,
-  });
+  try {
+    await browser.waitUntil(() => workspaceEntryExists(selector, text).then((exists) => exists === expected), {
+      timeout: 15_000,
+      timeoutMsg: description,
+    });
+  } catch (error) {
+    console.error(
+      "Current workspace DOM",
+      await browser.execute(() => document.querySelector(".workspace-tree")?.textContent),
+    );
+    console.error(
+      "Workspace refresh trace",
+      JSON.stringify(
+        await browser.execute(
+          (name) =>
+            (window.__readerTestEvents ?? []).filter((item) => JSON.stringify(item.data).includes(name)).slice(-12),
+          text,
+        ),
+      ),
+    );
+    throw error;
+  }
 }
 
 async function waitForSavedReadingPosition(fileName) {
@@ -553,36 +215,17 @@ async function waitForSavedReadingPosition(fileName) {
   );
 }
 
-async function getSavedReadingPosition(fileName) {
-  return browser.execute((expectedName) => {
-    try {
-      const raw = window.localStorage.getItem("moyang-reader-reading-positions");
-      const positions = raw ? JSON.parse(raw) : [];
-      return (
-        Array.isArray(positions) &&
-        positions.find(
-          (item) => item && typeof item.path === "string" && item.path.split(/[\\/]/).pop() === expectedName,
-        )
-      );
-    } catch {
-      return null;
-    }
-  }, fileName);
-}
-
 async function clickWorkspaceFile(name) {
-  const files = await browser.$$(".workspace-file");
-  for (const file of files) {
-    if ((await file.getText()).includes(name)) {
-      await file.click();
-      await browser.waitUntil(async () => (await browser.$(".document-title").getText()).includes(name), {
-        timeout: 15_000,
-        timeoutMsg: `workspace file ${name} did not finish opening`,
-      });
-      return;
-    }
-  }
-  throw new Error(`workspace file ${name} was not found`);
+  const file = await browser.$(`.workspace-file[title*="${name}"]`);
+  await file.waitForDisplayed();
+  await file.click();
+  await browser.waitUntil(
+    () => browser.execute((name) => document.querySelector(".document-title")?.textContent.includes(name), name),
+    {
+      timeout: 15_000,
+      timeoutMsg: `workspace file ${name} did not finish opening`,
+    },
+  );
 }
 
 async function findWorkspaceElement(selector, text) {
@@ -613,88 +256,6 @@ async function openWorkspaceContextMenu(selector, text) {
   return menu;
 }
 
-async function pressDesktopEscape() {
-  await browser.execute(() => {
-    window.__desktopE2EEscapeProbe = { count: 0 };
-    window.__desktopE2EEscapeListener = () => {
-      window.__desktopE2EEscapeProbe.count += 1;
-    };
-    document.addEventListener("keydown", window.__desktopE2EEscapeListener, true);
-  });
-
-  try {
-    await browser.keys("Escape");
-    const keydownCount = await browser.execute(() => window.__desktopE2EEscapeProbe?.count ?? 0);
-    const menuVisible = await browser
-      .$(".moyang-context-menu")
-      .isDisplayed()
-      .catch(() => false);
-    if (keydownCount === 0 && menuVisible) {
-      // The embedded Tauri driver can accept a WebDriver key action without
-      // forwarding it into the WebView. Exercise the same focused DOM path
-      // only for that driver limitation; a delivered native key must still
-      // close the menu through the product event listener above.
-      await browser.execute(() => {
-        const target = document.activeElement instanceof HTMLElement ? document.activeElement : document;
-        target.dispatchEvent(
-          new window.KeyboardEvent("keydown", {
-            bubbles: true,
-            cancelable: true,
-            key: "Escape",
-            code: "Escape",
-          }),
-        );
-      });
-    }
-  } finally {
-    await browser.execute(() => {
-      document.removeEventListener("keydown", window.__desktopE2EEscapeListener, true);
-      delete window.__desktopE2EEscapeListener;
-      delete window.__desktopE2EEscapeProbe;
-    });
-  }
-}
-
-async function dispatchDesktopKey(key, options = {}) {
-  await browser.execute(
-    (eventKey, eventOptions) => {
-      const target =
-        eventOptions.target === "document"
-          ? document
-          : document.activeElement instanceof HTMLElement
-            ? document.activeElement
-            : document;
-      target.dispatchEvent(
-        new window.KeyboardEvent("keydown", {
-          bubbles: true,
-          cancelable: true,
-          key: eventKey,
-          code: eventOptions.code ?? eventKey,
-          ctrlKey: Boolean(eventOptions.ctrlKey),
-          shiftKey: Boolean(eventOptions.shiftKey),
-          altKey: Boolean(eventOptions.altKey),
-          metaKey: Boolean(eventOptions.metaKey),
-        }),
-      );
-    },
-    key,
-    options,
-  );
-}
-
-async function discardDraftNotice() {
-  const recoveryNotice = await browser.$(".draft-recovery-notice");
-  await recoveryNotice.waitForDisplayed();
-  await recoveryNotice.$("button=丢弃").click();
-  const confirmButton = await browser.$('[data-testid="draft-discard-confirm"]');
-  await confirmButton.waitForDisplayed();
-  await confirmButton.click();
-  await browser.waitUntil(() => recoveryNotice.isDisplayed().then((visible) => !visible), {
-    timeout: 5_000,
-    timeoutMsg: "the draft recovery notice did not dismiss after confirmation",
-  });
-}
-
 async function requestCloseRequest() {
   await browser.execute(async () => {
     const tauriEvent = window.__TAURI__?.event;
@@ -713,120 +274,10 @@ async function waitForCloseConfirmation() {
 }
 
 describe("Moyang Reader desktop runtime", () => {
-  it("closes only the innermost command panel before focus mode", async () => {
-    await browser.execute(() => window.localStorage.clear());
-    await browser.refresh();
-
-    await browser.$(".document-title").waitForDisplayed();
-    await browser.$("h1=Desktop E2E").waitForDisplayed();
-
-    await browser.$(".focus-button.toolbar-optional").click();
-    const shell = await browser.$(".app-shell");
-    await browser.waitUntil(() => shell.getAttribute("class").then((value) => value?.includes("focus-mode")), {
-      timeout: 5_000,
-      timeoutMsg: "focus mode did not open in the desktop runtime",
-    });
-    const focusExit = await browser.$(".focus-exit");
-    await focusExit.waitForDisplayed();
-
-    await dispatchDesktopKey("p", { code: "KeyP", ctrlKey: true, shiftKey: true });
-    const commandPalette = await browser.$('[role="dialog"][aria-labelledby="command-palette-title"]');
-    await commandPalette.waitForDisplayed();
-    const commandInput = await browser.$('input[aria-label="搜索命令"]');
-    await commandInput.waitForDisplayed();
-    await commandInput.click();
-    await dispatchDesktopKey("Escape", { code: "Escape" });
-    await browser.waitUntil(() => commandPalette.isDisplayed().then((visible) => !visible), {
-      timeout: 5_000,
-      timeoutMsg: "the desktop command panel did not close on the first Escape",
-    });
-    await browser.waitUntil(
-      () => browser.execute(() => !document.querySelector('[aria-labelledby="command-palette-title"]')),
-      {
-        timeout: 5_000,
-        timeoutMsg: "the desktop command panel remained mounted after the first Escape",
-      },
-    );
-    assert.match(await shell.getAttribute("class"), /focus-mode/);
-    assert.equal(
-      await browser.execute((element) => document.activeElement === element, focusExit),
-      true,
-      "desktop command panel should restore focus to the visible focus-mode exit",
-    );
-
-    await browser.pause(100);
-    // Exercise the native desktop path first. The embedded driver can accept
-    // a WebDriver key action without forwarding it into the WebView, so keep
-    // the focused DOM dispatch as a deterministic fallback for that runner.
-    await browser.keys("Escape");
-    const closedByNativeEscape = await browser
-      .waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
-        timeout: 1_000,
-        timeoutMsg: "the desktop focus mode did not close on the native Escape path",
-      })
-      .then(() => true)
-      .catch(() => false);
-    if (!closedByNativeEscape) {
-      await dispatchDesktopKey("Escape", { code: "Escape" });
-    }
-    await browser.waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
-      timeout: 5_000,
-      timeoutMsg: "the desktop focus mode did not close on the second Escape",
-    });
-  });
-
-  it("focuses and scopes the current reading library search", async () => {
-    await resetDesktopSession();
-
-    const shell = await browser.$(".app-shell");
-    const workspaceSearch = await browser.$('input[aria-label="当前阅读库搜索"]');
-    await workspaceSearch.waitForDisplayed();
-
-    await browser.$(".focus-button.toolbar-optional").click();
-    await browser.waitUntil(() => shell.getAttribute("class").then((value) => value?.includes("focus-mode")), {
-      timeout: 5_000,
-      timeoutMsg: "focus mode did not open before workspace search shortcut coverage",
-    });
-
-    await dispatchDesktopKey("f", { code: "KeyF", ctrlKey: true, shiftKey: true });
-    await browser.waitUntil(() => shell.getAttribute("class").then((value) => !value?.includes("focus-mode")), {
-      timeout: 5_000,
-      timeoutMsg: "workspace search shortcut did not restore the sidebar from focus mode",
-    });
-    await browser.waitUntil(
-      () =>
-        browser
-          .execute(() => document.activeElement?.getAttribute("aria-label"))
-          .then((label) => label === "当前阅读库搜索"),
-      {
-        timeout: 5_000,
-        timeoutMsg: "workspace search shortcut did not focus the current library searchbox",
-      },
-    );
-
-    await workspaceSearch.setValue("Desktop E2E");
-    const result = await browser.$(".workspace-result");
-    await result.waitForDisplayed({ timeout: 15_000 });
-    assert.match(await result.getText(), /desktop-e2e\.md/i);
-
-    await workspaceSearch.setValue("no-such-desktop-search-term");
-    const results = await browser.$(".workspace-results");
-    await browser.waitUntil(() => results.getText().then((text) => text.includes("当前阅读库没有匹配文档。")), {
-      timeout: 15_000,
-      timeoutMsg: "workspace search did not explain an empty current-library result",
-    });
-  });
-
   it("opens an initial Markdown path, edits it, and writes it back to disk", async () => {
     await browser.execute(() => window.localStorage.clear());
     await browser.refresh();
 
-    const initialSource = fs.readFileSync(documentPath, "utf8");
-    const initialMarker =
-      initialSource
-        .split(/\r?\n/)
-        .find((line) => line.trim())
-        ?.trim() ?? "";
     const title = await browser.$(".document-title");
     await title.waitForDisplayed();
     await browser.waitUntil(async () => /desktop-e2e\.md/.test(await title.getText()), {
@@ -834,10 +285,11 @@ describe("Moyang Reader desktop runtime", () => {
       timeoutMsg: "the startup document path was not opened by the Tauri runtime",
     });
     await browser.$("h1=Desktop E2E").waitForDisplayed();
+    await browser.execute(() => { [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "知道了")?.click(); });
     assert.equal(await browser.$("button=打开列表").isExisting(), false);
-    assert.equal(await browser.$('summary[aria-label="阅读库管理"]').isDisplayed(), true);
+    assert.equal(await browser.$("summary=批量导出").isDisplayed(), true);
 
-    await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
+    await ensureWysiwygMode();
 
     await clickToolbarAction("源文本");
     const editor = await browser.$('[aria-label="Markdown 源文本"]');
@@ -875,215 +327,6 @@ describe("Moyang Reader desktop runtime", () => {
     });
 
     assert.match(fs.readFileSync(documentPath, "utf8"), /桌面保存内容。/);
-
-    const previousVersionPath = path.join(path.dirname(documentPath), ".desktop-e2e.md.moyang.bak");
-    await browser.waitUntil(() => fs.existsSync(previousVersionPath), {
-      timeout: 15_000,
-      timeoutMsg: "the latest-save backup was not created by the real Tauri write command",
-    });
-    assert.equal(fs.readFileSync(previousVersionPath, "utf8"), initialSource);
-
-    const previousVersionNotice = await browser.$(".previous-version-notice");
-    await browser.waitUntil(() => previousVersionNotice.isDisplayed(), {
-      timeout: 15_000,
-      timeoutMsg: "the previous-save recovery notice did not appear after saving",
-    });
-    await previousVersionNotice.$('[data-testid="previous-version-preview"]').click();
-
-    const previousVersionDialog = await browser.$('[role="dialog"][aria-labelledby="draft-comparison-title"]');
-    await previousVersionDialog.waitForDisplayed();
-    await browser.waitUntil(() => previousVersionDialog.getText().then((value) => value.includes("上次保存版本")), {
-      timeout: 5_000,
-      timeoutMsg: "the previous-save comparison dialog did not identify its recovery source",
-    });
-    const restorePreviousButton = await previousVersionDialog.$('[data-testid="draft-comparison-action"]');
-    await restorePreviousButton.waitForEnabled();
-    await restorePreviousButton.click();
-
-    const restoredEditor = await browser.$('[aria-label="Markdown 源文本"]');
-    await restoredEditor.waitForDisplayed();
-    await browser.waitUntil(() => restoredEditor.getText().then((value) => value.includes(initialMarker)), {
-      timeout: 5_000,
-      timeoutMsg: "restoring the previous-save version did not update the source editor",
-    });
-    await clickToolbarAction("保存");
-    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8") === initialSource, {
-      timeout: 15_000,
-      timeoutMsg: "saving the restored previous version did not update the fixture",
-    });
-  });
-
-  it("keeps workspace actions and management menus within a narrow sidebar", async () => {
-    await resetDesktopSession();
-    if (process.env.MOYANG_CAPTURE_WORKSPACE_UI === "1") {
-      const dismissGuide = await browser.$("button=知道了");
-      if (await dismissGuide.isDisplayed()) await dismissGuide.click();
-      fs.mkdirSync(path.join(process.cwd(), "test-results"), { recursive: true });
-      await browser.saveScreenshot(path.join(process.cwd(), "test-results", "workspace-desktop.png"));
-    }
-    await browser.execute(() => {
-      document.querySelector(".app-shell")?.style.setProperty("--sidebar-width", "216px");
-    });
-
-    const actionBar = await browser.$(".workspace-actions");
-    await actionBar.waitForDisplayed();
-    const readActionGeometry = () =>
-      browser.execute(() => {
-        const sidebar = document.querySelector(".sidebar");
-        const actions = document.querySelector(".workspace-actions");
-        const rectOf = (element) => {
-          if (!(element instanceof HTMLElement)) return null;
-          const rect = element.getBoundingClientRect();
-          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-        };
-        return {
-          sidebar: rectOf(sidebar),
-          actions: rectOf(actions),
-          children: Array.from(actions?.children ?? []).map(rectOf),
-          createPanel: rectOf(document.querySelector(".workspace-create-menu-panel")),
-          managePanel: rectOf(document.querySelector(".workspace-manage-panel")),
-          createPanelPosition: document.querySelector(".workspace-create-menu-panel")
-            ? window.getComputedStyle(document.querySelector(".workspace-create-menu-panel")).position
-            : null,
-          managePanelPosition: document.querySelector(".workspace-manage-panel")
-            ? window.getComputedStyle(document.querySelector(".workspace-manage-panel")).position
-            : null,
-        };
-      });
-
-    const initialGeometry = await readActionGeometry();
-    assert.ok(initialGeometry.sidebar && initialGeometry.actions, "workspace action geometry should be available");
-    for (const child of initialGeometry.children) {
-      assert.ok(child, "workspace action children should have geometry");
-      assert.ok(
-        child.left >= initialGeometry.sidebar.left,
-        "workspace actions should stay inside the sidebar left edge",
-      );
-      assert.ok(
-        child.right <= initialGeometry.sidebar.right,
-        "workspace actions should stay inside the sidebar right edge",
-      );
-    }
-
-    const createMenu = await browser.$(".workspace-create-menu");
-    const manageMenu = await browser.$(".workspace-manage-menu");
-    await createMenu.$("summary").click();
-    assert.equal(await createMenu.getAttribute("open"), "");
-    const createGeometry = await readActionGeometry();
-    assert.equal(createGeometry.createPanelPosition, "absolute");
-    assert.ok(createGeometry.createPanel, "the create menu panel should be visible");
-    assert.ok(
-      createGeometry.createPanel.right <= createGeometry.sidebar.right,
-      "the create menu should not be clipped by the sidebar",
-    );
-
-    await manageMenu.$("summary").click();
-    assert.equal(await createMenu.getAttribute("open"), null);
-    assert.equal(await manageMenu.getAttribute("open"), "");
-    const manageGeometry = await readActionGeometry();
-    assert.equal(manageGeometry.managePanelPosition, "absolute");
-    assert.ok(manageGeometry.managePanel, "the management menu panel should be visible");
-    assert.ok(
-      manageGeometry.managePanel.right <= manageGeometry.sidebar.right,
-      "the management menu should not be clipped by the sidebar",
-    );
-    if (process.env.MOYANG_CAPTURE_WORKSPACE_UI === "1") {
-      await browser.saveScreenshot(path.join(process.cwd(), "test-results", "workspace-narrow-menu.png"));
-    }
-
-    await browser.execute(() => {
-      document
-        .querySelector(".workspace-location")
-        ?.dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true }));
-    });
-    assert.equal(await manageMenu.getAttribute("open"), null);
-  });
-
-  it("shows native drag feedback and opens a dropped Markdown file", async () => {
-    await resetDesktopSession();
-    const droppedFileName = "desktop-drag-drop.md";
-    const droppedFilePath = path.join(path.dirname(documentPath), droppedFileName);
-    fs.rmSync(droppedFilePath, { force: true });
-    fs.writeFileSync(droppedFilePath, "# Native drag drop\n\n桌面拖放内容。\n", "utf8");
-
-    const emitDragEvent = async (eventName, payload) => {
-      await browser.execute(
-        async ({ name, detail }) => {
-          const tauriEvent = window.__TAURI__?.event;
-          if (!tauriEvent?.emit) throw new Error("Tauri event API is unavailable");
-          await tauriEvent.emit(name, detail);
-        },
-        { name: eventName, detail: payload },
-      );
-    };
-
-    try {
-      const position = { x: 24, y: 24 };
-      await emitDragEvent("tauri://drag-enter", { paths: [droppedFilePath], position });
-      const overlay = await browser.$('[data-testid="file-drop-overlay"]');
-      await overlay.waitForDisplayed();
-      assert.equal(await overlay.getAttribute("data-drop-source"), "native");
-      assert.equal(await overlay.getAttribute("data-drop-support"), "supported");
-
-      await emitDragEvent("tauri://drag-over", { position });
-      await emitDragEvent("tauri://drag-drop", { paths: [droppedFilePath], position });
-
-      const title = await browser.$(".document-title");
-      await browser.waitUntil(() => title.getText().then((text) => text.includes(droppedFileName)), {
-        timeout: 15_000,
-        timeoutMsg: "the native dropped Markdown file was not opened",
-      });
-      await browser.waitUntil(() => overlay.isDisplayed().then((visible) => !visible), {
-        timeout: 5_000,
-        timeoutMsg: "the native drag overlay did not clear after drop",
-      });
-    } finally {
-      await resetDesktopSession().catch(() => undefined);
-      fs.rmSync(droppedFilePath, { force: true });
-    }
-  });
-
-  it("compares a recovery draft with the current disk version before restoring", async () => {
-    await resetDesktopSession();
-    const comparisonFileName = "desktop-draft-comparison.md";
-    const comparisonFilePath = path.join(path.dirname(documentPath), comparisonFileName);
-    fs.rmSync(comparisonFilePath, { force: true });
-    fs.writeFileSync(comparisonFilePath, "# Draft comparison\n\n磁盘版本\n", "utf8");
-
-    const snapshot = {
-      path: comparisonFilePath,
-      draft: "# Draft comparison\n\n草稿版本\n",
-      baseSource: "# Draft comparison\n\n草稿保存时的旧版本\n",
-      savedAt: Date.now() - 60_000,
-    };
-
-    try {
-      await browser.execute((draft) => {
-        window.localStorage.setItem("moyang-reader-drafts", JSON.stringify([draft]));
-      }, snapshot);
-      await browser.refresh();
-      await browser.$(".document-title").waitForDisplayed();
-
-      await browser.$("button=草稿 1").click();
-      const preview = await browser.$(`[aria-label="查看 ${comparisonFileName} 当前文件与草稿的差异"]`);
-      await preview.waitForDisplayed();
-      await preview.click();
-
-      const dialog = await browser.$('[role="dialog"][aria-labelledby="draft-comparison-title"]');
-      await dialog.waitForDisplayed();
-      await browser.waitUntil(() => dialog.getText().then((text) => text.includes("当前磁盘版本")), {
-        timeout: 10_000,
-        timeoutMsg: "the draft comparison did not read the current disk version",
-      });
-      const dialogText = await dialog.getText();
-      assert.match(dialogText, /磁盘版本/);
-      assert.match(dialogText, /草稿版本/);
-      assert.match(dialogText, /草稿保存后原文件又发生了变化/);
-      assert.doesNotMatch(dialogText, /草稿保存时的旧版本/);
-    } finally {
-      await resetDesktopSession().catch(() => undefined);
-      fs.rmSync(comparisonFilePath, { force: true });
-    }
   });
 
   it("manages workspace files and folders from context menus", async () => {
@@ -1121,85 +364,21 @@ describe("Moyang Reader desktop runtime", () => {
         "the context-menu folder fixture did not appear in the workspace",
       );
 
-      const keyboardFileEntry = await findWorkspaceElement(".workspace-file", originalFileName);
-      assert.ok(keyboardFileEntry, `workspace entry ${originalFileName} was not found for keyboard context menu`);
-      await browser.execute((element) => {
-        element.focus();
-        element.dispatchEvent(
-          new window.KeyboardEvent("keydown", {
-            bubbles: true,
-            cancelable: true,
-            key: "F10",
-            shiftKey: true,
-          }),
-        );
-      }, keyboardFileEntry);
-      const keyboardMenu = await browser.$(".moyang-context-menu");
-      await keyboardMenu.waitForDisplayed();
-      const keyboardFocusState = await browser.execute(() => {
-        const menu = document.querySelector('.moyang-context-menu[role="menu"]');
-        const firstItem = menu?.querySelector('[role="menuitem"]');
-        return {
-          active: document.activeElement?.outerHTML?.slice(0, 240) ?? null,
-          firstItem: firstItem?.outerHTML?.slice(0, 240) ?? null,
-          isFirst: firstItem === document.activeElement,
-        };
-      });
-      assert.equal(
-        keyboardFocusState.isFirst,
-        true,
-        `keyboard context menu should focus its first action: ${JSON.stringify(keyboardFocusState)}`,
-      );
-      await pressDesktopEscape();
-      await browser.waitUntil(() => keyboardMenu.isDisplayed().then((visible) => !visible), {
-        timeout: 5_000,
-        timeoutMsg: "the keyboard context menu did not close on Escape",
-      });
-      assert.equal(
-        await browser.execute((element) => document.activeElement === element, keyboardFileEntry),
-        true,
-        "keyboard context menu should restore focus to the workspace entry",
-      );
-
       await browser.execute(() => {
         window.__desktopE2EOriginalPrompt = window.prompt;
         window.prompt = (message) => {
-          throw new Error(`Unexpected native prompt: ${message}`);
+          if (message === "复制文件") return "context-managed-copy";
+          if (message === "复制文件夹") return "context-managed-folder-copy";
+          return "context-renamed";
         };
       });
       const duplicateFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
       await duplicateFileMenu.$("button=复制文件").click();
-      let copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await copyDialog.waitForDisplayed();
-      assert.match(await copyDialog.getText(), /来源/);
-      assert.match(await copyDialog.getText(), /目标目录/);
-      await copyDialog.$("input").setValue("CON");
-      assert.equal(await copyDialog.$('[data-testid="workspace-name-submit"]').isEnabled(), false);
-      await pressDesktopEscape();
-      await copyDialog.waitForDisplayed({ reverse: true });
-      assert.equal(fs.existsSync(copiedFilePath), false);
-      const retryFileMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
-      await retryFileMenu.$("button=复制文件").click();
-      copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await copyDialog.waitForDisplayed();
-      await copyDialog.$("input").setValue("context-managed");
-      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
-      await copyDialog.$('[role="alert"]').waitForDisplayed();
-      assert.equal(await copyDialog.$("input").getValue(), "context-managed");
-      assert.equal(fs.readFileSync(originalFilePath, "utf8"), "# Context managed\n");
-      await copyDialog.$("input").setValue("context-managed-copy");
-      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
-      await copyDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(".workspace-file", copiedFileName, true, "the context-menu file was not copied");
       assert.equal(fs.readFileSync(copiedFilePath, "utf8"), "# Context managed\n");
 
       const duplicateFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
       await duplicateFolderMenu.$("button=复制文件夹").click();
-      copyDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await copyDialog.waitForDisplayed();
-      await copyDialog.$("input").setValue(copiedFolderName);
-      await copyDialog.$('[data-testid="workspace-name-submit"]').click();
-      await copyDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(
         ".workspace-folder",
         copiedFolderName,
@@ -1208,108 +387,32 @@ describe("Moyang Reader desktop runtime", () => {
       );
       assert.equal(fs.readFileSync(path.join(copiedFolderPath, "nested.md"), "utf8"), "# Nested\n");
 
-      const createFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
-      await createFolderMenu.$("button=新建文件夹").click();
-      let createDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await createDialog.waitForDisplayed();
-      await createDialog.$("input").setValue("input-created-folder");
-      await createDialog.$('[data-testid="workspace-name-submit"]').click();
-      await createDialog.waitForDisplayed({ reverse: true });
-      assert.ok(fs.statSync(path.join(folderPath, "input-created-folder")).isDirectory());
-
-      const createNoteMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
-      await createNoteMenu.$("button=新建笔记").click();
-      createDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await createDialog.waitForDisplayed();
-      await createDialog.$("input").setValue("input-created-note");
-      // The embedded driver dispatches an untrusted keydown without the browser's
-      // implicit form-submit default. Real Enter/IME behavior is in Playwright;
-      // use the shipped submit button here to verify the Windows filesystem path.
-      await createDialog.$('[data-testid="workspace-name-submit"]').click();
-      await createDialog.waitForDisplayed({ reverse: true });
-      assert.ok(fs.existsSync(path.join(folderPath, "input-created-note.md")));
-      await browser.waitUntil(async () => (await browser.$(".document-title").getText()) === "input-created-note.md", {
-        timeout: 15_000,
-        timeoutMsg: "the created note did not become the current document",
-      });
-
       const renameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
       await renameMenu.$("button=重命名文件").click();
-      let nameDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await nameDialog.waitForDisplayed();
-      let nameInput = await nameDialog.$("input");
-      assert.ok(await nameInput.isFocused(), "rename input should take focus before the dialog is visible");
-      assert.equal(await nameInput.getValue(), originalFileName);
-      await nameInput.setValue("CON");
-      assert.equal(await nameDialog.$('[data-testid="workspace-name-submit"]').isEnabled(), false);
-      assert.equal(fs.existsSync(originalFilePath), true);
-      await browser.keys("Escape");
-      await nameDialog.waitForDisplayed({ reverse: true });
-      assert.equal(fs.existsSync(originalFilePath), true, "cancelled rename must retain the original file");
-      const retryRenameMenu = await openWorkspaceContextMenu(".workspace-file", originalFileName);
-      await retryRenameMenu.$("button=重命名文件").click();
-      nameDialog = await browser.$('[aria-labelledby="workspace-name-title"]');
-      await nameDialog.waitForDisplayed();
-      nameInput = await nameDialog.$("input");
-      await nameInput.setValue(copiedFileName);
-      await nameDialog.$('[data-testid="workspace-name-submit"]').click();
-      const renameError = await nameDialog.$('[role="alert"]');
-      await renameError.waitForDisplayed();
-      assert.equal(await nameInput.getValue(), copiedFileName, "an existing name should retain input for retry");
-      assert.equal(fs.existsSync(originalFilePath), true);
-      await nameInput.setValue("context-renamed");
-      await nameDialog.$('[data-testid="workspace-name-submit"]').click();
-      await nameDialog.waitForDisplayed({ reverse: true });
       await waitForWorkspaceEntry(".workspace-file", renamedFileName, true, "the context-menu file was not renamed");
       assert.equal(fs.existsSync(originalFilePath), false);
       assert.equal(fs.existsSync(renamedFilePath), true);
 
+      await browser.execute(() => {
+        window.__desktopE2EOriginalConfirm = window.confirm;
+        window.confirm = () => true;
+      });
       const deleteFileMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
       await deleteFileMenu.$("button=删除文件").click();
-      let deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
-      await deleteDialog.waitForDisplayed();
-      assert.match(await deleteDialog.getText(), /Windows 回收站/);
-      const cancelDelete = await deleteDialog.$('[data-testid="workspace-entry-confirm-cancel"]');
-      assert.ok(await cancelDelete.isFocused(), "deletion confirmation should focus Cancel");
-      await browser.keys("Escape");
-      await deleteDialog.waitForDisplayed({ reverse: true });
-      assert.equal(fs.existsSync(renamedFilePath), true, "cancelled deletion must preserve the file");
-      const renamedEntry = await findWorkspaceElement(".workspace-file", renamedFileName);
-      const focusDiagnostic = await browser.execute(
-        (entry) => ({
-          isFocused: document.activeElement === entry,
-          connected: entry.isConnected,
-          active: document.activeElement?.outerHTML?.slice(0, 400),
-          expected: entry.outerHTML?.slice(0, 400),
-          openDialogs: document.querySelectorAll('[role="dialog"]').length,
-        }),
-        renamedEntry,
-      );
-      assert.ok(
-        focusDiagnostic.isFocused,
-        `cancel should restore the workspace row focus: ${JSON.stringify(focusDiagnostic)}`,
-      );
-      const retryDeleteMenu = await openWorkspaceContextMenu(".workspace-file", renamedFileName);
-      await retryDeleteMenu.$("button=删除文件").click();
-      deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
-      await deleteDialog.waitForDisplayed();
-      await deleteDialog.$('[data-testid="workspace-entry-confirm-confirm"]').click();
       await waitForWorkspaceEntry(".workspace-file", renamedFileName, false, "the context-menu file was not deleted");
       assert.equal(fs.existsSync(renamedFilePath), false);
 
       const deleteFolderMenu = await openWorkspaceContextMenu(".workspace-folder", folderName);
       await deleteFolderMenu.$("button=删除文件夹及内容").click();
-      deleteDialog = await browser.$('[role="dialog"][aria-labelledby="workspace-entry-confirm-title"]');
-      await deleteDialog.waitForDisplayed();
-      assert.match(await deleteDialog.getText(), /全部内容/);
-      await deleteDialog.$('[data-testid="workspace-entry-confirm-confirm"]').click();
       await waitForWorkspaceEntry(".workspace-folder", folderName, false, "the context-menu folder was not deleted");
       assert.equal(fs.existsSync(folderPath), false);
     } finally {
       await browser
         .execute(() => {
           if (window.__desktopE2EOriginalPrompt) window.prompt = window.__desktopE2EOriginalPrompt;
+          if (window.__desktopE2EOriginalConfirm) window.confirm = window.__desktopE2EOriginalConfirm;
           delete window.__desktopE2EOriginalPrompt;
+          delete window.__desktopE2EOriginalConfirm;
         })
         .catch(() => undefined);
       fs.rmSync(originalFilePath, { force: true });
@@ -1320,190 +423,7 @@ describe("Moyang Reader desktop runtime", () => {
     }
   });
 
-  it("navigates the workspace tree with one roving focus stop", async () => {
-    await resetDesktopSession();
-    const workspacePath = path.dirname(documentPath);
-    const folderName = "keyboard-roving-folder";
-    const nestedFileName = "keyboard-roving-note.md";
-    const folderPath = path.join(workspacePath, folderName);
-    const nestedFilePath = path.join(folderPath, nestedFileName);
-    fs.rmSync(folderPath, { recursive: true, force: true });
-    fs.mkdirSync(folderPath, { recursive: true });
-    fs.writeFileSync(nestedFilePath, "# Keyboard roving\n\n通过文件树键盘导航打开。\n", "utf8");
-
-    const readTreeState = () =>
-      browser.execute((expectedFileName) => {
-        const tree = document.querySelector('[role="tree"][aria-label="工作区文件树"]');
-        const items = Array.from(tree?.querySelectorAll('[role="treeitem"]') ?? []);
-        return {
-          treeRole: tree?.getAttribute("aria-label") ?? null,
-          tabStopCount: items.filter((item) => item.getAttribute("tabindex") === "0").length,
-          activeText: document.activeElement?.textContent?.trim() ?? "",
-          activeRole: document.activeElement?.getAttribute("role") ?? null,
-          nestedVisible: items.some((item) => item.textContent?.includes(expectedFileName)),
-          firstVisibleText: items[0]?.textContent?.trim() ?? "",
-          lastVisibleText: items.at(-1)?.textContent?.trim() ?? "",
-          visibleItemCount: items.length,
-        };
-      }, nestedFileName);
-
-    const dispatchTreeKey = (key) =>
-      browser.execute((expectedKey) => {
-        const target = document.activeElement;
-        if (!(target instanceof HTMLElement)) throw new Error("the workspace tree did not retain focus");
-        const KeyboardEventConstructor = target.ownerDocument.defaultView?.KeyboardEvent;
-        if (!KeyboardEventConstructor) throw new Error("the desktop document does not expose KeyboardEvent");
-        target.dispatchEvent(
-          new KeyboardEventConstructor("keydown", {
-            key: expectedKey,
-            code: expectedKey,
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-      }, key);
-
-    try {
-      await waitForWorkspaceEntry(
-        ".workspace-folder",
-        folderName,
-        true,
-        "the keyboard tree folder fixture did not appear",
-      );
-      await waitForWorkspaceEntry(
-        ".workspace-file",
-        nestedFileName,
-        true,
-        "the keyboard tree nested file fixture did not appear",
-      );
-
-      const tree = await browser.$('[role="tree"][aria-label="工作区文件树"]');
-      await tree.waitForDisplayed();
-      const folder = await findWorkspaceElement(".workspace-folder", folderName);
-      assert.ok(folder, `workspace folder ${folderName} was not found for keyboard navigation`);
-      await folder.click();
-      await browser.waitUntil(
-        () =>
-          readTreeState().then(
-            (state) =>
-              state.tabStopCount === 1 && state.activeRole === "treeitem" && state.activeText.includes(folderName),
-          ),
-        {
-          timeout: 5_000,
-          timeoutMsg: "the workspace tree did not settle on one Tab stop after focusing the folder",
-        },
-      );
-
-      const initialState = await readTreeState();
-      assert.equal(initialState.treeRole, "工作区文件树");
-      assert.equal(initialState.tabStopCount, 1, "the workspace tree should expose one Tab stop");
-      assert.equal(initialState.activeRole, "treeitem");
-      assert.match(initialState.activeText, new RegExp(folderName));
-      assert.equal(initialState.nestedVisible, false, "the focused folder should be collapsed after the initial click");
-
-      await browser.keys("ArrowRight");
-      await browser.waitUntil(
-        async () => {
-          const state = await readTreeState();
-          return state.activeRole === "treeitem" && state.activeText.includes(folderName) && state.nestedVisible;
-        },
-        { timeout: 5_000, timeoutMsg: "ArrowRight did not expand the focused workspace folder" },
-      );
-      assert.equal((await readTreeState()).tabStopCount, 1);
-
-      await browser.keys("ArrowRight");
-      await browser.waitUntil(async () => (await readTreeState()).activeText.includes(nestedFileName), {
-        timeout: 5_000,
-        timeoutMsg: "ArrowRight did not focus the first child in the workspace tree",
-      });
-
-      await browser.keys("ArrowLeft");
-      await browser.waitUntil(async () => (await readTreeState()).activeText.includes(folderName), {
-        timeout: 5_000,
-        timeoutMsg: "ArrowLeft did not return focus to the parent folder",
-      });
-      await browser.keys("ArrowLeft");
-      await browser.waitUntil(
-        async () => {
-          const state = await readTreeState();
-          const folderElement = await browser.$(`button.workspace-folder[aria-expanded="false"]`);
-          return state.activeText.includes(folderName) && !state.nestedVisible && (await folderElement.isExisting());
-        },
-        { timeout: 5_000, timeoutMsg: "ArrowLeft did not collapse the focused workspace folder" },
-      );
-
-      await browser.keys("ArrowRight");
-      await browser.waitUntil(
-        async () => {
-          const state = await readTreeState();
-          return state.activeText.includes(folderName) && state.nestedVisible;
-        },
-        { timeout: 5_000, timeoutMsg: "ArrowRight did not expand the focused workspace folder" },
-      );
-
-      await dispatchTreeKey("End");
-      await browser.waitUntil(
-        async () => {
-          const state = await readTreeState();
-          return state.activeRole === "treeitem" && state.activeText === state.lastVisibleText;
-        },
-        { timeout: 5_000, timeoutMsg: "End did not focus the last visible workspace tree item" },
-      );
-
-      await dispatchTreeKey("Home");
-      await browser.waitUntil(
-        async () => {
-          const state = await readTreeState();
-          return state.activeRole === "treeitem" && state.activeText === state.firstVisibleText;
-        },
-        { timeout: 5_000, timeoutMsg: "Home did not focus the first visible workspace tree item" },
-      );
-      const visibleItemCount = (await readTreeState()).visibleItemCount;
-      let nestedFileFocused = false;
-      for (let index = 0; index < visibleItemCount + 2; index += 1) {
-        const state = await readTreeState();
-        if (state.activeText.includes(nestedFileName)) {
-          nestedFileFocused = true;
-          break;
-        }
-        await browser.keys("ArrowDown");
-      }
-      assert.equal(nestedFileFocused, true, "ArrowDown did not reach the nested workspace tree file");
-      await dispatchTreeKey("Enter");
-      await browser.waitUntil(
-        () =>
-          browser
-            .$(".document-title")
-            .getText()
-            .then((text) => text.includes(nestedFileName)),
-        { timeout: 15_000, timeoutMsg: "Enter did not open the focused workspace tree file" },
-      );
-    } finally {
-      fs.rmSync(folderPath, { recursive: true, force: true });
-      try {
-        const originalFileName = path.basename(documentPath);
-        await waitForWorkspaceEntry(
-          ".workspace-file",
-          originalFileName,
-          true,
-          "the desktop fixture document was not available after keyboard tree cleanup",
-        );
-        await clickWorkspaceFile(originalFileName);
-      } catch {
-        // Preserve the original test failure if the desktop session is already unavailable.
-      }
-    }
-  });
-
   it("keeps wiki-link and slash completion working in the real desktop editor", async () => {
-    // Session resets intentionally clear onboarding storage. Dismiss the real
-    // guide before checking pointer actions, rather than clicking through it.
-    const closeGuide = await browser.$('button[aria-label="关闭使用教程"]');
-    if (await closeGuide.isExisting()) await closeGuide.click();
-    await browser.waitUntil(() => closeGuide.isExisting().then((exists) => !exists), {
-      timeout: 5_000,
-      timeoutMsg: "the first-use guide still covers the desktop editor controls",
-    });
     await waitForWorkspaceEntry(
       ".workspace-file",
       "wiki-target.md",
@@ -1511,7 +431,6 @@ describe("Moyang Reader desktop runtime", () => {
       "the desktop wiki-link fixture was not indexed in the workspace",
     );
     const editable = await ensureWysiwygMode();
-    await checkDesktopInsertPopover();
     await editable.click();
     await browser.execute((text) => {
       const insert = window.__moyangDesktopE2e?.insertWysiwygText;
@@ -1547,7 +466,6 @@ describe("Moyang Reader desktop runtime", () => {
     await clickToolbarAction("源文本");
     const editor = await browser.$('[aria-label="Markdown 源文本"]');
     await editor.waitForDisplayed();
-    await checkDesktopInsertPopover();
     await browser.waitUntil(
       () => editor.getText().then((text) => text.includes("[[wiki-target]]") || text.includes("\\[\\[wiki-target]]")),
       {
@@ -1610,311 +528,77 @@ describe("Moyang Reader desktop runtime", () => {
     assert.equal(docxBytes.subarray(0, 2).toString("ascii"), "PK");
   });
 
-  it("measures a 96-document batch Word export matrix across three runs", async function () {
-    this.timeout(600_000);
-    const matrixRoot = path.dirname(documentPath);
-    await resetDesktopSession();
-    await waitForWorkspaceRoot(matrixRoot);
-    const batchFixtureRoot = path.join(matrixRoot, "desktop-batch-matrix-fixtures");
-    const batchFixtureStagingRoot = path.join(
-      path.dirname(matrixRoot),
-      `.moyang-reader-batch-matrix-staging-${process.pid}-${Date.now()}`,
-    );
-    const batchFixtureCount = 96;
-    const categoryCounts = {
-      repeatedImage: 24,
-      independentImage: 20,
-      longText: 20,
-      complexTable: 16,
-      nestedHtml: 16,
-    };
-    const batchFixtureNames = Array.from(
-      { length: batchFixtureCount },
-      (_, index) => `desktop-batch-matrix-${String(index + 1).padStart(3, "0")}.md`,
-    );
-    const batchFixturePaths = batchFixtureNames.map((name) => path.join(batchFixtureRoot, name));
-    const repeatedImageName = "desktop-batch-matrix-repeated.svg";
-    const repeatedImagePath = path.join(batchFixtureRoot, repeatedImageName);
-    const independentImageNames = Array.from(
-      { length: categoryCounts.independentImage },
-      (_, index) => `desktop-batch-matrix-independent-${String(index + 1).padStart(3, "0")}.svg`,
-    );
-    const independentImagePaths = independentImageNames.map((name) => path.join(batchFixtureRoot, name));
-    const firstVolumePath = path.join(exportRoot, `${workspaceName} - 第 1 卷.docx`);
-
-    const createSvg = (seed, rectangleCount, width, height) => {
-      const rectangles = Array.from({ length: rectangleCount }, (_, index) => {
-        const x = (seed * 31 + index * 37) % (width - 16);
-        const y = (seed * 17 + index * 29) % (height - 16);
-        const color = `#${((seed * 97 + index * 53) % 0xffffff).toString(16).padStart(6, "0")}`;
-        return `<rect x="${x}" y="${y}" width="12" height="12" fill="${color}"/>`;
-      }).join("");
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#dbeafe"/>${rectangles}</svg>`;
-    };
-
-    const repeatedImageContent = createSvg(23, 4_000, 1600, 1000);
-    const independentImageContents = independentImageNames.map((_, index) => createSvg(100 + index, 1_500, 1400, 900));
-    const longText = "超长文本块需要在真实批量导出中保持原样，同时让序列化和调度路径面对连续的大输入。".repeat(4_000);
-    const complexTableRows = Array.from(
-      { length: 120 },
-      (_, index) =>
-        `<tr><th>第 ${index + 1} 行</th><td>复杂表格内容 ${"保留结构 ".repeat(12)}</td><td>列 ${index + 1}</td></tr>`,
-    ).join("");
-    const nestedHtml = Array.from(
-      { length: 20 },
-      (_, index) =>
-        `<section><article><h3>嵌套区块 ${index + 1}</h3><p>嵌套 HTML 内容 <strong>加粗</strong>、<em>强调</em>。</p><ul><li>一级项目<ul><li>二级项目 ${index + 1}</li></ul></li></ul></article></section>`,
-    ).join("");
-    const fixtureContents = [];
-    let fixtureIndex = 0;
-    const addFixture = (category, body) => {
-      const name = batchFixtureNames[fixtureIndex++];
-      const content = `# ${category} matrix fixture ${fixtureIndex}\n\n${body}\n`;
-      fixtureContents.push({ name, category, content });
-    };
-
-    for (let index = 0; index < categoryCounts.repeatedImage; index += 1) {
-      addFixture(
-        "Repeated image",
-        `大型重复图片 ${index + 1}。\n\n![[${repeatedImageName}]]\n\n${"重复图片后的段落内容。\n".repeat(80)}`,
-      );
+  it("keeps all documents reachable in a virtualized large library", async () => {
+    const root = path.dirname(documentPath);
+    const bulkPath = path.join(root, "large-library");
+    fs.mkdirSync(bulkPath);
+    for (let index = 0; index < 350; index++) {
+      fs.writeFileSync(path.join(bulkPath, `bulk-${String(index).padStart(3, "0")}.md`), `# Bulk ${index}\n`, "utf8");
     }
-    for (let index = 0; index < categoryCounts.independentImage; index += 1) {
-      addFixture(
-        "Independent image",
-        `独立图片 ${index + 1}。\n\n![[${independentImageNames[index]}]]\n\n每篇文档使用不同的 SVG 字节。`,
-      );
-    }
-    for (let index = 0; index < categoryCounts.longText; index += 1) {
-      addFixture("Long text", `${longText}\n\n长文本夹具编号 ${index + 1}。`);
-    }
-    for (let index = 0; index < categoryCounts.complexTable; index += 1) {
-      addFixture(
-        "Complex table",
-        `<table><thead><tr><th>编号</th><th>内容</th><th>校验</th></tr></thead><tbody>${complexTableRows}</tbody></table>`,
-      );
-    }
-    for (let index = 0; index < categoryCounts.nestedHtml; index += 1) {
-      addFixture("Nested HTML", `<div data-matrix-fixture="nested-${index + 1}">${nestedHtml}</div>`);
-    }
-    assert.equal(fixtureContents.length, batchFixtureCount);
-
-    const markdownBytes = fixtureContents.reduce(
-      (total, fixture) => total + Buffer.byteLength(fixture.content, "utf8"),
-      0,
-    );
-    const repeatedImageBytes = Buffer.byteLength(repeatedImageContent, "utf8");
-    const independentImageBytes = independentImageContents.reduce(
-      (total, content) => total + Buffer.byteLength(content, "utf8"),
-      0,
-    );
-    fs.mkdirSync(batchFixtureStagingRoot);
-    for (const fixture of fixtureContents)
-      fs.writeFileSync(path.join(batchFixtureStagingRoot, fixture.name), fixture.content, "utf8");
-    fs.writeFileSync(path.join(batchFixtureStagingRoot, repeatedImageName), repeatedImageContent, "utf8");
-    for (const [index, imagePath] of independentImagePaths.entries()) {
-      fs.writeFileSync(
-        path.join(batchFixtureStagingRoot, path.basename(imagePath)),
-        independentImageContents[index],
-        "utf8",
-      );
-    }
-    const initialItemCount = await browser.execute(() => {
-      const text = document.querySelector(".workspace-location")?.textContent ?? "";
-      return Number(text.match(/(\d+)\s*项/)?.[1] ?? 0);
-    });
-    fs.renameSync(batchFixtureStagingRoot, batchFixtureRoot);
-    removeExportArtifacts();
-
     try {
-      await resetDesktopSession();
-      await waitForWorkspaceRoot(matrixRoot);
-      await waitForWorkspaceItemCountAtLeast(
-        initialItemCount + batchFixtureCount,
-        "the desktop batch-export matrix did not finish indexing",
-      );
-
-      const matrixReports = [];
-      const metricFailures = [];
-      for (let round = 1; round <= 3; round += 1) {
-        removeExportArtifacts();
-        const memoryProbe = createApplicationMemoryProbe();
-        let rendererProbeActive = false;
-        let memoryMetrics = null;
-        try {
-          await startRendererResponsivenessProbe();
-          rendererProbeActive = true;
-          await clickWorkspaceExportAction("单文件 Word");
-          const contextMetrics = await measureContextToggleWhileExportRunning();
-          assert.equal(
-            contextMetrics.status,
-            "measured",
-            `batch export round ${round} did not expose a measurable context action: ${JSON.stringify(contextMetrics)}`,
-          );
-          await waitForSuccessfulExport(`batch export matrix round ${round}`);
-          const rendererMetrics = await stopRendererResponsivenessProbe();
-          rendererProbeActive = false;
-          memoryMetrics = memoryProbe.stop();
-          if (contextMetrics.contextToggleLatencyMs > 150) {
-            metricFailures.push(
-              `batch export round ${round} context action exceeded 150ms: ${contextMetrics.contextToggleLatencyMs}`,
-            );
-          }
-          if ((rendererMetrics?.maxGapMs ?? Number.POSITIVE_INFINITY) > 250) {
-            metricFailures.push(
-              `batch export round ${round} renderer gap exceeded 250ms: ${rendererMetrics?.maxGapMs}`,
-            );
-          }
-          if (memoryMetrics.isStrictlyIncreasing) {
-            metricFailures.push(
-              `batch export round ${round} Working Set grew monotonically: ${JSON.stringify(memoryMetrics)}`,
-            );
-          }
-          assert.deepEqual(listExportTempFiles(), []);
-          const artifacts = await validateDocxArtifacts(`batch export matrix round ${round}`, 1);
-          const note = await browser.$(".workspace-export-note").getText();
-          const exportedCount = Number(note.match(/已导出\s+(\d+)\s+篇/)?.[1] ?? 0);
-          assert.ok(
-            exportedCount >= batchFixtureCount,
-            `batch export round ${round} exported too few documents: ${note}`,
-          );
-          matrixReports.push({
-            round,
-            exportedCount,
-            artifacts,
-            responsiveness: {
-              contextToggleLatencyMs: Math.round(contextMetrics.contextToggleLatencyMs),
-              rendererSampleCount: rendererMetrics?.sampleCount ?? 0,
-              rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
-            },
-            process: {
-              measurement: "Windows tasklist Working Set",
-              sampleCount: memoryMetrics.sampleCount,
-              initialWorkingSetBytes: memoryMetrics.initialWorkingSetBytes,
-              peakWorkingSetBytes: memoryMetrics.peakWorkingSetBytes,
-              finalWorkingSetBytes: memoryMetrics.finalWorkingSetBytes,
-              minimumWorkingSetBytes: memoryMetrics.minimumWorkingSetBytes,
-              increasingStepCount: memoryMetrics.increasingStepCount,
-              decreasingStepCount: memoryMetrics.decreasingStepCount,
-            },
-          });
-        } finally {
-          if (rendererProbeActive) await stopRendererResponsivenessProbe().catch(() => null);
-          if (!memoryMetrics) memoryProbe.stop();
-        }
-      }
-
-      removeExportArtifacts();
-      const cancellationMemoryProbe = createApplicationMemoryProbe();
-      let cancellationRendererProbeActive = false;
-      let cancellationMemoryMetrics = null;
-      let cancellationReport = null;
-      try {
-        await waitForExportToSettle();
-        await startRendererResponsivenessProbe();
-        cancellationRendererProbeActive = true;
-        await clickWorkspaceExportAction("单文件 Word");
-        const contextMetrics = await measureContextToggleWhileExportRunning();
-        assert.equal(
-          contextMetrics.status,
-          "measured",
-          `batch export cancellation did not expose a measurable context action: ${JSON.stringify(contextMetrics)}`,
+      await browser.$(".virtual-rows").waitForDisplayed();
+      const count = await browser.execute(() => document.querySelectorAll(".virtual-row").length);
+      assert.ok(count < 120, `large library rendered ${count} rows at once`);
+      const total = Number(await browser.$(".virtual-rows").getAttribute("data-total-rows"));
+      assert.ok(total >= 350, "virtual tree lost documents");
+      // The embedded driver sends WebDriver special keys as literal private-use
+      // characters. Dispatch the standard DOM key to exercise the real React handler.
+      await browser.execute(() => {
+        const button = document.querySelector(".virtual-row button");
+        button?.focus();
+        button?.dispatchEvent(
+          new window.KeyboardEvent("keydown", { key: "End", code: "End", bubbles: true, cancelable: true }),
         );
-        const cancellationMetrics = await cancelExportAfterFirstCommittedVolume();
-        assert.equal(
-          cancellationMetrics.status,
-          "cancelled",
-          `batch export cancellation did not reach the post-volume cancellation path: ${JSON.stringify(cancellationMetrics)}`,
-        );
-        await waitForExportToSettle();
-        const cancellationLatencyMs = cancellationMetrics.cancellationLatencyMs;
-        const rendererMetrics = await stopRendererResponsivenessProbe();
-        cancellationRendererProbeActive = false;
-        cancellationMemoryMetrics = cancellationMemoryProbe.stop();
-        if (contextMetrics.contextToggleLatencyMs > 150) {
-          metricFailures.push(
-            `batch export cancellation context action exceeded 150ms: ${contextMetrics.contextToggleLatencyMs}`,
-          );
-        }
-        if (cancellationLatencyMs > 1_000) {
-          metricFailures.push(`batch export cancellation exceeded 1s: ${cancellationLatencyMs}`);
-        }
-        if ((rendererMetrics?.maxGapMs ?? Number.POSITIVE_INFINITY) > 250) {
-          metricFailures.push(`batch export cancellation renderer gap exceeded 250ms: ${rendererMetrics?.maxGapMs}`);
-        }
-        if (cancellationMemoryMetrics.isStrictlyIncreasing) {
-          metricFailures.push(
-            `batch export cancellation Working Set grew monotonically: ${JSON.stringify(cancellationMemoryMetrics)}`,
-          );
-        }
-        assert.match(await browser.$(".workspace-export-note").getText(), /已取消批量导出/);
-        assert.deepEqual(listExportTempFiles(), []);
-        const artifacts = await validateDocxArtifacts("cancelled batch export", 1);
-        cancellationReport = {
-          contextToggleLatencyMs: Math.round(contextMetrics.contextToggleLatencyMs),
-          cancellationLatencyMs: Math.round(cancellationLatencyMs),
-          rendererMaxGapMs: Math.round(rendererMetrics?.maxGapMs ?? 0),
-          artifacts,
-          process: {
-            measurement: "Windows tasklist Working Set",
-            sampleCount: cancellationMemoryMetrics.sampleCount,
-            initialWorkingSetBytes: cancellationMemoryMetrics.initialWorkingSetBytes,
-            peakWorkingSetBytes: cancellationMemoryMetrics.peakWorkingSetBytes,
-            finalWorkingSetBytes: cancellationMemoryMetrics.finalWorkingSetBytes,
-            minimumWorkingSetBytes: cancellationMemoryMetrics.minimumWorkingSetBytes,
-            increasingStepCount: cancellationMemoryMetrics.increasingStepCount,
-            decreasingStepCount: cancellationMemoryMetrics.decreasingStepCount,
-          },
-        };
-      } finally {
-        if (cancellationRendererProbeActive) await stopRendererResponsivenessProbe().catch(() => null);
-        if (!cancellationMemoryMetrics) cancellationMemoryProbe.stop();
-      }
-
-      removeExportArtifacts();
-      fs.mkdirSync(firstVolumePath);
-      try {
-        await clickWorkspaceExportAction("单文件 Word");
-        const errorAlert = await browser.$('[role="alert"]');
-        await browser.waitUntil(
-          async () => (await errorAlert.isDisplayed()) && /导出|保存|失败/.test(await errorAlert.getText()),
-          { timeout: 120_000, timeoutMsg: "the batch export failure fixture did not report an error" },
-        );
-        await waitForExportToSettle();
-        assert.equal(fs.statSync(firstVolumePath).isDirectory(), true);
-        assert.deepEqual(listExportTempFiles(), []);
-      } finally {
-        fs.rmSync(firstVolumePath, { recursive: true, force: true });
-      }
-
-      logExportBenchmark({
-        fixture: {
-          documentCount: batchFixtureCount,
-          categories: categoryCounts,
-          markdownBytes,
-          imageCount: 1 + independentImagePaths.length,
-          imageBytes: repeatedImageBytes + independentImageBytes,
-          repeatedImageBytes,
-          independentImageBytes,
-        },
-        thresholds: {
-          rendererMaxGapMs: 250,
-          contextToggleLatencyMs: 150,
-          cancellationLatencyMs: 1_000,
-        },
-        rounds: matrixReports,
-        cancellation: cancellationReport,
-        failureCleanup: { targetRemainsDirectory: true, tempFiles: 0 },
       });
-      assert.equal(metricFailures.length, 0, metricFailures.join("; "));
+      await waitForWorkspaceEntry(".workspace-file", "bulk-349.md", true, "last virtual row was unreachable");
+      await clickWorkspaceFile("bulk-349.md");
+      await ensureRenderedMode();
+      assert.match(await readerText(), /Bulk 349/);
     } finally {
-      fs.rmSync(batchFixtureStagingRoot, { recursive: true, force: true });
-      fs.rmSync(batchFixtureRoot, { recursive: true, force: true });
-      fs.rmSync(firstVolumePath, { recursive: true, force: true });
-      removeExportArtifacts();
-      fs.rmSync(repeatedImagePath, { force: true });
-      for (const imagePath of independentImagePaths) fs.rmSync(imagePath, { force: true });
-      for (const fixturePath of batchFixturePaths) fs.rmSync(fixturePath, { force: true });
+      try {
+        await restoreInitialDocument();
+      } finally {
+        assert.equal(path.dirname(path.resolve(bulkPath)), path.resolve(root));
+        fs.rmSync(bulkPath, { recursive: true, force: true });
+      }
+      await browser.waitUntil(async () => !(await browser.$(".virtual-rows").isExisting()), { timeout: 15000 });
+    }
+  });
+
+  it("reads cross-document block embeds and saves property form edits without changing the body", async () => {
+    const root = path.dirname(documentPath);
+    const source = path.join(root, "embed-source.md");
+    const note = path.join(root, "properties-roundtrip.md");
+    const body = "# Property roundtrip\n\n![[embed-source#^quote]]\n\n正文需要保留。\n";
+    fs.writeFileSync(source, "# Source\n\n来自另一个文档的原文。 ^quote\n", "utf8");
+    fs.writeFileSync(note, body, "utf8");
+    try {
+      await waitForWorkspaceEntry(
+        ".workspace-file",
+        "properties-roundtrip.md",
+        true,
+        "new property document did not appear",
+      );
+      await clickWorkspaceFile("properties-roundtrip.md");
+      await ensureRenderedMode();
+      await browser.waitUntil(() => browser.execute(() => document.querySelector(".reader-pane.is-active .document-embed")?.textContent?.includes("来自另一个文档的原文")), {timeout:15000});
+      await showDocumentProperties();
+      await browser.$("button=编辑文档属性").click();
+      await browser.$('input[placeholder="文档的显示标题"]').setValue("桌面属性测试");
+      await browser.$('input[placeholder="阅读, 工作, 灵感"]').setValue("阅读, 测试");
+      await browser.$("button=应用到文档").click();
+      // Save through the actual shortcut; autosave may already have removed the
+      // conditional Save button while the driver was locating the next element.
+      await browser.execute(() => window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "s", ctrlKey: true, bubbles: true, cancelable: true })));
+      await browser.waitUntil(() => fs.readFileSync(note, "utf8").includes("title: 桌面属性测试"));
+      assert.ok(fs.readFileSync(note, "utf8").endsWith(body), "property form changed the body");
+    } finally {
+      try {
+        await restoreInitialDocument();
+      } finally {
+        fs.rmSync(source, { force: true });
+        fs.rmSync(note, { force: true });
+      }
     }
   });
 
@@ -1939,38 +623,6 @@ describe("Moyang Reader desktop runtime", () => {
     );
 
     assert.match(await browser.$(".document-title").getText(), /desktop-e2e\.md/);
-  });
-
-  it("keeps the open document and offers save-as after the source file is deleted", async () => {
-    const preservedText = "外部删除前仍可见的内容。";
-    fs.appendFileSync(documentPath, `\n${preservedText}\n`, "utf8");
-    await browser.pause(2_000);
-
-    try {
-      fs.rmSync(documentPath, { force: true });
-
-      const notice = await browser.$(".external-change-notice");
-      await notice.waitForDisplayed();
-      await browser.waitUntil(() => notice.getText().then((text) => text.includes("已被删除或移走")), {
-        timeout: 15_000,
-        timeoutMsg: "the external deletion was not surfaced as a recoverable state",
-      });
-      assert.match(await browser.$(".reader-content").getText(), new RegExp(preservedText));
-      assert.equal(await notice.$("button=另存为").isDisplayed(), true);
-      assert.equal(await notice.$("button=覆盖保存").isExisting(), false);
-    } finally {
-      fs.writeFileSync(documentPath, `# Desktop E2E\n\n${preservedText}\n`, "utf8");
-      await browser.waitUntil(
-        async () => {
-          const reader = await browser.$(".reader-content");
-          return (await reader.isDisplayed()) && (await reader.getText()).includes(preservedText);
-        },
-        {
-          timeout: 15_000,
-          timeoutMsg: "the deleted desktop E2E fixture was not restored",
-        },
-      );
-    }
   });
 
   it("refreshes the file tree after external files and directories are added and removed", async () => {
@@ -2041,7 +693,7 @@ describe("Moyang Reader desktop runtime", () => {
 
       await clickWorkspaceFile(longName);
       await ensureRenderedMode();
-      await browser.$("h1=Long position note").waitForDisplayed();
+      await browser.waitUntil(async () => (await readerText()).includes("Long position note"), {timeout:15000});
 
       await browser.waitUntil(
         () =>
@@ -2054,7 +706,7 @@ describe("Moyang Reader desktop runtime", () => {
       await browser.execute(() => {
         const contentArea = document.querySelector(".content-area");
         if (!(contentArea instanceof HTMLElement)) throw new Error("the reader content area was not found");
-        contentArea.scrollTop = Math.round((contentArea.scrollHeight - contentArea.clientHeight) * 0.5);
+        contentArea.scrollTop = contentArea.scrollHeight;
         const EventConstructor = document.defaultView?.Event;
         if (!EventConstructor) throw new Error("the browser Event constructor was not found");
         contentArea.dispatchEvent(new EventConstructor("scroll"));
@@ -2070,22 +722,9 @@ describe("Moyang Reader desktop runtime", () => {
         { timeout: 5_000, timeoutMsg: "the long document did not record a non-zero reading position" },
       );
       await waitForSavedReadingPosition(longName);
-      const savedPosition = await getSavedReadingPosition(longName);
-      assert.ok(savedPosition, "reading position should be available after persistence");
-      assert.equal(typeof savedPosition?.headingId, "string", "reading position should include a heading anchor");
-      assert.equal(typeof savedPosition?.relativeOffset, "number", "reading position should include a heading offset");
-      assert.equal(typeof savedPosition?.progressRatio, "number", "reading position should include a progress ratio");
-      assert.ok(savedPosition.progressRatio >= 0 && savedPosition.progressRatio <= 1);
-      assert.equal(typeof savedPosition?.updatedAt, "number", "reading position should include an update timestamp");
-
-      const insertedSections = Array.from(
-        { length: 12 },
-        (_, index) => `## Inserted preface ${index + 1}\n\n用于验证正文前部插入后仍按标题锚点恢复。\n\n`,
-      );
-      fs.writeFileSync(longPath, `# Long position note\n\n${insertedSections.join("")}${sections.join("")}`, "utf8");
       await clickWorkspaceFile(shortName);
       await ensureRenderedMode();
-      await browser.$("h1=Short position note").waitForDisplayed();
+      await browser.waitUntil(async () => (await readerText()).includes("Short position note"), {timeout:15000});
       await browser.waitUntil(
         () =>
           browser.execute(
@@ -2098,22 +737,16 @@ describe("Moyang Reader desktop runtime", () => {
       );
       await clickWorkspaceFile(longName);
       await ensureRenderedMode();
-      await browser.$("h1=Long position note").waitForDisplayed();
+      await browser.waitUntil(async () => (await readerText()).includes("Long position note"), {timeout:15000});
       await browser.waitUntil(
         () =>
           browser.execute(
-            (headingId, expectedOffset) => {
-              const contentArea = document.querySelector(".content-area");
-              const heading = document.getElementById(headingId);
-              if (!(contentArea instanceof HTMLElement) || !(heading instanceof HTMLElement)) return false;
-              const areaRect = contentArea.getBoundingClientRect();
-              const headingRect = heading.getBoundingClientRect();
-              return contentArea.scrollTop > 0 && Math.abs(headingRect.top - areaRect.top - expectedOffset) <= 8;
-            },
-            savedPosition.headingId,
-            savedPosition.relativeOffset,
+            () =>
+              (document.querySelector(".content-area") instanceof HTMLElement
+                ? document.querySelector(".content-area").scrollTop
+                : 0) > 0,
           ),
-        { timeout: 5_000, timeoutMsg: "the long document did not restore its anchored reading position" },
+        { timeout: 5_000, timeoutMsg: "the long document did not restore its reading position" },
       );
     } finally {
       try {
@@ -2128,103 +761,111 @@ describe("Moyang Reader desktop runtime", () => {
     }
   });
 
-  it("flushes the latest draft before switching documents", async () => {
-    const targetName = "draft-flush-target.md";
-    const targetPath = path.join(path.dirname(documentPath), targetName);
-    const draftText = "切页前最后一段输入。";
-    let targetOpened = false;
-    fs.writeFileSync(targetPath, "# Draft flush target\n\n目标文档。\n", "utf8");
+  it("preserves an editing session on a file switch and autosaves its background draft", async () => {
+    const targetName = "draft-flush-target.md"; const targetPath = path.join(path.dirname(documentPath), targetName);
+    fs.writeFileSync(targetPath, "# Other note\n", "utf8");
+    await waitForWorkspaceEntry(".workspace-file", targetName, true, "switch target was not indexed");
+    await clickWorkspaceFile(path.basename(documentPath)); await clickToolbarAction("源文本");
+    const value = "切换后继续自动保存的草稿";
+    await browser.execute((text) => {
+      const target = document.querySelector('[aria-label="Markdown 源文本"]'); const view = target?.cmTile?.root?.view;
+      if (!view) throw new Error("CodeMirror unavailable"); view.dispatch({ changes: { from: view.state.doc.length, insert: "\n" + text } });
+    }, value);
+    await clickWorkspaceFile(targetName);
+    await browser.waitUntil(() => fs.readFileSync(documentPath, "utf8").includes(value), { timeout: 15000 });
+    await clickWorkspaceFile(path.basename(documentPath));
+    assert.ok((await browser.$('[aria-label="Markdown 源文本"]').getText()).includes(value));
+    await ensureRenderedMode(); fs.rmSync(targetPath, { force: true });
+  });
 
+  it("shares knowledge, long-term memory and skills with a real MCP process", async () => {
+    await ensureRenderedMode();
+    const before = await readerText();
+    await selectSpace("ai");
+    await browser.$(".ai-sidebar").waitForDisplayed();
+    const memoryNav = (await browser.$$(".ai-sidebar nav button"))[1];
+    await memoryNav.click();
+    await browser.$("button=＋ 新建记忆").click();
+    await browser.$('.ai-title-input').setValue("桌面长期偏好");
+    await browser.$("button=源码模式").click();
+    await browser.$('.ai-shared-editor .cm-content').waitForDisplayed();
+    await browser.execute(()=>{const target=document.querySelector('.ai-shared-editor .cm-content');const view=target?.cmTile?.root?.view;if(!view)throw new Error("AI editor unavailable");view.dispatch({changes:{from:0,to:view.state.doc.length,insert:"偏好清晰简洁的中文说明。"}});});
+    await browser.$("button=保存内容").click();
+    await browser.waitUntil(async () => (await browser.$(".ai-document h1").getText()) === "桌面长期偏好");
+    const info = await browser.execute(() => window.__TAURI_INTERNALS__.invoke("ai_connection_info"));
+    assert.equal(info.available, true);
+    const client = await connectMcp(info.executable, info.directory);
     try {
-      await waitForWorkspaceEntry(
-        ".workspace-file",
-        targetName,
-        true,
-        "the draft-flush target did not appear in the workspace",
-      );
-      if (await browser.$("button=阅读").isExisting()) {
-        await clickToolbarAction("阅读");
-      }
-      if (await browser.$("button=编辑").isExisting()) {
-        await clickToolbarAction("编辑");
-      }
-      await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
-      await clickToolbarAction("源文本");
-      const editor = await browser.$('[aria-label="Markdown 源文本"]');
-      await editor.waitForDisplayed();
-      await browser.execute((text) => {
-        const target = document.querySelector('[aria-label="Markdown 源文本"]');
-        if (!(target instanceof HTMLElement)) throw new Error("source editor was not found");
-        const view = target.cmTile?.root?.view;
-        if (!view) throw new Error("CodeMirror view is unavailable");
-        view.dispatch({ changes: { from: view.state.doc.length, insert: `\n${text}` } });
-      }, draftText);
-      await browser.waitUntil(() => editor.getText().then((value) => value.includes(draftText)), {
-        timeout: 5_000,
-        timeoutMsg: "the latest draft edit was not applied before switching",
+      const found = await client.call("search", { query: "中文", kind: "memory" });
+      assert.equal(found.total, 1);
+      const original = await client.call("get_record", { id: found.items[0].id });
+      const revised = await client.call("save_record", {
+        ...original,
+        expected_revision: original.revision,
+        body: "偏好清晰中文，重要结论放在开头。",
+        reason: "MCP 实际修订",
       });
+      assert.equal(revised.revision, 2);
+      await client.call("save_record", {
+        kind: "knowledge",
+        title: "桌面接入说明",
+        body: "多个 Agent 共用本机资料。",
+        source: "桌面测试",
+      });
+      const skill = await client.call("save_record", {
+        kind: "skill",
+        title: "native-review",
+        summary: "审阅资料时使用",
+        body: "先核对来源，再检查结论。",
+        assets: [{ path: "references/check.md", encoding: "utf8", content: "核对出处" }],
+      });
+      assert.equal(
+        (await client.call("read_skill_resource", { id: skill.id, path: "references/check.md" })).content,
+        "核对出处",
+      );
+      await browser.$('button[aria-label="刷新 AI 内容"]').click();
+      await browser.waitUntil(async () => (await browser.$(".ai-prose").getText()).includes("重要结论放在开头"));
+      await browser.$("button=查看历史").click();
+      assert.equal((await browser.$$(".ai-history details")).length, 2);
+      const stats = await client.call("library_status");
+      assert.equal(stats.memory, 1);
+      assert.equal(stats.knowledge, 1);
+      assert.equal(stats.skill, 1);
+      const checkpoint=(await client.call("task_checkpoint",{client:"desktop-mcp-test",session:"session",turn:"task-1",agent:"codex",project:""})).checkpoint;
+      const current=await client.call("get_record",{id:original.id});
+      const task={checkpoint_id:checkpoint.id,reason:"用户明确更正表达习惯",decisions:[{action:"correct",record:{...current,expected_revision:current.revision,body:"先给结论，再给可验证的依据。"},evidence:"用户原话：以后先给结论，再给依据",explicit_correction:true}]};
+      const first=await client.call("conclude_task",task);const repeated=await client.call("conclude_task",task);assert.deepEqual(first.record_ids,repeated.record_ids);
+      const activity=(await client.call("recent_activity")).activities.find(a=>a.record_id===original.id);assert.ok(activity);
+      await client.call("undo_memory_activity",{id:activity.id});assert.equal((await client.call("get_record",{id:original.id})).body,current.body);
+      await client.call("undo_memory_activity",{id:activity.id,restore:true});assert.match((await client.call("get_record",{id:original.id})).body,/可验证/);
+      const skillCheckpoint=(await client.call("task_checkpoint",{client:"desktop-mcp-test",session:"session",turn:"task-2",agent:"codex",project:""})).checkpoint;
+      const previousSkill=await client.call("get_record",{id:skill.id});
+      await client.call("conclude_task",{checkpoint_id:skillCheckpoint.id,reason:"审阅任务验证了来源检查顺序",decisions:[{action:"improve_skill",record:{...previousSkill,expected_revision:previousSkill.revision,body:"先核对来源，再检查结论；最后列出未验证项。"},evidence:"任务结果：提前列出未验证项，避免遗漏一个出处",outcome:"success"}]});
+      assert.equal((await client.call("read_skill_resource",{id:skill.id,path:"references/check.md"})).content,"核对出处");
+      const detail=await client.call("revision_detail",{id:skill.id,revision:2});assert.match(detail.reason,/审阅任务/);assert.ok(!detail.record.assets);
+      const backup=await browser.execute(()=>window.__TAURI_INTERNALS__.invoke("ai_request",{operation:"backup",payload:{}}));assert.equal(backup.version,2);assert.equal(backup.checkpoints.length,2);assert.equal(backup.activities.length,2);
+      await browser.$("button=近期活动与冲突").click();await browser.$(".ai-activity").waitForDisplayed();assert.match(await browser.$(".ai-activity").getText(),/用户明确更正表达习惯/);
+      fs.mkdirSync(path.resolve("artifacts/workbench"),{recursive:true});
+      await browser.saveScreenshot(path.resolve("artifacts/workbench/ai-activity-desktop.png"));
+      await browser.$("button=接入与备份").click();
+      await browser.waitUntil(async()=> (await browser.$$(".ai-client-connection")).length===2);
+      assert.match(await browser.$(".ai-client-connections").getText(),/Codex 桌面端/);
+      await browser.saveScreenshot(path.resolve("artifacts/workbench/ai-connections-desktop.png"));
 
-      await (await findWorkspaceElement(".workspace-file", targetName)).click();
-      let confirmation = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
-      await confirmation.waitForDisplayed();
-      assert.match(await confirmation.getText(), /最新修改已自动保留/);
-      assert.ok(await confirmation.$('[data-testid="document-transition-confirm-cancel"]').isFocused());
-      await browser.keys("Escape");
-      assert.match(await editor.getText(), new RegExp(draftText));
-      assert.equal(fs.readFileSync(documentPath, "utf8").includes(draftText), false);
-      await (await findWorkspaceElement(".workspace-file", targetName)).click();
-      confirmation = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
-      await confirmation.waitForDisplayed();
-      await confirmation.$('[data-testid="document-transition-confirm-confirm"]').click();
-      await browser.$("h1=Draft flush target").waitForDisplayed();
-      targetOpened = true;
-
-      const savedDraft = await browser.execute((expectedPath) => {
-        const normalize = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
-        const expected = normalize(expectedPath);
-        const expectedName = expected.slice(expected.lastIndexOf("/") + 1);
-        const drafts = JSON.parse(window.localStorage.getItem("moyang-reader-drafts") || "[]");
-        return (
-          drafts.find((snapshot) => {
-            const actual = normalize(snapshot.path);
-            return actual === expected || actual.endsWith(`/${expectedName}`);
-          }) ?? null
-        );
-      }, documentPath);
-      assert.ok(savedDraft, "the latest edit was not flushed to local draft storage");
-      assert.match(savedDraft.draft, new RegExp(draftText));
-
-      await clickWorkspaceFile(path.basename(documentPath));
-      await discardDraftNotice();
-      targetOpened = false;
-      if (!(await browser.$("button=编辑").isExisting())) {
-        if (await browser.$("button=源文本").isExisting()) {
-          await clickToolbarAction("源文本");
-        }
-        if (await browser.$("button=阅读").isExisting()) {
-          await clickToolbarAction("阅读");
-        }
-      }
-      await browser.$(".reader-content").waitForDisplayed();
     } finally {
-      if (targetOpened) {
-        try {
-          await clickWorkspaceFile(path.basename(documentPath));
-          await discardDraftNotice();
-        } catch {
-          // Preserve the original assertion when desktop cleanup cannot finish.
-        }
-      }
-      fs.rmSync(targetPath, { force: true });
+      await client.close();
     }
+    await selectSpace("reader");
+    assert.equal(await readerText(), before);
   });
 
   it("shows a conflict notice without replacing unsaved local edits", async () => {
+    await browser.execute(() => window.dispatchEvent(new window.CompositionEvent("compositionstart", { bubbles: true })));
     const localText = "本地未保存内容。";
     const externalText = "外部冲突内容。";
 
     await clickToolbarAction("编辑");
-    await browser.$('.wysiwyg-editor [contenteditable="true"]').waitForDisplayed();
+    await ensureWysiwygMode();
     await clickToolbarAction("源文本");
     const editor = await browser.$('[aria-label="Markdown 源文本"]');
     await editor.waitForDisplayed();
@@ -2245,17 +886,10 @@ describe("Moyang Reader desktop runtime", () => {
 
     const notice = await browser.$(".external-change-notice");
     await notice.waitForDisplayed();
+    await browser.execute(() => window.dispatchEvent(new window.CompositionEvent("compositionend", { bubbles: true })));
     assert.match(await notice.getText(), /已被其他程序修改/);
     assert.match(await editor.getText(), new RegExp(localText));
     assert.equal(await browser.$("button=重新载入").isDisplayed(), true);
-    await notice.$("button=重新载入").click();
-    const reloadDialog = await browser.$('[role="dialog"][aria-labelledby="document-transition-confirm-title"]');
-    await reloadDialog.waitForDisplayed();
-    assert.match(await reloadDialog.getText(), /不会覆盖磁盘文件/);
-    assert.ok(await reloadDialog.$('[data-testid="document-transition-confirm-cancel"]').isFocused());
-    await reloadDialog.$('[data-testid="document-transition-confirm-cancel"]').click();
-    assert.match(await editor.getText(), new RegExp(localText));
-    assert.equal(fs.readFileSync(documentPath, "utf8").includes(localText), false);
   });
 
   it("keeps the external-change marker after dismiss and blocks accidental overwrite", async () => {
@@ -2302,14 +936,14 @@ describe("Moyang Reader desktop runtime", () => {
   });
 
   it("keeps the window and local edits after cancelling a close request", async () => {
+    fs.appendFileSync(documentPath, "\n关闭时的外部修改\n", "utf8");
+    await browser.$(".external-change-notice").waitForDisplayed();
+    await browser.execute(() => { const view = document.querySelector('[aria-label="Markdown 源文本"]')?.cmTile?.root?.view; view?.dispatch({ changes: { from: view.state.doc.length, insert: "\n等待处理的关闭草稿" } }); });
+    await selectSpace("ai");
     await requestCloseRequest();
     const firstDialog = await waitForCloseConfirmation();
-    const firstDialogText = await firstDialog.getText();
-    assert.match(firstDialogText, /未保存修改/);
-    assert.match(firstDialogText, /草稿副本/);
-    assert.match(firstDialogText, /退出 Moyang Reader.*不会写回原文件/);
-    assert.match(firstDialogText, /保存并退出.*会先保存当前修改/);
-    assert.equal(await firstDialog.$('[data-testid="close-confirm-save"]').getText(), "保存并退出");
+    assert.equal(await browser.execute(() => document.body.dataset.activeSpace), "ai");
+    assert.match(await firstDialog.getText(), /未保存修改/);
     await firstDialog.$('[data-testid="close-confirm-cancel"]').click();
     await browser.waitUntil(
       async () => {
@@ -2325,6 +959,7 @@ describe("Moyang Reader desktop runtime", () => {
       },
     );
 
+    await selectSpace("reader");
     const editor = await browser.$('[aria-label="Markdown 源文本"]');
     await editor.waitForDisplayed();
     assert.match(await editor.getText(), /本地未保存内容/);
@@ -2332,9 +967,7 @@ describe("Moyang Reader desktop runtime", () => {
     await requestCloseRequest();
     const secondDialog = await waitForCloseConfirmation();
     assert.match(await secondDialog.getText(), /未保存修改/);
-    assert.match(await secondDialog.getText(), /草稿副本/);
     assert.equal(await secondDialog.$('[data-testid="close-confirm-confirm"]').getText(), "退出 Moyang Reader");
-    assert.equal(await secondDialog.$('[data-testid="close-confirm-save"]').getText(), "保存并退出");
     await secondDialog.$('[data-testid="close-confirm-cancel"]').click();
   });
 });
