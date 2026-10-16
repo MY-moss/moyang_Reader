@@ -785,7 +785,7 @@ describe("Moyang Reader desktop runtime", () => {
     await browser.$(".ai-sidebar").waitForDisplayed();
     const memoryNav = (await browser.$$(".ai-sidebar nav button"))[1];
     await memoryNav.click();
-    await browser.$("button=＋ 新建记忆").click();
+    await browser.$("button=新建记忆").click();
     await browser.$('.ai-title-input').setValue("桌面长期偏好");
     await browser.$("button=源码模式").click();
     await browser.$('.ai-shared-editor .cm-content').waitForDisplayed();
