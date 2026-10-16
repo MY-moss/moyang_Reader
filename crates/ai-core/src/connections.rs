@@ -173,6 +173,30 @@ fn contains_hooks(config: &Value, desired: &Value) -> bool {
         })
     })
 }
+fn same_server_target(left: &Value, right: &Value) -> bool {
+    let same_path = |left: &Value, right: &Value| {
+        let (Some(left), Some(right)) = (left.as_str(), right.as_str()) else {
+            return false;
+        };
+        left == right
+            || fs::canonicalize(left)
+                .ok()
+                .zip(fs::canonicalize(right).ok())
+                .is_some_and(|(left, right)| left == right)
+    };
+    let (Some(left_args), Some(right_args)) = (left["args"].as_array(), right["args"].as_array())
+    else {
+        return false;
+    };
+    left.as_object().is_some_and(|v| v.len() == 2)
+        && right.as_object().is_some_and(|v| v.len() == 2)
+        && left_args.len() == 2
+        && right_args.len() == 2
+        && left_args[0] == "--data-dir"
+        && right_args[0] == "--data-dir"
+        && same_path(&left["command"], &right["command"])
+        && same_path(&left_args[1], &right_args[1])
+}
 /// Exact merge with a per-application ownership manifest. Other services and hook groups survive.
 pub fn configure_client(
     store: &Store,
@@ -205,7 +229,17 @@ pub fn configure_client(
     };
     let before = read(&config_path)?;
     let hook_before = read(&hook_path)?;
-    let desired = json!({"command":exe,"args":["--data-dir",data]});
+    let target = json!({"command":exe,"args":["--data-dir",data]});
+    // Keep the exact installed spelling and hook definitions for the same files.
+    // A CLI forward-slash path and the desktop's Windows path must not look like
+    // a reinstall or invalidate client trust and successful connection receipts.
+    let matching = owned
+        .iter()
+        .rev()
+        .find(|entry| same_server_target(&entry["server"], &target) && entry["hooks"].is_object());
+    let desired = matching.map_or(target.clone(), |entry| entry["server"].clone());
+    let desired_hooks =
+        matching.map_or_else(|| hooks(exe, data, client), |entry| entry["hooks"].clone());
     let mut doc = if client == "codex" {
         before
             .parse::<DocumentMut>()
@@ -228,7 +262,6 @@ pub fn configure_client(
         config["mcpServers"]["moyang-ai"].clone()
     };
     let mut hook_config = object(&hook_before)?;
-    let desired_hooks = hooks(exe, data, client);
     let connection_changed = current != desired || !contains_hooks(&hook_config, &desired_hooks);
     if action != "status" {
         if action == "install" && !exe.is_file() {
@@ -254,10 +287,11 @@ pub fn configure_client(
                     doc["mcp_servers"] = Item::Table(Table::new());
                 }
                 let mut entry = Table::new();
-                entry["command"] = value(exe.to_string_lossy().as_ref());
+                entry["command"] = value(desired["command"].as_str().unwrap());
                 let mut args = toml_edit::Array::new();
-                args.push("--data-dir");
-                args.push(data.to_string_lossy().as_ref());
+                for arg in desired["args"].as_array().unwrap() {
+                    args.push(arg.as_str().unwrap());
+                }
                 entry["args"] = value(args);
                 if doc["mcp_servers"].get("moyang-ai").is_none() {
                     doc["mcp_servers"]["moyang-ai"] = Item::Table(entry);
@@ -374,6 +408,68 @@ pub fn configure_client(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn equivalent_windows_path_spellings_keep_connection_status_and_hooks() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = ClientPaths {
+            codex: root.path().join("codex"),
+            claude_settings: root.path().join("claude/settings.json"),
+            claude_mcp: root.path().join("claude.json"),
+        };
+        let exe = root.path().join("moyang.exe");
+        fs::write(&exe, "").unwrap();
+        let directory = root.path().join("data");
+        let forward = |p: &Path| PathBuf::from(p.to_string_lossy().replace('\\', "/"));
+        let initial = Store::open(forward(&directory)).unwrap();
+        let desktop = Store::open(&directory).unwrap();
+        for client in ["codex", "claude"] {
+            configure_client(&initial, &paths, &forward(&exe), client, "install").unwrap();
+            let key = format!("client-install:{client}");
+            let manifest = initial.setting_value(&key).unwrap();
+            let config_path = if client == "codex" {
+                paths.codex.join("config.toml")
+            } else {
+                paths.claude_mcp.clone()
+            };
+            let hook_path = if client == "codex" {
+                paths.codex.join("hooks.json")
+            } else {
+                paths.claude_settings.clone()
+            };
+            let config_before = read(&config_path).unwrap();
+            let hooks_before = read(&hook_path).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(3));
+            let at = now();
+            for kind in ["mcp", "hook", "completed"] {
+                initial
+                    .set_setting_value(&format!("connection:{client}:{kind}"), &json!(at))
+                    .unwrap();
+                initial
+                    .set_setting_value(
+                        &format!("connection-source:{client}:{kind}"),
+                        &json!({"at":at,"executable":exe}),
+                    )
+                    .unwrap();
+            }
+            for action in ["status", "install"] {
+                let status = configure_client(&desktop, &paths, &exe, client, action).unwrap();
+                assert_eq!(status["configured"], true, "{client} {action}");
+                assert_eq!(status["hooks_configured"], true);
+                assert_eq!(status["receipts"]["mcp_at"], at);
+                assert_eq!(status["receipts"]["hook_at"], at);
+                assert_eq!(status["receipts"]["completed_at"], at);
+            }
+            assert_eq!(read(&config_path).unwrap(), config_before);
+            assert_eq!(read(&hook_path).unwrap(), hooks_before);
+            assert_eq!(desktop.setting_value(&key).unwrap(), manifest);
+            let different = Store::open(root.path().join("different-data")).unwrap();
+            let status = configure_client(&different, &paths, &exe, client, "status").unwrap();
+            assert_eq!(status["configured"], false);
+            assert!(configure_client(&different, &paths, &exe, client, "install").is_err());
+            assert_eq!(read(&config_path).unwrap(), config_before);
+        }
+    }
     #[test]
     fn receipts_belong_to_the_installed_connection_and_reinstall_is_idempotent() {
         let root = tempfile::tempdir().unwrap();

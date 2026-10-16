@@ -1,5 +1,7 @@
 # MCP 与任务沉淀接口
 
+0.15.2 在已登记的同一程序、数据目录使用不同 Windows 路径写法时保持连接状态一致，保留原钩子定义和回执。配置成功、MCP 可读写和真实结束钩子仍分别核验；本机实测与未完成项见 [MCP 与 AI 记忆实测](VALIDATION-LIVE-AI.md)。
+
 ## 0.15 资料检查与上下文预算
 
 `library_health` / 桌面 `health` 为只读检查。输入 `project`（省略表示全部，空字符串表示仅全局）、`agent`、`kind`、`include_global`（默认 false）、`issue`（duplicate / expired / missing_source / broken_links）、`offset` 和 `limit`（默认 30，最多 100）。返回 `scanned`、各类 `counts`、当前条件下的 `total`、`checked_at` 和分页 `items`；每条含 ID、当前 revision、范围、摘要、问题类别、最多 3 条重复候选和已删除的关联 ID。不返回附件正文，也不触发索引维护。

@@ -118,13 +118,25 @@ try {
 
   const desktopPort = await unusedLocalPort();
   const desktopUrl = `http://127.0.0.1:${desktopPort}`;
+  const clientEnvironment = {
+    ...process.env,
+    CODEX_HOME: path.join(temp, "codex"),
+    CLAUDE_CONFIG_DIR: path.join(temp, "claude"),
+  };
+  for (const name of ["codex", "claude"]) {
+    const installed = JSON.parse(execFileSync(path.join(release, "moyang-ai-mcp.exe"),
+      ["--data-dir", path.join(temp, "ai").replaceAll("\\", "/"), "--request", "client_connection"],
+      { input: JSON.stringify({ client: name, action: "install" }), encoding: "utf8", windowsHide: true, env: clientEnvironment }));
+    assert.equal(installed.configured, true);
+    assert.equal(installed.hooks_configured, true);
+  }
   const pluginDocument = path.join(temp, "release-plugin.md");
   fs.writeFileSync(pluginDocument, "# 发布包阅读工具\n\n- [ ] 中文 &amp; 插件验证\n", "utf8");
   app = startTestProcess(path.join(release, "Moyang Reader Next.exe"), [pluginDocument], {
     windowsHide: true,
     stdio: "ignore",
     env: {
-      ...process.env,
+      ...clientEnvironment,
       MOYANG_DATA_DIR: path.join(temp, "desktop"),
       MOYANG_AI_DATA_DIR: path.join(temp, "ai"),
       WEBVIEW2_USER_DATA_FOLDER: path.join(temp, "webview"),
@@ -157,8 +169,15 @@ try {
   const info = await page.evaluate(() => window.__TAURI_INTERNALS__.invoke("ai_connection_info"));
   assert.equal(info.available, true);
   assert.equal(path.resolve(info.executable), path.join(release, "moyang-ai-mcp.exe"));
+  for (const name of ["codex", "claude"]) {
+    const status = await page.evaluate((client) => window.__TAURI_INTERNALS__.invoke("ai_request", {
+      operation: "client_connection", payload: { client, action: "status" },
+    }), name);
+    assert.equal(status.configured, true, `${name}: CLI and desktop path spellings must agree`);
+    assert.equal(status.hooks_configured, true);
+  }
   await page.screenshot({ path: "artifacts/workbench/release-desktop.png" });
-  report.desktop = { rendered: true, scale: 1.5, mcp_companion: true, wdio: false };
+  report.desktop = { rendered: true, scale: 1.5, mcp_companion: true, connection_paths: true, wdio: false };
   await page.locator(".ai-sidebar").getByRole("button", { name: "近期活动与冲突", exact: true }).click();
   await page.getByRole("button", { name: "资料检查", exact: true }).click();
   await page.getByText(/检查了 1 条未归档资料/).waitFor();
