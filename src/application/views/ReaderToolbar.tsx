@@ -6,6 +6,7 @@ import type { ReaderApplication } from "../useReaderApplication";
 export function ReaderToolbar({
   model,
   settingsOpen,
+  onSettingsOpen,
   onSettingsClose,
   navigation,
   extensionActions,
@@ -13,6 +14,7 @@ export function ReaderToolbar({
   navigation?: import("react").ReactNode;
   extensionActions?: import("../../shared/extension-types").ExtensionActions;
   settingsOpen?: boolean;
+  onSettingsOpen?: () => void;
   onSettingsClose?: () => void;
   model: Pick<
     ReaderApplication,
@@ -30,6 +32,7 @@ export function ReaderToolbar({
     | "searchResultCount"
     | "searchResultIndex"
     | "theme"
+    | "setTheme"
     | "locale"
     | "setReadingZoom"
     | "setReaderPreferences"
@@ -137,6 +140,7 @@ export function ReaderToolbar({
         extensionActions={extensionActions}
         navigation={navigation}
         settingsOpen={settingsOpen}
+        onSettingsOpen={onSettingsOpen}
         onSettingsClose={onSettingsClose}
         fileName={documentState?.name ?? null}
         mode={mode}
@@ -152,6 +156,7 @@ export function ReaderToolbar({
         searchResultCount={searchResultCount}
         searchResultIndex={searchResultIndex}
         theme={theme}
+        onThemeChange={model.setTheme}
         locale={locale}
         readingZoom={preferences.readingZoom}
         readingWidth={preferences.readingWidth}

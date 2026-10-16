@@ -1,4 +1,7 @@
 /* Unified workspace shell; document content remains the visual focus. */
+:root {
+  --page-title-size: 22px;
+}
 @media screen {
   .product-shell.workbench-shell {
     display: grid;
@@ -76,9 +79,13 @@
   }
   .workbench-sidebar-content > .sidebar {
     display: block;
+    position: static;
+    inset: auto;
     width: auto;
     height: auto;
+    max-height: none;
     border: 0;
+    box-shadow: none;
     padding: 16px 12px;
     overflow: visible;
   }
@@ -485,7 +492,8 @@
 }
 .bookroom-page h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--page-title-size);
+  font-weight: 600;
 }
 .bookroom-page h2 {
   margin: 28px 0 12px;
@@ -742,7 +750,7 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  z-index: 80;
+  z-index: 40;
   background: var(--surface-strong);
 }
 .workbench-main:has(.settings-page) > .space-pane {
@@ -762,6 +770,13 @@
   width: auto;
   padding: 8px 12px;
   font-size: 13px;
+}
+.settings-dialog .settings-dialog-header .settings-navigation-button {
+  display: none;
+}
+.workbench-sidebar-hidden .settings-dialog .settings-navigation-button,
+.workbench-narrow .settings-dialog .settings-navigation-button {
+  display: inline-flex;
 }
 
 .workbench-notice {

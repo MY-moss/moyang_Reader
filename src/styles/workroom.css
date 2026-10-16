@@ -341,7 +341,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
+  gap: 16px;
+  padding: 24px 28px;
   border-bottom: 1px solid var(--line);
 }
 .settings-dialog-header p {
@@ -351,7 +352,35 @@
 }
 .settings-dialog-header h2 {
   margin: 0;
-  font: 600 24px var(--font-ui);
+  font: 600 var(--page-title-size) var(--font-ui);
+}
+.settings-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-dialog .settings-dialog-header button,
+.settings-section > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font: 13px var(--font-ui);
+  cursor: pointer;
+}
+.settings-dialog .settings-dialog-header button:hover,
+.settings-section > button:hover {
+  background: var(--accent-soft);
+}
+.settings-dialog :is(button, select, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .settings-dialog-layout {
   display: grid;
@@ -385,7 +414,7 @@
   display: block;
   padding: 24px 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 .settings-content {
@@ -477,7 +506,7 @@
 .settings-section .settings-persistence-status {
   margin-top: 20px;
 }
-@media screen and (max-width: 719px) {
+@media screen and (max-width: 720px) {
   .document-actions {
     padding: 8px 12px;
     gap: 8px;
@@ -510,7 +539,7 @@
   }
   .settings-section-nav button {
     width: auto;
-    font-size: 11px;
+    font-size: 13px;
     padding: 10px;
   }
   .settings-section-nav small {

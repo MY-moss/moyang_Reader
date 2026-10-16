@@ -1,6 +1,6 @@
 import type { ReadingFont, EditorFont, ExportTemplate } from "../../features/settings/appearance";
 import { translate, type Locale, type MessageKey } from "../../features/settings/i18n";
-import type { ExportMargin, ExportOrientation, ExportPaper, ReadingWidth } from "../../shared/types";
+import type { ExportMargin, ExportOrientation, ExportPaper, ReadingWidth, ThemeMode } from "../../shared/types";
 import type { TopBarProps } from "./toolbar-types";
 import { useInterfaceDensity } from "../../features/settings/interface-density";
 import { StorageSettings } from "../../features/settings/StorageSettings";
@@ -76,10 +76,15 @@ export function SettingsContent(p: TopBarProps & { section?: string }) {
         aria-labelledby="settings-reading-title"
       >
         <h3 id="settings-reading-title">{en ? "Appearance" : "外观"}</h3>
-        <button onClick={p.onCycleTheme}>
-          {en ? "Theme" : "主题"}：{p.theme === "dark" ? "深色" : p.theme === "light" ? "浅色" : "跟随系统"} · 点击切换
-        </button>
         <p>{en ? "Make this space comfortable for you." : "选一个舒服的字体，让每一页都适合你。"}</p>
+        <label className="settings-select-option">
+          <span>{en ? "Theme" : "主题"}</span>
+          <select value={p.theme} onChange={(e) => p.onThemeChange(e.target.value as ThemeMode)}>
+            <option value="system">{en ? "Follow system" : "跟随系统"}</option>
+            <option value="light">{en ? "Light" : "浅色"}</option>
+            <option value="dark">{en ? "Dark" : "深色"}</option>
+          </select>
+        </label>
         <label className="settings-select-option">
           <span>{en ? "Interface density" : "界面密度"}</span>
           <select

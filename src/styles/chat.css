@@ -13,14 +13,14 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 28px;
+  padding: 24px 28px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 .chat-header h1,
 .chat-settings h2 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: var(--page-title-size);
   font-weight: 600;
 }
 .chat-space small,
@@ -450,6 +450,16 @@
   grid-template-columns: 190px minmax(0, 560px);
   gap: 36px;
   padding: 28px;
+}
+.chat-provider-pending {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+}
+.chat-provider-pending p {
+  margin: 0 0 12px;
+  line-height: 1.7;
 }
 .chat-settings nav button {
   display: flex;

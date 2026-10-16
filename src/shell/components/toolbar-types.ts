@@ -16,6 +16,7 @@ export type TopBarProps = {
   onPrepareForRestart?: () => Promise<void>;
   navigation?: import("react").ReactNode;
   settingsOpen?: boolean;
+  onSettingsOpen?: () => void;
   onSettingsClose?: () => void;
   fileName: string | null;
   mode: ReaderMode;
@@ -99,5 +100,6 @@ export type TopBarProps = {
   onSearchNext: () => void;
   onCloseSearch: () => void;
   onCycleTheme: () => void;
+  onThemeChange: (theme: ThemeMode) => void;
   onLocaleChange: (locale: Locale) => void;
 };

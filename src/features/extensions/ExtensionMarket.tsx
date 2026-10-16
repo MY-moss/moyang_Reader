@@ -128,7 +128,9 @@ export default function ExtensionMarket({
             <Icon name="plus" />
             导入扩展包
           </button>
-          <button onClick={() => setCatalogForm((value) => !value)}>管理目录源</button>
+          <button aria-expanded={catalogForm} onClick={() => setCatalogForm((value) => !value)}>
+            管理目录源
+          </button>
         </div>
         <input
           ref={file}
@@ -332,6 +334,20 @@ export default function ExtensionMarket({
                       ? "可以在目录源中刷新，检查作者发布的新版本。"
                       : "从发现列表选一个适合你的扩展，也可以导入本地包。"}
                 </p>
+                {query.trim() || kind !== "all" ? (
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      setKind("all");
+                    }}
+                  >
+                    清除筛选
+                  </button>
+                ) : view === "installed" ? (
+                  <button onClick={() => setView("discover")}>发现扩展</button>
+                ) : view === "updates" ? (
+                  <button onClick={() => setCatalogForm(true)}>管理目录源并检查更新</button>
+                ) : null}
               </div>
             )}
           </div>
