@@ -102,6 +102,7 @@ export const config = {
     const name = test.title.replace(/[^a-z0-9]+/gi, "-").slice(0,100);
     try {
       const state = await browser.execute(() => ({ title: document.querySelector(".document-title")?.textContent, tabs: [...document.querySelectorAll(".pane-tabs")].map((x) => x.textContent), panes: [...document.querySelectorAll(".reader-pane")].map((x) => ({ label: x.getAttribute("aria-label"), text: x.innerText.slice(0,3000) })), alerts: [...document.querySelectorAll('[role="alert"]')].map((x) => x.textContent), body: document.body.innerText.slice(0,5000) }));
+      state.exportFiles = fs.readdirSync(exportRoot, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => ({ name: entry.name, bytes: fs.statSync(path.join(exportRoot, entry.name)).size }));
       fs.writeFileSync(path.join(directory, name + ".json"), JSON.stringify(state,null,2));
       await browser.saveScreenshot(path.join(directory, name + ".png"));
     } catch { /* Preserve the original assertion. */ }
