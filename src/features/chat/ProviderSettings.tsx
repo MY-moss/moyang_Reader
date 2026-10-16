@@ -229,6 +229,7 @@ export function ProviderSettings({
             <label>
               可选模型列表
               <textarea
+                aria-label="可选模型列表"
                 rows={4}
                 value={(form.models ?? []).join("\n")}
                 onChange={(event) => setForm({ ...form, models: event.target.value.split("\n") })}
