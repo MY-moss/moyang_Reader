@@ -3,7 +3,7 @@ use super::*;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 
-fn error(e: impl std::fmt::Display) -> String {
+pub(super) fn error(e: impl std::fmt::Display) -> String {
     format!("阅读数据操作失败：{e}")
 }
 fn now() -> i64 {
@@ -13,6 +13,9 @@ fn now() -> i64 {
         .as_millis() as i64
 }
 fn connection(path: &Path) -> Result<Connection, String> {
+    // WAL and schema setup may race on the first concurrent request.
+    static INITIALIZE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = INITIALIZE.lock().map_err(error)?;
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(error)?;
     }
@@ -125,7 +128,7 @@ fn write_with_history_in(
         .err()
         .map(|e| format!("内容已保存，但历史版本未能写入：{e}")))
 }
-fn field<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
+pub(super) fn field<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
     request[key]
         .as_str()
         .ok_or_else(|| format!("缺少参数：{key}"))
@@ -180,13 +183,24 @@ fn query_terms(text: &str) -> String {
 }
 
 #[tauri::command]
-pub fn bookroom_request(
-    app: AppHandle,
-    access: State<'_, AccessRegistry>,
+pub async fn bookroom_request(app: AppHandle, request: Value) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let access = app.state::<AccessRegistry>();
+        bookroom_request_inner(&app, &access, request)
+    })
+    .await
+    .map_err(error)?
+}
+fn bookroom_request_inner(
+    app: &AppHandle,
+    access: &AccessRegistry,
     request: Value,
 ) -> Result<Value, String> {
     let action = field(&request, "action")?;
     let mut db = database(&app)?;
+    if action.starts_with("draft.") {
+        return super::reader_drafts::request(&mut db, &request);
+    }
     match action {
         "paths.rebase" => {
             let root = field(&request, "root")?;

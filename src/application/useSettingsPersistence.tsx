@@ -421,14 +421,12 @@ export function useSettingsPersistence({
       );
       for (const session of dirty) {
         if (session.document.path.startsWith("browser://")) continue;
-        handleDraftSaveResult(
-          saveDraftSnapshot({
-            path: session.document.path,
-            draft: session.draft,
-            baseSource: session.document.source,
-            savedAt: Date.now(),
-          }),
-        );
+        void saveDraftSnapshot({
+          path: session.document.path,
+          draft: session.draft,
+          baseSource: session.document.source,
+          savedAt: Date.now(),
+        }).then(handleDraftSaveResult);
       }
       if (isTauriRuntime() || !dirty.length) return;
       event.preventDefault();
@@ -451,7 +449,7 @@ export function useSettingsPersistence({
           try {
             await flushPendingWork();
           } catch {
-            setError("AI 草稿尚未完成暂存，请重试后关闭。");
+            setError("草稿尚未完成暂存，请重试后关闭。");
             return;
           }
           if (!(await flushDocumentSaves())) {
@@ -459,7 +457,7 @@ export function useSettingsPersistence({
               if (!session.document.modified || session.document.path.startsWith("browser://")) continue;
               if (
                 !handleDraftSaveResult(
-                  saveDraftSnapshot({
+                  await saveDraftSnapshot({
                     path: session.document.path,
                     draft: session.draft,
                     baseSource: session.document.source,

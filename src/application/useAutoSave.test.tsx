@@ -1,3 +1,6 @@
+vi.mock("../platform/reader-drafts", () => ({
+  readerDraftRequest: vi.fn(async (action: string) => (action === "get" ? null : [])),
+}));
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

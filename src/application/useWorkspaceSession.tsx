@@ -423,7 +423,7 @@ export function useWorkspaceSession({
       return;
     }
     const selected = await chooseWorkspacePath();
-    if (selected && confirmWorkspaceSwitch(selected, "切换阅读库")) {
+    if (selected && (await confirmWorkspaceSwitch(selected, "切换阅读库"))) {
       await loadWorkspace(selected);
     }
   }, [confirmWorkspaceSwitch, loadWorkspace, pendingWorkspaceMountsRef, setError]);
@@ -432,7 +432,7 @@ export function useWorkspaceSession({
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, true);
-        if (!confirmWorkspaceSwitch(authorizedPath, "切换阅读库")) {
+        if (!(await confirmWorkspaceSwitch(authorizedPath, "切换阅读库"))) {
           return;
         }
         await loadWorkspace(authorizedPath);

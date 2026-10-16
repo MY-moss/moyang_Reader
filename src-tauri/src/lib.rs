@@ -1,4 +1,5 @@
 mod ai;
+mod ai_changes;
 mod ai_model;
 mod chat;
 mod commands;

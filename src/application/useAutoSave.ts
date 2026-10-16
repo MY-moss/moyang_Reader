@@ -41,13 +41,13 @@ export function useAutoSave(store: DocumentSessions, save: (overwrite?: boolean,
         timers.set(document.path, {
           source: draft,
           base: document.source,
-          id: setTimeout(() => {
+          id: setTimeout(async () => {
             timers.delete(document.path);
             if (composing.current) return;
             const latest = store.get(document.path);
             if (!latest?.document.modified || latest.document.externallyModified || latest.saveStatus === "error")
               return;
-            const recovery = saveDraftSnapshot({
+            const recovery = await saveDraftSnapshot({
               path: document.path,
               draft: latest.draft,
               baseSource: latest.document.source,
@@ -61,7 +61,7 @@ export function useAutoSave(store: DocumentSessions, save: (overwrite?: boolean,
               }));
               return;
             }
-            void saveRef.current(false, document.path);
+            if (!composing.current && !store.isWriteHeld()) void saveRef.current(false, document.path);
           }, 1200),
         });
       }

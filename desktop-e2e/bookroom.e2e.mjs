@@ -34,6 +34,21 @@ function pdfFixture() {
   return Buffer.from(pdf + `trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
 }
 describe("Reader workbench acceptance", () => {
+  it("persists independent draft snapshots and preserves newer edits during cleanup", async () => {
+    const request=(request)=>invoke("bookroom_request",{request});
+    const path="C:/draft-fixture/中文草稿.md", key="c:\\draft-fixture\\中文草稿.md";
+    const snapshot={path,draft:"尚未保存的中文",baseSource:"原文",savedAt:Date.now()};
+    await request({action:"draft.put",key,snapshot});
+    assert.deepEqual(await request({action:"draft.get",key}),snapshot);
+    const newer={...snapshot,draft:"继续输入的新内容"};
+    await request({action:"draft.put",key,snapshot:newer});
+    await request({action:"draft.delete",key,expectedDraft:snapshot.draft});
+    assert.deepEqual(await request({action:"draft.get",key}),newer);
+    const summaries=await request({action:"draft.list"});
+    assert.ok(summaries.some(s=>s.path===path && s.preview===newer.draft && !("baseSource" in s)));
+    await request({action:"draft.delete",key,expectedDraft:newer.draft});
+    assert.equal(await request({action:"draft.get",key}),null);
+  });
   it("indexes four formats and navigates to a specific text hit and PDF physical page", async () => {
     await reader();
     fs.writeFileSync(path.join(root,"多证据.md"), "# 森林记录\n\n检索针叶林，第一段是气候资料。\n\n检索针叶林，第二段是土壤证据。\n");

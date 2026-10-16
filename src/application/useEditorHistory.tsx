@@ -39,7 +39,7 @@ export function useEditorHistory({
   const handleDraftSaveResult = useCallback(
     (result: DraftSaveResult): boolean => {
       if (!result.ok) {
-        setError("草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。");
+        setError(`草稿自动保存失败，仍保留在当前窗口中。请先手动保存文档。${result.error ?? ""}`);
         return false;
       }
 
@@ -133,12 +133,12 @@ export function useEditorHistory({
     [applyEditorHistoryState, documentStateRef, editorHistoryRef],
   );
 
-  const flushCurrentDraft = useCallback((): DraftFlushOutcome => {
+  const flushCurrentDraft = useCallback(async (): Promise<DraftFlushOutcome> => {
     const current = documentStateRef.current;
     if (!current?.modified || !isEditableDocument(current.kind)) return "not-needed";
     if (current.path.startsWith("browser://")) return "unavailable";
 
-    const result = saveDraftSnapshot({
+    const result = await saveDraftSnapshot({
       path: current.path,
       draft: sourceDraftRef.current,
       baseSource: current.source,

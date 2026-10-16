@@ -7,6 +7,9 @@ pub async fn ai_request(
 ) -> Result<serde_json::Value, String> {
     let path = directory(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        if operation == "change_token" {
+            return crate::ai_changes::token(&path).map(serde_json::Value::String);
+        }
         let mut store = moyang_ai_core::Store::open(&path).map_err(|e| e.to_string())?;
         if operation == "local_model" {
             return crate::ai_model::local_model(

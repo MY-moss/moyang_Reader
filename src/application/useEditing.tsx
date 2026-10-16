@@ -400,7 +400,7 @@ export function useEditing({
           ...session,
           draft: nextSource,
           history: isSameDocumentPath(history.documentKey, path)
-            ? recordEditorChange(history, nextSource)
+            ? recordEditorChange(history, nextSource, Date.now())
             : createEditorHistory(path, nextSource),
           document: { ...session.document, modified: nextSource !== session.document.source },
           saveError: undefined,
@@ -417,8 +417,8 @@ export function useEditing({
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      const result = saveDraftSnapshot({
+    const timer = window.setTimeout(async () => {
+      const result = await saveDraftSnapshot({
         path: current.path,
         draft: sourceDraft,
         baseSource: current.source,
@@ -456,7 +456,7 @@ export function useEditing({
     async (path: string) => {
       try {
         const authorizedPath = await authorizeStoredPath(path, false);
-        if (!confirmDocumentReplacement([authorizedPath], "打开另一个草稿")) {
+        if (!(await confirmDocumentReplacement([authorizedPath], "打开另一个草稿"))) {
           return;
         }
         const opened = await openPath(authorizedPath);
@@ -482,11 +482,16 @@ export function useEditing({
     if (request?.fromCenter) setDraftRecoveryOpen(true);
   }, [draftDiscardRequest, setDraftDiscardRequest, setDraftRecoveryOpen]);
 
-  const confirmDraftDiscard = useCallback(() => {
+  const confirmDraftDiscard = useCallback(async () => {
     const request = draftDiscardRequest;
     if (!request) return;
 
-    clearDraftSnapshot(request.path);
+    try {
+      await clearDraftSnapshot(request.path);
+    } catch (error) {
+      setError(String(error));
+      return;
+    }
     const remaining = loadDraftSnapshots();
     setDraftSnapshots(remaining);
     if (isSameDocumentPath(draftRecovery?.path ?? "", request.path)) setDraftRecovery(null);
@@ -499,14 +504,20 @@ export function useEditing({
     setDraftRecovery,
     setDraftRecoveryOpen,
     setDraftSnapshots,
+    setError,
   ]);
 
-  const clearAllDrafts = useCallback(() => {
+  const clearAllDrafts = useCallback(async () => {
     if (draftSnapshots.length === 0 || !window.confirm("确定清空全部未保存草稿吗？此操作无法撤销。")) return;
-    clearAllDraftSnapshots();
+    try {
+      await clearAllDraftSnapshots();
+    } catch (error) {
+      setError(String(error));
+      return;
+    }
     setDraftSnapshots([]);
     setDraftRecovery(null);
-  }, [draftSnapshots.length, setDraftRecovery, setDraftSnapshots]);
+  }, [draftSnapshots.length, setDraftRecovery, setDraftSnapshots, setError]);
 
   const handleSourcePaste = useCallback(
     (context: SourceEditorPasteContext) => {

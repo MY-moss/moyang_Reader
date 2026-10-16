@@ -1,113 +1,78 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  clearAllDraftSnapshots,
-  clearDraftSnapshot,
-  findDraftSnapshot,
-  formatDraftRecoveryTime,
-  loadDraftSnapshots,
-  MAX_DRAFT_CHARACTERS,
-  MAX_DRAFT_STORAGE_BYTES,
-  saveDraftSnapshot,
-} from "./draft-recovery";
-
-describe("draft recovery", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("stores and finds a changed draft without confusing path casing", () => {
-    const snapshot = { path: "C:\\Notes\\Draft.md", draft: "new", baseSource: "old", savedAt: 1_000 };
-    expect(saveDraftSnapshot(snapshot).ok).toBe(true);
-    expect(findDraftSnapshot("c:/notes/draft.md/", "old")).toEqual(snapshot);
-    expect(findDraftSnapshot(snapshot.path, "new")).toBeNull();
-  });
-
-  it("replaces the same path and limits snapshots to the newest eight", () => {
-    for (let index = 0; index < 10; index += 1) {
-      expect(
-        saveDraftSnapshot({
-          path: `C:/Notes/${index}.md`,
-          draft: `draft-${index}`,
-          baseSource: "",
-          savedAt: index + 1,
-        }).ok,
-      ).toBe(true);
+import { beforeEach, expect, it, vi } from "vitest";
+import { readerDraftRequest } from "../../platform/reader-drafts";
+import { draftSummary, type DraftSnapshot } from "../../shared/reader-draft-types";
+import { normalizePathKey } from "../../platform/path-key";
+vi.mock("../../platform/reader-drafts", () => ({ readerDraftRequest: vi.fn() }));
+let api: typeof import("./draft-recovery");
+let rows: Map<string, DraftSnapshot>;
+const snapshot = (path = "C:/Notes/one.md", draft = "修改后的中文") => ({
+  path,
+  draft,
+  baseSource: "原文",
+  savedAt: 1000,
+});
+beforeEach(async () => {
+  vi.resetModules();
+  localStorage.clear();
+  rows = new Map();
+  vi.mocked(readerDraftRequest).mockImplementation(async (action, p = {}) => {
+    const key = normalizePathKey((p.path as string) ?? "");
+    if (action === "list") return [...rows.values()].map(draftSummary);
+    if (action === "get") return rows.get(key) ?? null;
+    if (action === "clear") {
+      rows.clear();
+      return;
     }
-    expect(loadDraftSnapshots()).toHaveLength(8);
-    expect(loadDraftSnapshots()[0]?.path).toBe("C:/Notes/9.md");
-  });
-
-  it("clears a snapshot after normal save and formats recovery age", () => {
-    const snapshot = { path: "C:/Notes/Draft.md", draft: "new", baseSource: "old", savedAt: 1_000 };
-    saveDraftSnapshot(snapshot);
-    clearDraftSnapshot(snapshot.path);
-    expect(loadDraftSnapshots()).toEqual([]);
-    expect(formatDraftRecoveryTime(60_000, 60_000)).toBe("刚刚");
-    expect(formatDraftRecoveryTime(0, 3_660_000)).toBe("1 小时前");
-  });
-
-  it("clears all saved snapshots from the local recovery center", () => {
-    saveDraftSnapshot({ path: "C:/Notes/one.md", draft: "one", baseSource: "", savedAt: 1 });
-    saveDraftSnapshot({ path: "C:/Notes/two.md", draft: "two", baseSource: "", savedAt: 2 });
-
-    clearAllDraftSnapshots();
-
-    expect(loadDraftSnapshots()).toEqual([]);
-  });
-
-  it("does not store unchanged or oversized drafts", () => {
-    expect(saveDraftSnapshot({ path: "C:/Notes/same.md", draft: "same", baseSource: "same", savedAt: 1 }).ok).toBe(
-      true,
-    );
-    expect(
-      saveDraftSnapshot({
-        path: "C:/Notes/large.md",
-        draft: "x".repeat(MAX_DRAFT_CHARACTERS + 1),
-        baseSource: "",
-        savedAt: 1,
-      }).ok,
-    ).toBe(false);
-    expect(loadDraftSnapshots()).toEqual([]);
-  });
-
-  it("keeps the serialized draft store under the storage budget", () => {
-    for (let index = 0; index < 8; index += 1) {
-      expect(
-        saveDraftSnapshot({
-          path: `C:/Notes/${index}.md`,
-          draft: "x".repeat(200_000),
-          baseSource: "",
-          savedAt: index + 1,
-        }).ok,
-      ).toBe(true);
+    if (action === "delete") {
+      if (p.expectedDraft === undefined || rows.get(key)?.draft === p.expectedDraft) rows.delete(key);
+      return;
     }
-
-    const serialized = localStorage.getItem("moyang-reader-drafts") ?? "";
-    expect(serialized.length * 2).toBeLessThanOrEqual(MAX_DRAFT_STORAGE_BYTES);
-    expect(loadDraftSnapshots()).toHaveLength(7);
+    const item = p.snapshot as DraftSnapshot,
+      id = normalizePathKey(item.path);
+    if (action !== "import" || !rows.has(id)) rows.set(id, item);
   });
-
-  it("retries once after a quota error and drops the oldest draft", () => {
-    const oldDraft = { path: "C:/Notes/old.md", draft: "old", baseSource: "", savedAt: 1 };
-    const newDraft = { path: "C:/Notes/new.md", draft: "new", baseSource: "", savedAt: 2 };
-    expect(saveDraftSnapshot(oldDraft).ok).toBe(true);
-
-    const originalSetItem = Storage.prototype.setItem;
-    let attempts = 0;
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation((key, value) => {
-      if (key === "moyang-reader-drafts" && attempts === 0) {
-        attempts += 1;
-        throw new DOMException("quota exceeded", "QuotaExceededError");
-      }
-      return originalSetItem.call(localStorage, key, value);
-    });
-
-    expect(saveDraftSnapshot(newDraft)).toEqual({ ok: true, prunedCount: 1 });
-    expect(loadDraftSnapshots()).toEqual([newDraft]);
-    expect(attempts).toBe(1);
-  });
+  api = await import("./draft-recovery");
+});
+it("saves individual drafts and retrieves full text only on demand", async () => {
+  const one = snapshot();
+  expect((await api.saveDraftSnapshot(one)).ok).toBe(true);
+  await api.saveDraftSnapshot(snapshot("C:/Notes/two.md"));
+  expect(api.loadDraftSnapshots()).toHaveLength(2);
+  expect(api.loadDraftSnapshots()[0]).not.toHaveProperty("baseSource");
+  expect(await api.findDraftSnapshot("c:\\notes\\ONE.md/", "原文")).toEqual(one);
+  expect(await api.findDraftSnapshot(one.path, one.draft)).toBeNull();
+  expect(api.loadDraftSnapshots()).toHaveLength(1);
+});
+it("imports legacy drafts once and keeps a rollback copy without resurrecting discarded drafts", async () => {
+  const item = snapshot();
+  localStorage.setItem("moyang-reader-drafts", JSON.stringify([item]));
+  await api.initializeDrafts();
+  expect(await api.findDraftSnapshot(item.path, "原文")).toEqual(item);
+  await api.clearAllDraftSnapshots();
+  vi.resetModules();
+  api = await import("./draft-recovery");
+  await api.initializeDrafts();
+  expect(api.loadDraftSnapshots()).toEqual([]);
+  expect(localStorage.getItem("moyang-reader-drafts")).toContain("修改后的中文");
+});
+it("retains existing and legacy drafts when storage fails and retries migration", async () => {
+  localStorage.setItem("moyang-reader-drafts", JSON.stringify([snapshot()]));
+  vi.mocked(readerDraftRequest).mockRejectedValueOnce(new Error("disk full"));
+  await expect(api.initializeDrafts()).rejects.toThrow("disk full");
+  expect(localStorage.getItem("moyang-reader-drafts-migrated")).toBeNull();
+  await api.initializeDrafts();
+  vi.mocked(readerDraftRequest).mockRejectedValueOnce(new Error("quota"));
+  expect((await api.saveDraftSnapshot(snapshot("new.md"))).ok).toBe(false);
+  expect(api.loadDraftSnapshots()).toHaveLength(1);
+});
+it("serializes write and cleanup, and stale save cleanup keeps newer text", async () => {
+  const path = snapshot().path;
+  await Promise.all([
+    api.saveDraftSnapshot(snapshot()),
+    api.saveDraftSnapshot(snapshot(path, "继续输入")),
+    api.clearDraftSnapshot(path, "修改后的中文"),
+  ]);
+  expect((await api.findDraftSnapshot(path, "原文"))?.draft).toBe("继续输入");
+  await api.clearAllDraftSnapshots();
+  expect(api.loadDraftSnapshots()).toEqual([]);
 });

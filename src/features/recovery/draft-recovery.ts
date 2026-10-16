@@ -1,154 +1,116 @@
 import { normalizePathKey } from "../../platform/path-key";
-
-const draftStorageKey = "moyang-reader-drafts";
-const maxDrafts = 8;
-export const MAX_DRAFT_CHARACTERS = 1_000_000;
-export const MAX_DRAFT_STORAGE_BYTES = 3_000_000;
-
-export type DraftSnapshot = {
-  path: string;
-  draft: string;
-  baseSource: string;
-  savedAt: number;
-};
-
-export type DraftSaveResult = {
-  ok: boolean;
-  prunedCount: number;
-};
-
-function comparablePath(path: string): string {
-  return normalizePathKey(path);
+import { readerDraftRequest } from "../../platform/reader-drafts";
+import { draftSummary, type DraftSnapshot, type DraftSummary } from "../../shared/reader-draft-types";
+export type { DraftSnapshot, DraftSummary } from "../../shared/reader-draft-types";
+export const MAX_DRAFT_CHARACTERS = 8_000_000;
+export type DraftSaveResult = { ok: boolean; prunedCount: number; error?: string };
+const legacyKey = "moyang-reader-drafts";
+let summaries: DraftSummary[] = [];
+let initialized: Promise<void> | undefined;
+let queue: Promise<unknown> = Promise.resolve();
+const listeners = new Set<() => void>();
+function publish(next: DraftSummary[]) {
+  summaries = next.sort((a, b) => b.savedAt - a.savedAt);
+  listeners.forEach((listener) => listener());
 }
-
-function isDraftSnapshot(value: unknown): value is DraftSnapshot {
-  if (typeof value !== "object" || value === null) return false;
-  const snapshot = value as Partial<DraftSnapshot>;
+function valid(value: unknown): value is DraftSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const item = value as DraftSnapshot;
   return (
-    typeof snapshot.path === "string" &&
-    snapshot.path.trim().length > 0 &&
-    typeof snapshot.draft === "string" &&
-    typeof snapshot.baseSource === "string" &&
-    typeof snapshot.savedAt === "number" &&
-    Number.isFinite(snapshot.savedAt) &&
-    snapshot.savedAt > 0
+    typeof item.path === "string" &&
+    !!item.path.trim() &&
+    typeof item.draft === "string" &&
+    typeof item.baseSource === "string" &&
+    Number.isFinite(item.savedAt) &&
+    item.savedAt > 0
   );
 }
-
-function localStorageBytes(value: string): number {
-  // localStorage is generally quota-counted as UTF-16 code units.
-  return value.length * 2;
+export function initializeDrafts(): Promise<void> {
+  if (!initialized)
+    initialized = (async () => {
+      const raw = localStorage.getItem(legacyKey);
+      if (raw && !localStorage.getItem(`${legacyKey}-migrated`)) {
+        const values: unknown = JSON.parse(raw);
+        if (!Array.isArray(values) || !values.every(valid)) throw new Error("旧草稿格式无法识别，已保留原数据");
+        for (const snapshot of [...values].sort((a, b) => b.savedAt - a.savedAt))
+          await readerDraftRequest("import", { snapshot });
+        // Retain the original copy for rollback; this marker prevents discarded drafts from reappearing.
+        localStorage.setItem(`${legacyKey}-migrated`, "1");
+      }
+      publish(await readerDraftRequest<DraftSummary[]>("list"));
+    })().catch((error) => {
+      initialized = undefined;
+      throw error;
+    });
+  return initialized;
 }
-
-function isQuotaExceeded(cause: unknown): boolean {
-  if (typeof DOMException !== "undefined" && cause instanceof DOMException) {
-    return cause.name === "QuotaExceededError" || cause.code === 22;
-  }
-  return cause instanceof Error && /quota|storage/i.test(`${cause.name} ${cause.message}`);
+function enqueue<T>(work: () => Promise<T>): Promise<T> {
+  const result = queue
+    .catch(() => {})
+    .then(async () => {
+      await initializeDrafts();
+      return work();
+    });
+  queue = result;
+  return result;
 }
-
-function serializeDrafts(snapshots: DraftSnapshot[]): string | null {
-  const serialized = JSON.stringify(snapshots);
-  return localStorageBytes(serialized) <= MAX_DRAFT_STORAGE_BYTES ? serialized : null;
+export function subscribeDraftSnapshots(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
-
-export function loadDraftSnapshots(): DraftSnapshot[] {
-  try {
-    const raw = localStorage.getItem(draftStorageKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    const seen = new Set<string>();
-    return parsed
-      .filter(isDraftSnapshot)
-      .filter((snapshot) => {
-        const key = comparablePath(snapshot.path);
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, maxDrafts);
-  } catch {
-    return [];
-  }
+export function loadDraftSnapshots(): DraftSummary[] {
+  return summaries;
 }
-
-export function findDraftSnapshot(path: string, source: string): DraftSnapshot | null {
-  const snapshot = loadDraftSnapshots().find((item) => comparablePath(item.path) === comparablePath(path));
-  if (!snapshot) return null;
-  if (snapshot.draft === source) {
-    clearDraftSnapshot(path);
-    return null;
-  }
-  return snapshot;
+export async function flushDraftWrites() {
+  await queue;
 }
-
-export function saveDraftSnapshot(snapshot: DraftSnapshot): DraftSaveResult {
-  if (snapshot.draft === snapshot.baseSource) {
-    clearDraftSnapshot(snapshot.path);
-    return { ok: true, prunedCount: 0 };
-  }
-  if (
-    snapshot.path.trim().length === 0 ||
-    snapshot.draft.length > MAX_DRAFT_CHARACTERS ||
-    !Number.isFinite(snapshot.savedAt) ||
-    snapshot.savedAt <= 0
-  ) {
-    return { ok: false, prunedCount: 0 };
-  }
-
-  const key = comparablePath(snapshot.path);
-  let next = [snapshot, ...loadDraftSnapshots().filter((item) => comparablePath(item.path) !== key)].sort(
-    (left, right) => right.savedAt - left.savedAt,
-  );
-  let prunedCount = Math.max(0, next.length - maxDrafts);
-  next = next.slice(0, maxDrafts);
-
-  let serialized = serializeDrafts(next);
-  while (!serialized && next.length > 1) {
-    next = next.slice(0, -1);
-    prunedCount += 1;
-    serialized = serializeDrafts(next);
-  }
-  if (!serialized) return { ok: false, prunedCount: 0 };
-
-  try {
-    localStorage.setItem(draftStorageKey, serialized);
-    return { ok: true, prunedCount };
-  } catch (cause) {
-    if (!isQuotaExceeded(cause) || next.length <= 1) return { ok: false, prunedCount: 0 };
-
-    const retry = next.slice(0, -1);
-    const retrySerialized = serializeDrafts(retry);
-    if (!retrySerialized) return { ok: false, prunedCount: 0 };
-
-    try {
-      localStorage.setItem(draftStorageKey, retrySerialized);
-      return { ok: true, prunedCount: prunedCount + 1 };
-    } catch {
-      return { ok: false, prunedCount: 0 };
+export async function findDraftSnapshot(path: string, source: string): Promise<DraftSnapshot | null> {
+  return enqueue(async () => {
+    const item = await readerDraftRequest<DraftSnapshot | null>("get", { path });
+    if (item?.draft === source) {
+      await remove(path);
+      return null;
     }
+    return item;
+  });
+}
+async function remove(path: string, expectedDraft?: string) {
+  await readerDraftRequest("delete", { path, expectedDraft });
+  // Conditional deletion may retain a newer draft. Summaries remain small.
+  publish(await readerDraftRequest<DraftSummary[]>("list"));
+}
+export async function saveDraftSnapshot(snapshot: DraftSnapshot): Promise<DraftSaveResult> {
+  if (
+    !valid(snapshot) ||
+    snapshot.draft.length > MAX_DRAFT_CHARACTERS ||
+    snapshot.baseSource.length > MAX_DRAFT_CHARACTERS
+  )
+    return { ok: false, prunedCount: 0, error: "草稿超过单篇容量（800 万字符）" };
+  try {
+    await enqueue(async () => {
+      if (snapshot.draft === snapshot.baseSource) {
+        await remove(snapshot.path);
+        return;
+      }
+      await readerDraftRequest("put", { snapshot });
+      const key = normalizePathKey(snapshot.path);
+      publish([draftSummary(snapshot), ...summaries.filter((s) => normalizePathKey(s.path) !== key)]);
+    });
+    return { ok: true, prunedCount: 0 };
+  } catch (error) {
+    return { ok: false, prunedCount: 0, error: String(error) };
   }
 }
-
-export function clearDraftSnapshot(path: string): void {
-  try {
-    const key = comparablePath(path);
-    const next = loadDraftSnapshots().filter((snapshot) => comparablePath(snapshot.path) !== key);
-    if (next.length > 0) localStorage.setItem(draftStorageKey, JSON.stringify(next));
-    else localStorage.removeItem(draftStorageKey);
-  } catch {
-    // Draft cleanup is best-effort when local storage is unavailable.
-  }
+export function clearDraftSnapshot(path: string, expectedDraft?: string): Promise<void> {
+  return enqueue(() => remove(path, expectedDraft));
 }
-
-export function clearAllDraftSnapshots(): void {
-  try {
-    localStorage.removeItem(draftStorageKey);
-  } catch {
-    // Draft cleanup is best-effort when local storage is unavailable.
-  }
+export function clearAllDraftSnapshots(): Promise<void> {
+  return enqueue(async () => {
+    await readerDraftRequest("clear");
+    publish([]);
+  });
 }
 
 export function formatDraftRecoveryTime(savedAt: number, now = Date.now()): string {

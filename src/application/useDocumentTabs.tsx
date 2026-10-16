@@ -78,7 +78,7 @@ export function useDocumentTabs({
         return;
       }
       const nextPaths = supportedFiles.map((entry) => entry.path);
-      if (!confirmDocumentReplacement(nextPaths, "打开新文件")) {
+      if (!(await confirmDocumentReplacement(nextPaths, "打开新文件"))) {
         return;
       }
 
@@ -100,7 +100,7 @@ export function useDocumentTabs({
     async (path: string) => {
       const active = documentSessions.active()?.document.path;
       if (active && isSameDocumentPath(path, active)) return;
-      if (!confirmDocumentReplacement([path], "切换文档")) return;
+      if (!(await confirmDocumentReplacement([path], "切换文档"))) return;
       try {
         const authorizedPath = path.startsWith("browser://") ? path : await authorizeStoredPath(path, false);
         await openPath(authorizedPath);
@@ -129,7 +129,7 @@ export function useDocumentTabs({
         if (!session?.document.modified) continue;
         if (!tab.path.startsWith("browser://")) {
           if (await saveDocument(false, tab.path)) continue;
-          const recovery = saveDraftSnapshot({
+          const recovery = await saveDraftSnapshot({
             path: tab.path,
             draft: session.draft,
             baseSource: session.document.source,

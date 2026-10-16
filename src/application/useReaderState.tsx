@@ -1,9 +1,17 @@
+import { registerPendingWork } from "../shared/pending-work";
 import type { Update } from "../platform/updater";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDocumentSessions } from "./useDocumentSessions";
 import { type ReaderContextTarget } from "../features/reader/components/ReaderContextMenu";
 import { DocumentCache } from "../features/reader/document-cache";
-import { loadDraftSnapshots, type DraftSnapshot } from "../features/recovery/draft-recovery";
+import {
+  initializeDrafts,
+  flushDraftWrites,
+  subscribeDraftSnapshots,
+  loadDraftSnapshots,
+  type DraftSummary,
+  type DraftSnapshot,
+} from "../features/recovery/draft-recovery";
 import {
   loadAppSettingsSnapshot,
   type AppSettingsSnapshot,
@@ -179,7 +187,20 @@ export function useReaderState() {
 
   const [draftRecovery, setDraftRecovery] = useState<DraftSnapshot | null>(null);
 
-  const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>(loadDraftSnapshots);
+  const [draftSnapshots, setDraftSnapshots] = useState<DraftSummary[]>(loadDraftSnapshots);
+  useEffect(() => {
+    let active = true;
+    const unregister = registerPendingWork(flushDraftWrites);
+    const stop = subscribeDraftSnapshots(() => setDraftSnapshots(loadDraftSnapshots()));
+    void initializeDrafts().catch((error) => {
+      if (active) setError(`草稿恢复暂不可用：${String(error)}`);
+    });
+    return () => {
+      active = false;
+      stop();
+      unregister();
+    };
+  }, []);
 
   const [draftRecoveryOpen, setDraftRecoveryOpen] = useState(false);
 

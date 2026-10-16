@@ -2,8 +2,26 @@
 import { emptyAiFields, type AiBackup, type AiRecord, type AiRevision } from "../shared/ai-types";
 import { previewRecordView } from "../shared/ai-resource-metadata";
 const key = "moyang-ai-preview-v1";
+let previousRaw: string | null | undefined;
+let changeGeneration = 0;
+let nextExpiry = Infinity;
 export function previewRequest(operation: string, payload: any): unknown {
   const raw = localStorage.getItem(key);
+  if (operation === "change_token") {
+    if (raw !== previousRaw || nextExpiry <= Date.now()) {
+      previousRaw = raw;
+      changeGeneration++;
+      const records = (raw ? JSON.parse(raw).records : []) as AiRecord[];
+      nextExpiry = records.reduce(
+        (earliest, r) =>
+          r.state === "active" && r.expires_at && r.expires_at > Date.now()
+            ? Math.min(earliest, r.expires_at)
+            : earliest,
+        Infinity,
+      );
+    }
+    return String(changeGeneration);
+  }
   const db: AiBackup = raw
     ? JSON.parse(raw)
     : { format: "moyang-ai-space", version: 1, exported_at: Date.now(), records: [], history: [] };

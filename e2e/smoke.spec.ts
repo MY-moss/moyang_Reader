@@ -156,6 +156,9 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   await page.getByRole("button", { name: "丢弃 recovery-note.md 草稿" }).click();
   await page.getByTestId("draft-discard-confirm").click();
   await expect(page.getByRole("button", { name: "草稿 1" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "查看未保存的恢复草稿", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("moyang-reader-drafts-migrated"))).toBe("1");
 });
 
 test("opens the quick-open palette from the keyboard", async ({ page }) => {
