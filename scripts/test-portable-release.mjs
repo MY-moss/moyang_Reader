@@ -285,7 +285,9 @@ try {
   await page.getByRole("button", {name:"AI 服务与整理",exact:true}).click();
   await page.getByRole("region", {name:"AI 服务与整理",exact:true}).waitFor();
   assert.equal(await page.getByLabel("整理使用的服务",{exact:true}).locator("option").count(),2);
-  assert.ok(Number(await page.getByLabel("每日 token 额度",{exact:true}).inputValue())>0);
+  assert.equal(await page.getByLabel("每日 token 额度",{exact:true}).inputValue(),"");
+  await page.getByLabel("每日 token 额度",{exact:true}).fill("1000");
+  assert.equal(await page.getByLabel("每日 token 额度",{exact:true}).inputValue(),"1000");
   await page.screenshot({path:"artifacts/workbench/release-ai-services.png"});
   report.desktop.shared_services = true;
   await page.getByRole("button", {name:"关闭设置",exact:true}).click();
