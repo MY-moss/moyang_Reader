@@ -140,6 +140,7 @@ try {
       .map((p) => p.url())}`,
   );
   await page.getByRole("combobox", { name: "工作空间", exact: true }).waitFor();
+  await page.getByRole("button", { name: "关闭使用教程", exact: true }).click();
   assert.equal(await page.title(), "Moyang Reader Next");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("ai");
@@ -149,6 +150,15 @@ try {
   assert.equal(path.resolve(info.executable), path.join(release, "moyang-ai-mcp.exe"));
   await page.screenshot({ path: "artifacts/workbench/release-desktop.png" });
   report.desktop = { rendered: true, scale: 1.5, mcp_companion: true, wdio: false };
+  await page.getByRole("button", { name: "插件市场", exact: true }).click();
+  await page.locator(".extension-row").filter({ hasText: "阅读概览" }).click();
+  await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page.getByRole("button", { name: "停用", exact: true }).waitFor();
+  const extensionState = await page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke("extension_request", { operation: "load", payload: {} }),
+  );
+  assert.ok(extensionState.installed.some((item) => item.package.id === "moyang.reading-report" && item.enabled));
+  report.desktop.extension_install = true;
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("reader");
   await page.evaluate(() =>
     window.__TAURI_INTERNALS__.invoke("plugin:event|emit", { event: "close-requested", payload: null }),

@@ -83,6 +83,14 @@ Markdown 默认直接编辑，不可无损表达的结构使用源码；TXT 为�
 
 ## 参考与后续约束
 
+### 扩展状态与文档状态分离（0.12）
+
+`features/extensions` 管理清单、目录、版本、主题和 Worker 协议；`useExtensions` 是唯一安装状态所有者，目录只随安装状态变化重算，不随每次正文输入重新枚举。`application/useReaderExtensions` 将扩展命令接入现有命令面板，运行前读取文档会话快照，采用修改前再次比较草稿；最终调用原有 `updateSource`，不绕过历史、自动保存与冲突机制。
+
+`platform/extensions` 统一桥接；桌面在独立 SQLite 中事务保存版本化状态，浏览器使用 IndexedDB。网络目录通过原生有限时下载，浏览器使用普通 fetch。技能正文与资源进入现有 AI Store，安装记录只关联条目 ID 和上次修订；客户端连接由 AI 内核复用现有备份/原子配置写入，使用独立的扩展连接所有权记录。
+
+设置与市场属于全局页面，阅读和 AI 会话保持挂载。原生文件打开、空间切换和侧栏导航明确退出全局页；AI 导航位于 React Portal，导航通知从组件本身发出，不依赖 DOM 容器上的 React 事件冒泡。隐藏阅读页不处理全局页中的文档快捷键。
+
 [React 自定义 Hooks 文档](https://react.dev/learn/reusing-logic-with-custom-hooks)说明 hooks 抽取复用逻辑，不会自动共享状态；因此本工程只创建一次会话状态。[Tauri capabilities 文档](https://v2.tauri.app/security/capabilities/)用于核对权限配置边界；运行时路径授权仍由 Rust 显式执行。
 
 新增功能必须定义目录归属、状态所有者、存储行为与验证方式。`features` 不导入 `application` 或 `shell`；`platform` 不导入应用编排。业务 UI 不直接调用 Tauri `invoke`，统一经过桥接层。

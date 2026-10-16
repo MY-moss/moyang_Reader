@@ -36,14 +36,14 @@ impl ClientPaths {
         })
     }
 }
-fn read(path: &Path) -> Result<String> {
+pub(super) fn read(path: &Path) -> Result<String> {
     match fs::read_to_string(path) {
         Ok(s) => Ok(s),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
         Err(e) => Err(e.into()),
     }
 }
-fn object(raw: &str) -> Result<Value> {
+pub(super) fn object(raw: &str) -> Result<Value> {
     let v = if raw.trim().is_empty() {
         json!({})
     } else {
@@ -54,7 +54,7 @@ fn object(raw: &str) -> Result<Value> {
     }
     Ok(v)
 }
-fn write_config(path: &Path, before: &str, after: &str) -> Result<()> {
+pub(super) fn write_config(path: &Path, before: &str, after: &str) -> Result<()> {
     if before == after {
         return Ok(());
     }

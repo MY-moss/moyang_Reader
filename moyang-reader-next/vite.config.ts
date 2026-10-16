@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 1420,
       strictPort: true,
+      // Generated packages/models are not source. Watching their directories
+      // holds Windows handles that prevent atomic portable-package publication.
+      watch: {
+        ignored: ["**/release/**", "**/.local/**", "**/artifacts/**", "**/target/**", "**/.codex-worktrees/**"],
+      },
     },
   };
 });

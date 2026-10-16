@@ -2,6 +2,7 @@ mod ai;
 mod ai_model;
 mod commands;
 mod data_paths;
+mod extensions;
 
 use tauri::{Emitter, Url, WindowEvent};
 
@@ -109,6 +110,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::bookroom::bookroom_request,
             ai::ai_request,
+            extensions::extension_request,
             ai::ai_connection_info,
             commands::dialogs::initial_paths,
             commands::dialogs::resolve_open_paths,

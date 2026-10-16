@@ -51,3 +51,37 @@ test("new build never inherits a stale model or modifies old packages", (t) => {
   assert.equal(fs.readFileSync(path.join(previous.destination, "moyang-ai-mcp.exe"), "utf8"), "moyang-ai-mcp.exe");
   assert.equal(fs.readFileSync(path.join(next.destination, "moyang-ai-mcp.exe"), "utf8"), "new MCP");
 });
+
+test("transient Windows locks retry both directory and latest publication", (t) => {
+  const input = fixture(t);
+  const rename = fs.renameSync;
+  const attempted = new Set();
+  t.mock.method(Atomics, "wait", () => "timed-out");
+  t.mock.method(fs, "renameSync", (source, destination) => {
+    if (!attempted.has(source)) {
+      attempted.add(source);
+      throw Object.assign(new Error("file temporarily in use"), { code: "EPERM" });
+    }
+    return rename(source, destination);
+  });
+  const next = assemblePortablePackage(input);
+  assert.equal(attempted.size, 2);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(input.root, "release/latest.json"))).directory,
+    path.basename(next.destination),
+  );
+});
+
+test("persistent publication lock fails without replacing the known-good release", (t) => {
+  const input = fixture(t);
+  const previous = assemblePortablePackage(input);
+  const pointer = fs.readFileSync(path.join(input.root, "release/latest.json"), "utf8");
+  t.mock.method(Atomics, "wait", () => "timed-out");
+  const rename = t.mock.method(fs, "renameSync", () => {
+    throw Object.assign(new Error("file remains in use"), { code: "EBUSY" });
+  });
+  assert.throws(() => assemblePortablePackage(input), /file remains in use/);
+  assert.equal(rename.mock.callCount(), 11);
+  assert.equal(fs.readFileSync(path.join(input.root, "release/latest.json"), "utf8"), pointer);
+  assert.ok(fs.existsSync(path.join(previous.destination, "Moyang Reader Next.exe")));
+});

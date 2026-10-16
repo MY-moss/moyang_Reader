@@ -4,6 +4,8 @@ mod runtime;
 pub use runtime::{local_model, maintain_semantic};
 mod connections;
 pub use connections::{configure_client, ClientPaths};
+mod extension_connections;
+pub use extension_connections::configure_external_client;
 mod cancellation;
 pub use cancellation::cancel_search;
 mod exchange;
@@ -43,8 +45,8 @@ pub fn now() -> i64 {
 }
 
 #[cfg(test)]
+mod history_tests;
+#[cfg(test)]
 mod lifecycle_tests;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod history_tests;

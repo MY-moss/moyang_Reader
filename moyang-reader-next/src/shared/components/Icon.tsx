@@ -1,4 +1,7 @@
 const paths = {
+  extensions: "M4 4h6V2a2 2 0 0 1 4 0v2h6v6h2a2 2 0 0 1 0 4h-2v6h-6v-2a2 2 0 0 0-4 0v2H4v-6h2a2 2 0 0 0 0-4H4z",
+  theme:
+    "M12 3a9 9 0 1 0 0 18c2 0 3-1 2-3s0-3 2-3h2c4 0 4-5 1-8a10 10 0 0 0-7-4 M8 7h.1 M5 12h.1 M9 17h.1 M14 7h.1 M18 11h.1",
   search: "m20 20-5-5 M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
   plus: "M12 5v14 M5 12h14",
   settings: "M4 7h16 M4 17h16 M8 4v6 M16 14v6",

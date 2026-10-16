@@ -42,7 +42,8 @@ fn snapshot(conn: &Connection, directory: &Path, label: &str) -> Result<std::pat
     let pending = folder.join(format!(".pending-{}.sqlite3", uuid::Uuid::new_v4()));
     let result = (|| -> Result<()> {
         conn.execute("VACUUM INTO ?", [pending.to_string_lossy().as_ref()])?;
-        std::fs::rename(&pending, &path)?;
+        std::fs::rename(&pending, &path)
+            .map_err(|error| std::io::Error::new(error.kind(), format!("发布备份：{error}")))?;
         Ok(())
     })();
     if result.is_err() {
@@ -54,6 +55,20 @@ fn snapshot(conn: &Connection, directory: &Path, label: &str) -> Result<std::pat
 fn rotate_snapshots(conn: &Connection, directory: &Path) -> Result<()> {
     let folder = directory.join("snapshots");
     std::fs::create_dir_all(&folder)?;
+    // Desktop and MCP readers may open the same store concurrently. Only one
+    // process creates/prunes snapshots; others can continue reading the store.
+    // Keep the lock file stable so every process locks the same OS object.
+    let rotation = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(folder.join(".rotation.lock"))?;
+    match rotation.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => return Ok(()),
+        Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+    }
     let mut files: Vec<_> = std::fs::read_dir(&folder)?
         .filter_map(|e| e.ok())
         .map(|e| e.path())
@@ -75,11 +90,19 @@ fn rotate_snapshots(conn: &Connection, directory: &Path) -> Result<()> {
             .iter()
             .filter_map(|p| {
                 let name = p.file_name()?.to_string_lossy();
-                let bucket = name.strip_prefix(&format!("{kind}-"))?.split('-').next()?.parse::<i64>().ok()?;
+                let bucket = name
+                    .strip_prefix(&format!("{kind}-"))?
+                    .split('-')
+                    .next()?
+                    .parse::<i64>()
+                    .ok()?;
                 Some((bucket, p))
             })
             .collect();
-        series.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.file_name().cmp(&a.1.file_name())));
+        series.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then_with(|| b.1.file_name().cmp(&a.1.file_name()))
+        });
         let mut retained = std::collections::HashSet::new();
         for (bucket, path) in series {
             // Multiple processes may finish snapshots of the same period together.
@@ -90,7 +113,11 @@ fn rotate_snapshots(conn: &Connection, directory: &Path) -> Result<()> {
             match std::fs::remove_file(path) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    return Err(
+                        std::io::Error::new(error.kind(), format!("清理过期备份：{error}")).into(),
+                    )
+                }
             }
         }
     }
@@ -102,17 +129,72 @@ mod tests {
     use super::*;
 
     #[test]
+    fn simultaneous_readers_can_create_initial_snapshots() {
+        for _ in 0..10 {
+            let directory = tempfile::tempdir().unwrap();
+            let mut store = Store::open(directory.path()).unwrap();
+            let record = store
+                .save(
+                    serde_json::from_value(serde_json::json!({
+                        "kind":"memory", "title":"并发读取", "body":"保存正文"
+                    }))
+                    .unwrap(),
+                )
+                .unwrap();
+            drop(store);
+            let barrier = std::sync::Barrier::new(8);
+            std::thread::scope(|scope| {
+                let jobs: Vec<_> = (0..8)
+                    .map(|_| {
+                        scope.spawn(|| {
+                            barrier.wait();
+                            let store = Store::open(directory.path())?;
+                            assert_eq!(store.get(&record.id)?.fields.body, "保存正文");
+                            Ok::<_, Error>(())
+                        })
+                    })
+                    .collect();
+                for job in jobs {
+                    job.join().unwrap().unwrap();
+                }
+            });
+            let backups: Vec<_> = std::fs::read_dir(directory.path().join("snapshots"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| path.extension().is_some_and(|ext| ext == "sqlite3"))
+                .collect();
+            assert_eq!(backups.len(), 2);
+            for backup in backups {
+                let backup = Connection::open(backup).unwrap();
+                let count: i64 = backup
+                    .query_row(
+                        "SELECT COUNT(*) FROM records WHERE id=?",
+                        [&record.id],
+                        |row| row.get(0),
+                    )
+                    .unwrap();
+                assert_eq!(count, 1);
+            }
+        }
+    }
+
+    #[test]
     fn retention_counts_distinct_periods_instead_of_concurrent_copies() {
         let directory = tempfile::tempdir().unwrap();
         let folder = directory.path().join("snapshots");
         std::fs::create_dir_all(&folder).unwrap();
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("CREATE TABLE fixture (value TEXT);").unwrap();
+        conn.execute_batch("CREATE TABLE fixture (value TEXT);")
+            .unwrap();
         for (kind, period, retain) in [("day", 86_400_000, 7), ("week", 604_800_000, 4)] {
             let bucket = now() / period;
             for age in 1..=retain {
                 for copy in 0..3 {
-                    std::fs::write(folder.join(format!("{kind}-{}-1-{copy}.sqlite3", bucket - age)), "fixture").unwrap();
+                    std::fs::write(
+                        folder.join(format!("{kind}-{}-1-{copy}.sqlite3", bucket - age)),
+                        "fixture",
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -125,9 +207,12 @@ mod tests {
                     buckets.push(suffix.split('-').next().unwrap().parse::<i64>().unwrap());
                 }
             }
-            buckets.sort_unstable_by(|a,b| b.cmp(a));
+            buckets.sort_unstable_by(|a, b| b.cmp(a));
             let current = now() / period;
-            assert_eq!(buckets, (0..retain).map(|age| current - age).collect::<Vec<_>>());
+            assert_eq!(
+                buckets,
+                (0..retain).map(|age| current - age).collect::<Vec<_>>()
+            );
         }
     }
 }

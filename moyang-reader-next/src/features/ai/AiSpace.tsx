@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiKinds } from "../../shared/ai-types";
 import { Icon } from "../../shared/components/Icon";
 import { isTauriRuntime, chooseDocumentPaths } from "../../platform/bridge";
@@ -10,8 +10,40 @@ import { importAiFile, importAiDirectory, importAiPath, importAiWeb } from "./tr
 import { AiActivity } from "./AiActivity";
 import { AiConflictPanel } from "./AiConflictPanel";
 import { useAiSpace } from "./useAiSpace";
-export default function AiSpace({ active, sidebarTarget }: { active: boolean; sidebarTarget?: HTMLElement | null }) {
+export default function AiSpace({
+  active,
+  sidebarTarget,
+  action,
+  onNavigate,
+}: {
+  active: boolean;
+  sidebarTarget?: HTMLElement | null;
+  action?: { key: number; type: "search" | "skill"; id?: string } | null;
+  onNavigate?: () => void;
+}) {
   const m = useAiSpace(active);
+  const handledAction = useRef<number | null>(null);
+  const focusedAction = useRef<number | null>(null);
+  const { setConnections, setActivity, setKind, select } = m;
+  useEffect(() => {
+    if (!active || !action || handledAction.current === action.key) return;
+    handledAction.current = action.key;
+    setConnections(false);
+    setActivity(false);
+    if (action.type === "skill" && action.id) {
+      setKind("skill");
+      void select(action.id);
+    }
+  }, [active, action, setConnections, setActivity, setKind, select]);
+  useLayoutEffect(() => {
+    if (active && action?.type === "search" && !m.connections && !m.activity && focusedAction.current !== action.key) {
+      const input = document.querySelector<HTMLInputElement>(".ai-search");
+      if (input) {
+        input.focus();
+        focusedAction.current = action.key;
+      }
+    }
+  }, [active, action, m.connections, m.activity]);
   const fileRef = useRef<HTMLInputElement>(null);
   const directoryRef = useRef<HTMLInputElement | null>(null);
   const [webUrl, setWebUrl] = useState<string | null>(null),
@@ -33,7 +65,13 @@ export default function AiSpace({ active, sidebarTarget }: { active: boolean; si
   };
   const category = aiKinds.find((k) => k.key === m.kind)!;
   const sidebar = (
-    <aside className="ai-sidebar" aria-label="AI 空间导航">
+    <aside
+      className="ai-sidebar"
+      aria-label="AI 空间导航"
+      onClickCapture={(event) => {
+        if ((event.target as Element).closest("button")) onNavigate?.();
+      }}
+    >
       <div className="ai-space-title">
         <span className="ai-mark">M</span>
         <div>

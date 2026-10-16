@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { saveDraftSnapshot } from "../features/recovery/draft-recovery";
-import { flushLiveEditors } from "../shared/pending-work";
+import { flushLiveEditors, flushPendingWork } from "../shared/pending-work";
 import {
   createAppSettingsSnapshot,
   parseAppSettings,
@@ -449,7 +449,7 @@ export function useSettingsPersistence({
       void (async () => {
         try {
           try {
-            await (await import("../shared/pending-work")).flushPendingWork();
+            await flushPendingWork();
           } catch {
             setError("AI 草稿尚未完成暂存，请重试后关闭。");
             return;

@@ -2,13 +2,15 @@
 
 本地文档阅读器的独立重构工程。保留 Windows 桌面应用与原有启动命令，重做代码组织、阅读界面和操作层级。此目录可以独立复制、安装与开发，不需要引用父目录源代码。
 
+0.12.0 新增[插件市场](docs/EXTENSIONS.md)：阅读插件、主题、Agent Skills 与 MCP 连接，可安装、更新、停用和回退；同时修复全局导航与 Windows 并发备份问题。功能核对、真实测试与剩余边界见[本轮深度检查报告](docs/VALIDATION-EXTENSIONS.md)，参考项目与取舍见[扩展研究](docs/RESEARCH-EXTENSIONS.md)。
+
 新增独立 **AI 空间**：知识库、长期记忆和技能库，与日常笔记分开；外部 Agent 通过本机 MCP 读写、召回和整理。使用方法见 [AI 空间指南](docs/AI-USER-GUIDE.md)，研究与取舍见 [开源研究](docs/research/AI-RESEARCH.md)。
 
 本轮补充研究并采用 TencentDB Agent Memory 与 OpenViking 的任务检查点、来源历史和按需读取思路，详见 [补充研究与取舍](docs/RESEARCH-AGENT-MEMORY-2026-10.md)。[MCP 接口指南](docs/MCP-GUIDE.md)、[实际验收结果](docs/VALIDATION-WORKBENCH.md) 和 [剩余检查单](tasks/workbench-upgrade.md) 随源码维护。两个真实客户端仍有授权/模型服务门槛，因此当前为候选版，未宣称全部验收完成。
 
 ## 开始使用
 
-本轮候选版本为 0.11.0。本机生成的便携包放在 `release/<版本与构建时间>/`，`release/latest.json` 记录最新成功打包的目录。打开其中的 `Moyang Reader Next.exe`，保留同目录的 `moyang-ai-mcp.exe`；如打包时已安装本地模型，`ollama` 文件夹也一并保留。每个包内有 `使用说明.txt`。GitHub 保存源码与文档，便携包、模型和个人数据不提交到仓库。
+本轮候选版本为 0.12.0。本机生成的便携包放在 `release/<版本与构建时间>/`，`release/latest.json` 记录最新成功打包的目录。打开其中的 `Moyang Reader Next.exe`，保留同目录的 `moyang-ai-mcp.exe`；如打包时已安装本地模型，`ollama` 文件夹也一并保留。每个包内有 `使用说明.txt`。GitHub 保存源码与文档，便携包、模型和个人数据不提交到仓库。
 
 在本目录打开终端，首次执行：
 
@@ -37,6 +39,7 @@ npm run dev
 4. 停止输入约 1.2 秒后自动保存，中文组词期间暂停；Ctrl+S 立即保存。遇到外部修改可比较、合并或另存。
 5. Ctrl+P 快速打开，Ctrl+F 查找当前文档；左侧进入全文搜索、收藏、保存视图和恢复中心。
 6. 左侧切换“AI 空间”，独立管理知识、长期记忆和技能。在“接入与备份”连接 Agent。
+7. 侧栏底部的“插件市场”提供阅读插件、主题、AI 技能和 MCP 服务；支持本地导入、自定义目录、启停、更新与回退。见 [扩展使用与开发](docs/EXTENSIONS.md)。
 
 详细说明见 [使用指南](docs/USER-GUIDE.md)。
 
