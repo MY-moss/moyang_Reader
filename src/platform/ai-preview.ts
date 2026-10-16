@@ -1,6 +1,7 @@
 // Browser-only preview storage. Native desktop and MCP always use the shared Rust/SQLite engine.
 import { emptyAiFields, type AiBackup, type AiRecord, type AiRevision } from "../shared/ai-types";
 import { previewRecordView } from "../shared/ai-resource-metadata";
+import { previewHealth } from "../shared/ai-health";
 const key = "moyang-ai-preview-v1";
 let previousRaw: string | null | undefined;
 let changeGeneration = 0;
@@ -70,6 +71,8 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "health":
+      return previewHealth(db.records, payload);
     case "context": {
       const results = previewRequest("search", { query: payload.query, project: payload.project ?? "", limit: 8 }) as {
         items: AiRecord[];

@@ -15,7 +15,10 @@ mod migration;
 mod source;
 pub use lifecycle::*;
 pub use source::{fetch_web_source, install_embedding_model, local_model_status};
+mod context_pack;
+mod health;
 mod search;
+pub use health::*;
 mod semantic;
 mod store;
 mod types;
@@ -67,6 +70,8 @@ pub fn now() -> i64 {
         .as_millis() as i64
 }
 
+#[cfg(test)]
+mod health_tests;
 #[cfg(test)]
 mod history_tests;
 #[cfg(test)]

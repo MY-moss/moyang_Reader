@@ -164,7 +164,7 @@ export default function AiSpace({
           </div>
         )}
         {m.activity ? (
-          <AiActivity onSelect={(id) => void m.select(id)} notify={m.notify} />
+          <AiActivity stats={m.stats} onSelect={(id) => void m.select(id)} notify={m.notify} />
         ) : m.connections ? (
           <AiConnections stats={m.stats} refresh={m.refresh} notify={m.notify} />
         ) : (

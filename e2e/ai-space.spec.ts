@@ -108,6 +108,26 @@ test("memories merge, archive and restore without losing the originals", async (
   await page.getByLabel("已归档", { exact: true }).uncheck();
   await expect(page.locator(".ai-record-button")).toHaveCount(2);
 });
+
+test("a source comparison belongs to its original entry when switching knowledge", async ({ page }) => {
+  await openAi(page);
+  await page
+    .locator('.ai-page-header input[type="file"]')
+    .setInputFiles({ name: "source-a.txt", mimeType: "text/plain", buffer: Buffer.from("A 的原资料") });
+  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await create(page, "另一份知识", "B 保持自己的内容");
+  await page.locator(".ai-record-button").filter({ hasText: "source-a" }).click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "检查来源更新", exact: true }).click();
+  await (await chooser).setFiles({ name: "source-a.txt", mimeType: "text/plain", buffer: Buffer.from("A 的最新资料") });
+  await expect(page.locator(".ai-source-update")).toContainText("A 的最新资料");
+  await page.locator(".ai-record-button").filter({ hasText: "另一份知识" }).click();
+  await expect(page.locator(".ai-prose")).toContainText("B 保持自己的内容");
+  await expect(page.locator(".ai-source-update")).toHaveCount(0);
+  await page.locator(".ai-record-button").filter({ hasText: "source-a" }).click();
+  await expect(page.locator(".ai-prose")).toContainText("A 的原资料");
+  await expect(page.locator(".ai-source-update")).toHaveCount(0);
+});
 test("imports a portable skill and exports a real resource archive", async ({ page }) => {
   await openAi(page);
   await page.locator(".ai-sidebar nav button").filter({ hasText: "技能库" }).click();

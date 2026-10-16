@@ -1,5 +1,13 @@
 # MCP 与任务沉淀接口
 
+## 0.15 资料检查与上下文预算
+
+`library_health` / 桌面 `health` 为只读检查。输入 `project`（省略表示全部，空字符串表示仅全局）、`agent`、`kind`、`include_global`（默认 false）、`issue`（duplicate / expired / missing_source / broken_links）、`offset` 和 `limit`（默认 30，最多 100）。返回 `scanned`、各类 `counts`、当前条件下的 `total`、`checked_at` 和分页 `items`；每条含 ID、当前 revision、范围、摘要、问题类别、最多 3 条重复候选和已删除的关联 ID。不返回附件正文，也不触发索引维护。
+
+候选不是自动清理指令。正文相同可能用途不同；先 `get_record` 查看完整来源和资源，再按原有更新、合并或归档工具整理，并保留范围和历史。旧私有 Agent 之间不合并分组，归档关联不算删除。
+
+`recall_context` 的 `max_chars` 仍为 Unicode 字符上限（1,000–30,000），不是 token 数。现在分配条目预算、标明范围、缩短冗长来源并围绕查询保留证据；`truncated=true` 表示条目、元数据或片段有省略。返回 ID 可供按需补读。检索和模型调用次数不因排版增加；技能资源继续按需读取。
+
 0.12.0 继续使用 stdio MCP。桌面“AI 空间 → 接入与备份”显示真实可执行文件、数据目录和客户端连接状态。`tools/list` 的 JSON Schema 是参数契约，类型定义位于 `crates/ai-core/src/types.rs` 与 `lifecycle.rs`；不要从示例猜测未列出的字段。
 
 插件市场另可安装外部 MCP 连接，使用独立的 `moyang-ext-<扩展 ID>` 名称；预览、备份、精确合并和移除流程见 [扩展指南](EXTENSIONS.md)。这些外部服务与本应用的记忆工具分别管理，配置成功不等同于完成客户端信任或启动验证。
