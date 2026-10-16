@@ -4,10 +4,10 @@ use std::path::Path;
 
 pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -> Result<()> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if version > 3 {
+    if version > 4 {
         return Err(invalid("数据库版本更新，请使用新版程序。"));
     }
-    if version < 3 {
+    if version < 4 {
         if existing {
             snapshot(conn, directory, "upgrade")?;
         }
@@ -23,6 +23,13 @@ pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -
         }
         if version < 3 {
             tx.execute_batch("CREATE TABLE derived_context(id TEXT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE, input_fingerprint TEXT NOT NULL, overview TEXT NOT NULL, purpose TEXT NOT NULL, generated INTEGER NOT NULL); PRAGMA user_version=3;")?;
+        }
+        if version < 4 {
+            tx.execute_batch("CREATE TABLE organization_queue(id TEXT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE, fingerprint TEXT NOT NULL, revision INTEGER NOT NULL, state TEXT NOT NULL, priority INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '');
+                CREATE TABLE organization_usage(id TEXT PRIMARY KEY, job TEXT NOT NULL, day INTEGER NOT NULL, reserved INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, estimated INTEGER NOT NULL DEFAULT 1, state TEXT NOT NULL, created INTEGER NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL);
+                CREATE INDEX organization_usage_day ON organization_usage(day,state);
+                CREATE TABLE memory_merges(id TEXT PRIMARY KEY, state TEXT NOT NULL, updated INTEGER NOT NULL, payload TEXT NOT NULL);
+                PRAGMA user_version=4;")?;
         }
         tx.commit()?;
     }

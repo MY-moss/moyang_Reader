@@ -71,7 +71,13 @@ export type AiHit = Pick<
   | "state"
 > & { excerpt: string; score: number; fragments?: AiFragment[] };
 export type AiSearch = { items: AiHit[]; total: number; warning: string | null };
-export type AiSemantic = { enabled: boolean; endpoint: string; model: string };
+export type AiSemantic = {
+  enabled: boolean;
+  endpoint: string;
+  model: string;
+  protocol?: "ollama" | "openai" | "";
+  provider?: string;
+};
 export type AiStats = {
   knowledge: number;
   memory: number;

@@ -1,5 +1,11 @@
 mod dispatch;
+mod memory_merge;
+mod organizer;
+pub mod services;
+pub use organizer::{maintain_organization, OrganizationConfig};
 mod hooks;
+mod model_process;
+pub mod models;
 mod runtime;
 pub use runtime::runtime as local_model_runtime;
 pub use runtime::{local_model, maintain_semantic};

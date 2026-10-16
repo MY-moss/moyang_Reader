@@ -348,6 +348,7 @@ impl Store {
                 enabled: false,
                 endpoint: "http://127.0.0.1:11434".into(),
                 model: "qwen3-embedding:0.6b".into(),
+                ..Default::default()
             },
         })
     }

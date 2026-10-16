@@ -1,5 +1,17 @@
 import { test, expect } from "@playwright/test";
 
+test("API services are available without installing the chat plugin", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "AI 服务与整理", exact: true }).click();
+  await expect(page.getByRole("region", { name: "AI 服务与整理" })).toContainText("无需安装聊天插件");
+  await expect(page.getByLabel("每日 token 额度")).toHaveValue("");
+  await page.getByRole("button", { name: "管理 API 服务", exact: true }).click();
+  await expect(page.getByRole("region", { name: "API 服务设置" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回 AI 服务", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回聊天", exact: true })).toHaveCount(0);
+});
+
 test("project import stays a recoverable draft until explicitly saved", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("ai");

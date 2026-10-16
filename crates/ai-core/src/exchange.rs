@@ -208,6 +208,10 @@ impl Store {
             if key.starts_with("client-install:")
                 || key.starts_with("connection:")
                 || key.starts_with("connection-source:")
+                || key.starts_with("connection-service:")
+                || key.starts_with("hook-session:")
+                || key == "organization"
+                || key == "local_model"
                 || key == "semantic_background"
             {
                 continue;

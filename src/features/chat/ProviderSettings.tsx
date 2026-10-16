@@ -18,11 +18,13 @@ export function ProviderSettings({
   selectedId,
   onSaved,
   onClose,
+  returnLabel = "返回聊天",
 }: {
   providers: ChatProvider[];
   selectedId: string;
   onSaved: () => Promise<unknown>;
   onClose: () => void;
+  returnLabel?: string;
 }) {
   const [form, setForm] = useState<ChatProvider>(
     () => providers.find((p) => p.id === selectedId) ?? providers[0] ?? newProvider(),
@@ -99,11 +101,11 @@ export function ProviderSettings({
       <header>
         <div>
           <h2>API 服务</h2>
-          <p>添加自己的服务，在每次对话中选择模型。</p>
+          <p>添加自己的服务，供聊天、记忆整理和嵌入检索分别选择。</p>
         </div>
         <button disabled={busy || Boolean(destination)} onClick={() => requestNavigation("chat")}>
           <Icon name="back" />
-          返回聊天
+          {returnLabel}
         </button>
       </header>
       {destination && (

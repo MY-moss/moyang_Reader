@@ -4,6 +4,7 @@ import type { ExportMargin, ExportOrientation, ExportPaper, ReadingWidth, ThemeM
 import type { TopBarProps } from "./toolbar-types";
 import { useInterfaceDensity } from "../../features/settings/interface-density";
 import { StorageSettings } from "../../features/settings/StorageSettings";
+import { AiServiceSettings } from "../../features/settings/AiServiceSettings";
 
 export function SettingsContent(p: TopBarProps & { section?: string }) {
   const [density, setDensity] = useInterfaceDensity();
@@ -29,6 +30,7 @@ export function SettingsContent(p: TopBarProps & { section?: string }) {
   return (
     <div className="settings-content">
       {p.section === "storage" && <StorageSettings beforeRestart={p.onPrepareForRestart} />}
+      {p.section === "services" && <AiServiceSettings />}
       <section hidden={Boolean(p.section && p.section !== "updates")} className="settings-section">
         <h3>{en ? "App updates" : "应用更新"}</h3>
         <p>检查 Moyang Reader 独立发布通道。更新只替换程序，保留文档、AI 库、聊天与现有模型。</p>

@@ -3,6 +3,7 @@ import { aiRequest } from "../../platform/ai-bridge";
 import type { AiFields, AiRecord, AiStats } from "../../shared/ai-types";
 import { AiHealth } from "./AiHealth";
 import { AiSources } from "./AiSources";
+import { AiMergeGroups } from "./AiMergeGroups";
 type Conflict = { id: string; evidence: string; proposal: AiFields & { id: string; expected_revision: number } };
 type Activity = {
   id: string;
@@ -195,6 +196,7 @@ export function AiActivity({
             </select>
           </label>
           <button onClick={() => setTick((n) => n + 1)}>刷新活动</button>
+          <AiMergeGroups project={project} active={active} dataVersion={dataVersion + tick} onSelect={onSelect} />
           {error && <p role="alert">{error}</p>}
           {!feed && !error && <p role="status">正在读取活动…</p>}
           {feed && (

@@ -66,6 +66,18 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
             Value::Null
         }
         "stats" => serde_json::to_value(s.stats()?)?,
+        "organization_status" => s.organization_status()?,
+        "organization_config" => s.configure_organization(serde_json::from_value(payload)?)?,
+        "organization_action" => s.organization_action(payload["action"].as_str().unwrap_or(""))?,
+        "merge_groups" => s.merge_groups(
+            payload["project"].as_str(),
+            payload["offset"].as_u64().unwrap_or(0) as usize,
+        )?,
+        "merge_detail" => s.merge_detail(payload["id"].as_str().unwrap_or(""))?,
+        "merge_action" => s.merge_action(
+            payload["id"].as_str().unwrap_or(""),
+            payload["action"].as_str().unwrap_or(""),
+        )?,
         "health" => serde_json::to_value(s.health(serde_json::from_value(payload)?)?)?,
         "source_inventory" => {
             serde_json::to_value(s.source_inventory(serde_json::from_value(payload)?)?)?
@@ -76,6 +88,12 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
         "semantic_config" => {
             serde_json::to_value(s.configure_semantic(serde_json::from_value(payload)?)?)?
         }
+        "model_status" => s.model_status()?,
+        "model_action" => s.model_action(payload["action"].as_str().unwrap_or("status"))?,
+        "model_config" => s.configure_model(
+            payload["model"].as_str().unwrap_or(""),
+            std::path::Path::new(payload["directory"].as_str().unwrap_or("")),
+        )?,
         "semantic_index" => s.index_semantic()?,
         "semantic_pause" | "semantic_resume" => {
             s.pause_semantic(operation == "semantic_pause")?;

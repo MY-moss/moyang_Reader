@@ -19,7 +19,7 @@ impl Store {
         conn.busy_timeout(Duration::from_secs(8))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 3 {
+        if version > 4 {
             return Err(invalid("数据库版本更新，请使用新版程序。"));
         }
         if version == 0 {
@@ -363,6 +363,7 @@ pub(crate) fn persist(tx: &Transaction, r: &Record, reason: &str) -> Result<()> 
     for id in existing.into_values().flatten() {
         tx.execute("DELETE FROM chunks WHERE id=?", [id])?;
     }
+    crate::organizer::enqueue(tx, r)?;
     Ok(())
 }
 pub(crate) fn validate(f: &mut RecordFields) -> Result<()> {

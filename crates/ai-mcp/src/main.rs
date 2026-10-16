@@ -489,6 +489,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
     Store::open(&directory)?;
     moyang_ai_core::maintain_semantic(&directory);
+    moyang_ai_core::maintain_organization(&directory);
     let tool_count = router.list_all().len();
     let service = MemoryService {
         directory: Arc::new(directory.clone()),

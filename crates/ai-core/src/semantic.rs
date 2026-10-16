@@ -11,9 +11,19 @@ use std::{
 mod tests;
 
 pub(crate) fn model_key(c: &SemanticConfig) -> String {
-    format!("{}|{}|body-v2", c.endpoint.trim_end_matches('/'), c.model)
+    let base = format!("{}|{}|body-v2", c.endpoint.trim_end_matches('/'), c.model);
+    if c.protocol == "openai" {
+        format!("{base}|openai|{}", c.provider)
+    } else {
+        base
+    }
 }
-fn embed(c: &SemanticConfig, texts: &[String], request_id: Option<&str>) -> Result<Vec<Vec<f64>>> {
+fn embed(
+    c: &SemanticConfig,
+    texts: &[String],
+    key: &str,
+    request_id: Option<&str>,
+) -> Result<Vec<Vec<f64>>> {
     static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
     let runtime = RUNTIME.get_or_init(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -26,15 +36,18 @@ fn embed(c: &SemanticConfig, texts: &[String], request_id: Option<&str>) -> Resu
     let client = CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .timeout(Duration::from_secs(180))
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("HTTP client initialization")
     });
     crate::cancellation::check_cancelled(request_id)?;
     runtime.block_on(async {
     let fetch=async {
-    let response = client
-        .post(format!("{}/api/embed", c.endpoint.trim_end_matches('/')))
-        .json(&serde_json::json!({"model":c.model,"input":texts,"truncate":false}))
+    let api=c.protocol=="openai";
+    let mut request=client.post(if api {format!("{}/embeddings",c.endpoint.trim_end_matches('/'))}else{format!("{}/api/embed",c.endpoint.trim_end_matches('/'))});
+    if !key.is_empty(){request=request.bearer_auth(key);}
+    let response = request
+        .json(&if api{serde_json::json!({"model":c.model,"input":texts,"encoding_format":"float"})}else{serde_json::json!({"model":c.model,"input":texts,"truncate":false})})
         .send().await
         .map_err(|e| invalid(&format!("语义服务连接失败：{e}")))?;
     if !response.status().is_success() {
@@ -46,12 +59,15 @@ fn embed(c: &SemanticConfig, texts: &[String], request_id: Option<&str>) -> Resu
     let value: serde_json::Value = response
         .json().await
         .map_err(|e| invalid(&format!("语义响应无效：{e}")))?;
-    let vectors: Vec<Vec<f64>> = serde_json::from_value(
-        value
+    let vectors: Vec<Vec<f64>> = if api {
+        let mut data=value["data"].as_array().ok_or_else(||invalid("嵌入 API 响应缺少 data。"))?.clone();
+        data.sort_by_key(|v|v["index"].as_u64().unwrap_or(u64::MAX));
+        if data.iter().enumerate().any(|(i,v)|v["index"].as_u64()!=Some(i as u64)){return Err(invalid("嵌入 API 返回的索引不连续。"));}
+        data.into_iter().map(|v|serde_json::from_value(v["embedding"].clone())).collect::<std::result::Result<_,_>>()?
+    }else{serde_json::from_value(value
             .get("embeddings")
             .cloned()
-            .ok_or_else(|| invalid("语义响应缺少 embeddings。"))?,
-    )?;
+            .ok_or_else(|| invalid("语义响应缺少 embeddings。"))?)?};
     if vectors.len() != texts.len()
         || vectors.iter().any(|v| {
             v.is_empty()
@@ -73,7 +89,12 @@ fn embed(c: &SemanticConfig, texts: &[String], request_id: Option<&str>) -> Resu
     })
 }
 type CachedQuery = (String, Instant, Vec<f64>);
-fn query_embedding(c: &SemanticConfig, query: &str, request_id: Option<&str>) -> Result<Vec<f64>> {
+fn query_embedding(
+    c: &SemanticConfig,
+    query: &str,
+    credential: &str,
+    request_id: Option<&str>,
+) -> Result<Vec<f64>> {
     static CACHE: OnceLock<Mutex<VecDeque<CachedQuery>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(VecDeque::new()));
     let key = format!("{}\n{}", model_key(c), query);
@@ -90,7 +111,7 @@ fn query_embedding(c: &SemanticConfig, query: &str, request_id: Option<&str>) ->
     } else {
         query.to_string()
     };
-    let v = embed(c, &[text], request_id)?.remove(0);
+    let v = embed(c, &[text], credential, request_id)?.remove(0);
     if let Ok(mut entries) = cache.lock() {
         entries.retain(|(k, t, _)| k != &key && t.elapsed() < Duration::from_secs(300));
         entries.push_back((key, Instant::now(), v.clone()));
@@ -149,17 +170,51 @@ impl Store {
         Ok(self.conn.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active'", [key], |r| r.get(0))?)
     }
     pub fn configure_semantic(&self, mut c: SemanticConfig) -> Result<SemanticConfig> {
+        if !["", "ollama", "openai"].contains(&c.protocol.as_str()) {
+            return Err(invalid("请选择本地 Ollama 或兼容 OpenAI 的嵌入 API。"));
+        }
+        if c.protocol == "openai" && c.enabled {
+            let (provider, _) = self.service(&c.provider)?;
+            if provider.protocol != "openai" {
+                return Err(invalid("嵌入检索需要 OpenAI 兼容协议的服务。"));
+            }
+            c.endpoint = services::endpoint(&provider, true)
+                .map_err(|e| invalid(&e))?
+                .trim_end_matches("/models")
+                .into();
+        }
         c.endpoint = c.endpoint.trim().trim_end_matches('/').into();
         c.model = c.model.trim().into();
         if c.enabled {
             let url = reqwest::Url::parse(&c.endpoint)
-                .map_err(|_| invalid("请输入有效的 Ollama 服务地址。"))?;
-            if !["http", "https"].contains(&url.scheme()) || c.model.is_empty() {
+                .map_err(|_| invalid("请输入有效的嵌入服务地址。"))?;
+            if !["http", "https"].contains(&url.scheme())
+                || c.model.is_empty()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || url.query().is_some()
+                || url.fragment().is_some()
+            {
                 return Err(invalid("服务地址需使用 http/https，并填写模型名称。"));
             }
         }
         self.conn.execute("INSERT INTO settings(key,value) VALUES('semantic',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[serde_json::to_string(&c)?])?;
         Ok(c)
+    }
+    fn embedding_key(&self, c: &SemanticConfig) -> Result<String> {
+        if c.protocol != "openai" {
+            return Ok(String::new());
+        }
+        let (provider, key) = self.service(&c.provider)?;
+        let endpoint = services::endpoint(&provider, true).map_err(|e| invalid(&e))?;
+        if provider.protocol != "openai"
+            || endpoint.trim_end_matches("/models") != c.endpoint.trim_end_matches('/')
+        {
+            return Err(invalid(
+                "嵌入 API 服务已修改，请重新保存检索设置后建立索引。",
+            ));
+        }
+        Ok(key)
     }
     /// One bounded batch. UI repeats until remaining=0, allowing cancellation between batches.
     pub fn index_semantic(&mut self) -> Result<serde_json::Value> {
@@ -184,7 +239,7 @@ impl Store {
         };
         if !pending.is_empty() {
             let texts: Vec<String> = pending.iter().map(|(_, text)| text.clone()).collect();
-            let vectors = embed(&c, &texts, None)?;
+            let vectors = embed(&c, &texts, &self.embedding_key(&c)?, None)?;
             let tx = self.conn.transaction()?;
             // A settings change must not let an old request replace newer-model vectors.
             let current: String =
@@ -319,7 +374,12 @@ impl Store {
         if count == 0 {
             return Ok((vec![], true));
         }
-        let query = query_embedding(c, &q.query, q.request_id.as_deref())?;
+        let query = query_embedding(
+            c,
+            &q.query,
+            &self.embedding_key(c)?,
+            q.request_id.as_deref(),
+        )?;
         // Keep candidate chunks and their subsequently loaded records on one read snapshot.
         // Start only after the embedding request so no transaction waits for the network.
         let read_tx = self.conn.unchecked_transaction()?;

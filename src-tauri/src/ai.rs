@@ -1,4 +1,5 @@
 use crate::data_paths::ai_directory as directory;
+use tauri_plugin_dialog::DialogExt;
 #[tauri::command]
 pub async fn ai_request(
     app: tauri::AppHandle,
@@ -6,11 +7,17 @@ pub async fn ai_request(
     payload: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let path = directory(&app)?;
+    let services = crate::data_paths::config_directory(&app)?.join("chat");
     tauri::async_runtime::spawn_blocking(move || {
+        if operation=="model_choose_directory" {
+            return app.dialog().file().set_title("选择本地模型保存目录").blocking_pick_folder().map(|p|p.into_path().map(|p|serde_json::json!(p)).map_err(|e|e.to_string())).transpose().map(|p|p.unwrap_or(serde_json::Value::Null));
+        }
         if operation == "change_token" {
             return crate::ai_changes::token(&path).map(serde_json::Value::String);
         }
         let mut store = moyang_ai_core::Store::open(&path).map_err(|e| e.to_string())?;
+        store.bind_services(&services).map_err(|e| e.to_string())?;
+        moyang_ai_core::maintain_organization(&path);
         if operation == "local_model" {
             return crate::ai_model::local_model(
                 &mut store,
@@ -45,6 +52,7 @@ pub async fn ai_request(
                 "conclude",
                 "semantic_config",
                 "semantic_resume",
+                "model_action",
                 "merge",
                 "state",
                 "resolve_conflict",

@@ -19,6 +19,12 @@ try {
     [IO.Directory]::CreateDirectory((Join-Path $data 'empty-folder')) | Out-Null
     [IO.Directory]::CreateDirectory($cache) | Out-Null
     [IO.File]::WriteAllText((Join-Path $cache 'draft.txt'),'unsent draft')
+    $externalModels=Join-Path $fixture 'independent-models'
+    [IO.Directory]::CreateDirectory($externalModels) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $externalModels 'model-part.bin'),'keep separately chosen model bytes')
+    $modelAlias=Join-Path $data 'models'
+    New-Item -ItemType Junction -Path $modelAlias -Target $externalModels | Out-Null
+    [void]$aliases.Add($modelAlias)
     $ai=Join-Path $data 'ai-space'
     $chineseTitle = -join @([char]0x8FC1,[char]0x79FB,[char]0x9A8C,[char]0x8BC1)
     $raw=@{kind='memory';title=$chineseTitle;body='preserve resource and revision';source='isolated fixture';project='storage-test'} | ConvertTo-Json -Compress
@@ -43,6 +49,9 @@ try {
         Assert-True ($receipt.title -eq $chineseTitle) 'Chinese content must survive migration'
         Assert-True ((Get-Content -LiteralPath (Join-Path $cache 'draft.txt') -Raw) -eq 'unsent draft') 'Browser drafts must survive'
         Assert-True (Test-Path -LiteralPath (Join-Path $data 'empty-folder') -PathType Container) 'Empty folders must survive'
+        Assert-True ((Get-Content -LiteralPath (Join-Path $externalModels 'model-part.bin') -Raw) -eq 'keep separately chosen model bytes') 'Parent migration and cleanup must not delete independently stored model data'
+        Assert-True ((Get-Item -LiteralPath (Join-Path $target 'data/models') -Force).LinkType -eq 'Junction') 'Parent migration must preserve the independent storage junction'
+        [void]$aliases.Add((Join-Path $target 'data/models'))
         foreach($item in $items) { $item.physical=Join-Path $target $item.key; [void]$aliases.Add($item.physical) }
     }
     # Occupied destination and nested destination are rejected before modification.
@@ -64,7 +73,7 @@ try {
     $report=Get-Content -LiteralPath (Join-Path $fixture 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($report.status -eq 'error') 'A locked source should stop migration'
     Assert-True ((Get-Content -LiteralPath (Join-Path $cache 'draft.txt') -Raw) -eq 'unsent draft') 'Failure must preserve source data'
-    Write-Output 'Storage migration passed: two moves, live MCP path, drafts, empty folders, occupied/nested targets and locked-source recovery.'
+    Write-Output 'Storage migration passed: two moves, independent model directory, live MCP path, drafts, empty folders, occupied/nested targets and locked-source recovery.'
 } finally {
     # Remove each fixture link itself; never recursively traverse a junction during cleanup.
     foreach($alias in $aliases) {

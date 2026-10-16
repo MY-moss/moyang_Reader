@@ -271,6 +271,11 @@ pub struct SemanticConfig {
     pub enabled: bool,
     pub endpoint: String,
     pub model: String,
+    /// Empty/ollama preserves the original local protocol; openai uses a saved API service.
+    #[serde(default)]
+    pub protocol: String,
+    #[serde(default)]
+    pub provider: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stats {

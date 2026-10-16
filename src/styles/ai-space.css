@@ -1342,3 +1342,35 @@
   height: 420px;
   border: 1px solid var(--line);
 }
+.ai-model-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-block: 16px;
+}
+.ai-model-option {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ai-model-option span {
+  display: grid;
+  gap: 8px;
+}
+.ai-model-setup > label {
+  display: grid;
+  gap: 6px;
+  margin-block: 12px;
+}
+.ai-model-setup input {
+  min-width: 0;
+  max-width: 100%;
+}
+.ai-model-setup p,
+.ai-merge-body {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

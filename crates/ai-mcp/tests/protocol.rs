@@ -16,17 +16,34 @@ async fn cancelled_recall_closes_waiting_embedding_request() {
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let (closed_tx, closed_rx) = tokio::sync::oneshot::channel();
     let worker = std::thread::spawn(move || {
-        let (mut index,_) = listener.accept().unwrap();
-        let mut request=Vec::new();
+        let (mut index, _) = listener.accept().unwrap();
+        let mut request = Vec::new();
         loop {
-            let mut bytes=[0;4096]; let n=index.read(&mut bytes).unwrap(); assert!(n>0); request.extend_from_slice(&bytes[..n]);
-            if let Some(end)=request.windows(4).position(|v|v==b"\r\n\r\n") {
-                let length:usize=String::from_utf8_lossy(&request[..end]).lines().find_map(|l|l.to_lowercase().strip_prefix("content-length:").map(|v|v.trim().parse().unwrap())).unwrap_or(0);
-                if request.len()>=end+4+length {break;}
+            let mut bytes = [0; 4096];
+            let n = index.read(&mut bytes).unwrap();
+            assert!(n > 0);
+            request.extend_from_slice(&bytes[..n]);
+            if let Some(end) = request.windows(4).position(|v| v == b"\r\n\r\n") {
+                let length: usize = String::from_utf8_lossy(&request[..end])
+                    .lines()
+                    .find_map(|l| {
+                        l.to_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(|v| v.trim().parse().unwrap())
+                    })
+                    .unwrap_or(0);
+                if request.len() >= end + 4 + length {
+                    break;
+                }
             }
         }
-        let body=r#"{"embeddings":[[1.0,0.0]]}"#;
-        write!(index,"HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).unwrap();
+        let body = r#"{"embeddings":[[1.0,0.0]]}"#;
+        write!(
+            index,
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .unwrap();
         drop(index);
         let (mut stream, _) = listener.accept().unwrap();
         stream
@@ -47,15 +64,25 @@ async fn cancelled_recall_closes_waiting_embedding_request() {
         }
     });
     let mut store = moyang_ai_core::Store::open(dir.path()).unwrap();
-    store.save(serde_json::from_value(json!({"kind":"knowledge","title":"正常资料","body":"查询取消用的普通短文"})).unwrap()).unwrap();
+    store
+        .save(
+            serde_json::from_value(
+                json!({"kind":"knowledge","title":"正常资料","body":"查询取消用的普通短文"}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
     store
         .configure_semantic(moyang_ai_core::SemanticConfig {
             enabled: true,
             endpoint,
             model: "fixture".into(),
+            ..Default::default()
         })
         .unwrap();
-    tokio::task::spawn_blocking(move || store.index_semantic().unwrap()).await.unwrap();
+    tokio::task::spawn_blocking(move || store.index_semantic().unwrap())
+        .await
+        .unwrap();
     let pending = c
         .send_cancellable_request(
             ClientRequest::CallToolRequest(Request::new(
@@ -159,6 +186,7 @@ fn request_mode_supports_semantic_search_and_web_fetch_without_runtime_panics() 
             enabled: true,
             endpoint: endpoint.clone(),
             model: "fixture".into(),
+            ..Default::default()
         })
         .unwrap();
     store.index_semantic().unwrap();

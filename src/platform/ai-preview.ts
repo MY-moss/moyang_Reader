@@ -72,6 +72,8 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "merge_groups":
+      return { items: [], next_offset: null };
     case "source_inventory":
       return previewSourceInventory(db.records, payload);
     case "health":

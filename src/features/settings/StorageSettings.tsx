@@ -17,6 +17,7 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
     [models, setModels] = useState(false),
     [plan, setPlan] = useState<StoragePlan | null>(null);
   const [starting, setStarting] = useState(false);
+  const [category, setCategory] = useState("all");
   const size = (n: number) =>
     n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
   const run = async (task: () => Promise<void>) => {
@@ -100,11 +101,34 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
               选择新位置
             </button>
           </div>
+          <label className="settings-select-option">
+            <span>迁移范围</span>
+            <select
+              aria-label="迁移范围"
+              value={category}
+              disabled={busy}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setPlan(null);
+              }}
+            >
+              <option value="all">全部应用数据（不含程序更新目录）</option>
+              {info.locations.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <small>
+            可逐项迁移到不同磁盘。父目录迁移保留已分开的目录链接；系统临时目录由 Windows
+            管理，导出文件每次可自行选择位置。
+          </small>
           {target && (
             <div className="storage-move">
               <h4>迁移到</h4>
               <p className="storage-path">{target}</p>
-              {info.locations.some((p) => p.key === "models") && (
+              {category === "all" && info.locations.some((p) => p.key === "models") && (
                 <label className="settings-option">
                   <input
                     type="checkbox"
@@ -116,8 +140,8 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
                     }}
                   />
                   <span>
-                    <strong>同时迁移本应用的模型</strong>
-                    <small>勾选前请退出本地 Ollama 服务；不勾选则模型位置保持不变。</small>
+                    <strong>同时迁移独立保存的模型</strong>
+                    <small>父目录内的模型随父目录迁移；勾选后也迁移另行存放的模型。迁移前请停止模型服务。</small>
                   </span>
                 </label>
               )}
@@ -128,7 +152,7 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
               <button
                 className="quiet-button"
                 disabled={busy}
-                onClick={() => void run(async () => setPlan(await prepareStorageMove(models)))}
+                onClick={() => void run(async () => setPlan(await prepareStorageMove(models, category)))}
               >
                 {busy ? "正在检查…" : "检查迁移"}
               </button>
