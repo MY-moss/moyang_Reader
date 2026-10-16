@@ -83,7 +83,7 @@ export default function ChatSpace({
     if (m.busy && !assistant) m.stop();
   }, [assistant, m]);
   useEffect(() => {
-    if (!m.ready || m.busy) return;
+    if (!m.ready || m.busy || m.switching) return;
     if (selection && selection.key !== handled.current) {
       m.change({ assistantId: selection.id });
       handled.current = selection.key;
@@ -118,19 +118,19 @@ export default function ChatSpace({
       />
     );
   return (
-    <section className="chat-space" aria-label="书房聊天">
+    <section className="chat-space" aria-label="书房聊天" aria-busy={m.switching}>
       <header className="chat-header">
         <div>
           <h1>书房聊天</h1>
-          <small>{m.busy ? "正在生成 · 可随时停止" : "记录保存在本机"}</small>
+          <small>{m.switching ? "正在保存并切换对话…" : m.busy ? "正在生成 · 可随时停止" : "记录保存在本机"}</small>
         </div>
         <div className="chat-actions">
-          <button aria-expanded={history} onClick={() => setHistory(!history)}>
+          <button disabled={m.switching} aria-expanded={history} onClick={() => setHistory(!history)}>
             <Icon name="history" />
             历史
           </button>
           <button
-            disabled={m.busy || !m.ready}
+            disabled={m.busy || m.switching || !m.ready}
             onClick={() =>
               void run(async () => {
                 await m.open();
@@ -142,7 +142,7 @@ export default function ChatSpace({
             <Icon name="plus" />
             新对话
           </button>
-          <button disabled={m.busy} onClick={() => setSettings(true)}>
+          <button disabled={m.busy || m.switching} onClick={() => setSettings(true)}>
             <Icon name="settings" />
             API 服务
           </button>
@@ -154,7 +154,7 @@ export default function ChatSpace({
           {!m.threads.length && <p>发送第一条消息后，对话会保存在这里。</p>}
           {m.threads.map((t) => (
             <button
-              disabled={m.busy}
+              disabled={m.busy || m.switching}
               key={t.id}
               aria-current={t.id === m.thread.id ? "page" : undefined}
               onClick={() =>
@@ -201,7 +201,7 @@ export default function ChatSpace({
             ) : (
               <div className="chat-starters">
                 {assistant?.starters.map((text) => (
-                  <button key={text} onClick={() => m.setDraft(text)}>
+                  <button key={text} disabled={m.switching} onClick={() => m.setDraft(text)}>
                     {text}
                     <Icon name="next" />
                   </button>
@@ -237,12 +237,12 @@ export default function ChatSpace({
                 !m.busy &&
                 message.role === "assistant" &&
                 index === m.thread.messages.length - 1 && (
-                  <button onClick={() => void m.generate()}>
+                  <button disabled={m.switching} onClick={() => void m.generate()}>
                     <Icon name="retry" />
                     重试回答
                   </button>
                 )}
-              {message.content && !m.busy && (
+              {message.content && !m.busy && !m.switching && (
                 <div className="chat-message-actions">
                   <button
                     aria-label="复制消息"
@@ -262,7 +262,7 @@ export default function ChatSpace({
                         存入 AI 库
                       </button>
                       {index === m.thread.messages.length - 1 && (
-                        <button onClick={() => void m.generate()}>
+                        <button disabled={m.switching} onClick={() => void m.generate()}>
                           <Icon name="retry" />
                           重新回答
                         </button>
@@ -290,17 +290,22 @@ export default function ChatSpace({
               <Icon name="download" />
               导出对话
             </button>
-            <button onClick={() => setRemove(!remove)}>
+            <button disabled={m.switching} onClick={() => setRemove(!remove)}>
               <Icon name="trash" />
               删除对话
             </button>
-            {m.thread.messages.at(-1)?.role === "user" && <button onClick={() => void m.generate()}>继续回答</button>}
+            {m.thread.messages.at(-1)?.role === "user" && (
+              <button disabled={m.switching} onClick={() => void m.generate()}>
+                继续回答
+              </button>
+            )}
           </div>
         )}
         {remove && (
           <div className="chat-confirm">
             <p>删除本机的这段对话？已存入 AI 库的内容会保留。</p>
             <button
+              disabled={m.switching}
               onClick={() =>
                 void run(async () => {
                   await m.remove();
@@ -345,7 +350,7 @@ export default function ChatSpace({
               <span className="sr-only">聊天助手</span>
               <select
                 aria-label="聊天助手"
-                disabled={m.busy}
+                disabled={m.busy || m.switching}
                 value={m.thread.assistantId}
                 onChange={(e) => m.change({ assistantId: e.target.value })}
               >
@@ -361,7 +366,7 @@ export default function ChatSpace({
               <span className="sr-only">API 服务</span>
               <select
                 aria-label="API 服务"
-                disabled={m.busy}
+                disabled={m.busy || m.switching}
                 value={m.thread.providerId}
                 onChange={(e) => {
                   const p = m.providers.find((p) => p.id === e.target.value);
@@ -379,7 +384,7 @@ export default function ChatSpace({
             <input
               aria-label="本次模型"
               placeholder="模型 ID"
-              disabled={m.busy}
+              disabled={m.busy || m.switching}
               value={m.thread.model}
               onChange={(e) => m.change({ model: e.target.value })}
             />
@@ -392,7 +397,12 @@ export default function ChatSpace({
                 </summary>
                 <pre>{attached.text}</pre>
               </details>
-              <button type="button" disabled={m.busy} aria-label="移除附件" onClick={() => setAttached(null)}>
+              <button
+                type="button"
+                disabled={m.busy || m.switching}
+                aria-label="移除附件"
+                onClick={() => setAttached(null)}
+              >
                 <Icon name="close" />
               </button>
             </div>
@@ -401,7 +411,7 @@ export default function ChatSpace({
             aria-label="聊天消息"
             placeholder="写下问题…"
             value={m.draft}
-            disabled={m.busy || !m.ready}
+            disabled={m.busy || m.switching || !m.ready}
             onChange={(e) => m.setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
@@ -414,7 +424,7 @@ export default function ChatSpace({
             <div className="chat-actions">
               <button
                 type="button"
-                disabled={m.busy || !attachment}
+                disabled={m.busy || m.switching || !attachment}
                 title={attachment ? "预览后随下一条消息发送" : "先在阅读空间打开文字文档"}
                 onClick={() => setAttached(attachment ?? null)}
               >
@@ -425,7 +435,7 @@ export default function ChatSpace({
                 <summary>{m.thread.useMemory ? "已开启 AI 库召回" : "AI 库召回"}</summary>
                 <label className="chat-checkbox">
                   <input
-                    disabled={m.busy}
+                    disabled={m.busy || m.switching}
                     type="checkbox"
                     checked={m.thread.useMemory}
                     onChange={(e) => m.change({ useMemory: e.target.checked })}
@@ -435,7 +445,7 @@ export default function ChatSpace({
                 <label>
                   项目范围
                   <input
-                    disabled={m.busy}
+                    disabled={m.busy || m.switching}
                     value={m.thread.project}
                     placeholder="留空仅使用全局资料"
                     onChange={(e) => m.change({ project: e.target.value })}
@@ -453,7 +463,9 @@ export default function ChatSpace({
               <button
                 className="primary-action"
                 type="submit"
-                disabled={!m.ready || !m.draft.trim() || !provider || !assistant || !m.thread.model.trim()}
+                disabled={
+                  m.switching || !m.ready || !m.draft.trim() || !provider || !assistant || !m.thread.model.trim()
+                }
               >
                 <Icon name="send" />
                 发送
