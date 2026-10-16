@@ -84,3 +84,14 @@ it("applies through the normal document session and ignores a cancelled result",
   expect(h.api.run).toBeNull();
   expect(h.updateSource).toHaveBeenCalledTimes(1);
 });
+it("locates only the document snapshot that produced the result", async () => {
+  vi.mocked(runExtension).mockResolvedValue({ report: "check" });
+  const h = await harness();
+  await act(async () => h.api.execute("extension:moyang.tidy-markdown:tidy"));
+  await vi.waitFor(() => expect(h.api.run?.running).toBe(false));
+  const finding = { label: "原文", line: 1, from: 0, to: 8 };
+  expect(h.api.locate(finding)).toMatchObject({ offset: 0, endOffset: 8, quote: "original", source: true });
+  h.store.update("C:/notes/current.md", (s) => ({ ...s, draft: "new draft" }));
+  await act(async () => expect(h.api.locate(finding)).toBeNull());
+  expect(h.api.run?.error).toContain("内容已改变");
+});

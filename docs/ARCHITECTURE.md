@@ -12,6 +12,14 @@
 
 ## 职责关系
 
+### 0.14 扩展结果与后台解析
+
+`extension.worker.ts` 按需加载插件和 Markdown 分析器，解析不发生在输入路径上。`document-analysis` 复用 Markdown/GFM/frontmatter 语法树，提供当前文档内的任务、链接、标题、表格与源位置；不扫描其他笔记。构建为解析器选择无 DOM 的实体解码实现，浏览器开发和桌面构建保持一致。
+
+结果协议保留 report/replacement，增加 findings 与文本 files。输出验证在宿主完成，下载经过现有平台保存接口；来源位置使用运行时原文指纹，并在定位前核对文档会话仍未变化。旧草稿、撤销及保存队列继续由原有所有者管理。
+
+内置工具从可测试的 `builtin-readers.ts` 生成固定 JSON 包，线上目录和应用使用同一份源码字符串，避免压缩构建改变同版本代码。生成物一致性进入检查流程。
+
 ```mermaid
 flowchart TD
     UI[Shell 与阅读视图] --> App[application 应用编排]

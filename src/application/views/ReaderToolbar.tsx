@@ -8,8 +8,10 @@ export function ReaderToolbar({
   settingsOpen,
   onSettingsClose,
   navigation,
+  extensionActions,
 }: {
   navigation?: import("react").ReactNode;
+  extensionActions?: import("../../shared/extension-types").ExtensionActions;
   settingsOpen?: boolean;
   onSettingsClose?: () => void;
   model: Pick<
@@ -132,6 +134,7 @@ export function ReaderToolbar({
   return (
     <>
       <TopBar
+        extensionActions={extensionActions}
         navigation={navigation}
         settingsOpen={settingsOpen}
         onSettingsClose={onSettingsClose}

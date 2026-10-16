@@ -391,6 +391,67 @@
 .extension-result h3 {
   font-size: 15px;
 }
+.extension-command-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+.extension-findings {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.extension-findings button {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 4px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.extension-findings span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.extension-findings strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.extension-findings small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.extension-files {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+}
+.extension-files > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+.extension-files details {
+  flex: 1;
+  min-width: 0;
+}
+.extension-files summary {
+  cursor: pointer;
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+.extension-result pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.6;
+}
 .extension-comparison {
   display: grid;
   grid-template-columns: 1fr 1fr;

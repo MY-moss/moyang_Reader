@@ -1,7 +1,7 @@
 import type { ExtensionPackage, McpConfiguration } from "../../shared/extension-types";
 import { contentHash } from "../documents/source-chunks";
 
-export const APP_VERSION = "0.13.0";
+export const APP_VERSION = "0.14.0";
 export const MAX_PACKAGE_BYTES = 16 * 1024 * 1024;
 export const themeTokens = [
   "--canvas",
@@ -65,6 +65,8 @@ export function validatePackage(value: unknown): ExtensionPackage {
     throw new Error("扩展来源网址无效。");
   if (p.readme !== undefined && typeof p.readme !== "string") throw new Error("扩展说明应为文字。");
   if (p.kind === "reader") {
+    if (p.documentAnalysis !== undefined && typeof p.documentAnalysis !== "boolean")
+      throw new Error("文档分析能力声明无效。");
     if (
       p.formats !== undefined &&
       (!Array.isArray(p.formats) ||

@@ -5,17 +5,33 @@ import ts from "typescript";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const source = fs.readFileSync(path.join(root, "src/features/extensions/catalog.ts"), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText;
 // The desktop release targets Windows; browser previews choose their own host at runtime.
-const context = { exports: {}, navigator: { userAgent: "Windows" } };
-vm.runInNewContext(compiled, context, { timeout: 1000, filename: "catalog.js" });
+function loadCatalogModule(file) {
+  if (file.endsWith(".json")) return JSON.parse(fs.readFileSync(file, "utf8"));
+  const source = fs.readFileSync(file, "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+  }).outputText;
+  const context = { exports: {}, navigator: { userAgent: "Windows" }, require: (specifier) => {
+    if (!specifier.startsWith("./")) throw new Error(`Unexpected catalog import: ${specifier}`);
+    return loadCatalogModule(path.resolve(path.dirname(file), specifier.endsWith(".json") ? specifier : specifier + ".ts"));
+  } };
+  vm.runInNewContext(compiled, context, { timeout: 1000, filename: file });
+  return context.exports;
+}
+function publish(file, value) {
+  const content = JSON.stringify(value, null, 2) + "\n";
+  if (process.argv.includes("--check")) {
+    if (fs.readFileSync(file, "utf8").replaceAll("\r\n", "\n") !== content) throw new Error(`Generated catalog is stale: ${file}. Run node scripts/export-extension-catalog.mjs.`);
+  } else fs.writeFileSync(file, content);
+}
+const readers = loadCatalogModule(path.join(root, "src/features/extensions/builtin-readers.ts"));
+publish(path.join(root, "src/features/extensions/builtin-reader-packages.json"), readers.practicalReaders);
+const catalog = loadCatalogModule(path.join(root, "src/features/extensions/catalog.ts"));
 const directory = path.join(root, "public/extensions");
 fs.mkdirSync(directory, { recursive: true });
-fs.writeFileSync(
+publish(
   path.join(directory, "catalog.json"),
-  JSON.stringify({ format: "moyang-extension-catalog", packages: context.exports.builtInCatalog }, null, 2) + "\n",
+  { format: "moyang-extension-catalog", packages: catalog.builtInCatalog },
 );
-console.log(`Exported ${context.exports.builtInCatalog.length} curated packages.`);
+console.log(`Exported ${catalog.builtInCatalog.length} curated packages.`);

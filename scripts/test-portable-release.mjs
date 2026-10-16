@@ -111,7 +111,9 @@ try {
 
   const desktopPort = await unusedLocalPort();
   const desktopUrl = `http://127.0.0.1:${desktopPort}`;
-  app = startTestProcess(path.join(release, "Moyang Reader Next.exe"), [], {
+  const pluginDocument = path.join(temp, "release-plugin.md");
+  fs.writeFileSync(pluginDocument, "# 发布包阅读工具\n\n- [ ] 中文 &amp; 插件验证\n", "utf8");
+  app = startTestProcess(path.join(release, "Moyang Reader Next.exe"), [pluginDocument], {
     windowsHide: true,
     stdio: "ignore",
     env: {
@@ -159,6 +161,14 @@ try {
   );
   assert.ok(extensionState.installed.some((item) => item.package.id === "moyang.reading-report" && item.enabled));
   report.desktop.extension_install = true;
+  await page.locator(".extension-row").filter({ hasText: "待办提取" }).click();
+  await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page.getByRole("button", { name: "运行：提取文档待办", exact: true }).click();
+  await page.getByRole("button", { name: /待办 · 中文 & 插件验证/ }).waitFor();
+  assert.ok((await page.getByRole("dialog").textContent()).includes("未完成 1 项"));
+  await page.screenshot({ path: "artifacts/workbench/release-practical-reader.png" });
+  report.desktop.practical_reader = true;
+  await page.getByRole("button", { name: "关闭", exact: true }).click();
   await page.locator(".extension-row").filter({ hasText: "书房聊天" }).click();
   await page.getByRole("button", { name: "安装扩展", exact: true }).click();
   await page.getByText("扩展已安装，可在下方管理。", { exact: true }).waitFor();
