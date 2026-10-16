@@ -4,10 +4,10 @@ use std::path::Path;
 
 pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -> Result<()> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if version > 4 {
+    if version > 5 {
         return Err(invalid("数据库版本更新，请使用新版程序。"));
     }
-    if version < 4 {
+    if version < 5 {
         if existing {
             snapshot(conn, directory, "upgrade")?;
         }
@@ -30,6 +30,10 @@ pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -
                 CREATE INDEX organization_usage_day ON organization_usage(day,state);
                 CREATE TABLE memory_merges(id TEXT PRIMARY KEY, state TEXT NOT NULL, updated INTEGER NOT NULL, payload TEXT NOT NULL);
                 PRAGMA user_version=4;")?;
+        }
+        if version < 5 {
+            crate::resources::migrate(&tx)?;
+            tx.execute_batch("PRAGMA user_version=5;")?;
         }
         tx.commit()?;
     }

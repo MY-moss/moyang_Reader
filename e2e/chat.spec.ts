@@ -21,6 +21,69 @@ async function configure(page: Page, protocol = "openai") {
   await page.getByRole("button", { name: "返回聊天", exact: true }).click();
 }
 
+test("context preview excludes a source and refreshes changed evidence before sending", async ({ page }) => {
+  await installChat(page);
+  await configure(page);
+  await page.evaluate(() => {
+    const records = ["甲", "乙"].map((suffix, i) => ({
+      id: `preview-${i}`,
+      kind: "memory",
+      title: `偏好${suffix}`,
+      body: `偏好${suffix}的原始证据`,
+      summary: "",
+      project: "",
+      agent: "",
+      sharing: "global",
+      state: "active",
+      revision: 1,
+      created_at: 1,
+      updated_at: 1,
+      tags: [],
+      source: "用户明确要求",
+      memory_type: "preference",
+      importance: 3,
+      pinned: false,
+      expires_at: null,
+      links: [],
+      assets: [],
+      skill_meta: {},
+    }));
+    localStorage.setItem(
+      "moyang-ai-preview-v1",
+      JSON.stringify({ format: "moyang-ai-space", version: 2, records, history: [] }),
+    );
+  });
+  await page.locator(".chat-context-options summary").click();
+  await page.getByLabel("发送相关知识与记忆", { exact: true }).check();
+  await page.getByLabel("聊天消息").fill("偏好");
+  await page.getByRole("button", { name: "预览上下文", exact: true }).click();
+  const preview = page.getByRole("region", { name: "本次参考资料" });
+  await expect(preview).toContainText("偏好甲");
+  await preview.getByLabel("偏好乙", { exact: true }).uncheck();
+  await page.setViewportSize({ width: 720, height: 900 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: ".local/screenshots/chat-context-preview.png", fullPage: true });
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem("moyang-ai-preview-v1")!);
+    data.records[0].body = "偏好甲的新证据：使用短句";
+    data.records[0].revision++;
+    localStorage.setItem("moyang-ai-preview-v1", JSON.stringify(data));
+  });
+  let sent = "";
+  await page.route("http://localhost:7331/v1/chat/completions", async (route) => {
+    sent = route.request().postData() ?? "";
+    await route.fulfill({
+      contentType: "text/event-stream",
+      body: 'data: {"choices":[{"delta":{"content":"已使用新的参考资料"}}]}\n\ndata: [DONE]\n\n',
+    });
+  });
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(page.locator(".chat-message-assistant")).toContainText("已使用新的参考资料");
+  expect(sent).toContain("新证据");
+  expect(sent).not.toContain("偏好乙的原始证据");
+  expect(sent).not.toContain("偏好甲的原始证据");
+});
+
 test("optional assistant uses selected API, persists history, and retains it after disabling", async ({ page }) => {
   const requests: unknown[] = [],
     errors: string[] = [];

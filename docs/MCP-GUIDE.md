@@ -1,6 +1,6 @@
 # MCP 与任务沉淀接口
 
-## 分层读取与工具模式（本轮开发版）
+## 0.17 分层读取与工具模式
 
 新连接带 `--profile compact`，只展示 8 个常用工具：`recall_context`、`read_context`、`save_record`、`patch_record`、`task_checkpoint`、`conclude_task`、`read_skill_resource`、`library_status`。已有不带 profile 的连接保留完整工具和旧召回响应；接入页可切换后重连。`library_status.service` 报告正在运行的构建版本、提交、模式、工具数量与能力，不能把配置写入等同于重连成功。
 

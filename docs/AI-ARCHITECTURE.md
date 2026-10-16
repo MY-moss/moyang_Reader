@@ -1,5 +1,13 @@
 # AI 空间架构与开发流程
 
+## 0.17 分层、整理与资源
+
+读取边界、队列与额度见 [ADR 0005](adr/0005-layered-context-and-organizer.md)，去重资源和原生流式备份见 [ADR 0006](adr/0006-resources-and-portable-archive.md)，统一名词见 [领域术语](AI-DOMAIN.md)。`layers / recall / patch` 提供按需读写与短期上下文回执；`organizer / organization_queue / organization_usage` 共用单任务锁与账本；`services` 复用聊天服务配置，密钥不进入 AI 数据库。
+
+数据库当前版本为 5，升级前完整快照，新增 `derived_context`、整理队列与账本、`memory_merges` 和不可变 `resources`。当前记录、历史、冲突提议只保存资源引用；旧资源接口读时还原。原生便携备份流式写入 SQLite 快照和 ZIP，导入同 ID 的异源历史时保留本地记录并跳过不匹配的撤回关系。历史版本说明保留在下方。
+
+AI 草稿摘要与正文 / 资源分开；聊天草稿异步逐条写入，历史按 20 条游标分页。聊天上下文在发送前验证变化标记，保留排除选择，按正文指纹去重；同一无状态 API 请求保留必要证据，不因上一轮发过而盲目省略。
+
 ## 0.16 来源核对
 
 `source_inventory` 通过 SQLite 投影已导入知识的来源信息，以 ID 游标分页，不反序列化正文、历史、来源位置数组和资源。项目及旧 Agent 范围沿用检索规则；MCP `list_knowledge_sources` 使用不触发索引维护的只读路径。

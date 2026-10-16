@@ -71,7 +71,7 @@ export function assemblePortablePackage({ root, target, outputRoot = path.join(r
   // Raw artifacts and client reports are local evidence, not package dependencies.
   fs.writeFileSync(
     path.join(stage, "使用说明.txt"),
-    `Moyang Reader Next ${version}\n\n双击 Moyang Reader Next.exe。保留同目录 moyang-ai-mcp.exe。\n${bundledModel ? "ollama 目录包含本地嵌入运行程序与 qwen3-embedding:0.6b，可离线运行。" : "使用语义检索前安装 Ollama，并在接入页准备 qwen3-embedding:0.6b。"}\n左侧切换阅读空间 / AI 空间。Markdown 默认编辑，停止输入后自动保存，Ctrl+S 立即保存。\nAI 空间 → 接入与备份：合并 Codex / Claude Code 配置；在客户端完成 MCP 权限和钩子信任。\n配置成功不代表真实客户端已验证。实际验收与待完成事项见 docs/VALIDATION-WORKBENCH.md。\n使用与恢复见 docs/USER-GUIDE.md、docs/AI-USER-GUIDE.md、docs/MIGRATION.md。\n新构建放在独立目录，已有包和运行中的 Agent 连接继续保留。启用新版 MCP 时，从新应用重新安装连接后重启客户端。\n插件市场安装书房聊天后，在 API 服务中添加自己的地址、密钥与模型。\n设置 → 存储位置可迁移记忆、技能、聊天、草稿与缓存，模型可选。\n设置 → 应用更新可检查、下载、保存后重启；使用新的独立签名通道。\n本候选包不注册文件关联，不使用原项目更新渠道，不覆盖原项目。\n`,
+    `Moyang Reader Next ${version}\n\n双击 Moyang Reader Next.exe。保留同目录 moyang-ai-mcp.exe。\n${bundledModel ? "ollama 目录包含本地嵌入运行程序与 qwen3-embedding:0.6b，可离线运行。" : "语义检索可选本地 Ollama 或自己的嵌入 API；在接入页选择模型和下载位置。"}\n左侧切换阅读空间 / AI 空间。Markdown 默认编辑，停止输入后自动保存，Ctrl+S 立即保存。\nAI 空间 → 接入与备份：合并 Codex / Claude Code 配置；在客户端完成 MCP 权限和钩子信任。\n配置成功不代表真实客户端已验证。实际验收与待完成事项见 docs/VALIDATION-WORKBENCH.md。\n使用与恢复见 docs/USER-GUIDE.md、docs/AI-USER-GUIDE.md、docs/MIGRATION.md。\n新构建放在独立目录，已有包和运行中的 Agent 连接继续保留。启用新版 MCP 时，从新应用重新安装连接后重启客户端。\n插件市场安装书房聊天后，在 API 服务中添加自己的地址、密钥与模型。\n设置 → 存储位置可迁移记忆、技能、聊天、草稿与缓存，模型可选。\n设置 → 应用更新可检查、下载、保存后重启；使用新的独立签名通道。\n本候选包不注册文件关联，不使用原项目更新渠道，不覆盖原项目。\n`,
     "utf8",
   );
   const manifest = {

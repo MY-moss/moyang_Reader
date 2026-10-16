@@ -46,7 +46,7 @@ impl Store {
             return Err(invalid("资源分页超出范围。"));
         }
         let Some(path) = &q.path else {
-            let mut stmt=self.conn.prepare("SELECT json_extract(a.value,'$.path'),json_extract(a.value,'$.encoding'),length(json_extract(a.value,'$.content')) FROM revisions r,json_each(r.payload,'$.assets') a WHERE r.id=?1 AND r.revision=?2 ORDER BY a.key LIMIT 21 OFFSET ?3")?;
+            let mut stmt=self.conn.prepare("SELECT json_extract(a.value,'$.path'),json_extract(a.value,'$.encoding'),COALESCE(json_extract(a.value,'$.stored_chars'),length(json_extract(a.value,'$.content'))) FROM revisions r,json_each(r.payload,'$.assets') a WHERE r.id=?1 AND r.revision=?2 ORDER BY a.key LIMIT 21 OFFSET ?3")?;
             let rows=stmt.query_map(params![q.id,revision,q.resource_offset as i64],|r|Ok(json!({"path":r.get::<_,String>(0)?,"encoding":r.get::<_,String>(1)?,"stored_chars":r.get::<_,i64>(2)?})))?.collect::<std::result::Result<Vec<_>,_>>()?;
             let mut out =
                 json!({"id":q.id,"revision":revision,"resources":[],"next_resource_offset":null});
@@ -63,7 +63,10 @@ impl Store {
             return Ok(out);
         };
         let raw:Option<String>=self.conn.query_row("SELECT a.value FROM revisions r,json_each(r.payload,'$.assets') a WHERE r.id=?1 AND r.revision=?2 AND json_extract(a.value,'$.path')=?3",params![q.id,revision,path],|r|r.get(0)).optional()?;
-        let a: Asset = serde_json::from_str(&raw.ok_or_else(|| invalid("技能资源不存在。"))?)?;
+        let a: Asset = serde_json::from_value(crate::resources::hydrate_asset(
+            &self.conn,
+            serde_json::from_str(&raw.ok_or_else(|| invalid("技能资源不存在。"))?)?,
+        )?)?;
         let fingerprint = hex(Sha256::digest(a.content.as_bytes()));
         if q.expected_fingerprint
             .as_ref()

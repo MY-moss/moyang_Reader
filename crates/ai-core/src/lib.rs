@@ -1,6 +1,10 @@
+mod archive;
+#[cfg(test)]
+mod archive_tests;
 mod dispatch;
 mod memory_merge;
 mod organizer;
+mod resources;
 pub mod services;
 pub use organizer::{maintain_organization, OrganizationConfig};
 mod hooks;

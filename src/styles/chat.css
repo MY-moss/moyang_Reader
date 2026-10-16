@@ -7,6 +7,51 @@
   background: var(--canvas);
   color: var(--ink);
 }
+.chat-context-preview {
+  max-height: min(45vh, 440px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.chat-context-preview header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.chat-context-preview > div {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.chat-context-preview label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-context-preview small {
+  display: block;
+}
+.chat-context-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-context-preview textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  max-height: 220px;
+  resize: vertical;
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 10px;
+}
 .chat-header,
 .chat-settings > header {
   display: flex;
@@ -346,11 +391,11 @@
   position: relative;
   font-size: 12px;
 }
-.chat-context-options[open] {
+.chat-context-options[open] .chat-context-fields {
   position: absolute;
-  bottom: 74px;
-  left: max(24px, calc((100% - 820px) / 2));
-  width: min(340px, calc(100% - 48px));
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: min(300px, calc(100vw - 48px));
   padding: 16px;
   z-index: 11;
   border: 1px solid var(--line);

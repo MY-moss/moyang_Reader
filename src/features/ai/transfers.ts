@@ -175,6 +175,7 @@ export async function importAiDirectory(files: File[]): Promise<AiFields> {
   );
 }
 export async function exportAiRecord(record: AiRecord) {
+  if (record.resources) record = await aiRequest<AiRecord>("get", { id: record.id });
   if (record.kind === "skill") {
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
@@ -195,6 +196,7 @@ export async function exportAiRecord(record: AiRecord) {
   return downloadAi(`${name}.md`, new TextEncoder().encode(`---\n${front}---\n\n${record.body}`), "markdown");
 }
 export async function exportAiBackup() {
+  if (isTauriRuntime()) return Boolean(await aiRequest("export_archive"));
   const data = await aiRequest("backup");
   return downloadAi(
     `moyang-ai-${new Date().toISOString().slice(0, 10)}.json`,

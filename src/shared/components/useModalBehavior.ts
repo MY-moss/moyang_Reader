@@ -56,6 +56,7 @@ export function useModalBehavior({
   useEffect(() => {
     if (!enabled) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const restoreFocus = restoreFocusRef?.current;
     const modalContainer = containerRef.current;
     const background = backgroundRef?.current;
     const wasInert = background?.hasAttribute("inert") ?? false;
@@ -104,8 +105,7 @@ export function useModalBehavior({
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       background?.toggleAttribute("inert", wasInert);
-      const target =
-        previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : restoreFocusRef?.current;
+      const target = previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : restoreFocus;
       if (target?.isConnected && !modalContainer?.contains(target)) {
         target.focus();
       }

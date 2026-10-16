@@ -24,7 +24,7 @@ fn process_command(pid: u32, stop: Option<&str>) -> Result<Value> {
     }
     Ok(serde_json::from_slice(&output.stdout)?)
 }
-pub(crate) fn remember(root: &Path, pid: u32, directory: &Path, executable: &Path) -> Result<()> {
+pub(crate) fn remember(root: &Path, pid: u32, directory: &Path, _executable: &Path) -> Result<()> {
     #[cfg(windows)]
     let identity = process_command(pid, None)?;
     #[cfg(windows)]
@@ -34,6 +34,8 @@ pub(crate) fn remember(root: &Path, pid: u32, directory: &Path, executable: &Pat
         .ok_or_else(|| invalid("模型运行程序启动后已退出。"))?;
     #[cfg(not(windows))]
     let identity = Value::Null;
+    #[cfg(not(windows))]
+    let executable = _executable;
     let value =
         json!({"pid":pid,"directory":directory,"executable":executable,"identity":identity});
     use std::io::Write;
@@ -48,6 +50,26 @@ pub(crate) fn ownership(root: &Path) -> Option<Value> {
     std::fs::read(root.join("model-runtime.json"))
         .ok()
         .and_then(|v| serde_json::from_slice(&v).ok())
+}
+pub(crate) fn owns_running(root: &Path, directory: &Path) -> bool {
+    let Some(owner) = ownership(root) else {
+        return false;
+    };
+    if owner["directory"] != json!(directory) {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let Some(pid) = owner["pid"].as_u64().and_then(|n| u32::try_from(n).ok()) else {
+            return false;
+        };
+        return process_command(pid, None)
+            .is_ok_and(|current| !current.is_null() && current == owner["identity"]);
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
 }
 pub(crate) fn stop(root: &Path) -> Result<()> {
     let value = ownership(root)

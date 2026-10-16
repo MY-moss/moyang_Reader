@@ -1,6 +1,6 @@
 //! Optional chat extension. Shared API credentials and chat history remain outside the memory database.
+use moyang_ai_core::services::{database, endpoint, load_provider, Provider};
 use rusqlite::{params, OptionalExtension};
-use moyang_ai_core::services::{Provider, database, endpoint, load_provider};
 use serde_json::{json, Value};
 use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 use tauri::{ipc::Channel, State};
@@ -36,10 +36,33 @@ impl ChatRequests {
 }
 
 fn store_request(path: &Path, operation: &str, payload: Value) -> Result<Value, String> {
-    if matches!(operation, "providers" | "save_provider" | "delete_provider") { return moyang_ai_core::services::provider_request(path,operation,payload); }
+    if matches!(operation, "providers" | "save_provider" | "delete_provider") {
+        return moyang_ai_core::services::provider_request(path, operation, payload);
+    }
     let mut db = database(path)?;
     let id = payload["id"].as_str().unwrap_or("");
     match operation {
+        "threads_page" => {
+            let before = payload["before"]["updatedAt"].as_i64();
+            let id = payload["before"]["id"].as_str().unwrap_or("");
+            let mut stmt=db.prepare("SELECT json_remove(data,'$.messages') FROM threads WHERE ?1 IS NULL OR updated<?1 OR (updated=?1 AND id<?2) ORDER BY updated DESC,id DESC LIMIT 21").map_err(|e|e.to_string())?;
+            let mut items = stmt
+                .query_map(params![before, id], |r| r.get::<_, String>(0))
+                .map_err(|e| e.to_string())?
+                .map(|r| {
+                    serde_json::from_str::<Value>(&r.map_err(|e| e.to_string())?)
+                        .map_err(|e| e.to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let next = if items.len() > 20 {
+                items.truncate(20);
+                let last = items.last().unwrap();
+                json!({"updatedAt":last["updatedAt"],"id":last["id"]})
+            } else {
+                Value::Null
+            };
+            Ok(json!({"items":items,"next":next}))
+        }
         "threads" => {
             let mut stmt = db
                 .prepare("SELECT json_remove(data,'$.messages') FROM threads ORDER BY updated DESC")
@@ -328,6 +351,29 @@ mod tests {
             load_provider(&database(&root).unwrap(), "mine").unwrap().1,
             ""
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn history_pages_keep_equal_timestamps_distinct_and_exclude_messages() {
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let root = parent.join(format!(
+            "moyang-chat-pages-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        for n in 0..21 {
+            store_request(&root, "save_thread",json!({"id":format!("thread-{n:02}"),"title":"讨论","revision":0,"updatedAt":12,"messages":[{"role":"user","content":"正文不进目录"}]})).unwrap();
+        }
+        let first = store_request(&root, "threads_page", json!({})).unwrap();
+        assert_eq!(first["items"].as_array().unwrap().len(), 20);
+        assert!(!first.to_string().contains("正文不进目录"));
+        let second = store_request(&root, "threads_page", json!({"before":first["next"]})).unwrap();
+        assert_eq!(second["items"].as_array().unwrap().len(), 1);
+        assert_eq!(second["items"][0]["id"], "thread-00");
+        assert!(second["next"].is_null());
+        assert!(root.canonicalize().unwrap().starts_with(&parent));
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]

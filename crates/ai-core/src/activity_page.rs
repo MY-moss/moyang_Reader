@@ -43,7 +43,7 @@ impl Store {
             [id],
             |r| r.get(0),
         )?;
-        Ok(serde_json::from_str(&raw)?)
+        crate::resources::decode(&self.conn, &raw)
     }
 }
 

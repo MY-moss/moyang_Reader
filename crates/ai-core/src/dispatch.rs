@@ -19,6 +19,20 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
             )?,
         )?,
         "save" => serde_json::to_value(s.save(serde_json::from_value(payload)?)?)?,
+        "record_view_if_changed" => s.view_if_changed(
+            payload["id"]
+                .as_str()
+                .ok_or_else(|| invalid("缺少编号。"))?,
+            payload["revision"]
+                .as_i64()
+                .ok_or_else(|| invalid("缺少版本。"))?,
+        )?,
+        "record_view" => s.record_view(
+            payload["id"]
+                .as_str()
+                .ok_or_else(|| invalid("缺少记录编号。"))?,
+            None,
+        )?,
         "patch" => s.patch(serde_json::from_value(payload)?)?,
         "read_context" => s.read_context(serde_json::from_value(payload)?)?,
         "recall" => s.recall(serde_json::from_value(payload)?)?,
@@ -44,8 +58,7 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
         "history_page" => serde_json::to_value(s.history_page(serde_json::from_value(payload)?)?)?,
         "revision_view" => {
             let q: RevisionRequest = serde_json::from_value(payload)?;
-            let h = s.revision_detail(&q.id, q.revision)?;
-            serde_json::json!({"record": view_record(h.record)?,"reason":h.reason,"recorded_at":h.recorded_at})
+            s.revision_view(&q.id, q.revision)?
         }
         "restore" => serde_json::to_value(s.restore(serde_json::from_value(payload)?)?)?,
         "merge" => serde_json::to_value(s.merge(serde_json::from_value(payload)?)?)?,

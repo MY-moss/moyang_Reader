@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { aiConnection, aiRequest } from "../../platform/ai-bridge";
+import { isTauriRuntime } from "../../platform/bridge";
 import type { AiConnection, AiSemantic, AiStats } from "../../shared/ai-types";
 import { exportAiBackup } from "./transfers";
 import { AiClientConnections } from "./AiClientConnections";
@@ -272,7 +273,26 @@ export function AiConnections({
           >
             导出完整备份
           </button>
-          <button onClick={() => importRef.current?.click()}>导入备份</button>
+          <button
+            onClick={() => {
+              if (!isTauriRuntime()) {
+                importRef.current?.click();
+                return;
+              }
+              void aiRequest<{ imported: number; skipped: number; skipped_activity?: number } | null>("import_archive")
+                .then((result) => {
+                  if (result) {
+                    refresh();
+                    notify(
+                      `导入 ${result.imported} 条，跳过 ${result.skipped} 条已有记录。${result.skipped_activity ? `另有 ${result.skipped_activity} 项活动与本地版本不一致，已跳过。` : ""}`,
+                    );
+                  }
+                })
+                .catch((e) => notify(String(e), true));
+            }}
+          >
+            导入备份
+          </button>
           <input
             ref={importRef}
             type="file"

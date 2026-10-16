@@ -9,6 +9,7 @@ const Wysiwyg = lazy(() =>
 );
 const Source = lazy(() => import("../editor/components/SourceEditor").then((m) => ({ default: m.SourceEditor })));
 export type AiDraft = {
+  deferred?: boolean;
   fields: AiFields;
   id?: string;
   key?: string;

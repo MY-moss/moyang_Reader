@@ -25,7 +25,7 @@ export async function updateArchive(directory) {
   // This download also serves first-time installations: do not claim the local
   // model bundled with the full on-device package is present in the small ZIP.
   zip.file("SHA256.json", JSON.stringify({ ...manifest, bundled_model: false }, null, 2));
-  zip.file("使用说明.txt", `Moyang Reader Next ${manifest.version}\n\n解压后打开 Moyang Reader Next.exe，保留 moyang-ai-mcp.exe。\n这是不含 Ollama 运行程序和模型的轻量包；普通阅读、关键词检索与自定义 API 聊天可直接使用。语义检索需要已安装的 Ollama 和 qwen3-embedding:0.6b。在线升级会沿用原有模型。\n插件市场安装“书房聊天”后，在 API 服务中填写自己的地址、密钥与模型。\n设置 → 存储位置：查看占用，并迁移 AI、聊天、草稿与缓存到其他磁盘。\n设置 → 应用更新：启动检查、可选自动下载、保存后重启。\n使用与恢复：https://github.com/MY-moss/moyang_Reader/tree/main/docs\n`);
+  zip.file("使用说明.txt", `Moyang Reader Next ${manifest.version}\n\n解压后打开 Moyang Reader Next.exe，保留 moyang-ai-mcp.exe。\n这是不含 Ollama 运行程序和模型的轻量包；普通阅读、关键词检索与自定义 API 聊天可直接使用。语义检索可选本地 Ollama（0.6B / 4B / 8B 或自选嵌入模型）及自己的嵌入 API；下载前可选模型目录。在线升级会沿用原有模型。\n插件市场安装“书房聊天”后，在 API 服务中填写自己的地址、密钥与模型。\n设置 → 存储位置：查看占用，并迁移 AI、聊天、草稿与缓存到其他磁盘。\n设置 → 应用更新：启动检查、可选自动下载、保存后重启。\n使用与恢复：https://github.com/MY-moss/moyang_Reader/tree/main/docs\n`);
   return { manifest, bytes: await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } }) };
 }
 

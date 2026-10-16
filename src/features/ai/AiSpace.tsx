@@ -505,12 +505,12 @@ export default function AiSpace({
                   <AiDetail
                     key={`${m.selected.id}:${m.selected.revision}`}
                     record={m.selected}
-                    onEdit={() =>
+                    onEdit={(record) =>
                       m.setDraft({
-                        fields: m.selected!,
-                        id: m.selected!.id,
-                        expected_revision: m.selected!.revision,
-                        baseBody: m.selected!.body,
+                        fields: record,
+                        id: record.id,
+                        expected_revision: record.revision,
+                        baseBody: record.body,
                         dirty: false,
                       })
                     }

@@ -1,3 +1,4 @@
+import { readSourceSelection } from "../features/editor/source-selection";
 import type { SourceLocation } from "../shared/bookroom-types";
 import { ConflictDialog } from "./views/ConflictDialog";
 import { useBookroom } from "./useBookroom";
@@ -57,6 +58,7 @@ export function RootApp() {
     [extensions.state.installed],
   );
   const chatVisible = chatOpen && assistants.length > 0;
+  const [chatSelectedText, setChatSelectedText] = useState<{ path: string; text: string } | null>(null);
   const chatAttachment = useMemo<ChatSource | null>(() => {
     const doc = model.documentState;
     if (!doc || !["markdown", "text", "md", "txt", "docx"].includes(doc.kind)) return null;
@@ -66,12 +68,26 @@ export function RootApp() {
         : (model.sourceDraft ?? doc.source ?? "");
     return {
       id: doc.path,
-      title: doc.name + (text.length > 12000 ? "（前 12000 字符）" : ""),
+      title: doc.name,
       source: doc.path,
-      text: text.slice(0, 12000),
+      text,
+      selectionText: chatSelectedText?.path === doc.path ? chatSelectedText.text : undefined,
     };
-  }, [model.documentState, model.sourceDraft]);
+  }, [model.documentState, model.sourceDraft, chatSelectedText]);
   const openChat = (id?: string) => {
+    const pane = document.querySelector(".reader-pane.is-active"),
+      sourceSelection = pane ? readSourceSelection(pane) : undefined,
+      selection = window.getSelection();
+    const selected =
+      sourceSelection && sourceSelection.from !== sourceSelection.to
+        ? sourceSelection.text.slice(sourceSelection.from, sourceSelection.to)
+        : selection?.anchorNode &&
+            selection.focusNode &&
+            pane?.contains(selection.anchorNode) &&
+            pane.contains(selection.focusNode)
+          ? selection.toString()
+          : "";
+    setChatSelectedText(model.documentState && selected ? { path: model.documentState.path, text: selected } : null);
     setMarketOpen(false);
     setSettingsOpen(false);
     setSpace("ai");
@@ -485,7 +501,15 @@ export function RootApp() {
                 </div>
               }
             >
-              <ChatSpace assistants={assistants} selection={chatSelection} attachment={chatAttachment} />
+              <ChatSpace
+                assistants={assistants}
+                selection={chatSelection}
+                attachment={chatAttachment}
+                onOpenAi={(id) => {
+                  setChatOpen(false);
+                  setAiAction((old) => ({ key: (old?.key ?? 0) + 1, type: "search", id }));
+                }}
+              />
             </Suspense>
           </div>
         )}

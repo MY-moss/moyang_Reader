@@ -373,4 +373,6 @@ pub struct Backup {
     pub conflicts: Vec<serde_json::Value>,
     #[serde(default)]
     pub activities: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub memory_merges: Vec<serde_json::Value>,
 }

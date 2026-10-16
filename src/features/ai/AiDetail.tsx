@@ -4,7 +4,7 @@ import { openExternalUrl } from "../../platform/bridge";
 import type { AiRecord } from "../../shared/ai-types";
 import { exportAiRecord } from "./transfers";
 import { AiSource } from "./AiSource";
-import { AiResources } from "./AiResources";
+import { AiResources, ResourceReference } from "./AiResources";
 import { AiRelations } from "./AiRelations";
 import { AiHistory } from "./AiHistory";
 export function AiDetail({
@@ -15,7 +15,7 @@ export function AiDetail({
   notify,
 }: {
   record: AiRecord;
-  onEdit: () => void;
+  onEdit: (record: AiRecord) => void;
   onSelect: (id: string) => void;
   onChange: (record: AiRecord | null) => void;
   notify: (message: string, error?: boolean) => void;
@@ -71,7 +71,21 @@ export function AiDetail({
           >
             导出{r.kind === "skill" ? "技能包" : "文档"}
           </button>
-          <button className="ai-primary" onClick={onEdit}>
+          <button
+            className="ai-primary"
+            disabled={busy}
+            onClick={() => {
+              if (!r.resources) {
+                onEdit(r);
+                return;
+              }
+              setBusy(true);
+              void aiRequest<AiRecord>("get", { id: r.id })
+                .then(onEdit)
+                .catch((e) => notify(String(e), true))
+                .finally(() => setBusy(false));
+            }}
+          >
             编辑
           </button>
         </div>
@@ -117,6 +131,16 @@ export function AiDetail({
         <AiSource record={r} onChange={onChange} notify={notify} />
         {r.links.length > 0 && <AiRelations ids={r.links} onPreview={setRelated} />}
         {r.assets.length > 0 && <AiResources assets={r.assets} />}
+        {r.resources && r.resources.length > 0 && (
+          <section className="ai-resources">
+            <h2>
+              技能资源 <small>{r.resources.length} 个</small>
+            </h2>
+            {r.resources.map((a) => (
+              <ResourceReference key={a.path} id={r.id} revision={r.revision} path={a.path} />
+            ))}
+          </section>
+        )}
         {related && (
           <aside className="ai-related-preview" aria-label="关联内容预览">
             <header>

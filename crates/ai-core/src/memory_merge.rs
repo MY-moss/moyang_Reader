@@ -30,12 +30,12 @@ fn anchors(body: &str) -> (BTreeSet<String>, BTreeSet<String>) {
             numbers.insert(std::mem::take(&mut word));
         }
     }
-    let lower = body.to_lowercase();
+    let lower = format!(" {} ", body.to_lowercase());
     let conditions = [
         "不", "未", "无", "禁止", "除非", "仅", "只", "以后", "之前", "之后", "今天", "明天",
         "昨天", "始终", "从不", "所有", "必须", "至少", "最多", "一次", "两", "三", "四", "五",
-        "六", "七", "八", "九", "十", "百", "千", "万", " not ", " never ", " only ", " before ",
-        " after ", " unless ",
+        "零", "一", "二", "六", "七", "八", "九", "十", "百", "千", "万", " not ", " never ",
+        " only ", " before ", " after ", " unless ",
     ];
     let guards = conditions
         .into_iter()
@@ -314,6 +314,45 @@ mod tests {
         let merged = detail["result"]["id"].as_str().unwrap();
         assert_ne!(merged, a.id);
         assert_eq!(s.get(&a.id).unwrap().state, RecordState::Archived);
+        let archive = dir.path().join("merge.zip");
+        s.export_archive(&archive).unwrap();
+        let legacy_dir = tempfile::tempdir().unwrap();
+        let mut legacy = Store::open(legacy_dir.path()).unwrap();
+        legacy.import(s.backup().unwrap()).unwrap();
+        legacy.merge_action(id, "undo").unwrap();
+        assert_eq!(legacy.get(&a.id).unwrap().state, RecordState::Active);
+        // Same current records with a forked old version must not import undo actions.
+        let fork_dir = tempfile::tempdir().unwrap();
+        let mut fork = Store::open(fork_dir.path()).unwrap();
+        fork.import_archive(&archive).unwrap();
+        fork.conn.execute("DELETE FROM memory_merges", []).unwrap();
+        fork.conn.execute("UPDATE revisions SET payload=json_set(payload,'$.body','另一条历史') WHERE id=? AND revision=1",[&a.id]).unwrap();
+        assert!(
+            fork.import_archive(&archive).unwrap()["skipped_activity"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
+        assert!(fork.merge_groups(None, 0).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(
+            fork.import(s.backup().unwrap()).unwrap()["skipped_activity"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
+        assert!(fork.merge_groups(None, 0).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let recovered = tempfile::tempdir().unwrap();
+        let mut restored = Store::open(recovered.path()).unwrap();
+        restored.import_archive(&archive).unwrap();
+        restored.merge_action(id, "undo").unwrap();
+        assert_eq!(restored.get(&a.id).unwrap().state, RecordState::Active);
+        assert_eq!(restored.get(&b.id).unwrap().state, RecordState::Active);
         s.patch(
             serde_json::from_value(
                 json!({"id":merged,"expected_revision":1,"fields":{"body":"后续的新规则"}}),

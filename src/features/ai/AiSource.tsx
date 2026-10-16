@@ -107,8 +107,10 @@ export function AiSource({
               const sequence = ++request.current.sequence;
               setBusy(true);
               try {
+                const complete = record.resources ? await aiRequest<AiRecord>("get", { id: record.id }) : record;
+                if (complete.revision !== record.revision) throw new Error("内容已被其他操作更新，请重新比较来源。");
                 const next = await aiRequest<AiRecord>("save", {
-                  ...record,
+                  ...complete,
                   body: incoming.body,
                   source: incoming.source,
                   snapshot: incoming.snapshot ? { ...incoming.snapshot, checked_at: Date.now() } : null,

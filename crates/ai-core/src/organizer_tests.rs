@@ -148,3 +148,71 @@ fn interrupted_reservation_is_estimated_and_job_survives_restart() {
     assert_eq!(status["reserved"], 0);
     assert_eq!(status["counts"]["pending"], 1);
 }
+
+#[test]
+fn organizer_child_process() {
+    let Ok(path) = std::env::var("MOYANG_ORGANIZER_FIXTURE") else {
+        return;
+    };
+    let worked = Store::open(&path).unwrap().organization_tick().unwrap();
+    let output = std::env::var("MOYANG_ORGANIZER_RESULT").unwrap();
+    std::fs::write(output, worked.to_string()).unwrap();
+}
+#[test]
+fn independent_processes_share_one_organizer_request_and_ledger() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = Store::open(dir.path()).unwrap();
+    memory(&mut s, "简洁中文回答");
+    let (started, waiting) = std::sync::mpsc::channel();
+    let (release, receive) = std::sync::mpsc::channel();
+    let (address, worker) = server(
+        move || {
+            started.send(()).unwrap();
+            receive.recv_timeout(Duration::from_secs(10)).unwrap();
+        },
+        Some(73),
+    );
+    profile(&s, &address);
+    config(&mut s, 10000);
+    let spawn = |name: &str| {
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "organizer::tests::organizer_child_process",
+                "--nocapture",
+            ])
+            .env("MOYANG_ORGANIZER_FIXTURE", dir.path())
+            .env("MOYANG_ORGANIZER_RESULT", dir.path().join(name))
+            .stdout(std::process::Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        command.spawn().unwrap()
+    };
+    let mut first = spawn("first");
+    waiting.recv_timeout(Duration::from_secs(10)).unwrap();
+    let mut second = spawn("second");
+    assert!(second.wait().unwrap().success());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("second")).unwrap(),
+        "false"
+    );
+    release.send(()).unwrap();
+    assert!(first.wait().unwrap().success());
+    worker.join().unwrap();
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("first")).unwrap(),
+        "true"
+    );
+    assert_eq!(s.organization_status().unwrap()["used"], 73);
+    assert_eq!(
+        s.conn
+            .query_row("SELECT COUNT(*) FROM organization_usage", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+}

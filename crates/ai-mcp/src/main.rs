@@ -84,10 +84,10 @@ impl MemoryService {
         )
     )]
     async fn get_record(&self, Parameters(q): Parameters<IdRequest>) -> CallToolResult {
-        self.run(move |s| view_record(s.get(&q.id)?)).await
+        self.run(move |s| s.record_view(&q.id, None)).await
     }
     #[tool(
-        description = "Save durable facts, preferences, decisions, lessons, knowledge or skills with source and scope. New identical content is deduplicated. Updates require id and expected_revision; preserve other fields from get_record. Empty/omitted assets retain existing skill resources; use the app to remove resources. Do not treat guesses as facts. Returns a compact receipt.",
+        description = "Save sourced durable knowledge, memories or skills in an explicit scope. Identical new content is deduplicated. Prefer patch_record for edits; full replacement requires id/expected_revision and preserving existing fields. Empty/omitted assets retain resources; patch_record can remove them. Do not save guesses as facts. Returns a compact receipt.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -331,7 +331,7 @@ impl MemoryService {
         annotations(read_only_hint = true)
     )]
     async fn revision_detail(&self, Parameters(q): Parameters<RevisionRequest>) -> CallToolResult {
-        self.run(move|s|{let h=s.revision_detail(&q.id,q.revision)?;Ok(serde_json::json!({"record":view_record(h.record)?,"reason":h.reason,"recorded_at":h.recorded_at}))}).await
+        self.run(move |s| s.revision_view(&q.id, q.revision)).await
     }
 }
 #[tool_handler(router=self.router)]

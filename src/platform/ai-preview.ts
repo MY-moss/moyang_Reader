@@ -72,6 +72,32 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "record_view":
+      return previewRecordView(get(payload.id));
+    case "record_view_if_changed":
+      return get(payload.id).revision === payload.revision ? null : previewRecordView(get(payload.id));
+    case "recall": {
+      const result = previewRequest("search", {
+        query: payload.query,
+        project: payload.project ?? "",
+        limit: 5,
+        include_global: true,
+      }) as { items: AiRecord[] };
+      return {
+        items: result.items.map((hit) => {
+          const r = get(hit.id);
+          return {
+            id: r.id,
+            title: r.title,
+            source: r.source,
+            content: r.body.length <= 1200 ? r.body : r.summary || r.body.slice(0, 800),
+            layer: "l1",
+            revision: r.revision,
+            scope: { project: r.project },
+          };
+        }),
+      };
+    }
     case "merge_groups":
       return { items: [], next_offset: null };
     case "source_inventory":

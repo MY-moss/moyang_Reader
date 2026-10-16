@@ -3,6 +3,28 @@ import { apiEndpoint, boundedMessages, requestBody, streamDecoder } from "./prot
 import type { ChatThread } from "../../shared/chat-types";
 
 describe("chat protocols", () => {
+  it("returns each attachment once while preserving updated evidence and original history", () => {
+    const a = { id: "doc", title: "引用", source: "a.md", text: "相同原文" };
+    const thread = {
+      messages: [
+        { role: "user", content: "第一次", sources: [a] },
+        { role: "assistant", content: "回答", sources: [a] },
+        { role: "user", content: "追问", sources: [a, { ...a, id: "changed", text: "更新的原文" }] },
+      ],
+    } as ChatThread;
+    const output = boundedMessages(thread, "规则")
+      .messages.map((m) => m.content)
+      .join("\n");
+    expect(output.split("相同原文")).toHaveLength(2);
+    expect(output).toContain("更新的原文");
+    expect(thread.messages[0].sources?.[0].text).toBe("相同原文");
+    expect(
+      boundedMessages(thread, "系统参考：相同原文")
+        .messages.map((m) => m.content)
+        .join("\n")
+        .split("相同原文"),
+    ).toHaveLength(2);
+  });
   it("normalizes local and compatible endpoints without duplicating paths", () => {
     expect(apiEndpoint("http://127.0.0.1:11434", "openai")).toBe("http://127.0.0.1:11434/v1/chat/completions");
     expect(apiEndpoint("https://example.org/proxy/v1/messages", "anthropic", true)).toBe(

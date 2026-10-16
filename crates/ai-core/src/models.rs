@@ -46,6 +46,17 @@ fn status(endpoint: &str, model: &str) -> Value {
     json!({"running":response.is_some(),"model_ready":models.iter().any(|m|m["name"]==model),"installed":models.iter().map(|m|json!({"name":m["name"],"size":m["size"]})).collect::<Vec<_>>()})
 }
 impl Store {
+    fn model_runtime_guard(&self) -> Result<std::fs::File> {
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(self.path.parent().unwrap().join("model-runtime.lock"))?;
+        lock.try_lock()
+            .map_err(|_| invalid("另一窗口正在切换本地模型服务，请稍后重试。"))?;
+        Ok(lock)
+    }
     pub fn model_directory(&self) -> Result<PathBuf> {
         let config = self.setting_value("local_model")?;
         if let Some(path) = config["directory"].as_str() {
@@ -78,14 +89,27 @@ impl Store {
             .get(&self.path)
             .map(|v| v.status.clone())
             .unwrap_or(json!({"state":"idle"}));
-        out["can_stop"] = json!(process().lock().is_ok_and(|p| p.is_some()));
+        out["can_stop"] = json!(false);
+        out["directory_verified"] = json!(false);
         if let Some(owner) = crate::model_process::ownership(self.path.parent().unwrap()) {
-            out["runtime_directory"] = owner["directory"].clone();
-            out["can_stop"] = json!(true);
+            if let Some(directory) = owner["directory"].as_str().map(Path::new) {
+                if crate::model_process::owns_running(self.path.parent().unwrap(), directory) {
+                    out["runtime_directory"] = owner["directory"].clone();
+                    out["can_stop"] = json!(out["running"] == true);
+                    out["directory_verified"] = json!(directory == self.model_directory()?);
+                }
+            }
+        }
+        if out["directory_verified"] != true {
+            // /api/tags does not reveal OLLAMA_MODELS. Never label another service's
+            // models as installed in the selected download directory.
+            out["installed"] = json!([]);
+            out["model_ready"] = json!(false);
         }
         Ok(out)
     }
     pub fn configure_model(&self, model: &str, directory: &Path) -> Result<Value> {
+        let _guard = self.model_runtime_guard()?;
         if model.trim().is_empty() || model.len() > 200 || model.chars().any(char::is_whitespace) {
             return Err(invalid("模型名称无效。"));
         }
@@ -114,13 +138,10 @@ impl Store {
         self.model_status()
     }
     pub fn start_managed_model(&self) -> Result<()> {
+        let _guard = self.model_runtime_guard()?;
         let directory = self.model_directory()?;
         if status(MANAGED_ENDPOINT, "")["running"] == true {
-            let owner = crate::model_process::ownership(self.path.parent().unwrap());
-            if owner
-                .as_ref()
-                .is_some_and(|v| v["directory"] == json!(directory))
-            {
+            if crate::model_process::owns_running(self.path.parent().unwrap(), &directory) {
                 return Ok(());
             }
             return Err(invalid(
@@ -135,9 +156,7 @@ impl Store {
             .lock()
             .map_err(|_| invalid("本地模型进程状态不可用。"))?;
         if status(MANAGED_ENDPOINT, "")["running"] == true {
-            if crate::model_process::ownership(self.path.parent().unwrap())
-                .is_some_and(|v| v["directory"] == json!(directory))
-            {
+            if crate::model_process::owns_running(self.path.parent().unwrap(), &directory) {
                 return Ok(());
             }
             return Err(invalid("模型端口已被其他服务占用，请停止原服务后重试。"));
@@ -192,6 +211,7 @@ impl Store {
             return self.model_status();
         }
         if action == "stop" {
+            let _guard = self.model_runtime_guard()?;
             if self.semantic_config()?.endpoint == MANAGED_ENDPOINT {
                 self.pause_semantic(true)?;
             }
@@ -300,6 +320,18 @@ fn pull(path: &Path, endpoint: &str, model: &str, cancel: Arc<AtomicBool>) -> Re
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+    #[test]
+    fn model_changes_share_an_os_lock_before_contacting_the_runtime() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path()).unwrap();
+        let guard = store.model_runtime_guard().unwrap();
+        assert!(store
+            .configure_model("qwen3-embedding:4b", &dir.path().join("chosen"))
+            .is_err());
+        assert!(store.start_managed_model().is_err());
+        drop(guard);
+        assert!(store.model_runtime_guard().is_ok());
+    }
     #[test]
     fn model_download_streams_progress_and_cancellation_closes_request() {
         for cancelled in [false, true] {

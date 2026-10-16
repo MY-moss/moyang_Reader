@@ -36,6 +36,7 @@ export type AiFields = {
   skill_meta: Record<string, unknown>;
 };
 export type AiRecord = AiFields & {
+  resources?: AiResourceInfo[];
   id: string;
   revision: number;
   created_at: number;

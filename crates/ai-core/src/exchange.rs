@@ -11,7 +11,7 @@ impl Store {
         {
             let mut stmt = tx.prepare("SELECT payload FROM records ORDER BY id")?;
             for row in stmt.query_map([], |r| r.get::<_, String>(0))? {
-                records.push(serde_json::from_str(&row?)?);
+                records.push(crate::resources::decode(&tx, &row?)?);
             }
         }
         {
@@ -20,7 +20,7 @@ impl Store {
             for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?)))? {
                 let (p, reason, recorded_at) = row?;
                 history.push(Revision {
-                    record: serde_json::from_str(&p)?,
+                    record: crate::resources::decode(&tx, &p)?,
                     reason,
                     recorded_at,
                 });
@@ -45,7 +45,9 @@ impl Store {
                 stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
             {
                 let (k, v) = row?;
-                settings.insert(k, v);
+                if crate::archive::portable_setting(&k) {
+                    settings.insert(k, v);
+                }
             }
         }
         let read_rows = |table: &str| -> Result<Vec<serde_json::Value>> {
@@ -53,13 +55,21 @@ impl Store {
                 tx.prepare(&format!("SELECT payload FROM {table} ORDER BY updated,id"))?;
             let rows = stmt
                 .query_map([], |r| r.get::<_, String>(0))?
-                .map(|r| Ok(serde_json::from_str(&r?)?))
+                .map(|r| crate::resources::decode(&tx, &r?))
                 .collect();
             rows
         };
         let checkpoints = read_rows("checkpoints")?;
         let conflicts = read_rows("conflicts")?;
         let activities = read_rows("activities")?;
+        let memory_merges = {
+            let mut stmt = tx.prepare(
+                "SELECT id,state,updated,payload FROM memory_merges ORDER BY updated,id",
+            )?;
+            let rows = stmt.query_map([],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?,r.get::<_,String>(3)?)))?
+                .map(|r|{let (id,state,updated,payload)=r?; Ok(serde_json::json!({"id":id,"state":state,"updated_at":updated,"payload":serde_json::from_str::<serde_json::Value>(&payload)?}))}).collect::<Result<Vec<_>>>()?;
+            rows
+        };
         tx.commit()?;
         Ok(Backup {
             format: "moyang-ai-space".into(),
@@ -72,6 +82,7 @@ impl Store {
             checkpoints,
             conflicts,
             activities,
+            memory_merges,
         })
     }
     pub fn import(&mut self, mut backup: Backup) -> Result<serde_json::Value> {
@@ -135,6 +146,20 @@ impl Store {
         if let Some(config) = backup.settings.get("semantic") {
             let _: SemanticConfig = serde_json::from_str(config)?;
         }
+        let mut merge_ids = HashSet::new();
+        for group in &backup.memory_merges {
+            let id = group["id"]
+                .as_str()
+                .ok_or_else(|| invalid("合并组缺少编号。"))?;
+            if !merge_ids.insert(id)
+                || group["updated_at"].as_i64().is_none()
+                || !["pending", "merged", "dismissed", "undone"]
+                    .contains(&group["state"].as_str().unwrap_or(""))
+            {
+                return Err(invalid("合并组状态无效。"));
+            }
+            crate::archive::validate_event("memory_merges", id, &group["payload"])?;
+        }
         let mut ids = HashSet::new();
         for r in &mut backup.records {
             crate::store::validate(&mut r.fields)?;
@@ -175,6 +200,7 @@ impl Store {
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut inserted = HashSet::new();
+        let mut matching = HashSet::new();
         let mut skipped = 0;
         for r in &backup.records {
             let exists: Option<String> = tx
@@ -184,15 +210,23 @@ impl Store {
                 .optional()?;
             if exists.is_some() {
                 skipped += 1;
+                if serde_json::to_value(crate::store::read_record(&tx, &r.id)?)?
+                    == serde_json::to_value(r)?
+                {
+                    matching.insert(r.id.clone());
+                }
                 continue;
             }
             crate::store::persist(&tx, r, "从备份导入")?;
             inserted.insert(r.id.clone());
+            matching.insert(r.id.clone());
         }
         for h in backup.history {
             if inserted.contains(&h.record.id) {
                 // Current record from the archive is authoritative; older revisions are restored verbatim.
-                tx.execute("INSERT OR REPLACE INTO revisions(id,revision,payload,reason,recorded) VALUES(?,?,?,?,?)",params![h.record.id,h.record.revision,serde_json::to_string(&h.record)?,h.reason,h.recorded_at])?;
+                tx.execute("INSERT OR REPLACE INTO revisions(id,revision,payload,reason,recorded) VALUES(?,?,?,?,?)",params![h.record.id,h.record.revision,crate::resources::encode(&tx, &h.record)?,h.reason,h.recorded_at])?;
+            } else if !crate::archive::revision_matches(&tx, &h.record)? {
+                matching.remove(&h.record.id);
             }
         }
         for feedback in backup.feedback {
@@ -221,18 +255,26 @@ impl Store {
                 params![key, value],
             )?;
         }
+        let mut lifecycle_skipped = 0;
         for (table, rows) in [
             ("checkpoints", backup.checkpoints),
             ("conflicts", backup.conflicts),
             ("activities", backup.activities),
         ] {
             for row in rows {
+                if crate::archive::event_records(table, &row)
+                    .iter()
+                    .any(|id| !matching.contains(*id))
+                {
+                    lifecycle_skipped += 1;
+                    continue;
+                }
                 let id = row["id"].as_str().unwrap();
                 let updated = row["updated_at"].as_i64().unwrap();
                 if table == "checkpoints" {
                     tx.execute("INSERT OR IGNORE INTO checkpoints(id,client,session,turn,status,updated,payload) VALUES(?,?,?,?,?,?,?)",params![id,row["client"].as_str(),row["session"].as_str(),row["turn"].as_str(),row["status"].as_str(),updated,serde_json::to_string(&row)?])?;
                 } else if table == "conflicts" {
-                    tx.execute("INSERT OR IGNORE INTO conflicts(id,status,updated,payload) VALUES(?,?,?,?)",params![id,row["status"].as_str(),updated,serde_json::to_string(&row)?])?;
+                    tx.execute("INSERT OR IGNORE INTO conflicts(id,status,updated,payload) VALUES(?,?,?,?)",params![id,row["status"].as_str(),updated,crate::resources::encode(&tx, &row)?])?;
                 } else {
                     tx.execute(
                         "INSERT OR IGNORE INTO activities(id,updated,payload) VALUES(?,?,?)",
@@ -241,8 +283,28 @@ impl Store {
                 }
             }
         }
+        for group in backup.memory_merges {
+            if crate::archive::event_records("memory_merges", &group["payload"])
+                .iter()
+                .any(|id| !matching.contains(*id))
+            {
+                lifecycle_skipped += 1;
+                continue;
+            }
+            tx.execute(
+                "INSERT OR IGNORE INTO memory_merges VALUES(?,?,?,?)",
+                params![
+                    group["id"].as_str(),
+                    group["state"].as_str(),
+                    group["updated_at"].as_i64(),
+                    serde_json::to_string(&group["payload"])?
+                ],
+            )?;
+        }
         tx.commit()?;
-        Ok(serde_json::json!({"imported":inserted.len(),"skipped":skipped}))
+        Ok(
+            serde_json::json!({"imported":inserted.len(),"skipped":skipped,"skipped_activity":lifecycle_skipped}),
+        )
     }
 }
 

@@ -1,11 +1,25 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { chatRequest } from "../../platform/chat";
 import { useChat } from "./useChat";
 import type { ChatThread } from "../../shared/chat-types";
 import { flushPendingWork } from "../../shared/pending-work";
 
+import { readChatDraft, writeChatDraft, removeChatDraft } from "./draft-store";
+vi.mock("./draft-store", () => ({ readChatDraft: vi.fn(), writeChatDraft: vi.fn(), removeChatDraft: vi.fn() }));
+beforeEach(() => {
+  const drafts = new Map<string, { id: string; text: string; session?: ChatThread }>();
+  vi.mocked(readChatDraft).mockImplementation(
+    async (id) => drafts.get(id) ?? { id, text: localStorage.getItem(`moyang.chat.draft.${id}`) ?? "" },
+  );
+  vi.mocked(writeChatDraft).mockImplementation(async (value) => {
+    drafts.set(value.id, value);
+  });
+  vi.mocked(removeChatDraft).mockImplementation(async (id) => {
+    drafts.delete(id);
+  });
+});
 vi.mock("../../platform/chat", () => ({ chatRequest: vi.fn(), streamChat: vi.fn() }));
 let root: ReturnType<typeof createRoot>;
 afterEach(async () => {
@@ -24,7 +38,7 @@ it("locks conversation edits until a delayed switch is complete and retains the 
         finish = resolve as (thread: ChatThread) => void;
       });
     }
-    return [];
+    return operation === "threads_page" ? { items: [], next: null } : [];
   });
   let model!: ReturnType<typeof useChat>;
   function Harness() {
@@ -40,7 +54,7 @@ it("locks conversation edits until a delayed switch is complete and retains the 
     opening = model.open();
   });
   await act(async () => model.setDraft("切换期间不应写进旧会话"));
-  expect(localStorage.getItem(`moyang.chat.draft.${originalId}`)).toBe("第一段未发送想法");
+  expect((await readChatDraft(originalId)).text).toBe("第一段未发送想法");
   expect(model.switching).toBe(true);
   expect(model.open("another-conversation")).toBe(opening);
   let flushed = false;
@@ -61,14 +75,14 @@ it("locks conversation edits until a delayed switch is complete and retains the 
   expect(model.thread.id).not.toBe(originalId);
   expect(model.draft).toBe("");
   await act(async () => model.setDraft("第二段独立想法"));
-  expect(localStorage.getItem(`moyang.chat.draft.${originalId}`)).toBe("第一段未发送想法");
-  expect(localStorage.getItem(`moyang.chat.draft.${model.thread.id}`)).toBe("第二段独立想法");
+  expect((await readChatDraft(originalId)).text).toBe("第一段未发送想法");
+  expect((await readChatDraft(model.thread.id)).text).toBe("第二段独立想法");
 });
 
 it("keeps the current conversation editable after a failed switch save", async () => {
   vi.mocked(chatRequest).mockImplementation(async (operation) => {
     if (operation === "save_thread") throw new Error("disk unavailable");
-    return [];
+    return operation === "threads_page" ? { items: [], next: null } : [];
   });
   let model!: ReturnType<typeof useChat>;
   function Harness() {
@@ -86,7 +100,7 @@ it("keeps the current conversation editable after a failed switch save", async (
   expect(model.thread.id).toBe(id);
   expect(model.draft).toBe("保存失败也必须保留");
   await act(async () => model.setDraft("仍能继续修改"));
-  expect(localStorage.getItem(`moyang.chat.draft.${id}`)).toBe("仍能继续修改");
+  expect((await readChatDraft(id)).text).toBe("仍能继续修改");
 });
 
 it("retries failed initial storage reads and restores the existing draft identity", async () => {
@@ -95,7 +109,9 @@ it("retries failed initial storage reads and restores the existing draft identit
   const thread = { id: "existing", title: "已有对话", messages: [], revision: 2 };
   vi.mocked(chatRequest)
     .mockRejectedValueOnce(new Error("database is locked"))
-    .mockImplementation(async (operation) => (operation === "thread" ? thread : []));
+    .mockImplementation(async (operation) =>
+      operation === "thread" ? thread : operation === "threads_page" ? { items: [], next: null } : [],
+    );
   let model!: ReturnType<typeof useChat>;
   function Harness() {
     model = useChat([]);

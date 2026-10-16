@@ -7,7 +7,18 @@ export type ChatProvider = {
   model: string;
   hasKey: boolean;
 };
-export type ChatSource = { id: string; title: string; source: string; text: string };
+export type ChatSource = {
+  id: string;
+  title: string;
+  source: string;
+  text: string;
+  fingerprint?: string;
+  layer?: string;
+  project?: string;
+  revision?: number;
+  kind?: "ai" | "document";
+  selectionText?: string;
+};
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";

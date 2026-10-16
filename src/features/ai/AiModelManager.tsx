@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
+import { openExternalUrl } from "../../platform/bridge";
 import type { AiSemantic } from "../../shared/ai-types";
 type Status = {
   directory: string;
@@ -9,6 +10,7 @@ type Status = {
   model_ready: boolean;
   runtime_available: boolean;
   can_stop: boolean;
+  directory_verified: boolean;
   installed: Array<{ name: string; size: number }>;
   presets: Array<{ id: string; name: string; bytes: number; description: string; url: string }>;
   download: { state: string; status?: string; total?: number; completed?: number };
@@ -107,7 +109,16 @@ export function AiModelManager({
                     {p.bytes >= 1e9 ? `${(p.bytes / 1e9).toFixed(1)} GB` : `${Math.round(p.bytes / 1e6)} MB`}
                   </strong>
                   <small>{p.description}</small>
-                  <a href={p.url} target="_blank" rel="noreferrer">
+                  <a
+                    href={p.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void openExternalUrl(p.url).catch((error) => setError(String(error)));
+                    }}
+                  >
                     查看官方模型目录
                   </a>
                 </span>
@@ -148,10 +159,21 @@ export function AiModelManager({
             存储位置”迁移，或选择已有模型目录。应用使用独立端口，不修改你已有的 Ollama 设置。
           </small>
           <p>实际配置目录：{status.directory}</p>
+          {status.running && !status.directory_verified && (
+            <p role="status">当前端口的运行目录与此选择尚未核对一致。请先停止原服务，再从这里启动。</p>
+          )}
           {!status.runtime_available && (
             <p>
               未找到 Ollama 运行程序。
-              <a href="https://ollama.com/download/windows" target="_blank" rel="noreferrer">
+              <a
+                href="https://ollama.com/download/windows"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternalUrl("https://ollama.com/download/windows").catch((error) => setError(String(error)));
+                }}
+              >
                 下载并安装 Ollama
               </a>{" "}
               后刷新本页，模型文件仍可保存在你选择的磁盘。
@@ -193,7 +215,7 @@ export function AiModelManager({
               </button>
             )}
             {status.running && (
-              <button disabled={busy} onClick={() => void run(() => act("stop"))}>
+              <button disabled={busy || !status.can_stop} onClick={() => void run(() => act("stop"))}>
                 停止本应用的模型服务
               </button>
             )}
