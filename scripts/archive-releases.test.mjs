@@ -9,7 +9,7 @@ import JSZip from "jszip";
 test("release cleanup verifies archives, reuses identical models, and preserves current package", { skip: process.platform !== "win32" }, async (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-archive-"));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
-  const root = path.join(base, "project"), archive = path.join(base, "archive");
+  const root = path.join(base, "project-书房"), archive = path.join(base, "archive-归档");
   const write = (name, text) => {
     const file = path.join(root, name);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -46,4 +46,12 @@ test("release cleanup verifies archives, reuses identical models, and preserves 
   assert.ok(index.every((record) => fs.existsSync(record.archive)));
   assert.equal(fs.existsSync(path.join(root, "release/second-old")), false);
   assert.equal(fs.existsSync(path.join(root, "release/third-old")), false);
+  // Also accept a UTF-8 ledger written without a BOM by another local tool.
+  fs.writeFileSync(path.join(archive, "release-archive-index.json"), JSON.stringify(index));
+  write("release/fourth-old/executable", "fourth old");
+  execFileSync("powershell.exe", [...args, "-Apply"], { windowsHide: true, stdio: "pipe" });
+  const appended = JSON.parse(fs.readFileSync(path.join(archive, "release-archive-index.json"), "utf8").replace(/^\uFEFF/, ""));
+  assert.equal(appended.length, 4);
+  assert.ok(appended.every((record) => typeof record.archive === "string"));
+  assert.ok(appended.every((record) => fs.existsSync(record.archive)));
 });

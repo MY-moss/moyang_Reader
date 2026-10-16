@@ -7,9 +7,9 @@ function Get-Sha256([string]$path) {
     finally { $stream.Dispose(); $sha.Dispose() }
 }
 $project = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
-if ((Get-Content -LiteralPath (Join-Path $project 'package.json') -Raw | ConvertFrom-Json).name -ne 'moyang-reader-next') { throw 'Not a Moyang Reader workspace.' }
+if ((Get-Content -LiteralPath (Join-Path $project 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).name -ne 'moyang-reader-next') { throw 'Not a Moyang Reader workspace.' }
 $release = Join-Path $project 'release'
-$latest = Get-Content -LiteralPath (Join-Path $release 'latest.json') -Raw | ConvertFrom-Json
+$latest = Get-Content -LiteralPath (Join-Path $release 'latest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($latest.directory -match '[/\\:]' -or $latest.directory -in @('', '.', '..')) { throw 'Invalid current release pointer.' }
 if (-not (Test-Path -LiteralPath (Join-Path $release "$($latest.directory)/Moyang Reader Next.exe") -PathType Leaf)) { throw 'Current release is missing.' }
 if (-not $ArchiveRoot) { $ArchiveRoot = Join-Path (Split-Path -Parent $project) ((Split-Path -Leaf $project) + ('-' + [char]0x5f52 + [char]0x6863 + '/') + (Get-Date -Format 'yyyy-MM-dd')) }
@@ -51,7 +51,15 @@ Assert-PlainPath $modelRoot
 $modelHashes = @{}
 $indexPath = Join-Path $archive 'release-archive-index.json'
 $receipts = @()
-if (Test-Path -LiteralPath $indexPath) { $receipts = @(Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json) }
+function Expand-Receipts($values) {
+    foreach ($value in $values) {
+        if ($value -is [Array]) { Expand-Receipts $value } else { $value }
+    }
+}
+if (Test-Path -LiteralPath $indexPath) {
+    $previous = Get-Content -LiteralPath $indexPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $receipts = @(Expand-Receipts $previous)
+}
 foreach ($item in $targets) {
     $files = @(Get-PlainFiles $item.FullName)
     $zipPath = Join-Path $archive ($item.Name + '-' + [guid]::NewGuid().ToString('N').Substring(0,8) + '.zip')
@@ -97,7 +105,7 @@ foreach ($item in $targets) {
     $absolute = [IO.Path]::GetFullPath($item.FullName)
     if (-not $absolute.StartsWith($release + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Removal outside release directory.' }
     $receipts += [PSCustomObject]@{source=$absolute;archive=$zipPath;files=$manifest.Count;sourceBytes=($files | Measure-Object Length -Sum).Sum;archiveBytes=(Get-Item -LiteralPath $zipPath).Length;sha256=(Get-Sha256 $zipPath)}
-    $receipts | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $indexPath -Encoding UTF8
+    ConvertTo-Json -InputObject $receipts -Depth 5 | Set-Content -LiteralPath $indexPath -Encoding UTF8
     Remove-Item -LiteralPath $absolute -Recurse -Force
     Write-Output "Archived and verified: $($item.Name)"
 }
