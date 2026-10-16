@@ -181,7 +181,14 @@ export default function ChatSpace({
         }}
       >
         {!m.ready ? (
-          <p role="status">正在读取本机对话…</p>
+          m.error ? (
+            <div className="chat-welcome">
+              <p>本机对话暂时无法读取，记录仍保留在原处。</p>
+              <button onClick={m.reload}>重新读取</button>
+            </div>
+          ) : (
+            <p role="status">正在读取本机对话…</p>
+          )
         ) : !m.thread.messages.length ? (
           <div className="chat-welcome">
             <Icon name="chat" size={30} />

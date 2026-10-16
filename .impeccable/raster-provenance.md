@@ -46,3 +46,5 @@
 `storage-plan-720-fixture.png` 与 `storage-result-720-fixture.png` 由 `.local/capture-storage-states.mjs` 在现有设置页截图，720×900，替换的只是存储接口模块：C:/Users/Example、D:/Moyang 和 E:/MoyangData 均为虚构路径。前者展示模型选项、迁移范围、容量和确认操作；后者展示结果、实际位置与兼容路径说明。主任务已查看两图。它们仅证明这些控件的布局，不证明原生迁移已经执行；真实迁移结果来自独立 PowerShell/MCP 测试。
 
 最终路径比较沿用 `normalizePathKey`，处理大小写、Windows命名空间与尾分隔符；此前原生图中的重复说明仍属旧证据，最终便携烟测会核对当前源码。
+
+2026-10-16 15:10（Asia/Shanghai），最终 0.13.0 便携包 `07-10-26.600Z-95e9de` 的 `artifacts/workbench/release-storage.png` 已由主任务查看：真实 Windows WebView、150% 缩放、隔离 D 盘测试资料；无迁移时不再显示重复的兼容路径说明。`release-desktop.png` 同批来源为隔离空 AI 库。实际保存/读取/正常退出结果见同目录 `release-smoke.json`。聊天并发首次初始化与失败重试另有原生和 Hook 回归；不将截图当成所有并发情况的证明。

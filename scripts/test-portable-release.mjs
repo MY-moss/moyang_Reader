@@ -30,7 +30,7 @@ const fixtureBase = path.join(root, ".local");
 fs.mkdirSync(fixtureBase, { recursive: true });
 const temp = fs.mkdtempSync(path.join(fixtureBase, "portable-smoke-"));
 const report = { timestamp: new Date().toISOString(), version: manifest.version, hashes: true };
-let client, app, browser, model;
+let client, app, browser, model, page;
 try {
   // Production single-instance identity is shared across package directories.
   // Fail before starting a test app rather than waking a user's running window.
@@ -124,7 +124,6 @@ try {
   });
   await waitForTestService(app, `${desktopUrl}/json/version`);
   browser = await chromium.connectOverCDP(desktopUrl);
-  let page;
   for (let n = 0; n < 120; n++) {
     page = browser
       .contexts()
@@ -162,7 +161,9 @@ try {
   report.desktop.extension_install = true;
   await page.locator(".extension-row").filter({ hasText: "书房聊天" }).click();
   await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page.getByText("扩展已安装，可在下方管理。", { exact: true }).waitFor();
   await page.getByRole("button", { name: "开始聊天", exact: true }).click();
+  await page.getByRole("region", { name: "书房聊天", exact: true }).waitFor();
   await page.getByRole("button", { name: "添加我的 API 服务" }).click();
   await page.getByLabel("服务名称", {exact:true}).fill("本机验证服务");
   await page.getByLabel("API 基础地址").fill("http://127.0.0.1:1/v1");
@@ -191,6 +192,13 @@ try {
   for (let n = 0; n < 100 && app.exitCode === null; n++) await pause(100);
   assert.equal(app.exitCode, 0, "Final desktop did not close normally");
   report.desktop.normal_close = true;
+} catch (error) {
+  report.failure = String(error);
+  if (page && !page.isClosed()) {
+    await page.screenshot({ path: "artifacts/workbench/release-failure.png" }).catch(() => undefined);
+    report.visible_text = await page.locator("body").innerText().catch(() => "");
+  }
+  throw error;
 } finally {
   if (app?.exitCode === null) app.kill();
   model?.kill();
@@ -202,7 +210,7 @@ try {
   if (path.dirname(temp) !== fixtureBase || !path.basename(temp).startsWith("portable-smoke-")) {
     report.cleanup_note = "Unexpected fixture path retained without removal";
   } else {
-    try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }); }
+    try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); }
     catch (error) { report.retained_test_fixture = temp; report.cleanup_note = String(error); }
   }
   fs.writeFileSync("artifacts/workbench/release-smoke.json", JSON.stringify(report, null, 2));

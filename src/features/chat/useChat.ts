@@ -44,6 +44,7 @@ export function useChat(assistants: ChatAssistant[]) {
   const [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [notice, setNotice] = useState(""),
     [usage, setUsage] = useState<ChatUsage | null>(null);
   const [draft, setDraftState] = useState("");
@@ -84,6 +85,7 @@ export function useChat(assistants: ChatAssistant[]) {
   }, []);
   useEffect(() => {
     let alive = true;
+    setError("");
     void Promise.all([chatRequest<ChatProvider[]>("providers"), chatRequest<ChatThreadSummary[]>("threads")])
       .then(async ([services, history]) => {
         const last = localStorage.getItem("moyang.chat.last");
@@ -109,7 +111,7 @@ export function useChat(assistants: ChatAssistant[]) {
     return () => {
       alive = false;
     };
-  }, [put]);
+  }, [put, loadAttempt]);
   useEffect(
     () =>
       registerPendingWork(async () => {
@@ -301,6 +303,7 @@ export function useChat(assistants: ChatAssistant[]) {
     setError,
     setNotice,
     refreshProviders,
+    reload: () => setLoadAttempt((attempt) => attempt + 1),
     stop: () => controller.current?.abort(),
   };
 }

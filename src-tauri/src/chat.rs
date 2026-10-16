@@ -48,6 +48,12 @@ struct Provider {
 }
 
 fn database(path: &Path) -> Result<Connection, String> {
+    // Providers and history load concurrently. SQLite's busy timeout does not
+    // serialize the first transition to WAL; initialize before another opener.
+    static INITIALIZE: Mutex<()> = Mutex::new(());
+    let _initialize = INITIALIZE
+        .lock()
+        .map_err(|_| "聊天数据库暂时无法初始化，请重新读取。")?;
     std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
     let db = Connection::open(path.join("chat.sqlite")).map_err(|e| e.to_string())?;
     db.busy_timeout(Duration::from_secs(5))
@@ -363,6 +369,49 @@ pub fn chat_cancel(state: State<'_, ChatRequests>, request_id: String) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fresh_database_supports_parallel_initial_loads() {
+        let root = std::env::temp_dir().join(format!(
+            "moyang-chat-start-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut failures = Vec::new();
+        for attempt in 0..8 {
+            let path = root.join(attempt.to_string());
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+            let workers: Vec<_> = (0..8)
+                .map(|index| {
+                    let path = path.clone();
+                    let barrier = barrier.clone();
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        store_request(
+                            &path,
+                            if index % 2 == 0 {
+                                "providers"
+                            } else {
+                                "threads"
+                            },
+                            json!({}),
+                        )
+                    })
+                })
+                .collect();
+            for worker in workers {
+                if let Err(error) = worker.join().unwrap() {
+                    failures.push(error);
+                }
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(
+            failures.is_empty(),
+            "Parallel first load failed: {failures:?}"
+        );
+    }
     #[test]
     fn stop_before_registration_does_not_start_a_paid_request() {
         let requests = ChatRequests::default();

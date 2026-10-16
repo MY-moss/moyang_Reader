@@ -386,7 +386,7 @@ export default function ExtensionMarket({
                 )}
                 {installed?.skillId && <button onClick={() => onOpenSkill(installed.skillId!)}>在技能库打开</button>}
                 {installed?.enabled && pkg.kind === "assistant" && (
-                  <button className="primary-action" onClick={() => onOpenAssistant?.(pkg.id)}>
+                  <button className="primary-action" disabled={busy} onClick={() => onOpenAssistant?.(pkg.id)}>
                     开始聊天
                   </button>
                 )}
