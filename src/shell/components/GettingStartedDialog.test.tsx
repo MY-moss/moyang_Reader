@@ -18,7 +18,7 @@ describe("GettingStartedDialog", () => {
 
     expect(container.querySelector('[role="dialog"]')?.textContent).toContain("快速上手 Moyang Reader");
     expect(container.textContent).toContain("添加阅读库");
-    expect(container.textContent).toContain("设置保存到本机");
+    expect(container.textContent).toContain("阅读设置保存在本机");
 
     act(() => {
       const done = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "知道了");

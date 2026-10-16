@@ -4,6 +4,8 @@
 
 本次根目录迁移、运行验证和清理边界见 [整合验证报告](docs/VALIDATION-CONSOLIDATION.md)。
 
+最新[界面与记忆召回复核](docs/VALIDATION-USABILITY-RECALL.md)修复置顶记忆遗漏任务相关片段、窄窗导航焦点、AI 首次使用提示、帮助主题、目录失败重试及长扩展名显示。
+
 0.12.0 新增[插件市场](docs/EXTENSIONS.md)：阅读插件、主题、Agent Skills 与 MCP 连接，可安装、更新、停用和回退；同时修复全局导航与 Windows 并发备份问题。功能核对、真实测试与剩余边界见[本轮深度检查报告](docs/VALIDATION-EXTENSIONS.md)，参考项目与取舍见[扩展研究](docs/RESEARCH-EXTENSIONS.md)。
 
 新增独立 **AI 空间**：知识库、长期记忆和技能库，与日常笔记分开；外部 Agent 通过本机 MCP 读写、召回和整理。使用方法见 [AI 空间指南](docs/AI-USER-GUIDE.md)，研究与取舍见 [开源研究](docs/research/AI-RESEARCH.md)。

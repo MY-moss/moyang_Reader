@@ -17,7 +17,12 @@ export function useExtensions() {
   const [state, setState] = useState<ExtensionState>(emptyExtensionState);
   const [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setErrorText] = useState("");
+  const [failedCatalog, setFailedCatalog] = useState<{ url: string; name?: string } | null>(null);
+  const setError = useCallback((message: string) => {
+    setFailedCatalog(null);
+    setErrorText(message);
+  }, []);
   const latest = useRef(state),
     loading = useRef(false),
     pending = useRef<Promise<unknown>>(Promise.resolve());
@@ -31,7 +36,7 @@ export function useExtensions() {
     } catch (cause) {
       setError(String(cause));
     }
-  }, []);
+  }, [setError]);
   useEffect(() => {
     void reload();
     return registerPendingWork(async () => {
@@ -39,7 +44,7 @@ export function useExtensions() {
     });
   }, [reload]);
   const change = useCallback(
-    (operation: (state: ExtensionState) => Promise<ExtensionState>) => {
+    (operation: (state: ExtensionState) => Promise<ExtensionState>, catalog?: { url: string; name?: string }) => {
       if (!ready || loading.current) return Promise.resolve(false);
       loading.current = true;
       setBusy(true);
@@ -53,6 +58,7 @@ export function useExtensions() {
           return true;
         } catch (cause) {
           setError(String(cause));
+          setFailedCatalog(catalog ?? null);
           return false;
         } finally {
           loading.current = false;
@@ -62,7 +68,7 @@ export function useExtensions() {
       pending.current = task;
       return task;
     },
-    [ready],
+    [ready, setError],
   );
   const install = (candidate: ExtensionPackage, source: string, copySkill = false, rollback = false) =>
     change(async (current) => {
@@ -164,15 +170,18 @@ export function useExtensions() {
       installed: current.installed.map((i) => (i.package.id === id ? { ...i, mcpOverride: validateMcp(config) } : i)),
     }));
   const refreshCatalog = (url: string, name?: string) =>
-    change(async (current) => {
-      const packages = parseCatalog(await fetchExtensionJson(url));
-      const old = current.catalogs.find((c) => c.url === url);
-      current.catalogs = [
-        ...current.catalogs.filter((c) => c.url !== url),
-        { url, name: name?.trim() || old?.name || new URL(url).hostname, packages, checkedAt: Date.now() },
-      ];
-      return current;
-    });
+    change(
+      async (current) => {
+        const packages = parseCatalog(await fetchExtensionJson(url));
+        const old = current.catalogs.find((c) => c.url === url);
+        current.catalogs = [
+          ...current.catalogs.filter((c) => c.url !== url),
+          { url, name: name?.trim() || old?.name || new URL(url).hostname, packages, checkedAt: Date.now() },
+        ];
+        return current;
+      },
+      { url, name },
+    );
   const removeCatalog = (url: string) =>
     change(async (current) => ({ ...current, catalogs: current.catalogs.filter((c) => c.url !== url) }));
   const entries = useMemo(() => {
@@ -217,6 +226,7 @@ export function useExtensions() {
     ready,
     busy,
     error,
+    failedCatalog,
     setError,
     reload,
     install,

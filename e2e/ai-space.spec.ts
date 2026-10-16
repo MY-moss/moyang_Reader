@@ -16,6 +16,32 @@ async function create(page: Page, title: string, body: string) {
   await page.getByRole("button", { name: "保存内容", exact: true }).click();
   await expect(page.locator(".ai-document h1")).toHaveText(title);
 }
+test("narrow empty AI space offers a start and contextual help, but search misses do not", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 900 });
+  await openAi(page);
+  const welcome = page.locator(".ai-list-onboarding");
+  await expect(welcome).toBeVisible();
+  await expect(welcome).toContainText("日常笔记不会自动进入 AI 库");
+  await expect(page.locator(".ai-pagination")).toBeHidden();
+  await page.getByLabel("搜索 AI 内容").fill("不存在的内容");
+  await expect(welcome).toBeHidden();
+  await expect(page.locator(".ai-list-empty")).toContainText("没有匹配内容");
+  await page.getByLabel("搜索 AI 内容").fill("");
+  await welcome.getByRole("button", { name: /连接我的 Agent/ }).click();
+  await expect(page.locator(".ai-connections")).toBeVisible();
+  await page.keyboard.press("Control+Shift+B");
+  await page.getByRole("button", { name: "使用帮助", exact: true }).click();
+  const guide = page.getByRole("dialog", { name: "快速上手 Moyang Reader" });
+  await expect(guide.getByRole("button", { name: "AI 空间", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(guide).toContainText("重启客户端并完成它的信任授权");
+  await guide.getByRole("button", { name: "插件市场", exact: true }).click();
+  await expect(guide).toContainText("阅读插件从命令面板运行");
+  await guide.getByRole("button", { name: "阅读空间", exact: true }).click();
+  await expect(guide).toContainText("更多操作");
+  await page.keyboard.press("Escape");
+  await expect(guide).toBeHidden();
+});
+
 test("knowledge persists after reload and revisions can be restored", async ({ page }) => {
   await openAi(page);
   await create(page, "本地知识测试", "# 来源清楚\n\n保存独立的知识资料。");

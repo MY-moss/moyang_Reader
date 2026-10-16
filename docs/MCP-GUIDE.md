@@ -41,6 +41,7 @@
 ## 一轮任务
 
 1. 使用 recall_context 找相关知识和偏好，需要时再读取完整正文、技能及资源。
+   命中本轮任务的置顶记忆保留相关片段，不以开头摘要替换；不会重复带入同一条目，也不增加默认字符预算。
 2. 优先使用生命周期钩子提供的原始 checkpoint_id。没有钩子时，使用稳定的 client/session/turn 调用 task_checkpoint。
 3. 任务结束选择有证据的事实、偏好、决定、经验。进度与重复内容不保存。
 4. 调用 conclude_task。action=save 保存新结论；correct 必须明确更正并提供当前 revision；conflict 提交推测矛盾；improve_skill 必须附任务结果与证据。

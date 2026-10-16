@@ -165,6 +165,8 @@
 }
 .extension-row-title strong {
   font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .extension-row-title span {
   font-size: 12px;
@@ -176,6 +178,7 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 .extension-row small {
   color: var(--muted);
@@ -284,6 +287,19 @@
 }
 .extension-message[role="alert"] {
   color: var(--danger);
+}
+.extension-message > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.extension-message small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.extension-message details {
+  margin-top: 8px;
+  color: var(--muted);
 }
 .extension-catalogs {
   padding: 18px 32px;

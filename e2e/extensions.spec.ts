@@ -138,11 +138,48 @@ test("custom catalogs update on request, failures retain installed content, and 
   failed = true;
   await page.getByRole("button", { name: "刷新目录", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("已有安装仍可使用");
+  await expect(page.getByRole("alert")).toContainText(url);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await page.emulateMedia({ colorScheme: "dark" });
+  for (const theme of [null, "dark", "light"]) {
+    await page.evaluate((value) => {
+      if (value) document.documentElement.dataset.theme = value;
+      else delete document.documentElement.dataset.theme;
+    }, theme);
+    const audit = await new AxeBuilder({ page }).include('.extension-message[role="alert"]').analyze();
+    expect(audit.violations).toEqual([]);
+  }
+  failed = false;
+  version = "1.2.0";
+  await page.getByRole("button", { name: "重试目录更新", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeHidden();
+  await page.getByRole("button", { name: /测试阅读插件/ }).click();
+  await expect(page.getByRole("button", { name: "更新到 1.2.0", exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: /已安装/ })
     .first()
     .click();
   await expect(page.getByRole("button", { name: /测试阅读插件/ })).toBeVisible();
+});
+
+test("long extension names keep the type and installed state within each list row", async ({ page }) => {
+  const name = "EvidenceReviewLongName".repeat(5);
+  await page.goto("/");
+  await market(page);
+  await importPackage(page, { ...plugin(), name });
+  await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page
+    .getByRole("button", { name: /^已安装/ })
+    .first()
+    .click();
+  const row = page.locator(".extension-row").filter({ hasText: name });
+  for (const width of [1440, 720]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(row).toBeVisible();
+    expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(row.locator(".extension-row-title span")).toBeVisible();
+  }
 });
 
 test("skill updates preserve local improvements and uninstall preserves knowledge", async ({ page }) => {

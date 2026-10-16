@@ -218,7 +218,21 @@ impl Store {
             limit: 4,
             ..Default::default()
         })?;
-        let mut combined: Vec<Hit> = pinned.items.into_iter().filter(|h| h.pinned).collect();
+        // A matching pin needs the query's evidence, not the generic opening excerpt.
+        // Reuse the hit we already retrieved; no extra search or model call is needed.
+        let mut combined: Vec<Hit> = pinned
+            .items
+            .into_iter()
+            .filter(|h| h.pinned)
+            .map(|pin| {
+                search
+                    .items
+                    .iter()
+                    .find(|hit| hit.id == pin.id)
+                    .cloned()
+                    .unwrap_or(pin)
+            })
+            .collect();
         let pinned_ids: HashSet<String> = combined.iter().map(|h| h.id.clone()).collect();
         combined.extend(
             search

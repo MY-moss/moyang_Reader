@@ -2,13 +2,23 @@ import type { SourceLocation } from "../shared/bookroom-types";
 import { ConflictDialog } from "./views/ConflictDialog";
 import { useBookroom, type BookroomPage } from "./useBookroom";
 import { BookroomPageView, ExcerptComposer } from "./views/BookroomPage";
-import { lazy, Suspense, useEffect, useLayoutEffect, useState, type CSSProperties, type SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type SetStateAction,
+} from "react";
 import { App } from "./App";
 import { subscribeToFileDrop, subscribeToOpenPaths } from "../platform/bridge";
 import { useReaderApplication } from "./useReaderApplication";
 import { useWorkbenchPanes } from "./useWorkbenchPanes";
 import { LibrarySidebar } from "./views/LibrarySidebar";
 import { Icon } from "../shared/components/Icon";
+import { useModalBehavior } from "../shared/components/useModalBehavior";
 import { PaneResizeHandle } from "../shared/components/PaneResizeHandle";
 import { PANE_WIDTH_LIMITS } from "../features/reader/pane-layout";
 import { useExtensions } from "../features/extensions/useExtensions";
@@ -41,6 +51,9 @@ export function RootApp() {
   );
   const [narrow, setNarrow] = useState(() => window.innerWidth < 900);
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const restoreNavigationRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
@@ -129,6 +142,14 @@ export function RootApp() {
   const collapsed =
     (narrow ? !navigationOpen : model.sidebarCollapsed) ||
     (space === "reader" && model.focusMode && !marketOpen && !settingsOpen);
+  const modalNavigation = narrow && !collapsed;
+  useModalBehavior({
+    containerRef: navigationRef,
+    backgroundRef: mainRef,
+    restoreFocusRef: restoreNavigationRef,
+    enabled: modalNavigation,
+    onClose: () => setNavigationOpen(false),
+  });
   const baseModel = narrow
     ? {
         ...model,
@@ -159,7 +180,14 @@ export function RootApp() {
       {narrow && !collapsed && (
         <button className="navigation-backdrop" aria-label="收起导航" onClick={() => setNavigationOpen(false)} />
       )}
-      <aside className="workbench-sidebar" aria-label="工作台导航">
+      <aside
+        ref={navigationRef}
+        className="workbench-sidebar"
+        role={modalNavigation ? "dialog" : undefined}
+        aria-modal={modalNavigation || undefined}
+        aria-label="工作台导航"
+        tabIndex={modalNavigation ? -1 : undefined}
+      >
         <div className="workbench-identity">
           <span className="brand-mark" aria-hidden="true">
             M
@@ -314,9 +342,13 @@ export function RootApp() {
           />
         )}
       </aside>
-      <div className="workbench-main">
+      <div ref={mainRef} className="workbench-main">
         {collapsed && (space === "ai" || marketOpen) && (
-          <button className="restore-sidebar" onClick={() => shellModel.setSidebarCollapsed(false)}>
+          <button
+            ref={restoreNavigationRef}
+            className="restore-sidebar"
+            onClick={() => shellModel.setSidebarCollapsed(false)}
+          >
             <Icon name="sidebar" />
             显示导航
           </button>

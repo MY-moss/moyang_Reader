@@ -3,6 +3,9 @@ import { useEffect, useRef, type RefObject } from "react";
 type ModalBehaviorOptions = {
   containerRef: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  backgroundRef?: RefObject<HTMLElement | null>;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
+  enabled?: boolean;
   onClose: () => void;
 };
 
@@ -36,7 +39,14 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * Keeps every application modal consistent: initial focus, Escape close,
  * keyboard focus containment, and focus restoration after unmount.
  */
-export function useModalBehavior({ containerRef, initialFocusRef, onClose }: ModalBehaviorOptions): void {
+export function useModalBehavior({
+  containerRef,
+  initialFocusRef,
+  backgroundRef,
+  restoreFocusRef,
+  enabled = true,
+  onClose,
+}: ModalBehaviorOptions): void {
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
@@ -44,10 +54,14 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
   }, [onClose]);
 
   useEffect(() => {
+    if (!enabled) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const modalContainer = containerRef.current;
+    const background = backgroundRef?.current;
+    const wasInert = background?.hasAttribute("inert") ?? false;
     const initialFocus = initialFocusRef?.current ?? modalContainer;
     initialFocus?.focus();
+    background?.setAttribute("inert", "");
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -89,9 +103,12 @@ export function useModalBehavior({ containerRef, initialFocusRef, onClose }: Mod
     window.addEventListener("keydown", handleKeyDown, true);
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
-      if (previousFocus?.isConnected && !modalContainer?.contains(previousFocus)) {
-        previousFocus.focus();
+      background?.toggleAttribute("inert", wasInert);
+      const target =
+        previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : restoreFocusRef?.current;
+      if (target?.isConnected && !modalContainer?.contains(target)) {
+        target.focus();
       }
     };
-  }, [containerRef, initialFocusRef]);
+  }, [containerRef, initialFocusRef, backgroundRef, restoreFocusRef, enabled]);
 }
