@@ -175,7 +175,7 @@ export function useEditing({
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
-      if (document.body.dataset.activeSpace === "ai") return;
+      if (document.body.dataset.activeSpace === "ai" || document.body.dataset.globalPage) return;
       const eventTarget = event.target instanceof HTMLElement ? event.target : null;
       const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const isCodeMirrorEditor = Boolean(eventTarget?.closest(".cm-editor") ?? activeElement?.closest(".cm-editor"));
@@ -299,7 +299,7 @@ export function useEditing({
 
   useEffect(() => {
     const handleEditorHistoryShortcut = (event: KeyboardEvent) => {
-      if (document.body.dataset.activeSpace === "ai") return;
+      if (document.body.dataset.activeSpace === "ai" || document.body.dataset.globalPage) return;
       if (event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return;
       if (mode !== "source" && mode !== "wysiwyg") return;
 

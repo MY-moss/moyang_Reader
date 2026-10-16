@@ -2446,12 +2446,13 @@ dependencies = [
 
 [[package]]
 name = "moyang-reader"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "encoding_rs",
  "moyang-ai-core",
  "notify",
  "percent-encoding",
+ "reqwest 0.12.28",
  "rusqlite",
  "serde",
  "serde_json",

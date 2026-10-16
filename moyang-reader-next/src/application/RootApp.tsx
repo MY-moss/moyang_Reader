@@ -11,40 +11,51 @@ import { LibrarySidebar } from "./views/LibrarySidebar";
 import { Icon } from "../shared/components/Icon";
 import { PaneResizeHandle } from "../shared/components/PaneResizeHandle";
 import { PANE_WIDTH_LIMITS } from "../features/reader/pane-layout";
+import { useExtensions } from "../features/extensions/useExtensions";
+import { useReaderExtensions } from "./useReaderExtensions";
+import { ExtensionResult } from "../features/extensions/ExtensionResult";
+const ExtensionMarket = lazy(() => import("../features/extensions/ExtensionMarket"));
 const AiSpace = lazy(() => import("../features/ai/AiSpace"));
 export function RootApp() {
   const model = useReaderApplication();
+  const extensions = useExtensions();
+  const readerExtensions = useReaderExtensions(model, extensions);
   const panes = useWorkbenchPanes(model);
   const bookroom = useBookroom(model, panes);
   const [excerpt, setExcerpt] = useState<SourceLocation | null>(null);
   const setBookroomPage = bookroom.setPage;
-  useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === "f" &&
-        document.body.dataset.activeSpace !== "ai"
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        setBookroomPage("search");
-      }
-    };
-    window.addEventListener("keydown", shortcut, true);
-    return () => window.removeEventListener("keydown", shortcut, true);
-  }, [setBookroomPage]);
   const [space, setSpace] = useState<"reader" | "ai">(() =>
     localStorage.getItem("moyang.activeSpace") === "ai" ? "ai" : "reader",
   );
   const [visitedAi, setVisitedAi] = useState(space === "ai");
   const [aiSidebar, setAiSidebar] = useState<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [aiAction, setAiAction] = useState<{ key: number; type: "search" | "skill"; id?: string } | null>(null);
+  const closeGlobalPage = () => {
+    setSettingsOpen(false);
+    setMarketOpen(false);
+  };
   const [density, setDensity] = useState(() =>
     localStorage.getItem("moyang.density") === "compact" ? "compact" : "comfortable",
   );
   const [narrow, setNarrow] = useState(() => window.innerWidth < 900);
   const [navigationOpen, setNavigationOpen] = useState(false);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setSettingsOpen(false);
+        setMarketOpen(false);
+        setNavigationOpen(false);
+        if (document.body.dataset.activeSpace === "ai") setAiAction({ key: Date.now(), type: "search" });
+        else setBookroomPage("search");
+      }
+    };
+    window.addEventListener("keydown", shortcut, true);
+    return () => window.removeEventListener("keydown", shortcut, true);
+  }, [setBookroomPage]);
   const navigateSource = bookroom.navigate,
     reportSourceError = bookroom.setError;
   useEffect(() => {
@@ -53,6 +64,7 @@ export function RootApp() {
       if (!location?.path) return;
       setSpace("reader");
       setSettingsOpen(false);
+      setMarketOpen(false);
       void navigateSource(location).catch((error) => reportSourceError(String(error)));
     };
     window.addEventListener("moyang:open-ai-source", open);
@@ -84,7 +96,11 @@ export function RootApp() {
     const disposers: Array<() => void> = [];
     for (const subscribe of [subscribeToOpenPaths, subscribeToFileDrop]) {
       void subscribe(() => {
-        if (active) setSpace("reader");
+        if (active) {
+          setSpace("reader");
+          setSettingsOpen(false);
+          setMarketOpen(false);
+        }
       })
         .then((dispose) => {
           if (dispose) {
@@ -101,6 +117,7 @@ export function RootApp() {
   }, []);
   useLayoutEffect(() => {
     document.body.dataset.activeSpace = space;
+    document.body.dataset.globalPage = marketOpen ? "extensions" : settingsOpen ? "settings" : "";
     document.body.dataset.density = density;
     try {
       localStorage.setItem("moyang.activeSpace", space);
@@ -108,9 +125,11 @@ export function RootApp() {
     } catch {
       /* view preferences only */
     }
-  }, [space, density]);
-  const collapsed = (narrow ? !navigationOpen : model.sidebarCollapsed) || (space === "reader" && model.focusMode);
-  const shellModel = narrow
+  }, [space, density, marketOpen, settingsOpen]);
+  const collapsed =
+    (narrow ? !navigationOpen : model.sidebarCollapsed) ||
+    (space === "reader" && model.focusMode && !marketOpen && !settingsOpen);
+  const baseModel = narrow
     ? {
         ...model,
         sidebarCollapsed: !navigationOpen,
@@ -118,6 +137,20 @@ export function RootApp() {
           setNavigationOpen((open) => !(typeof value === "function" ? value(!open) : value)),
       }
     : model;
+  const shellModel = {
+    ...baseModel,
+    commandItems: [
+      ...baseModel.commandItems,
+      { id: "extension-market", label: "打开插件市场" },
+      ...readerExtensions.commands,
+    ],
+    executeCommand: (id: string) =>
+      id === "extension-market"
+        ? (setSettingsOpen(false), setMarketOpen(true))
+        : id.startsWith("extension:")
+          ? readerExtensions.execute(id)
+          : baseModel.executeCommand(id),
+  };
   return (
     <div
       className={`product-shell workbench-shell${collapsed ? " workbench-sidebar-hidden" : ""}${narrow ? " workbench-narrow" : ""}`}
@@ -139,7 +172,7 @@ export function RootApp() {
             aria-label="工作空间"
             value={space}
             onChange={(event) => {
-              setSettingsOpen(false);
+              closeGlobalPage();
               setNavigationOpen(false);
               const next = event.target.value as "reader" | "ai";
               if (next === "ai") setVisitedAi(true);
@@ -153,19 +186,24 @@ export function RootApp() {
         <div className="workbench-primary-actions">
           <button
             onClick={() => {
+              closeGlobalPage();
               if (space === "reader") {
                 bookroom.setPage("search");
                 setNavigationOpen(false);
-              } else document.querySelector<HTMLInputElement>(".ai-search")?.focus();
+              } else {
+                setAiAction({ key: Date.now(), type: "search" });
+                setNavigationOpen(false);
+              }
             }}
           >
             <Icon name="search" />
             <span>搜索</span>
-            <kbd>{space === "reader" ? "Ctrl Shift F" : ""}</kbd>
+            <kbd>Ctrl Shift F</kbd>
           </button>
           {space === "reader" && (
             <button
               onClick={() => {
+                closeGlobalPage();
                 setNavigationOpen(false);
                 if (model.workspacePath) void model.handleCreateWorkspaceNote("");
                 else void model.openSelectedFile();
@@ -176,7 +214,13 @@ export function RootApp() {
             </button>
           )}
         </div>
-        <div className="workbench-sidebar-content" hidden={space !== "reader"}>
+        <div
+          className="workbench-sidebar-content"
+          hidden={space !== "reader"}
+          onClickCapture={(event) => {
+            if ((event.target as Element).closest("button")) closeGlobalPage();
+          }}
+        >
           <nav className="reader-collection-nav" aria-label="阅读内容">
             {(
               [
@@ -215,13 +259,27 @@ export function RootApp() {
           hidden={space !== "ai"}
           ref={setAiSidebar}
           onClickCapture={(event) => {
+            if ((event.target as Element).closest("button")) closeGlobalPage();
             if (narrow && (event.target as Element).closest("nav button")) setNavigationOpen(false);
           }}
         />
         <footer className="workbench-sidebar-footer">
           <button
+            aria-current={marketOpen ? "page" : undefined}
             onClick={() => {
               setNavigationOpen(false);
+              setSettingsOpen(false);
+              setMarketOpen(true);
+            }}
+          >
+            <Icon name="extensions" />
+            插件市场
+          </button>
+          <button
+            aria-current={settingsOpen ? "page" : undefined}
+            onClick={() => {
+              setNavigationOpen(false);
+              setMarketOpen(false);
               setSettingsOpen(true);
             }}
           >
@@ -257,13 +315,13 @@ export function RootApp() {
         )}
       </aside>
       <div className="workbench-main">
-        {collapsed && space === "ai" && (
+        {collapsed && (space === "ai" || marketOpen) && (
           <button className="restore-sidebar" onClick={() => shellModel.setSidebarCollapsed(false)}>
             <Icon name="sidebar" />
             显示导航
           </button>
         )}
-        <div className="space-pane" hidden={space !== "reader"}>
+        <div className="space-pane" hidden={space !== "reader" || marketOpen}>
           <App
             model={shellModel}
             panes={panes}
@@ -303,7 +361,7 @@ export function RootApp() {
           />
         </div>
         {visitedAi && (
-          <div className="space-pane" hidden={space !== "ai"}>
+          <div className="space-pane" hidden={space !== "ai" || marketOpen}>
             <Suspense
               fallback={
                 <div className="ai-loading" role="status">
@@ -311,11 +369,42 @@ export function RootApp() {
                 </div>
               }
             >
-              <AiSpace active={space === "ai"} sidebarTarget={aiSidebar} />
+              <AiSpace
+                active={space === "ai" && !marketOpen}
+                sidebarTarget={aiSidebar}
+                action={aiAction}
+                onNavigate={() => {
+                  closeGlobalPage();
+                  setNavigationOpen(false);
+                }}
+              />
             </Suspense>
           </div>
         )}
+        {marketOpen && (
+          <Suspense
+            fallback={
+              <div className="ai-loading" role="status">
+                正在打开插件市场…
+              </div>
+            }
+          >
+            <ExtensionMarket
+              manager={extensions}
+              onClose={() => setMarketOpen(false)}
+              onOpenSkill={(id) => {
+                setMarketOpen(false);
+                setVisitedAi(true);
+                setSpace("ai");
+                setAiAction({ key: Date.now(), type: "skill", id });
+              }}
+            />
+          </Suspense>
+        )}
       </div>
+      {readerExtensions.run && (
+        <ExtensionResult run={readerExtensions.run} onClose={readerExtensions.close} onApply={readerExtensions.apply} />
+      )}
       {bookroom.notice && (
         <div className="workbench-notice" role="status">
           {bookroom.notice}

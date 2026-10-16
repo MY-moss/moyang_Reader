@@ -1,5 +1,11 @@
 # Moyang Reader
 
+## Reader Next 重构版（0.12.0）
+
+新的阅读与 AI 工作台位于 **[moyang-reader-next](moyang-reader-next/README.md)**，包含独立知识/记忆/技能库、MCP 接入与插件市场。查看[本轮检查与验收报告](moyang-reader-next/docs/VALIDATION-EXTENSIONS.md)、[插件市场指南](moyang-reader-next/docs/EXTENSIONS.md)和[迁移说明](moyang-reader-next/docs/MIGRATION.md)。在该目录使用原有 `npm run dev`、`npm run desktop`、`npm run build`。
+
+原工程继续保留；下文介绍的是原版及其发布渠道。Next 的便携包与个人数据不提交到源码仓库，启动及本地打包见重构版说明。
+
 一个 **Windows x64、阅读器优先、本地优先** 的文档阅读/编辑工具。
 
 目标不是复制 Obsidian、Notion、VS Code 或 AI 客户端，而是把本地 Markdown 与常见文档的 **打开 → 阅读 → 查找 → 批注 → 编辑 → 保存 → 恢复 → 导出** 做得可靠、轻量，并保持普通文件始终是真源。

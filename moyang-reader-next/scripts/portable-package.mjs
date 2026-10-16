@@ -2,6 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
+// Windows can briefly hold freshly copied executables. Keep publication atomic
+// and leave the previous latest pointer intact if the lock does not clear.
+function publishRename(source, destination) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(source, destination);
+      return;
+    } catch (error) {
+      if (!["EPERM", "EBUSY"].includes(error.code) || attempt >= 10) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    }
+  }
+}
+
 // Node 22's native cpSync aborts on some Windows volumes used by this project.
 function copyTree(source, destination, filter = () => true) {
   if (!filter(source)) return;
@@ -72,9 +86,9 @@ export function assemblePortablePackage({ root, target, outputRoot = path.join(r
     })),
   };
   fs.writeFileSync(path.join(stage, "SHA256.json"), JSON.stringify(manifest, null, 2));
-  fs.renameSync(stage, destination);
+  publishRename(stage, destination);
   const pointer = path.join(outputRoot, `.latest-${crypto.randomUUID()}.json`);
   fs.writeFileSync(pointer, JSON.stringify({ directory: name, ...manifest }, null, 2));
-  fs.renameSync(pointer, path.join(outputRoot, "latest.json"));
+  publishRename(pointer, path.join(outputRoot, "latest.json"));
   return { destination, ...manifest };
 }

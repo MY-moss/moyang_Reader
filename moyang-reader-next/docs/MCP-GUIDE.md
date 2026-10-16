@@ -1,6 +1,8 @@
 # MCP 与任务沉淀接口
 
-0.11.0 使用 stdio MCP。桌面“AI 空间 → 接入与备份”显示真实可执行文件、数据目录和客户端连接状态。`tools/list` 的 JSON Schema 是参数契约，类型定义位于 `crates/ai-core/src/types.rs` 与 `lifecycle.rs`；不要从示例猜测未列出的字段。
+0.12.0 继续使用 stdio MCP。桌面“AI 空间 → 接入与备份”显示真实可执行文件、数据目录和客户端连接状态。`tools/list` 的 JSON Schema 是参数契约，类型定义位于 `crates/ai-core/src/types.rs` 与 `lifecycle.rs`；不要从示例猜测未列出的字段。
+
+插件市场另可安装外部 MCP 连接，使用独立的 `moyang-ext-<扩展 ID>` 名称；预览、备份、精确合并和移除流程见 [扩展指南](EXTENSIONS.md)。这些外部服务与本应用的记忆工具分别管理，配置成功不等同于完成客户端信任或启动验证。
 
 ## 接入
 
