@@ -1,0 +1,41 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import JSZip from "jszip";
+
+test("release cleanup verifies archives, reuses identical models, and preserves current package", { skip: process.platform !== "win32" }, async (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-release-archive-"));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const root = path.join(base, "project"), archive = path.join(base, "archive");
+  const write = (name, text) => {
+    const file = path.join(root, name);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+  };
+  write("package.json", JSON.stringify({ name: "moyang-reader-next" }));
+  write("release/latest.json", JSON.stringify({ directory: "current", version: "1.0.0" }));
+  write("release/current/Moyang Reader Next.exe", "current executable");
+  write("release/publish-1.0.0/package.zip", "current download");
+  write("release/old/Moyang Reader Next.exe", "old executable");
+  write("release/old/ollama/models/shared", "same model");
+  write("release/old/ollama/models/unique", "old unique model");
+  write(".local/ollama/models/shared", "same model");
+  const args = ["-NoProfile", "-File", path.resolve("scripts/archive-releases.ps1"), "-Root", root, "-ArchiveRoot", archive];
+  execFileSync("powershell.exe", args, { windowsHide: true, stdio: "pipe" });
+  assert.ok(fs.existsSync(path.join(root, "release/old/Moyang Reader Next.exe")));
+  execFileSync("powershell.exe", [...args, "-Apply"], { windowsHide: true, stdio: "pipe" });
+  assert.equal(fs.existsSync(path.join(root, "release/old")), false);
+  assert.equal(fs.readFileSync(path.join(root, "release/current/Moyang Reader Next.exe"), "utf8"), "current executable");
+  assert.ok(fs.existsSync(path.join(root, "release/publish-1.0.0/package.zip")));
+  assert.equal(fs.readFileSync(path.join(root, ".local/ollama/models/shared"), "utf8"), "same model");
+  const zipFile = fs.readdirSync(archive).find((name) => name.endsWith(".zip"));
+  const zip = await JSZip.loadAsync(fs.readFileSync(path.join(archive, zipFile)));
+  assert.equal(await zip.file("Moyang Reader Next.exe").async("string"), "old executable");
+  assert.equal(await zip.file("ollama/models/unique").async("string"), "old unique model");
+  assert.equal(zip.file("ollama/models/shared"), null);
+  const manifest = JSON.parse(await zip.file("_archive-manifest.json").async("string"));
+  assert.equal(manifest.files.find((file) => file.path === "ollama/models/shared").reuse, path.join(root, ".local/ollama/models/shared"));
+});

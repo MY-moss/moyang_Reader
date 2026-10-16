@@ -55,6 +55,7 @@ export type ExtensionState = {
 };
 export type ExtensionLocation = { line: number; from: number; to: number };
 export type ExtensionDocumentAnalysis = {
+  protectedRanges?: ExtensionLocation[];
   headings: Array<ExtensionLocation & { depth: number; text: string }>;
   tasks: Array<ExtensionLocation & { checked: boolean; text: string }>;
   links: Array<ExtensionLocation & { text: string; url: string; image: boolean }>;

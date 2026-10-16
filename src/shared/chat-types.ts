@@ -5,6 +5,8 @@ export type ChatProvider = {
   protocol: ChatProtocol;
   baseUrl: string;
   model: string;
+  /** Available model IDs; older profiles only have a default model. */
+  models?: string[];
   hasKey: boolean;
 };
 export type ChatSource = {

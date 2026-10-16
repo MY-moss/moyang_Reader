@@ -165,6 +165,69 @@ test("model lookup does not offer an ineffective stop-test action", async ({ pag
   await expect(page.getByRole("button", { name: "返回聊天", exact: true })).toBeEnabled();
 });
 
+test("provider model catalogs persist, select per conversation, and keep user messages compact", async ({ page }) => {
+  await installChat(page);
+  await configure(page);
+  await page.route("http://localhost:7331/v1/models", (route) =>
+    route.fulfill({
+      json: { data: [{ id: "fast-model" }, { id: "careful-model" }, { id: "fast-model" }] },
+    }),
+  );
+  await page.getByRole("button", { name: "API 服务", exact: true }).click();
+  await page.getByRole("button", { name: "获取模型", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("并保存");
+  await expect(page.getByLabel("可选模型列表")).toHaveValue("test-model\nfast-model\ncareful-model");
+  await page.getByRole("button", { name: "返回聊天", exact: true }).click();
+  await page.getByLabel("本次模型", { exact: true }).selectOption({ label: "careful-model" });
+  const sent: string[] = [];
+  await page.route("http://localhost:7331/v1/chat/completions", (route) => {
+    sent.push(route.request().postDataJSON().model);
+    return route.fulfill({
+      contentType: "text/event-stream",
+      body: 'data: {"choices":[{"delta":{"content":"收到。"}}]}\n\ndata: [DONE]\n\n',
+    });
+  });
+  await page.getByLabel("聊天消息").fill("你好");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(page.locator(".chat-message-assistant")).toContainText("收到。");
+  const card = await page.locator(".chat-message-user").boundingBox();
+  expect(card!.height).toBeLessThan(90);
+  expect(card!.width).toBeLessThan(300);
+  await page.locator(".chat-message-user").getByRole("button", { name: "复制消息" }).focus();
+  await expect(page.locator(".chat-message-user").getByRole("button", { name: "复制消息" })).toBeFocused();
+  await page.reload();
+  await page.getByRole("button", { name: "书房聊天", exact: true }).click();
+  await expect(page.getByLabel("本次模型", { exact: true })).toHaveValue("2");
+  await page.getByRole("button", { name: "API 服务", exact: true }).click();
+  await expect(page.getByLabel("默认模型", { exact: true })).toHaveValue("test-model");
+  await expect(page.getByLabel("可选模型列表")).toHaveValue("test-model\nfast-model\ncareful-model");
+  await page.route("http://localhost:7331/v1/models", (route) =>
+    route.fulfill({ status: 503, body: "temporary failure" }),
+  );
+  await page.getByRole("button", { name: "获取模型", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByLabel("可选模型列表")).toHaveValue("test-model\nfast-model\ncareful-model");
+  await page.getByRole("button", { name: "返回聊天", exact: true }).click();
+  await page.getByLabel("本次模型", { exact: true }).selectOption("custom");
+  await page.getByLabel("自定义模型 ID", { exact: true }).fill("private/custom-model");
+  await page.getByLabel("聊天消息").fill("第一行\n第二行，保留换行。\n" + "长网址文字".repeat(60));
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(page.locator(".chat-message-assistant")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "重新回答" })).toBeEnabled();
+  expect(sent).toEqual(["careful-model", "private/custom-model"]);
+  for (const width of [1440, 720]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(
+      await page
+        .locator(".chat-message-user")
+        .last()
+        .evaluate((el) => el.scrollWidth <= el.clientWidth),
+    ).toBe(true);
+    await page.screenshot({ path: `.local/screenshots/chat-models-${width}.png`, fullPage: true });
+  }
+});
+
 test("Anthropic failures preserve the prompt and retry without duplicating it", async ({ page }) => {
   let calls = 0;
   await page.route("http://localhost:7331/v1/messages", async (route) => {

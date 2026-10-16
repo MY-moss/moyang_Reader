@@ -1,7 +1,7 @@
 import type { ExtensionPackage, McpConfiguration } from "../../shared/extension-types";
 import { contentHash } from "../documents/source-chunks";
 
-export const APP_VERSION = "0.16.0";
+export const APP_VERSION = __MOYANG_VERSION__;
 export const MAX_PACKAGE_BYTES = 16 * 1024 * 1024;
 export const themeTokens = [
   "--canvas",

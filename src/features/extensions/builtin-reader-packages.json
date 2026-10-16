@@ -106,5 +106,63 @@
     "files": {
       "main.js": "export default function health({ analysis, title }) {\n    const { headings, links } = analysis;\n    const findings = [];\n    const seen = new Set();\n    let depth = 0;\n    for (const heading of headings) {\n        if (depth && heading.depth > depth + 1)\n            findings.push({\n                ...heading,\n                label: \"标题层级跳跃\",\n                detail: `从 ${depth} 级跳到 ${heading.depth} 级，检查是否缺少中间章节。`,\n            });\n        const normalized = heading.text.trim().toLocaleLowerCase();\n        if (seen.has(normalized))\n            findings.push({ ...heading, label: \"重复标题\", detail: `“${heading.text}”出现多次；若需引用章节，请核对目标。` });\n        if (!normalized)\n            findings.push({ ...heading, label: \"空标题\", detail: \"补充标题文字，便于目录导航。\" });\n        seen.add(normalized);\n        depth = heading.depth;\n    }\n    for (const link of links) {\n        if (!link.url)\n            findings.push({ ...link, label: \"链接目标为空\", detail: \"补充链接目标，或改为普通文字。\" });\n        if (!link.text.trim())\n            findings.push({ ...link, label: link.image ? \"图片缺少替代文字\" : \"链接缺少说明\", detail: link.url });\n    }\n    const report = `${title} · 文档体检\\n\\n${headings.some((h) => h.depth === 1) ? \"已包含一级标题。\" : \"建议添加一级标题，方便识别文档主题。\"}\\n发现 ${findings.length} 处可核对的结构问题。重复标题也可能是有意安排，请按实际内容判断。这里只检查结构，不检查事实或外部链接有效性。`;\n    return {\n        report,\n        findings,\n        files: [\n            {\n                name: \"文档体检.md\",\n                content: report +\n                    \"\\n\\n\" +\n                    findings.map((item) => `- 第 ${item.line} 行 · ${item.label}：${item.detail}`).join(\"\\n\") +\n                    \"\\n\",\n            },\n        ],\n    };\n}"
     }
+  },
+  {
+    "id": "moyang.reading-report",
+    "name": "阅读概览",
+    "description": "统计中文字符、英文词数、标题与阅读时间，并列出文档大纲。",
+    "readme": "打开一份文档，运行“生成阅读概览”。只读取当前页，不修改内容，不联网。Markdown 大纲识别正式标题，忽略代码示例与文档属性。阅读时长按每分钟约 400 个汉字或 200 个英文词估算。",
+    "formats": [
+      "markdown",
+      "text",
+      "docx"
+    ],
+    "format": "moyang-extension",
+    "version": "1.0.1",
+    "minAppVersion": "0.17.0",
+    "kind": "reader",
+    "author": "Moyang",
+    "license": "MIT",
+    "homepage": "https://github.com/MY-moss/moyang_Reader",
+    "documentAnalysis": true,
+    "entry": "main.js",
+    "commands": [
+      {
+        "id": "report",
+        "name": "生成阅读概览"
+      }
+    ],
+    "files": {
+      "main.js": "export default function overview({ text, title, analysis, format }) {\n    const chinese = (text.match(/[\\u3400-\\u9fff]/g) ?? []).length;\n    const words = (text.match(/[a-zA-Z]+(?:['’-][a-zA-Z]+)*/g) ?? []).length;\n    const headings = format === \"markdown\" ? (analysis?.headings ?? []) : [];\n    const minutes = Math.max(1, Math.ceil(chinese / 400 + words / 200));\n    return {\n        report: `${title}\\n\\n中文字符：${chinese}\\n英文词数：${words}\\n预计阅读：${minutes} 分钟\\n\\n` +\n            (headings.length\n                ? `文档大纲\\n${headings.map((heading) => `${\"#\".repeat(heading.depth)} ${heading.text}`).join(\"\\n\")}`\n                : \"未找到 Markdown 标题。\"),\n    };\n}"
+    }
+  },
+  {
+    "id": "moyang.tidy-markdown",
+    "name": "段落留白整理",
+    "description": "把连续多余空行收为一个段落间隔，保留代码块、文档属性、硬换行与原换行格式。",
+    "readme": "运行后先显示修改前后内容，采用后可用原有撤销恢复。仅整理 Markdown/TXT 的多余空行，不重排文字或更改链接；Markdown 的围栏代码、缩进代码和文档属性保持原样。",
+    "formats": [
+      "markdown",
+      "text"
+    ],
+    "format": "moyang-extension",
+    "version": "1.0.1",
+    "minAppVersion": "0.17.0",
+    "kind": "reader",
+    "author": "Moyang",
+    "license": "MIT",
+    "homepage": "https://github.com/MY-moss/moyang_Reader",
+    "documentAnalysis": true,
+    "entry": "main.js",
+    "commands": [
+      {
+        "id": "tidy",
+        "name": "整理段落留白",
+        "modifiesDocument": true
+      }
+    ],
+    "files": {
+      "main.js": "export default function tidy({ text, analysis }) {\n    const ranges = analysis?.protectedRanges ?? [];\n    const lines = text.split(/(\\r\\n|\\n|\\r)/);\n    let empty = 0, offset = 0, rangeIndex = 0;\n    const out = [];\n    for (let i = 0; i < lines.length; i += 2) {\n        const line = lines[i], ending = lines[i + 1] ?? \"\";\n        while (rangeIndex < ranges.length && ranges[rangeIndex].to <= offset)\n            rangeIndex++;\n        const range = ranges[rangeIndex];\n        const protectedLine = range && range.from <= offset + line.length && range.to > offset;\n        if (protectedLine || line.trim()) {\n            empty = 0;\n            out.push(line, ending);\n        }\n        else if (++empty <= 1)\n            out.push(line, ending);\n        offset += line.length + ending.length;\n    }\n    return { replacement: out.join(\"\"), report: \"已整理多余空行；代码块、文档属性和 Markdown 硬换行保持原样。\" };\n}"
+    }
   }
 ]

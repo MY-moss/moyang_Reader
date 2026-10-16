@@ -16,6 +16,8 @@ pub struct Provider {
     pub base_url: String,
     pub model: String,
     #[serde(default)]
+    pub models: Vec<String>,
+    #[serde(default)]
     pub has_key: bool,
 }
 
@@ -107,6 +109,20 @@ pub fn provider_request(path: &Path, operation: &str, payload: Value) -> Result<
                 return Err("请填写服务名称并选择协议。".into());
             }
             endpoint(&provider, false)?;
+            if payload.get("models").is_none() {
+                provider.models = load_provider(&db, &provider.id)
+                    .map(|v| v.0.models)
+                    .unwrap_or_default();
+            }
+            provider.model = provider.model.trim().to_string();
+            provider.models.push(provider.model.clone());
+            let mut seen = std::collections::HashSet::new();
+            provider.models = provider
+                .models
+                .into_iter()
+                .map(|id| id.trim().to_string())
+                .filter(|id| !id.is_empty() && seen.insert(id.clone()))
+                .collect();
             let old = load_provider(&db, &provider.id)
                 .ok()
                 .map(|v| v.1)
@@ -171,5 +187,34 @@ impl crate::Store {
     pub(crate) fn service(&self, id: &str) -> crate::Result<(Provider, String)> {
         let db = database(&self.services_directory()?).map_err(|e| crate::invalid(&e))?;
         load_provider(&db, id).map_err(|e| crate::invalid(&e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn model_catalog_roundtrips_preserving_legacy_profiles_and_credentials() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut input = json!({"id":"multi","name":"多模型服务","protocol":"openai","baseUrl":"http://localhost:7331/v1","model":"fast","apiKey":"test-secret"});
+        let old = provider_request(dir.path(), "save_provider", input.clone()).unwrap();
+        assert_eq!(old["models"], json!(["fast"]));
+        input["models"] = json!(["fast", " careful ", "fast", ""]);
+        input.as_object_mut().unwrap().remove("apiKey");
+        let saved = provider_request(dir.path(), "save_provider", input.clone()).unwrap();
+        assert_eq!(saved["models"], json!(["fast", "careful"]));
+        assert_eq!(saved["hasKey"], true);
+        input.as_object_mut().unwrap().remove("models");
+        input["name"] = json!("旧客户端改名");
+        provider_request(dir.path(), "save_provider", input).unwrap();
+        let list = provider_request(dir.path(), "providers", json!({})).unwrap();
+        assert_eq!(list[0]["models"], json!(["fast", "careful"]));
+        assert!(!list.to_string().contains("test-secret"));
+        assert_eq!(
+            load_provider(&database(dir.path()).unwrap(), "multi")
+                .unwrap()
+                .1,
+            "test-secret"
+        );
     }
 }

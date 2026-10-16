@@ -1,6 +1,40 @@
 import type { ExtensionInput, ExtensionOutput, ExtensionPackage } from "../../shared/extension-types";
 
 // Each function is serialized as a standalone module. Keep dependencies inside its body.
+function overview({ text, title, analysis, format }: ExtensionInput): ExtensionOutput {
+  const chinese = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
+  const words = (text.match(/[a-zA-Z]+(?:['’-][a-zA-Z]+)*/g) ?? []).length;
+  const headings = format === "markdown" ? (analysis?.headings ?? []) : [];
+  const minutes = Math.max(1, Math.ceil(chinese / 400 + words / 200));
+  return {
+    report:
+      `${title}\n\n中文字符：${chinese}\n英文词数：${words}\n预计阅读：${minutes} 分钟\n\n` +
+      (headings.length
+        ? `文档大纲\n${headings.map((heading) => `${"#".repeat(heading.depth)} ${heading.text}`).join("\n")}`
+        : "未找到 Markdown 标题。"),
+  };
+}
+function tidy({ text, analysis }: ExtensionInput): ExtensionOutput {
+  const ranges = analysis?.protectedRanges ?? [];
+  const lines = text.split(/(\r\n|\n|\r)/);
+  let empty = 0,
+    offset = 0,
+    rangeIndex = 0;
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 2) {
+    const line = lines[i],
+      ending = lines[i + 1] ?? "";
+    while (rangeIndex < ranges.length && ranges[rangeIndex].to <= offset) rangeIndex++;
+    const range = ranges[rangeIndex];
+    const protectedLine = range && range.from <= offset + line.length && range.to > offset;
+    if (protectedLine || line.trim()) {
+      empty = 0;
+      out.push(line, ending);
+    } else if (++empty <= 1) out.push(line, ending);
+    offset += line.length + ending.length;
+  }
+  return { replacement: out.join(""), report: "已整理多余空行；代码块、文档属性和 Markdown 硬换行保持原样。" };
+}
 function tasks({ analysis, title }: ExtensionInput): ExtensionOutput {
   const tasks = analysis!.tasks;
   const pending = tasks.filter((task) => !task.checked);
@@ -161,5 +195,42 @@ export const practicalReaders: ExtensionPackage[] = [
     "打开 Markdown 文档后，从此页直接运行，或在阅读页的更多操作中选择阅读插件。只处理当前文档，不联网，不修改正文；代码块和文档属性不会当作正文解析。结果可点击定位、复制或导出。",
   entry: "main.js",
   commands: [{ id: "run", name: command }],
+  files: { "main.js": `export default ${run.toString()}` },
+}));
+
+export const basicReaders: ExtensionPackage[] = [
+  {
+    id: "moyang.reading-report",
+    name: "阅读概览",
+    description: "统计中文字符、英文词数、标题与阅读时间，并列出文档大纲。",
+    readme:
+      "打开一份文档，运行“生成阅读概览”。只读取当前页，不修改内容，不联网。Markdown 大纲识别正式标题，忽略代码示例与文档属性。阅读时长按每分钟约 400 个汉字或 200 个英文词估算。",
+    formats: ["markdown", "text", "docx"],
+    command: { id: "report", name: "生成阅读概览" },
+    run: overview,
+  },
+  {
+    id: "moyang.tidy-markdown",
+    name: "段落留白整理",
+    description: "把连续多余空行收为一个段落间隔，保留代码块、文档属性、硬换行与原换行格式。",
+    readme:
+      "运行后先显示修改前后内容，采用后可用原有撤销恢复。仅整理 Markdown/TXT 的多余空行，不重排文字或更改链接；Markdown 的围栏代码、缩进代码和文档属性保持原样。",
+    formats: ["markdown", "text"],
+    command: { id: "tidy", name: "整理段落留白", modifiesDocument: true },
+    run: tidy,
+  },
+].map(({ command, run, ...metadata }) => ({
+  ...metadata,
+  format: "moyang-extension",
+  version: "1.0.1",
+  minAppVersion: "0.17.0",
+  kind: "reader",
+  author: "Moyang",
+  license: "MIT",
+  homepage: "https://github.com/MY-moss/moyang_Reader",
+  formats: metadata.formats as ExtensionPackage["formats"],
+  documentAnalysis: true,
+  entry: "main.js",
+  commands: [command],
   files: { "main.js": `export default ${run.toString()}` },
 }));

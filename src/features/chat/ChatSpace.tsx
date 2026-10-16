@@ -12,6 +12,7 @@ import { ProviderSettings } from "./ProviderSettings";
 import { useChat } from "./useChat";
 import { ContextPreview } from "./ContextPreview";
 import { AttachmentPicker } from "./AttachmentPicker";
+import { ModelPicker } from "./ModelPicker";
 
 function MessageBody({ message, streaming }: { message: ChatMessage; streaming: boolean }) {
   const [html, setHtml] = useState("");
@@ -241,7 +242,7 @@ export default function ChatSpace({
         ) : (
           m.thread.messages.map((message, index) => (
             <article key={message.id} className={`chat-message chat-message-${message.role}`}>
-              <header>
+              <header className={message.role === "user" ? "sr-only" : undefined}>
                 <strong>{message.role === "user" ? "我" : message.provider || "助手"}</strong>
                 <small>{message.model}</small>
               </header>
@@ -283,7 +284,7 @@ export default function ChatSpace({
                     }
                   >
                     <Icon name="copy" />
-                    复制
+                    <span className={message.role === "user" ? "sr-only" : undefined}>复制</span>
                   </button>
                   {message.role === "assistant" && (
                     <>
@@ -430,12 +431,12 @@ export default function ChatSpace({
                 ))}
               </select>
             </label>
-            <input
-              aria-label="本次模型"
-              placeholder="模型 ID"
+            <ModelPicker
+              key={m.thread.providerId}
+              provider={provider}
               disabled={m.busy || m.switching}
               value={m.thread.model}
-              onChange={(e) => m.change({ model: e.target.value })}
+              onChange={(model) => m.change({ model })}
             />
           </div>
           {attached && (

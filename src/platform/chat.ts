@@ -1,6 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "./bridge";
 import type { ChatProvider, ChatUsage } from "../shared/chat-types";
+import { providerModels } from "../shared/provider-models";
 import { apiEndpoint, streamDecoder } from "../features/chat/protocol";
 
 const keys = new Map<string, string>();
@@ -95,6 +96,10 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
           protocol: payload.protocol,
           baseUrl: payload.baseUrl,
           model: payload.model,
+          models: providerModels({
+            model: String(payload.model ?? ""),
+            models: (payload.models ?? old?.models) as string[] | undefined,
+          }),
           hasKey,
         };
         store.put(result);
