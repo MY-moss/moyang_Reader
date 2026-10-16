@@ -1,0 +1,248 @@
+:root[data-theme="dark"] .settings-persistence-error {
+  color: #f0b69f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .settings-persistence-error {
+    color: #f0b69f;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .file-type {
+    background: #304844;
+    color: #eef3ed;
+  }
+}
+
+:root[data-theme="dark"] .file-type {
+  background: #304844;
+  color: #eef3ed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .statusbar {
+    color: var(--muted);
+  }
+}
+
+:root[data-theme="dark"] .statusbar {
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --canvas: #1b201f;
+    --surface: #222826;
+    --surface-strong: #2a302e;
+    --ink: #e8e8e1;
+    --muted: #a3aaa3;
+    --line: #39423f;
+    --accent: #8fc3b8;
+    --accent-deep: #a9d9cf;
+    --accent-soft: #304844;
+    --search-hit: #92722b;
+    --search-hit-active: #bb7040;
+  }
+  :root:not([data-theme]) .topbar,
+  :root:not([data-theme]) .sidebar,
+  :root:not([data-theme]) .statusbar {
+    background: #1d2321;
+  }
+  :root:not([data-theme]) .file-card {
+    background: #252c2a;
+    border-color: var(--line);
+  }
+  :root:not([data-theme]) .markdown-body,
+  :root:not([data-theme]) .markdown-body h1,
+  :root:not([data-theme]) .markdown-body h2,
+  :root:not([data-theme]) .markdown-body h3,
+  :root:not([data-theme]) .markdown-body h4,
+  :root:not([data-theme]) .markdown-body h5,
+  :root:not([data-theme]) .markdown-body h6,
+  :root:not([data-theme]) .source-editor {
+    color: #e8e8e1;
+  }
+  :root:not([data-theme]) .markdown-body code {
+    background: #323a37;
+    color: #f0b69f;
+  }
+  :root:not([data-theme]) .markdown-body th {
+    background: #303734;
+  }
+  :root:not([data-theme]) .error-state {
+    border-color: #70463e;
+    background: #372522;
+  }
+  :root:not([data-theme]) .update-notice-error {
+    border-color: #70463e;
+    background: #372522;
+  }
+  :root:not([data-theme]) .external-change-notice {
+    border-color: #77613b;
+    background: #3a3325;
+    color: #e6c981;
+  }
+  :root:not([data-theme]) .external-change-notice strong {
+    color: #f0d79a;
+  }
+  :root:not([data-theme]) .external-change-notice button {
+    border-color: #987a43;
+    background: #423a2a;
+    color: #efd28b;
+  }
+  :root:not([data-theme]) .workspace-folder,
+  :root:not([data-theme]) .workspace-file,
+  :root:not([data-theme]) .workspace-result {
+    color: #b6b7ae;
+  }
+  :root:not([data-theme]) .backlink-list button {
+    color: #b6b7ae;
+  }
+  :root:not([data-theme]) .backlink-list button:hover {
+    background: #2a3531;
+    color: var(--accent-deep);
+  }
+  :root:not([data-theme]) .outgoing-list button {
+    color: #b6b7ae;
+  }
+  :root:not([data-theme]) .outgoing-list button:hover {
+    background: #2a3531;
+    color: var(--accent-deep);
+  }
+  :root:not([data-theme]) .unresolved-link button {
+    background: #252c2a;
+  }
+  :root:not([data-theme]) .workspace-folder:hover,
+  :root:not([data-theme]) .workspace-file:hover,
+  :root:not([data-theme]) .workspace-file.active,
+  :root:not([data-theme]) .workspace-result:hover {
+    background: #2a3531;
+    color: var(--accent-deep);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #1b201f;
+  --surface: #222826;
+  --surface-strong: #2a302e;
+  --ink: #e8e8e1;
+  --muted: #a3aaa3;
+  --line: #39423f;
+  --accent: #8fc3b8;
+  --accent-deep: #a9d9cf;
+  --accent-soft: #304844;
+  --search-hit: #92722b;
+  --search-hit-active: #bb7040;
+}
+
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .statusbar {
+  background: #1d2321;
+}
+
+:root[data-theme="dark"] .file-card {
+  background: #252c2a;
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .markdown-body,
+:root[data-theme="dark"] .markdown-body h1,
+:root[data-theme="dark"] .markdown-body h2,
+:root[data-theme="dark"] .markdown-body h3,
+:root[data-theme="dark"] .markdown-body h4,
+:root[data-theme="dark"] .markdown-body h5,
+:root[data-theme="dark"] .markdown-body h6,
+:root[data-theme="dark"] .source-editor {
+  color: #e8e8e1;
+}
+
+:root[data-theme="dark"] .markdown-body code {
+  background: #323a37;
+  color: #f0b69f;
+}
+
+:root[data-theme="dark"] .markdown-body th {
+  background: #303734;
+}
+
+:root[data-theme="dark"] .error-state {
+  border-color: #70463e;
+  background: #372522;
+}
+
+:root[data-theme="dark"] .update-notice-error {
+  border-color: #70463e;
+  background: #372522;
+}
+
+:root[data-theme="dark"] .external-change-notice {
+  border-color: #77613b;
+  background: #3a3325;
+  color: #e6c981;
+}
+
+:root[data-theme="dark"] .external-change-notice strong {
+  color: #f0d79a;
+}
+
+:root[data-theme="dark"] .external-change-notice button {
+  border-color: #987a43;
+  background: #423a2a;
+  color: #efd28b;
+}
+
+:root[data-theme="dark"] .workspace-folder,
+:root[data-theme="dark"] .workspace-file,
+:root[data-theme="dark"] .workspace-result {
+  color: #b6b7ae;
+}
+
+:root[data-theme="dark"] .backlink-list button {
+  color: #b6b7ae;
+}
+
+:root[data-theme="dark"] .backlink-list button:hover {
+  background: #2a3531;
+  color: var(--accent-deep);
+}
+
+:root[data-theme="dark"] .outgoing-list button {
+  color: #b6b7ae;
+}
+
+:root[data-theme="dark"] .outgoing-list button:hover {
+  background: #2a3531;
+  color: var(--accent-deep);
+}
+
+:root[data-theme="dark"] .unresolved-link button {
+  background: #252c2a;
+}
+
+:root[data-theme="dark"] .workspace-folder:hover,
+:root[data-theme="dark"] .workspace-file:hover,
+:root[data-theme="dark"] .workspace-file.active,
+:root[data-theme="dark"] .workspace-result:hover {
+  background: #2a3531;
+  color: var(--accent-deep);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --line-strong: #53645d;
+    --accent-warm: #d58a69;
+    --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.2);
+    --shadow-lifted: 0 18px 48px rgba(0, 0, 0, 0.32);
+  }
+}
+
+:root[data-theme="dark"] {
+  --line-strong: #53645d;
+  --accent-warm: #d58a69;
+  --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.2);
+  --shadow-lifted: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
