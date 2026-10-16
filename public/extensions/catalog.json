@@ -2,6 +2,176 @@
   "format": "moyang-extension-catalog",
   "packages": [
     {
+      "id": "moyang.task-extract",
+      "name": "待办提取",
+      "description": "从当前笔记提取未完成与已完成任务，回到原文核对，导出独立清单。",
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.14.0",
+      "kind": "reader",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "formats": [
+        "markdown"
+      ],
+      "documentAnalysis": true,
+      "readme": "打开 Markdown 文档后，从此页直接运行，或在阅读页的更多操作中选择阅读插件。只处理当前文档，不联网，不修改正文；代码块和文档属性不会当作正文解析。结果可点击定位、复制或导出。",
+      "entry": "main.js",
+      "commands": [
+        {
+          "id": "run",
+          "name": "提取文档待办"
+        }
+      ],
+      "files": {
+        "main.js": "export default function tasks({ analysis, title }) {\n    const tasks = analysis.tasks;\n    const pending = tasks.filter((task) => !task.checked);\n    const done = tasks.filter((task) => task.checked);\n    const lines = (items) => items.map((task) => `- [${task.checked ? \"x\" : \" \"}] ${task.text}（原文第 ${task.line} 行）`).join(\"\\n\");\n    const report = `${title} · 待办清单\\n\\n未完成 ${pending.length} 项，已完成 ${done.length} 项。`;\n    return {\n        report: report + (!tasks.length ? \"\\n未找到 Markdown 复选任务，例如 - [ ] 待办。\" : \"\"),\n        findings: [...pending, ...done].map((task) => ({\n            ...task,\n            label: `${task.checked ? \"已完成\" : \"待办\"} · ${task.text}`,\n        })),\n        files: tasks.length\n            ? [\n                {\n                    name: \"待办清单.md\",\n                    content: `# ${title} · 待办\\n\\n## 未完成\\n\\n${lines(pending) || \"无\"}\\n\\n## 已完成\\n\\n${lines(done) || \"无\"}\\n`,\n                },\n            ]\n            : [],\n    };\n}"
+      }
+    },
+    {
+      "id": "moyang.link-inventory",
+      "name": "链接清单",
+      "description": "集中查看正文里的链接、图片和引用式链接，附原文位置并导出。",
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.14.0",
+      "kind": "reader",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "formats": [
+        "markdown"
+      ],
+      "documentAnalysis": true,
+      "readme": "打开 Markdown 文档后，从此页直接运行，或在阅读页的更多操作中选择阅读插件。只处理当前文档，不联网，不修改正文；代码块和文档属性不会当作正文解析。结果可点击定位、复制或导出。",
+      "entry": "main.js",
+      "commands": [
+        {
+          "id": "run",
+          "name": "整理文档链接"
+        }
+      ],
+      "files": {
+        "main.js": "export default function links({ analysis, title }) {\n    const links = analysis.links;\n    const unique = new Set(links.map((link) => link.url));\n    return {\n        report: `${title} · 链接清单\\n\\n共 ${links.length} 处引用，${unique.size} 个不同目标。包括 Markdown 链接、图片和引用式链接；不包含双链。仅整理当前文档，没有联网检查有效性。`,\n        findings: links.map((link) => ({\n            ...link,\n            label: `${link.image ? \"图片\" : \"链接\"} · ${link.text || \"未命名\"}`,\n            detail: link.url || \"目标为空\",\n        })),\n        files: links.length\n            ? [\n                {\n                    name: \"链接清单.md\",\n                    content: `# ${title} · 链接清单\\n\\n` +\n                        links\n                            .map((link) => `- 第 ${link.line} 行 · ${link.text || \"未命名\"}\\n  ${link.url || \"目标为空\"}`)\n                            .join(\"\\n\\n\") +\n                        \"\\n\",\n                },\n            ]\n            : [],\n    };\n}"
+      }
+    },
+    {
+      "id": "moyang.table-export",
+      "name": "表格导出",
+      "description": "将 Markdown 表格分别导出为中文友好的 CSV，供电子表格继续整理。",
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.14.0",
+      "kind": "reader",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "formats": [
+        "markdown"
+      ],
+      "documentAnalysis": true,
+      "readme": "打开 Markdown 文档后，从此页直接运行，或在阅读页的更多操作中选择阅读插件。只处理当前文档，不联网，不修改正文；代码块和文档属性不会当作正文解析。结果可点击定位、复制或导出。",
+      "entry": "main.js",
+      "commands": [
+        {
+          "id": "run",
+          "name": "导出文档表格"
+        }
+      ],
+      "files": {
+        "main.js": "export default function tables({ analysis, title }) {\n    const tables = analysis.tables;\n    const cell = (text) => {\n        // Spreadsheet programs can execute formula-looking text; preserve it as text.\n        const literal = /^[\\s]*[=+@-]|^[\\t\\r\\n]/.test(text) ? \"'\" + text : text;\n        return '\"' + literal.replaceAll('\"', '\"\"') + '\"';\n    };\n    return {\n        report: `${title} · 表格导出\\n\\n找到 ${tables.length} 张 Markdown 表格。每张表单独导出 UTF-8 CSV，保留表头与行列，单元格取可读文字。以公式符号开头的值加单引号，防止电子表格将原文当公式执行。` +\n            (tables.length > 32 ? \"\\n本次只导出前 32 张，请拆分文档后导出剩余表格。\" : \"\"),\n        findings: tables.map((table, index) => ({\n            ...table,\n            label: `表格 ${index + 1} · ${Math.max(0, table.rows.length - 1)} 行数据`,\n            detail: table.rows[0]?.join(\" · \"),\n        })),\n        files: tables.slice(0, 32).map((table, index) => ({\n            name: `表格-${index + 1}.csv`,\n            content: \"\\uFEFF\" +\n                table.rows\n                    .map((row) => Array.from({ length: table.rows[0].length }, (_, i) => cell(row[i] ?? \"\")).join(\",\"))\n                    .join(\"\\r\\n\") +\n                \"\\r\\n\",\n        })),\n    };\n}"
+      }
+    },
+    {
+      "id": "moyang.document-health",
+      "name": "文档体检",
+      "description": "核对标题跳级、重复标题、空链接与图片说明，定位后自行修改。",
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.14.0",
+      "kind": "reader",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "formats": [
+        "markdown"
+      ],
+      "documentAnalysis": true,
+      "readme": "打开 Markdown 文档后，从此页直接运行，或在阅读页的更多操作中选择阅读插件。只处理当前文档，不联网，不修改正文；代码块和文档属性不会当作正文解析。结果可点击定位、复制或导出。",
+      "entry": "main.js",
+      "commands": [
+        {
+          "id": "run",
+          "name": "检查文档结构"
+        }
+      ],
+      "files": {
+        "main.js": "export default function health({ analysis, title }) {\n    const { headings, links } = analysis;\n    const findings = [];\n    const seen = new Set();\n    let depth = 0;\n    for (const heading of headings) {\n        if (depth && heading.depth > depth + 1)\n            findings.push({\n                ...heading,\n                label: \"标题层级跳跃\",\n                detail: `从 ${depth} 级跳到 ${heading.depth} 级，检查是否缺少中间章节。`,\n            });\n        const normalized = heading.text.trim().toLocaleLowerCase();\n        if (seen.has(normalized))\n            findings.push({ ...heading, label: \"重复标题\", detail: `“${heading.text}”出现多次；若需引用章节，请核对目标。` });\n        if (!normalized)\n            findings.push({ ...heading, label: \"空标题\", detail: \"补充标题文字，便于目录导航。\" });\n        seen.add(normalized);\n        depth = heading.depth;\n    }\n    for (const link of links) {\n        if (!link.url)\n            findings.push({ ...link, label: \"链接目标为空\", detail: \"补充链接目标，或改为普通文字。\" });\n        if (!link.text.trim())\n            findings.push({ ...link, label: link.image ? \"图片缺少替代文字\" : \"链接缺少说明\", detail: link.url });\n    }\n    const report = `${title} · 文档体检\\n\\n${headings.some((h) => h.depth === 1) ? \"已包含一级标题。\" : \"建议添加一级标题，方便识别文档主题。\"}\\n发现 ${findings.length} 处可核对的结构问题。重复标题也可能是有意安排，请按实际内容判断。这里只检查结构，不检查事实或外部链接有效性。`;\n    return {\n        report,\n        findings,\n        files: [\n            {\n                name: \"文档体检.md\",\n                content: report +\n                    \"\\n\\n\" +\n                    findings.map((item) => `- 第 ${item.line} 行 · ${item.label}：${item.detail}`).join(\"\\n\") +\n                    \"\\n\",\n            },\n        ],\n    };\n}"
+      }
+    },
+    {
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.13.0",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "id": "moyang.argument-review",
+      "name": "论证审阅",
+      "kind": "assistant",
+      "description": "区分结论、证据与推测，找出资料里的论证缺口，提出可核查的问题。",
+      "assistant": {
+        "prompt": "你是审慎的论证审阅助手。围绕用户明确提供的材料，整理主张、证据、隐含前提和反例。每个判断指向材料中的具体句子，区分原文观点和你的推断。不因文风自信就认定事实成立，不虚构参考文献。缺少材料时先请用户附加材料。给出可核查的问题和最小改进建议，不擅自改写用户的立场。",
+        "starters": [
+          "这份材料的结论分别由哪些证据支持？",
+          "找出最值得核对的三个隐含前提",
+          "给出反例，并说明原文需要补充哪些证据"
+        ]
+      }
+    },
+    {
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.13.0",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "id": "moyang.recall-coach",
+      "name": "复习教练",
+      "kind": "assistant",
+      "description": "围绕当前资料做主动回忆，一次一个问题，按你的回答给出有依据的反馈。",
+      "assistant": {
+        "prompt": "你是主动回忆学习教练。只围绕用户明确给出的资料开展练习；没有资料先询问。每次提出一个问题，等用户回答后再反馈，不提前泄露答案。反馈指出答对的部分、遗漏和原文依据。用户要求时导出本轮问答和待复习概念的 Markdown。不要声称具备提醒、跨会话学习排程或修改记忆库的能力。",
+        "starters": [
+          "根据附加资料，先问我一道理解题",
+          "用具体例子检查我是否真正理解这个概念",
+          "整理这轮练习里需要再复习的内容"
+        ]
+      }
+    },
+    {
+      "format": "moyang-extension",
+      "version": "1.0.0",
+      "minAppVersion": "0.12.0",
+      "author": "Moyang",
+      "license": "MIT",
+      "homepage": "https://github.com/MY-moss/moyang_Reader",
+      "id": "moyang.source-review",
+      "name": "来源核对与知识整理",
+      "kind": "skill",
+      "description": "让 Agent 区分原始来源与转述，核对时效和项目范围，提出知识更新建议。",
+      "skill": {
+        "body": "---\nname: source-review\ndescription: 核对知识的来源、时效和项目范围，在有证据时提出修订，保留用户已有历史。\n---\n\n# 来源核对\n\n1. 先按当前项目召回相关记录，读取正文、来源和修订；不要遍历未授权的普通笔记。\n2. 区分原文事实、用户明确决定、模型推测；只有前两者可作为可靠依据。\n3. 需要检查网页或原文件时使用客户端已授权的工具，不能把此技能当作额外文件或联网权限。无法访问就标为待核对。\n4. 对照来源日期、适用条件和正文差异。相似文本不等于重复事实，旧内容不一定失效。\n5. 明确更正可沿原记录修订并保留历史；推测冲突提交待处理，不直接删除。\n6. 输出已核对、待核对、建议更新三组结果，附条目 ID、来源和依据。只有用户已授权的修改才执行；否则保留建议。\n\n按需读取 references/checklist.md。",
+        "assets": [
+          {
+            "path": "references/checklist.md",
+            "encoding": "utf8",
+            "content": "# 核对清单\n\n- 来源是否可访问，还是仅有二手转述？\n- 日期和适用版本是否明确？\n- 是全局偏好还是单个项目约定？\n- 新来源是明确更正还是另一种场景？\n- 修改前是否读取当前修订，能否恢复？\n- 没有证据的条目保留待核对，不补写虚构出处。\n"
+          }
+        ]
+      }
+    },
+    {
       "format": "moyang-extension",
       "version": "1.0.0",
       "minAppVersion": "0.13.0",

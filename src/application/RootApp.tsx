@@ -411,6 +411,7 @@ export function RootApp() {
         )}
         <div className="space-pane" hidden={space !== "reader" || marketOpen}>
           <App
+            extensionActions={readerExtensions}
             model={shellModel}
             panes={panes}
             settingsOpen={settingsOpen}
@@ -496,6 +497,10 @@ export function RootApp() {
           >
             <ExtensionMarket
               manager={extensions}
+              readerCommands={readerExtensions.commands}
+              onRunReader={(id) => {
+                readerExtensions.execute(id);
+              }}
               onOpenAssistant={openChat}
               onClose={() => setMarketOpen(false)}
               onOpenSkill={(id) => {
@@ -510,7 +515,20 @@ export function RootApp() {
         )}
       </div>
       {readerExtensions.run && (
-        <ExtensionResult run={readerExtensions.run} onClose={readerExtensions.close} onApply={readerExtensions.apply} />
+        <ExtensionResult
+          run={readerExtensions.run}
+          onClose={readerExtensions.close}
+          onApply={readerExtensions.apply}
+          onLocate={(finding) => {
+            const location = readerExtensions.locate(finding);
+            if (!location) return;
+            readerExtensions.close();
+            closeGlobalPage();
+            setSpace("reader");
+            setNavigationOpen(false);
+            void bookroom.navigate(location).catch((error) => bookroom.setError(String(error)));
+          }}
+        />
       )}
       {model.updateNoticeVisible && model.updateStatus !== "idle" && model.updateStatus !== "checking" && (
         <div className="global-update-notice">

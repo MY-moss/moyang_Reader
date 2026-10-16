@@ -12,6 +12,7 @@ import type {
   ThemeMode,
 } from "../../shared/types";
 export type TopBarProps = {
+  extensionActions?: import("../../shared/extension-types").ExtensionActions;
   onPrepareForRestart?: () => Promise<void>;
   navigation?: import("react").ReactNode;
   settingsOpen?: boolean;

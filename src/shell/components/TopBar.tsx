@@ -172,6 +172,23 @@ export function TopBar(p: TopBarProps) {
                 </button>
               </div>
             </div>
+            {!!p.extensionActions?.commands.length && (
+              <details className="toolbar-overflow-group">
+                <summary>阅读插件</summary>
+                <div className="toolbar-overflow-actions">
+                  {p.extensionActions.commands.map((command) => (
+                    <button
+                      key={command.id}
+                      className="toolbar-button"
+                      disabled={command.disabled}
+                      onClick={() => run(() => p.extensionActions?.execute(command.id))}
+                    >
+                      {command.label}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
             <button className="toolbar-button settings-trigger" onClick={() => run(() => setSettingsOpen(true))}>
               {t("settings.title")}
               <span aria-hidden="true">↗</span>

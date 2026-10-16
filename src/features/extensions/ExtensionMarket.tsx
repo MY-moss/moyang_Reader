@@ -13,11 +13,15 @@ export default function ExtensionMarket({
   onClose,
   onOpenSkill,
   onOpenAssistant,
+  readerCommands = [],
+  onRunReader,
 }: {
   manager: ExtensionManager;
   onClose: () => void;
   onOpenSkill: (id: string) => void;
   onOpenAssistant?: (id: string) => void;
+  readerCommands?: Array<{ id: string; disabled?: boolean }>;
+  onRunReader?: (id: string) => void;
 }) {
   const [view, setView] = useState<"discover" | "installed" | "updates">("discover"),
     [kind, setKind] = useState<ExtensionKind | "all">("all"),
@@ -423,14 +427,35 @@ export default function ExtensionMarket({
               {pkg.commands?.length ? (
                 <section>
                   <h3>可用命令</h3>
-                  <p>安装后在阅读页按 Ctrl Shift P 打开命令面板。</p>
+                  <p>打开支持的文档后可直接运行，也可在阅读页的更多操作或命令面板中使用。</p>
                   <ul>
-                    {pkg.commands.map((c) => (
-                      <li key={c.id}>
-                        {c.name} · {c.modifiesDocument ? "可修改正文" : "只读"}
-                      </li>
-                    ))}
+                    {pkg.commands.map((c) => {
+                      const id = `extension:${pkg.id}:${c.id}`;
+                      const runnable =
+                        installed?.enabled &&
+                        installed.package.commands?.some((item) => item.id === c.id) &&
+                        readerCommands.some((item) => item.id === id && !item.disabled);
+                      return (
+                        <li key={c.id} className="extension-command-row">
+                          <span>
+                            {c.name} · {c.modifiesDocument ? "可修改正文" : "只读"}
+                          </span>
+                          {installed && (
+                            <button disabled={busy || !runnable} onClick={() => onRunReader?.(id)}>
+                              运行：{c.name}
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
+                  {installed && (
+                    <p>
+                      {!installed.enabled
+                        ? "启用插件后可运行。"
+                        : `使用当前打开的文档。支持：${(installed.package.formats ?? ["markdown", "text"]).map((kind) => ({ markdown: "Markdown", text: "TXT", docx: "DOCX" })[kind]).join("、")}；未打开适用文档时按钮不可用。`}
+                    </p>
+                  )}
                 </section>
               ) : null}
               {pkg.skill && (

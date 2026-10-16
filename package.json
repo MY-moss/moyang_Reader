@@ -1,6 +1,6 @@
 {
   "name": "moyang-reader-next",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,7 @@
     "tauri": "node scripts/run-tauri.mjs",
     "rust": "node scripts/run-cargo.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
-    "check": "npm run check:architecture && npm run lint && npm test && npm run test:scripts && npm run build",
+    "check": "npm run check:architecture && node scripts/export-extension-catalog.mjs --check && npm run lint && npm test && npm run test:scripts && npm run build",
     "test:scripts": "node --test scripts/*.test.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"docs/**/*.md\" \"tasks/*.md\" \"README.md\" \"e2e/*.ts\"",
     "build:mcp": "node scripts/build-mcp.mjs",

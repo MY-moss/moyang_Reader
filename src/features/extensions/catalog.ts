@@ -1,4 +1,5 @@
 import type { ExtensionPackage } from "../../shared/extension-types";
+import practicalReaders from "./builtin-reader-packages.json";
 export const curatedCatalogUrl =
   "https://raw.githubusercontent.com/MY-moss/moyang_Reader/main/public/extensions/catalog.json";
 
@@ -11,6 +12,59 @@ const base = {
   homepage: "https://github.com/MY-moss/moyang_Reader",
 };
 export const builtInCatalog: ExtensionPackage[] = [
+  ...(practicalReaders as ExtensionPackage[]),
+  {
+    ...base,
+    minAppVersion: "0.13.0",
+    id: "moyang.argument-review",
+    name: "论证审阅",
+    kind: "assistant",
+    description: "区分结论、证据与推测，找出资料里的论证缺口，提出可核查的问题。",
+    assistant: {
+      prompt:
+        "你是审慎的论证审阅助手。围绕用户明确提供的材料，整理主张、证据、隐含前提和反例。每个判断指向材料中的具体句子，区分原文观点和你的推断。不因文风自信就认定事实成立，不虚构参考文献。缺少材料时先请用户附加材料。给出可核查的问题和最小改进建议，不擅自改写用户的立场。",
+      starters: [
+        "这份材料的结论分别由哪些证据支持？",
+        "找出最值得核对的三个隐含前提",
+        "给出反例，并说明原文需要补充哪些证据",
+      ],
+    },
+  },
+  {
+    ...base,
+    minAppVersion: "0.13.0",
+    id: "moyang.recall-coach",
+    name: "复习教练",
+    kind: "assistant",
+    description: "围绕当前资料做主动回忆，一次一个问题，按你的回答给出有依据的反馈。",
+    assistant: {
+      prompt:
+        "你是主动回忆学习教练。只围绕用户明确给出的资料开展练习；没有资料先询问。每次提出一个问题，等用户回答后再反馈，不提前泄露答案。反馈指出答对的部分、遗漏和原文依据。用户要求时导出本轮问答和待复习概念的 Markdown。不要声称具备提醒、跨会话学习排程或修改记忆库的能力。",
+      starters: [
+        "根据附加资料，先问我一道理解题",
+        "用具体例子检查我是否真正理解这个概念",
+        "整理这轮练习里需要再复习的内容",
+      ],
+    },
+  },
+  {
+    ...base,
+    id: "moyang.source-review",
+    name: "来源核对与知识整理",
+    kind: "skill",
+    description: "让 Agent 区分原始来源与转述，核对时效和项目范围，提出知识更新建议。",
+    skill: {
+      body: "---\nname: source-review\ndescription: 核对知识的来源、时效和项目范围，在有证据时提出修订，保留用户已有历史。\n---\n\n# 来源核对\n\n1. 先按当前项目召回相关记录，读取正文、来源和修订；不要遍历未授权的普通笔记。\n2. 区分原文事实、用户明确决定、模型推测；只有前两者可作为可靠依据。\n3. 需要检查网页或原文件时使用客户端已授权的工具，不能把此技能当作额外文件或联网权限。无法访问就标为待核对。\n4. 对照来源日期、适用条件和正文差异。相似文本不等于重复事实，旧内容不一定失效。\n5. 明确更正可沿原记录修订并保留历史；推测冲突提交待处理，不直接删除。\n6. 输出已核对、待核对、建议更新三组结果，附条目 ID、来源和依据。只有用户已授权的修改才执行；否则保留建议。\n\n按需读取 references/checklist.md。",
+      assets: [
+        {
+          path: "references/checklist.md",
+          encoding: "utf8",
+          content:
+            "# 核对清单\n\n- 来源是否可访问，还是仅有二手转述？\n- 日期和适用版本是否明确？\n- 是全局偏好还是单个项目约定？\n- 新来源是明确更正还是另一种场景？\n- 修改前是否读取当前修订，能否恢复？\n- 没有证据的条目保留待核对，不补写虚构出处。\n",
+        },
+      ],
+    },
+  },
   {
     ...base,
     minAppVersion: "0.13.0",

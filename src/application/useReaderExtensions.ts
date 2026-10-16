@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReaderApplication } from "./useReaderApplication";
 import type { ExtensionManager } from "../features/extensions/useExtensions";
-import type { ExtensionOutput } from "../shared/extension-types";
+import type { ExtensionFinding, ExtensionOutput } from "../shared/extension-types";
+import type { SourceLocation } from "../shared/bookroom-types";
+import { contentHash } from "../features/documents/source-chunks";
 import { flushLiveEditors } from "../shared/pending-work";
 import { runExtension } from "../features/extensions/runtime";
 
@@ -9,6 +11,7 @@ export type ExtensionRun = {
   name: string;
   path: string;
   original: string;
+  hash?: string;
   result?: ExtensionOutput;
   error?: string;
   running: boolean;
@@ -52,13 +55,16 @@ export function useReaderExtensions(model: ReaderApplication, manager: Extension
     controller.current = abort;
     const initial = { name: command.name, path: doc.path, original: source, running: true };
     setRun(initial);
-    void runExtension(
-      installed.package,
-      { command: commandId, text: source, path: doc.path, title: doc.name, format: doc.kind },
-      abort.signal,
-    )
-      .then((result) => {
-        if (controller.current === abort) setRun({ ...initial, running: false, result });
+    void Promise.all([
+      runExtension(
+        installed.package,
+        { command: commandId, text: source, path: doc.path, title: doc.name, format: doc.kind },
+        abort.signal,
+      ),
+      contentHash(source),
+    ])
+      .then(([result, hash]) => {
+        if (controller.current === abort) setRun({ ...initial, running: false, result, hash });
       })
       .catch((cause) => {
         if (controller.current === abort) setRun({ ...initial, running: false, error: String(cause) });
@@ -80,5 +86,22 @@ export function useReaderExtensions(model: ReaderApplication, manager: Extension
     model.updateSource(run.result.replacement, run.path);
     close();
   };
-  return { commands, execute, run, close, apply };
+  const locate = (finding: ExtensionFinding): SourceLocation | null => {
+    if (!run) return null;
+    flushLiveEditors();
+    const session = model.documentSessions.get(run.path);
+    if (!session || session.draft !== run.original) {
+      setRun({ ...run, error: "文档内容已改变或已关闭，请重新运行插件后定位。报告仍可复制和导出。" });
+      return null;
+    }
+    return {
+      path: run.path,
+      hash: run.hash,
+      source: true,
+      offset: finding.from,
+      endOffset: finding.to,
+      quote: run.original.slice(finding.from, finding.to),
+    };
+  };
+  return { commands, execute, run, close, apply, locate };
 }

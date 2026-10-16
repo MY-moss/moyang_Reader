@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, ".", "VITE_");
@@ -9,6 +10,11 @@ export default defineConfig(({ mode }) => {
       __MOYANG_DESKTOP_E2E__: env.VITE_MOYANG_DESKTOP_E2E === "1",
     },
     plugins: [react()],
+    worker: { format: "es" },
+    resolve: {
+      // The package's default/worker decoder also works without a DOM in dev and production workers.
+      alias: { "decode-named-character-reference": fileURLToPath(new URL("./node_modules/decode-named-character-reference/index.js", import.meta.url)) },
+    },
     clearScreen: false,
     server: {
       port: 1420,

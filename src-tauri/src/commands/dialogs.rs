@@ -135,7 +135,7 @@ pub async fn choose_save_path(
             "pdf" => ("导出 PDF", "PDF 文件", &["pdf"]),
             "json" => ("导出备份", "JSON 备份", &["json"]),
             "zip" => ("导出技能包", "ZIP 技能包", &["zip"]),
-            "resource" => ("下载技能资源", "所有文件", &["*"]),
+            "resource" => ("保存资源文件", "所有文件", &["*"]),
             "markdown" => (
                 "导出 Markdown",
                 "Markdown / 文本",

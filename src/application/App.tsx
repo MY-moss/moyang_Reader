@@ -21,11 +21,13 @@ export function App({
   onSettingsClose,
   content,
   documentTools,
+  extensionActions,
 }: {
   model: ReaderApplication;
   panes: WorkbenchPanes;
   content?: ReactNode;
   documentTools?: ReactNode;
+  extensionActions?: import("../shared/extension-types").ExtensionActions;
   settingsOpen: boolean;
   onSettingsClose: () => void;
 }) {
@@ -92,6 +94,7 @@ export function App({
       onDrop={handleDrop}
     >
       <ReaderToolbar
+        extensionActions={extensionActions}
         model={{ ...model, rightPanelOpen, setRightPanelOpen: toggleContext }}
         settingsOpen={settingsOpen}
         onSettingsClose={onSettingsClose}
