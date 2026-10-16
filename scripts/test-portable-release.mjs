@@ -243,6 +243,7 @@ try {
   await page.getByLabel("服务名称", {exact:true}).fill("本机验证服务");
   await page.getByLabel("API 基础地址").fill("http://127.0.0.1:1/v1");
   await page.getByLabel("默认模型", {exact:true}).fill("verification-only");
+  await page.getByLabel("可选模型列表", {exact:true}).fill("verification-only\nsecond-model");
   await page.getByRole("button", {name:"返回聊天",exact:true}).click();
   await page.getByRole("region", {name:"未保存的服务配置"}).waitFor();
   await page.getByRole("button", {name:"继续编辑",exact:true}).click();
@@ -252,6 +253,13 @@ try {
   await page.getByRole("region", {name:"书房聊天",exact:true}).waitFor();
   assert.equal(await page.getByRole("combobox", {name:"API 服务",exact:true}).inputValue() !== "", true);
   report.desktop.chat_configuration = true;
+  await page.getByLabel("本次模型", {exact:true}).selectOption({label:"second-model"});
+  await page.getByRole("button", {name:"API 服务",exact:true}).click();
+  assert.equal(await page.getByLabel("默认模型",{exact:true}).inputValue(),"verification-only");
+  assert.equal(await page.getByLabel("可选模型列表",{exact:true}).inputValue(),"verification-only\nsecond-model");
+  await page.getByRole("button", {name:"返回聊天",exact:true}).click();
+  assert.equal(await page.getByLabel("本次模型",{exact:true}).inputValue(),"1");
+  report.desktop.multiple_models_per_provider = true;
   report.desktop.provider_unsaved_navigation = true;
   await page.getByLabel("聊天消息", {exact:true}).fill("第一份尚未发送的原生草稿");
   await page.getByRole("button", {name:"新对话",exact:true}).click();
