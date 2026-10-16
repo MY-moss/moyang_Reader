@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import http from "node:http";
+const invoke=(operation,payload={})=>browser.execute((operation,payload)=>window.__TAURI_INTERNALS__.invoke("ai_request",{operation,payload}),operation,payload);
+const click=async(name,scope=".ai-sources")=>browser.execute((name,scope)=>{const b=[...document.querySelectorAll(`${scope} button`)].find(b=>b.textContent.trim()===name);if(!b)throw new Error(`Missing ${name}`);b.click();},name,scope);
+const waitText=(text)=>browser.waitUntil(()=>browser.execute(text=>document.querySelector(".ai-sources")?.textContent.includes(text),text));
+describe("source snapshot review",()=>{
+  it("reviews real files and HTTP sources, preserves failed and concurrent content, then saves history",async()=>{
+    const location=path.join(path.dirname(process.env.MOYANG_DESKTOP_E2E_DOCUMENT),"source-review.md");
+    const body="# 更新后的项目说明\n\n保留来源与准确的范围。\n";
+    fs.writeFileSync(location,body,"utf8");
+    const webBody="网页资料更新后需要核对原始出处和时间。".repeat(8);
+    const server=http.createServer((_request,response)=>{response.writeHead(200,{"content-type":"text/plain; charset=utf-8"});response.end(webBody);});
+    await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+    const web=`http://127.0.0.1:${server.address().port}/source`;
+    const fields={kind:"knowledge",project:"desktop-sources",sharing:"project",tags:["保留标签"]};
+    const create=(title,uri,format)=>invoke("save",{...fields,title,body:`${title}的原始内容`,source:uri,snapshot:{uri,format,fingerprint:"old",imported_at:1,locations:[]}});
+    try{
+      const file=await create("文件来源",location,"markdown");
+      const webpage=await create("网页来源",web,"web");
+      const missing=await create("移动后的来源",location+".missing.txt","text");
+      await browser.execute(()=>{const s=document.querySelector('select[aria-label="工作空间"]');s.value="ai";s.dispatchEvent(new window.Event("change",{bubbles:true}));});
+      await click("近期活动与冲突",".ai-sidebar");await click("来源更新",".ai-activity");
+      await browser.waitUntil(()=>browser.execute(()=>[...document.querySelectorAll('[aria-label="来源项目"] option')].some(o=>o.value==="desktop-sources")));
+      await browser.$('[aria-label="来源项目"]').selectByAttribute("value","desktop-sources");
+      await waitText("检查全部来源（3）");await click("检查全部来源（3）");await waitText("本次检查完成");
+      assert.equal((await invoke("get",{id:file.id})).body,file.body);
+      assert.equal((await invoke("get",{id:missing.id})).body,missing.body);
+      await browser.execute(()=>[...document.querySelectorAll(".ai-sources article")].find(a=>a.querySelector("h2")?.textContent==="文件来源").querySelector("button").click());
+      await browser.$(".ai-sources .version-compare").waitForDisplayed();
+      const edited=await invoke("save",{...file,body:"其他 Agent 的新整理",expected_revision:file.revision,reason:"并发编辑验收"});
+      await click("更新快照并保留历史");
+      await browser.waitUntil(()=>browser.execute(()=>document.body.textContent.includes("更新失败")));
+      assert.equal((await invoke("get",{id:file.id})).body,edited.body);
+      await click("重新读取与比较");await waitText(edited.body);
+      await click("更新快照并保留历史");
+      await browser.waitUntil(async()=> (await invoke("get",{id:file.id})).revision===3);
+      const updated=await invoke("get",{id:file.id});assert.equal(updated.body,body);assert.deepEqual(updated.tags,fields.tags);
+      assert.equal((await invoke("history",{id:file.id})).length,3);assert.ok(updated.snapshot.checked_at);
+      await click("返回来源列表");
+      await browser.execute(()=>[...document.querySelectorAll(".ai-sources article")].find(a=>a.querySelector("h2")?.textContent==="网页来源").querySelector("button").click());
+      await waitText(webBody);await click("更新快照并保留历史");
+      await browser.waitUntil(async()=> (await invoke("get",{id:webpage.id})).revision===2);
+      assert.equal((await invoke("get",{id:webpage.id})).body,webBody);
+      assert.equal(fs.readFileSync(location,"utf8"),body);
+      await click("返回来源列表");await click("检查全部来源（3）");await waitText("本次检查完成");
+      const texts=await browser.$$(".ai-sources .ai-health-item").map(r=>r.getText());
+      assert.equal(texts.filter(t=>t.includes("没有变化")).length,2);assert.equal(texts.filter(t=>t.includes("无法读取")).length,1);
+      await browser.refresh();
+      assert.equal((await invoke("get",{id:file.id})).body,body);
+      assert.equal((await invoke("get",{id:webpage.id})).body,webBody);
+    }finally{await new Promise(resolve=>server.close(resolve));fs.rmSync(location,{force:true});}
+  });
+});

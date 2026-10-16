@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "moyang-reader"
-version = "0.15.3"
+version = "0.16.0"
 dependencies = [
  "encoding_rs",
  "moyang-ai-core",

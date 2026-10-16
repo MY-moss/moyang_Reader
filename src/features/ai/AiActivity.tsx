@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
 import type { AiFields, AiRecord, AiStats } from "../../shared/ai-types";
 import { AiHealth } from "./AiHealth";
+import { AiSources } from "./AiSources";
 type Conflict = { id: string; evidence: string; proposal: AiFields & { id: string; expected_revision: number } };
 type Activity = {
   id: string;
@@ -83,13 +84,13 @@ export function AiActivity({
   notify: (text: string, error?: boolean) => void;
   stats?: AiStats | null;
 }) {
-  const [health, setHealth] = useState(false);
+  const [view, setView] = useState<"activity" | "health" | "sources">("activity");
   const [feed, setFeed] = useState<Feed | null>(null),
     [error, setError] = useState(""),
     [tick, setTick] = useState(0),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (health) return;
+    if (view !== "activity") return;
     let cancelled = false;
     void aiRequest<Feed>("activity")
       .then((r) => {
@@ -104,7 +105,7 @@ export function AiActivity({
     return () => {
       cancelled = true;
     };
-  }, [tick, health]);
+  }, [tick, view]);
   const act = async (operation: string, payload: unknown) => {
     setBusy(true);
     try {
@@ -119,16 +120,21 @@ export function AiActivity({
   };
   return (
     <main className="ai-activity">
-      <h1>{health ? "资料检查" : "近期活动"}</h1>
+      <h1>{view === "health" ? "资料检查" : view === "sources" ? "来源更新" : "近期活动"}</h1>
       <nav className="ai-health-tabs" aria-label="积累管理">
-        <button aria-pressed={!health} onClick={() => setHealth(false)}>
+        <button aria-pressed={view === "activity"} onClick={() => setView("activity")}>
           近期活动与冲突
         </button>
-        <button aria-pressed={health} onClick={() => setHealth(true)}>
+        <button aria-pressed={view === "health"} onClick={() => setView("health")}>
           资料检查
         </button>
+        <button aria-pressed={view === "sources"} onClick={() => setView("sources")}>
+          来源更新
+        </button>
       </nav>
-      {health ? (
+      {view === "sources" ? (
+        <AiSources stats={stats} notify={notify} />
+      ) : view === "health" ? (
         <AiHealth stats={stats} onSelect={onSelect} notify={notify} />
       ) : (
         <>

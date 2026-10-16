@@ -84,6 +84,9 @@ try {
   assert.ok(context.text.includes("范围：全局"));
   assert.ok([...context.text].length <= 1000);
   report.memory_maintenance = "native health tool and bounded scoped recall passed";
+  const sources = await client.call("list_knowledge_sources", { project: "" });
+  assert.equal(sources.total, 0, "Ordinary memories must not be listed as imported knowledge sources");
+  report.source_inventory = "production MCP metadata-only source listing passed";
   report.mcp = "write, recall, update, restore passed";
   await client.close();
   client = null;
@@ -183,6 +186,29 @@ try {
   await page.getByText(/检查了 1 条未归档资料/).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   report.desktop.memory_health = true;
+  await page.getByRole("button", { name: "来源更新", exact: true }).click();
+  await page.getByRole("region", { name: "来源更新", exact: true }).getByText(/还没有导入的知识来源/).waitFor();
+  const sourcePath = path.join(temp, "production-source.md");
+  const sourceBody = "# 正式来源检查\n\n保存前比较这份原文件的新内容。\n";
+  fs.writeFileSync(sourcePath, sourceBody, "utf8");
+  const importedSource = await page.evaluate((uri) => window.__TAURI_INTERNALS__.invoke("ai_request", {
+    operation: "save", payload: { kind: "knowledge", title: "正式来源检查", body: "原来的独立快照", source: uri, snapshot: { uri, format: "markdown", fingerprint: "old", imported_at: 1, locations: [] } },
+  }), sourcePath);
+  await page.getByRole("button", { name: "刷新来源列表", exact: true }).click();
+  await page.getByRole("button", { name: "检查全部来源（1）", exact: true }).click();
+  await page.getByRole("button", { name: "查看差异", exact: true }).click();
+  assert.equal(await page.locator(".ai-sources .version-compare pre").last().textContent(), sourceBody);
+  await page.screenshot({ path: "artifacts/workbench/release-source-review.png" });
+  await page.getByRole("button", { name: "更新快照并保留历史", exact: true }).click();
+  await page.locator(".ai-sources .ai-source-update").waitFor({state:"hidden"});
+  client = await connectMcp(path.join(release, "moyang-ai-mcp.exe"), path.join(temp, "ai"));
+  assert.equal((await client.call("get_record", {id: importedSource.id})).body, sourceBody);
+  const updatedSources = await client.call("list_knowledge_sources", {project:""});
+  assert.equal(updatedSources.total, 1);
+  assert.equal(updatedSources.items[0].revision, 2);
+  assert.equal("body" in updatedSources.items[0], false);
+  await client.close(); client = null;
+  report.desktop.source_review = true;
   await page.getByRole("button", { name: "插件市场", exact: true }).click();
   await page.locator(".extension-row").filter({ hasText: "阅读概览" }).click();
   await page.getByRole("button", { name: "安装扩展", exact: true }).click();

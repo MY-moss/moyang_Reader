@@ -2,7 +2,7 @@ use moyang_ai_core::{
     view_record, ActivityRequest, AssetRequest, CheckpointRequest, ConcludeRequest, ContextRequest,
     DeleteRequest, FeedbackRequest, HealthQuery, HistoryRequest, IdRequest, MergeRequest,
     ResolveConflictRequest, RestoreRequest, Result as CoreResult, RevisionRequest, SaveRequest,
-    SearchQuery, StateRequest, Store,
+    SearchQuery, SourceInventoryQuery, StateRequest, Store,
 };
 use rmcp::{
     handler::server::wrapper::Parameters,
@@ -185,6 +185,13 @@ impl MemoryService {
     )]
     async fn library_health(&self, Parameters(q): Parameters<HealthQuery>) -> CallToolResult {
         self.run_with_maintenance(move |s| s.health(q), false).await
+    }
+    #[tool(
+        description = "List active imported knowledge source metadata by project, with stable cursor pagination. Returns titles, URIs, fingerprints and revisions only, not bodies or attachments. No file/web access, writes or model calls. Use get_record to inspect a selected snapshot; source checking does not authorize automatic replacement. Ordinary reader notes and manually written memories are excluded.",
+        annotations(read_only_hint = true, destructive_hint = false, idempotent_hint = true, open_world_hint = false)
+    )]
+    async fn list_knowledge_sources(&self, Parameters(q): Parameters<SourceInventoryQuery>) -> CallToolResult {
+        self.run_with_maintenance(move |s| s.source_inventory(q), false).await
     }
     #[tool(
         description = "Build one batch of missing embeddings using the configured Ollama service. Repeat while remaining > 0. Basic search works without this."

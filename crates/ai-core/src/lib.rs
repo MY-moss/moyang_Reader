@@ -13,6 +13,8 @@ mod exchange;
 mod lifecycle;
 mod migration;
 mod source;
+mod source_inventory;
+pub use source_inventory::*;
 pub use lifecycle::*;
 pub use source::{fetch_web_source, install_embedding_model, local_model_status};
 mod context_pack;
@@ -72,6 +74,8 @@ pub fn now() -> i64 {
 
 #[cfg(test)]
 mod health_tests;
+#[cfg(test)]
+mod source_inventory_tests;
 #[cfg(test)]
 mod history_tests;
 #[cfg(test)]
