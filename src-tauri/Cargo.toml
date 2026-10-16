@@ -1,10 +1,9 @@
 [package]
 name = "moyang-reader"
-version = "0.11.0"
+version = "0.12.0"
 description = "A fast local document reader"
 authors = ["Moyang"]
 edition = "2021"
-rust-version = "1.88"
 
 [lib]
 name = "moyang_reader_lib"
@@ -14,6 +13,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+moyang-ai-core = { path = "../crates/ai-core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
@@ -23,16 +24,16 @@ tauri-plugin-updater = "2"
 encoding_rs = "0.8"
 notify = { version = "8", features = ["serde", "serialization-compat-6"] }
 percent-encoding = "2"
-pinyin = { version = "0.11", default-features = false, features = ["plain"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 wdio = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
 
 [dependencies.tauri-plugin-wdio-webdriver]
 version = "1.3"

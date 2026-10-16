@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Moyang Reader",
-  "version": "0.11.0",
-  "identifier": "com.moyang.reader",
+  "productName": "Moyang Reader Next",
+  "version": "0.12.0",
+  "identifier": "com.moyang.reader.next",
   "build": {
     "beforeDevCommand": "node scripts/tauri-dev-server.mjs",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Moyang Reader",
+        "title": "Moyang Reader Next",
         "width": 1240,
         "height": 820,
         "minWidth": 720,
@@ -23,79 +23,18 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' blob: http: https: data:; frame-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
-      "capabilities": ["default"]
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost blob:; worker-src 'self' blob:; img-src 'self' blob: http: https: data:; frame-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' blob: 'wasm-unsafe-eval'",
+      "capabilities": [
+        "default"
+      ]
     }
   },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBM0NEQkQxNDdGNkQ2RDAKUldUUTF2WkgwZHM4cW9qWUlqb0pHSnpnQ0NDR3I5ZTRkdy9reS8zUzNaVlNtcTl5a29SKzllYlIK",
-      "endpoints": [
-        "https://github.com/MY-moss/moyang_Reader/releases/latest/download/latest.json",
-        "https://moyang-reader-mirror.pages.dev/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
-  },
+  "plugins": {},
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": [
-      "icons/icon.ico",
-      "icons/icon.png",
-      "icons/32x32.png",
-      "icons/64x64.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/Square30x30Logo.png",
-      "icons/Square44x44Logo.png",
-      "icons/Square71x71Logo.png",
-      "icons/Square89x89Logo.png",
-      "icons/Square107x107Logo.png",
-      "icons/Square142x142Logo.png",
-      "icons/Square150x150Logo.png",
-      "icons/Square284x284Logo.png",
-      "icons/Square310x310Logo.png",
-      "icons/StoreLogo.png"
+    "targets": [
+      "nsis"
     ],
-    "fileAssociations": [
-      {
-        "ext": ["md", "markdown", "mdown", "mkd"],
-        "name": "Markdown 文档",
-        "description": "使用 Moyang Reader 阅读 Markdown 文档",
-        "role": "Editor",
-        "mimeType": "text/markdown"
-      },
-      {
-        "ext": ["txt", "text", "log"],
-        "name": "文本文件",
-        "description": "使用 Moyang Reader 阅读文本文件",
-        "role": "Editor",
-        "mimeType": "text/plain"
-      },
-      {
-        "ext": ["docx"],
-        "name": "Word 文档",
-        "description": "使用 Moyang Reader 阅读 Word 文档",
-        "role": "Viewer",
-        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      },
-      {
-        "ext": ["pdf"],
-        "name": "PDF 文档",
-        "description": "使用 Moyang Reader 打开 PDF 文档",
-        "role": "Viewer",
-        "mimeType": "application/pdf"
-      },
-      {
-        "ext": ["avif", "gif", "jpeg", "jpg", "png", "svg", "webp"],
-        "name": "图片文件",
-        "description": "使用 Moyang Reader 预览图片",
-        "role": "Viewer",
-        "mimeType": "image/*"
-      }
-    ]
+    "fileAssociations": []
   }
 }

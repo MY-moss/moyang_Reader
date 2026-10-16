@@ -1,4 +1,8 @@
+mod ai;
+mod ai_model;
 mod commands;
+mod data_paths;
+mod extensions;
 
 use tauri::{Emitter, Url, WindowEvent};
 
@@ -6,6 +10,19 @@ use tauri::{Emitter, Url, WindowEvent};
 use tauri::Manager;
 
 const DEV_SERVER_PORT: u16 = 1420;
+
+fn updater_is_configured(value: Option<&serde_json::Value>) -> bool {
+    value.is_some_and(|config| {
+        config
+            .get("pubkey")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|key| !key.trim().is_empty())
+            && config
+                .get("endpoints")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|endpoints| !endpoints.is_empty())
+    })
+}
 
 fn is_allowed_app_navigation(url: &Url) -> bool {
     match url.scheme() {
@@ -26,6 +43,8 @@ fn is_allowed_app_navigation(url: &Url) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    let enable_updater = updater_is_configured(context.config().plugins.0.get("updater"));
     let builder = tauri::Builder::default()
         .manage(commands::AccessRegistry::default())
         .manage(commands::WorkspaceWatcher::default())
@@ -65,9 +84,14 @@ pub fn run() {
         );
 
     #[cfg(desktop)]
-    let builder = builder
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+    let builder = builder.plugin(tauri_plugin_process::init());
+
+    #[cfg(desktop)]
+    let builder = if enable_updater {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
 
     #[cfg(feature = "wdio")]
     let builder = builder
@@ -84,58 +108,69 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::initial_paths,
-            commands::resolve_open_paths,
-            commands::choose_document_paths,
-            commands::choose_image_paths,
-            commands::choose_workspace_path,
-            commands::authorize_stored_path,
-            commands::choose_save_path,
-            commands::close_window,
-            commands::read_app_settings,
-            commands::write_app_settings,
-            commands::read_annotations,
-            commands::write_annotations,
-            commands::read_text_file,
-            commands::read_previous_version,
-            commands::read_binary_file,
-            commands::path_exists,
-            commands::file_size,
-            commands::file_metadata,
-            commands::watch_workspace,
-            commands::unwatch_workspace,
-            commands::write_text_file,
-            commands::write_binary_file,
-            commands::write_binary_file_raw,
-            commands::write_binary_file_chunk,
-            commands::write_binary_file_chunk_raw,
-            commands::commit_binary_file,
-            commands::discard_binary_file,
-            commands::export_pdf_file,
-            commands::create_markdown_file,
-            commands::create_workspace_note,
-            commands::create_workspace_folder,
-            commands::rename_workspace_entry,
-            commands::delete_workspace_entry,
-            commands::duplicate_workspace_entry,
-            commands::copy_workspace_entry,
-            commands::move_workspace_entry,
-            commands::reveal_workspace_entry,
-            commands::list_workspace_files,
-            commands::list_workspace_directories,
-            commands::list_workspace_entries,
-            commands::search_workspace,
-            commands::index_workspace,
-            commands::refresh_workspace
+            commands::bookroom::bookroom_request,
+            ai::ai_request,
+            extensions::extension_request,
+            ai::ai_connection_info,
+            commands::dialogs::initial_paths,
+            commands::dialogs::resolve_open_paths,
+            commands::dialogs::choose_document_paths,
+            commands::dialogs::choose_workspace_path,
+            commands::dialogs::authorize_stored_path,
+            commands::dialogs::choose_save_path,
+            commands::settings::close_window,
+            commands::settings::read_app_settings,
+            commands::settings::write_app_settings,
+            commands::files::read_text_file,
+            commands::files::read_binary_file,
+            commands::files::path_exists,
+            commands::files::file_size,
+            commands::files::file_metadata,
+            commands::watcher::watch_workspace,
+            commands::watcher::unwatch_workspace,
+            commands::files::write_text_file,
+            commands::files::write_binary_file,
+            commands::files::write_binary_file_raw,
+            commands::pdf::export_pdf_file,
+            commands::entries::create_markdown_file,
+            commands::entries::create_workspace_note,
+            commands::entries::create_workspace_folder,
+            commands::entries::rename_workspace_entry,
+            commands::entries::delete_workspace_entry,
+            commands::entries::duplicate_workspace_entry,
+            commands::entries::reveal_workspace_entry,
+            commands::workspace::list_workspace_files,
+            commands::workspace::list_workspace_directories,
+            commands::search::search_workspace,
+            commands::index::index_workspace,
+            commands::index::refresh_workspace
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running Moyang Reader");
 }
 
 #[cfg(test)]
 mod tests {
     use super::is_allowed_app_navigation;
+    use super::updater_is_configured;
     use tauri::Url;
+
+    #[test]
+    fn starts_without_a_release_update_channel() {
+        assert!(!updater_is_configured(None));
+        assert!(!updater_is_configured(Some(&serde_json::json!({}))));
+        assert!(!updater_is_configured(Some(
+            &serde_json::json!({"pubkey": "key", "endpoints": []})
+        )));
+    }
+
+    #[test]
+    fn enables_a_configured_release_update_channel() {
+        assert!(updater_is_configured(Some(&serde_json::json!({
+            "pubkey": "release-verification-key",
+            "endpoints": ["https://updates.example.test/latest.json"]
+        }))));
+    }
 
     #[test]
     fn allows_app_origins_and_dev_server() {

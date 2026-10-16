@@ -1,25 +1,11 @@
-import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import "./sync-pdfjs-assets.mjs";
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const devServer = spawn(npmCommand, ["run", "dev"], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: "inherit",
-  windowsHide: true,
-});
-
-const forwardSignal = (signal) => {
-  if (!devServer.killed) devServer.kill(signal);
-};
-
-process.once("SIGINT", () => forwardSignal("SIGINT"));
-process.once("SIGTERM", () => forwardSignal("SIGTERM"));
-
-devServer.once("error", (cause) => {
-  console.error("Unable to start the Vite development server:", cause);
-  process.exitCode = 1;
-});
-
-devServer.once("exit", (code, signal) => {
-  process.exitCode = code ?? (signal ? 1 : 0);
-});
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const cli = path.join(root, "node_modules/vite/bin/vite.js");
+// Run the CLI in this Node process: Windows cannot spawn npm.cmd without a
+// shell, and an extra launcher process can leave Vite running after Tauri exits.
+process.chdir(root);
+process.argv.splice(1, 1, cli, "--host", "127.0.0.1");
+await import(pathToFileURL(cli).href);

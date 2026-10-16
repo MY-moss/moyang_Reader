@@ -1,4 +1,5 @@
 {
+  "identifier": "com.moyang.reader.next.tests",
   "app": {
     "withGlobalTauri": true,
     "security": {

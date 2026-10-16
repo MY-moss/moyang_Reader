@@ -1,197 +1,107 @@
-# Moyang Reader
+# Moyang Reader Next
 
-## Reader Next 重构版（0.12.0）
+本地文档阅读器与个人 AI 工作台。当前工程已提升到仓库根目录，原 `moyang-reader-next/` 不再作为开发入口。保留 Windows 桌面应用与原有启动命令；旧工程、工作副本和历史程序已归档到仓库外。整理方式见[目录维护与恢复](WORKSPACE.md)。
 
-新的阅读与 AI 工作台位于 **[moyang-reader-next](moyang-reader-next/README.md)**，包含独立知识/记忆/技能库、MCP 接入与插件市场。查看[本轮检查与验收报告](moyang-reader-next/docs/VALIDATION-EXTENSIONS.md)、[插件市场指南](moyang-reader-next/docs/EXTENSIONS.md)和[迁移说明](moyang-reader-next/docs/MIGRATION.md)。在该目录使用原有 `npm run dev`、`npm run desktop`、`npm run build`。
+本次根目录迁移、运行验证和清理边界见 [整合验证报告](docs/VALIDATION-CONSOLIDATION.md)。
 
-原工程继续保留；下文介绍的是原版及其发布渠道。Next 的便携包与个人数据不提交到源码仓库，启动及本地打包见重构版说明。
+0.12.0 新增[插件市场](docs/EXTENSIONS.md)：阅读插件、主题、Agent Skills 与 MCP 连接，可安装、更新、停用和回退；同时修复全局导航与 Windows 并发备份问题。功能核对、真实测试与剩余边界见[本轮深度检查报告](docs/VALIDATION-EXTENSIONS.md)，参考项目与取舍见[扩展研究](docs/RESEARCH-EXTENSIONS.md)。
 
-一个 **Windows x64、阅读器优先、本地优先** 的文档阅读/编辑工具。
+新增独立 **AI 空间**：知识库、长期记忆和技能库，与日常笔记分开；外部 Agent 通过本机 MCP 读写、召回和整理。使用方法见 [AI 空间指南](docs/AI-USER-GUIDE.md)，研究与取舍见 [开源研究](docs/research/AI-RESEARCH.md)。
 
-目标不是复制 Obsidian、Notion、VS Code 或 AI 客户端，而是把本地 Markdown 与常见文档的 **打开 → 阅读 → 查找 → 批注 → 编辑 → 保存 → 恢复 → 导出** 做得可靠、轻量，并保持普通文件始终是真源。
+本轮补充研究并采用 TencentDB Agent Memory 与 OpenViking 的任务检查点、来源历史和按需读取思路，详见 [补充研究与取舍](docs/RESEARCH-AGENT-MEMORY-2026-10.md)。[MCP 接口指南](docs/MCP-GUIDE.md)、[实际验收结果](docs/VALIDATION-WORKBENCH.md) 和 [剩余检查单](tasks/workbench-upgrade.md) 随源码维护。两个真实客户端仍有授权/模型服务门槛，因此当前为候选版，未宣称全部验收完成。
 
-## 当前状态
+## 开始使用
 
-当前稳定版本：`v0.11.0`，已发布 Windows x64 安装包和 updater metadata。
+本轮候选版本为 0.12.0。本机可双击根目录的 **启动阅读器.cmd**，或执行 `npm start` 打开最新成功打包的应用。首次克隆源码后先执行 `npm ci`，然后 `npm run package` 生成便携包。本机生成的便携包放在 `release/<版本与构建时间>/`，`release/latest.json` 记录最新成功打包的目录。打开其中的 `Moyang Reader Next.exe`，保留同目录的 `moyang-ai-mcp.exe`；如打包时已安装本地模型，`ollama` 文件夹也一并保留。每个包内有 `使用说明.txt`。GitHub 保存源码与文档，便携包、模型和个人数据不提交到仓库。
 
-当前开发阶段是 v1.0 Freeze / 接手收口：先修正事实源、开发环境和架构边界，再进行最终 RC；v1.x 功能候选继续保持 GATED。
-
-当前唯一可执行范围是 `docs/AI-TASKS.md` 的 `D00–Dxx`；没有已定义的 Dxx 任务时，必须先复核最新 `main`、开放 PR/Issue 和真实开发反馈，再定义下一项。v1.1 Reader+、Knowledge、AI、RAG、MCP、RSS 和插件候选不得提前实现。
-
-正式产品边界：只发布和维护 Windows x64 桌面版。浏览器构建仅用于本地开发预览和 UI 测试；macOS、Linux、Windows ARM、移动端、云同步、实时协作和任意第三方脚本插件不在 v1.0 范围。
-
-当前开发主线已经收敛为：
-
-```text
-v0.11 体验/职责收口
-    ↓
-v0.12 可靠性、性能、安全与真实使用证明
-    ↓
-v0.13 Freeze / Compatibility / RC
-    ↓
-v1.0 可靠 Windows x64 基线
-```
-
-v1.0 不等待轻量知识库、AI provider、RAG、MCP 或插件内核完成。
-
-## 核心能力
-
-### 阅读与格式
-
-- Markdown / GFM、YAML/TOML frontmatter、数学公式与安全 HTML 清洗；
-- TXT / TEXT / LOG 纯文本；
-- DOCX 转安全 HTML 阅读，覆盖常见标题、段落、列表、表格和内嵌图片；
-- PDF 内嵌快速预览；
-- PNG / JPG / GIF / WebP / SVG / AVIF 图片预览；
-- UTF-8、UTF-8 BOM、UTF-16、GB18030 文本读取；
-- Markdown、DOCX 等解析能力按需加载，避免空白启动页加载完整解析器。
-
-### 本地阅读库
-
-- 添加整个文件夹为阅读库，并支持同时挂载多个本地资料库；
-- 目录树、最近打开、标签、出链、反向链接、未解析链接与一跳关系图；
-- `[[文档]]` / `[[文档|别名]]`、同目录优先、工作区路径与 `#章节` 跳转；
-- 工作区递归监听，外部文件增删改后增量刷新；
-- 大工作区使用有界扫描、倒排索引、文件级缓存和安全回退；
-- 文件类型/标签筛选与当前范围明确提示；
-- Ctrl+P 快速打开用于“找文件”，Ctrl+F 用于“找当前文档文字”，Ctrl+Shift+F 用于“找当前阅读库内容”，三种语义保持分离。
-
-### 阅读体验
-
-- 多标签页、阅读历史、导航历史、章节目录和滚动位置；
-- 书签、批注与本地阅读统计，不写回 Markdown 正文；
-- 专注阅读、正文宽度/字号、75%–150% 阅读缩放；
-- 浅色/深色/系统主题、Windows 高对比度与 reduced-motion 基线；
-- 左右侧栏独立滚动和可调宽度；
-- 720px 起的紧凑 Windows 窗口布局；
-- 命令面板支持键盘搜索、活动项播报和高频动作入口。
-
-### 编辑与文件安全
-
-- Markdown 所见即所得与源码编辑；复杂语法会安全回退源码模式；
-- 双链补全、`/` 块级命令、链接/图片/表格插入；
-- 源码与所见即所得共享编辑历史；
-- 外部修改冲突提示，避免覆盖未保存内容；
-- 写回前使用临时文件/备份与安全替换策略；
-- 草稿恢复中心、当前磁盘版本对比、上一保存版本恢复；
-- Windows 工作区删除使用回收站语义；
-- 文件/文件夹新建、重命名、复制、移动、剪切/粘贴等操作继续经过受控 Rust/Tauri 文件边界。
-
-### 导出
-
-- 当前文档导出 HTML、DOCX、源文件；
-- 系统打印 / 保存 PDF 前提供应用内版式预览；
-- 阅读库按当前筛选批量导出 HTML / Word / 打印-PDF；
-- 批量导出支持进度、取消、失败清单、临时文件清理和分卷；
-- 大批量 Word 导出保留独立 desktop performance benchmark，不把共享 CI Runner 的单轮毫秒抖动误判成功能回归。
-
-### 本地隐私与恢复
-
-- 核心阅读默认离线；
-- 远程图片默认关闭，可由用户显式开启；
-- 启动自动检查更新默认可关闭，手动更新入口不受影响；
-- 最近文件、阅读位置、书签、批注和设置保存在本机；
-- portable settings 不包含文档正文或秘密；
-- AI、插件、RAG、MCP 尚不是 v1.0 核心依赖。
-
-## 更新与发布
-
-更新入口位于“更多 → 更新”。
-
-- **GitHub Release `latest.json` 是 updater metadata 权威源**；
-- **Cloudflare Pages 只作为备用镜像 / 分发源**；
-- 配置和 release test 会阻止 endpoint 顺序退回到“镜像优先”；
-- 下载完成停在“已更新”，用户确认保存状态后再手动重启；
-- Tauri updater 的 `.sig` 不等于 Windows NSIS 安装包的 Authenticode；
-- 真实 Windows 旧版本 → 新版本自动升级闭环不能由 CI 绿灯替代。
-
-完整更新、签名、镜像和发布说明见 [`docs/UPDATE.md`](docs/UPDATE.md) 与 [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)。
-
-## v1.0 前明确不做
-
-为了避免项目再次跑偏，以下内容不进入 v1.0 阻塞链：
-
-- macOS / Linux / Windows ARM / 移动端；
-- 账号、云同步、实时协作；
-- 任意第三方 JavaScript 插件市场；
-- Reading Inbox 完整实现；
-- Knowledge/数据库化工作区替代普通文件真源；
-- AiProvider / PermissionBroker / RAG / MCP 先行架构；
-- bundled local LLM；
-- 把 SQLite/向量库变成用户正文唯一真源。
-
-长期接口只从**真实内置用户动作**提炼，不做 provider/mock-first 架构工程。
-
-## 路线图
-
-1. **v0.11.0**：当前稳定 Windows x64 版本，已完成桌面体验、职责边界、RC 预检和发布。
-2. **v0.12**：可靠性证明——5k/20k 工作区 benchmark、1MB/10MB Markdown 降级、Resilient Reading Anchor、Tauri 权限库存与负向测试、真实主流程、本地诊断。
-3. **v0.13**：Freeze / Compatibility / RC——兼容、恢复、发布、安全披露和真实 Windows 验证已完成，不承载大型新功能。
-4. **v1.0**：当前收口目标；先完成 D00 起的接手/运行防跑偏工作，再制作最终 RC 和正式发布。
-
-v1.0 后的候选顺序：
-
-- **v1.1 Reader+**：增强阅读、轻量捕获/Inbox 等；
-- **v1.2 Metadata / Knowledge**：Properties、表格/保存视图等；frontmatter 写回必须先通过 round-trip safety spike；
-- **v1.3 AI**：从真实“解释选区 / 翻译选区”等低风险动作开始，再根据第二个真实调用方提炼 provider/consent/secret 边界；
-- **v1.4+ Interop**：RAG、MCP、RSS、声明式扩展、更多格式等按 Gate 评估。
-
-详细阶段以 [`docs/ROADMAP.md`](docs/ROADMAP.md) 和 [`docs/AI-TASKS.md`](docs/AI-TASKS.md) 为准；[`docs/FUTURE-DEVELOPMENT-PLAN.md`](docs/FUTURE-DEVELOPMENT-PLAN.md) 只保存长期候选，不是开工许可。
-
-## 开发
-
-完整的 Windows x64 前置条件、依赖恢复、浏览器/桌面边界、测试分层和构建缓存规则见 [`docs/DEVELOPMENT-SETUP.md`](docs/DEVELOPMENT-SETUP.md)。日常开发按 lockfile 使用 `npm ci`，不要用 `npm install` 代替可复现安装。
+在本目录打开终端，首次执行：
 
 ```powershell
 npm ci
-npm run test
-npm run test:coverage
-npm run lint
-npm run build
-npm run test:e2e
-npm run test:e2e:desktop
 npm run desktop
 ```
 
-桌面正确性 smoke 与性能 benchmark 分开：
+桌面启动会同时构建本地 MCP 程序。生成便携包使用 `npm run package`；它先完成正常优化构建，再输出独立的新目录，保留旧包及正在运行的 Agent 连接。启用新版 MCP 时，从新应用重新安装连接后重启客户端。
+
+桌面开发需要 Node.js、Rust MSVC 工具链、Visual Studio C++ Build Tools 和 WebView2。Windows x64 是当前维护目标。环境检查与启动故障处理见 [开发指南](docs/DEVELOPMENT.md)。
+
+只预览界面：
 
 ```powershell
-# 确定性桌面功能正确性，PR gate 使用这一条
-npm run test:e2e:desktop
-
-# 96 文档批量 Word 等性能场景，scheduled/manual 趋势证据
-npm run test:e2e:desktop:benchmark
+npm run dev
 ```
 
-`npm run dev` 只启动浏览器版 Vite 开发预览；桌面调试请使用 `npm run desktop`。普通生产构建不加载 WebdriverIO 测试桥接。
+访问终端显示的本机地址，默认 `http://127.0.0.1:1420`。浏览器预览支持选择文件，但没有桌面文件夹授权、原位保存、监听与文件关联能力。不要同时启动两个服务占用 1420 端口。
 
-本地 Tauri/Cargo 构建通过项目脚本使用受管缓存，默认位于 `%LOCALAPPDATA%\Moyang Reader\build-cache\cargo-target`，避免多个 worktree 在项目目录重复生成数 GB Rust 构建物。详细清理规则见 [`docs/WORKSPACE-CLEANUP.md`](docs/WORKSPACE-CLEANUP.md)。
+## 阅读流程
 
-## 文档
+1. 在左侧选择“阅读空间”，打开文档或添加阅读库。
+2. Markdown 默认直接编辑；TXT 保持纯文本，Word/PDF 以阅读为主。右侧提供目录、属性和关联内容。
+3. 单击文件临时预览，双击或编辑后保留标签；双窗格可以各自打开文档、阅读和定位。
+4. 停止输入约 1.2 秒后自动保存，中文组词期间暂停；Ctrl+S 立即保存。遇到外部修改可比较、合并或另存。
+5. Ctrl+P 快速打开，Ctrl+F 查找当前文档；左侧进入全文搜索、收藏、保存视图和恢复中心。
+6. 左侧切换“AI 空间”，独立管理知识、长期记忆和技能。在“接入与备份”连接 Agent。
+7. 侧栏底部的“插件市场”提供阅读插件、主题、AI 技能和 MCP 服务；支持本地导入、自定义目录、启停、更新与回退。见 [扩展使用与开发](docs/EXTENSIONS.md)。
 
-- 第一次使用：[`docs/USER-GUIDE.md`](docs/USER-GUIDE.md)
-- 产品需求：[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)
-- UI 交互：[`docs/UI-INTERACTION.md`](docs/UI-INTERACTION.md)
-- 当前架构：[`ARCHITECTURE.md`](ARCHITECTURE.md)
-- 开发架构契约：[`docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`](docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md)
-- 隐私：[`PRIVACY.md`](PRIVACY.md)
-- 安全披露：[`SECURITY.md`](SECURITY.md)
-- 贡献：[`CONTRIBUTING.md`](CONTRIBUTING.md)
-- 更新/发布：[`docs/UPDATE.md`](docs/UPDATE.md) / [`docs/RELEASE-POLICY.md`](docs/RELEASE-POLICY.md)
-- 版本变化：[`CHANGELOG.md`](CHANGELOG.md)
+详细说明见 [使用指南](docs/USER-GUIDE.md)。
 
-## 安全报告
+## 文档入口
 
-潜在漏洞请先阅读 [`SECURITY.md`](SECURITY.md)。如果仓库 `Security` 页面已经显示 GitHub Private Vulnerability Reporting 的 **Report a vulnerability**，请使用该私密入口。
+最新代码、运行与依赖复查见 [代码复查报告](docs/VALIDATION-CODE-AUDIT.md)，包含本轮修复、真实桌面结果、性能对比及未完成的外部验收条件。
 
-如果私密入口暂未启用，不要在公开 Issue / PR / Discussion 中粘贴 PoC、利用细节、用户内容、私有路径、令牌或证书。可以只创建一个不含漏洞细节的最小公开 Issue，请求维护者提供私密渠道。
+逐项完成度复查见 [功能与成本复查](docs/VALIDATION-COMPLETION-AUDIT.md)：来源定位、技能资源与历史、跨进程索引、反馈备份及云端桌面回归。
 
-## AI 快速接手
+原规划新增能力和清理决策见 [深度重构交付清单](docs/ROADMAP-DELIVERY.md)：属性编辑、块引用与嵌入、关系图筛选、字体、命令搜索、导出模板、大目录渲染和可靠性修复。
 
-当前执行真源：[`AGENTS.md`](AGENTS.md) + [`docs/AI-TASKS.md`](docs/AI-TASKS.md) + [`docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md`](docs/DEVELOPMENT-ARCHITECTURE-CONTRACT.md)。完整工作流见 [`docs/AI-WORKFLOW.md`](docs/AI-WORKFLOW.md)。
+| 文档                                         | 解决的问题                                 |
+| -------------------------------------------- | ------------------------------------------ |
+| [现状提炼](docs/PROJECT-ANALYSIS.md)         | 原项目是什么、核心价值、架构问题和重构依据 |
+| [功能保留矩阵](docs/FEATURE-MATRIX.md)       | 哪些能力保留、哪些交互改变、如何验证       |
+| [架构与决策](docs/ARCHITECTURE.md)           | 各层职责、数据流、目录和技术取舍           |
+| [界面与交互规范](docs/DESIGN.md)             | 视觉规则、布局、状态和键盘交互             |
+| [开发流程](docs/DEVELOPMENT.md)              | 环境、命令、变更步骤、质量门禁与发布流程   |
+| [使用指南](docs/USER-GUIDE.md)               | 打开、阅读、编辑、保存、导出与恢复         |
+| [迁移与回滚](docs/MIGRATION.md)              | 工程归档、数据迁移和恢复保护               |
+| [最新验证报告](docs/VALIDATION-WORKBENCH.md) | 实际执行结果与尚未验证事项                 |
+| [本轮实施检查单](tasks/workbench-upgrade.md) | 依赖顺序、验收标准与当前状态               |
+
+## 工程结构
 
 ```text
-继续开发 Moyang Reader。先同步最新 main，读 AGENTS.md、docs/AI-TASKS.md 和架构契约；找到最早未完成任务。只有对应该任务、修改同一范围或形成真实依赖的开放 PR 才阻塞；Dependabot/无关维护 PR 不冻结主线。BLOCKED_EXTERNAL 只标真正外部子项。一次只做一个垂直切片，并按改动范围测试。
+src/
+  application/        应用状态、业务编排、视图连接
+  features/           documents / reader / editor / workspace / export / recovery / settings / ai
+  platform/           桌面桥接、本地持久化、更新、路径规范化
+  shared/             类型、弹层和基础组件
+  shell/              欢迎页、工具栏、标签页、设置内容
+  styles/             分职责样式和书房主题
+src-tauri/src/
+  commands/           十个桌面命令模块、共享模型和原有回归测试
+  ai.rs               AI 空间与共享内核的桌面桥接
+crates/
+  ai-core/            SQLite、检索、记忆生命周期、技能和备份
+  ai-mcp/             独立 stdio MCP 程序
+e2e/                  浏览器交互与可访问性测试
+desktop-e2e/          真实桌面测试
+docs/                 产品、技术、开发和使用文档
 ```
 
-需要转交到不自动读取仓库规则的 AI 时，使用 [`docs/AI-TAKEOVER-PROMPT.md`](docs/AI-TAKEOVER-PROMPT.md)。
+性能变化及可靠性修复见 [优化记录](docs/PERFORMANCE.md)。
+
+AI 模块的存储、召回、协议与开发流程见 [AI 架构](docs/AI-ARCHITECTURE.md)。
+
+## 验证
+
+```powershell
+npm run check
+npm run test:ai
+npm run test:e2e
+npm run rust -- test --manifest-path src-tauri/Cargo.toml --lib
+npm run test:e2e:desktop
+```
+
+本次开发版使用独立桌面标识 `com.moyang.reader.next`，保留原文档文件格式，不自动导入旧应用设置。为避免重构版被旧版更新包替换，未配置正式更新源，也未注册文件关联。发布之前应按开发指南完成安装与发布验证。
+
+## 0.11.0 的实施依据
+
+全部确认的工作台选择见 [实施检查单](tasks/workbench-upgrade.md)。[Tencent 与 OpenViking 研究](docs/RESEARCH-AGENT-MEMORY-2026-10.md)、[中文检索实测](docs/VALIDATION-AI-SEARCH.md)和 [Agent 接入约定](docs/adr/0004-client-lifecycle.md)记录采用机制与实际边界。原阶段报告保留作为历史，最终可用性以本轮验证记录中的通过项为准。
