@@ -238,8 +238,11 @@ pub fn configure_client(
         .rev()
         .find(|entry| same_server_target(&entry["server"], &target) && entry["hooks"].is_object());
     let desired = matching.map_or(target.clone(), |entry| entry["server"].clone());
-    let desired_hooks =
-        matching.map_or_else(|| hooks(exe, data, client), |entry| entry["hooks"].clone());
+    let desired_hooks = hooks(
+        Path::new(desired["command"].as_str().unwrap()),
+        Path::new(desired["args"][1].as_str().unwrap()),
+        client,
+    );
     let mut doc = if client == "codex" {
         before
             .parse::<DocumentMut>()
@@ -463,6 +466,17 @@ mod tests {
             assert_eq!(read(&config_path).unwrap(), config_before);
             assert_eq!(read(&hook_path).unwrap(), hooks_before);
             assert_eq!(desktop.setting_value(&key).unwrap(), manifest);
+            // Path equivalence must not freeze an older installation's hook definitions.
+            let mut older = manifest.clone();
+            older["hooks"]["Stop"] = json!([]);
+            desktop.set_setting_value(&key, &older).unwrap();
+            let mut missing = object(&hooks_before).unwrap();
+            missing["hooks"]["Stop"] = json!([]);
+            fs::write(&hook_path, serde_json::to_string(&missing).unwrap()).unwrap();
+            let status = configure_client(&desktop, &paths, &exe, client, "status").unwrap();
+            assert_eq!(status["hooks_configured"], false);
+            let repaired = configure_client(&desktop, &paths, &exe, client, "install").unwrap();
+            assert_eq!(repaired["hooks_configured"], true);
             let different = Store::open(root.path().join("different-data")).unwrap();
             let status = configure_client(&different, &paths, &exe, client, "status").unwrap();
             assert_eq!(status["configured"], false);
