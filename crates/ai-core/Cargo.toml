@@ -15,7 +15,7 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 toml_edit = "0.22"
 tempfile = "3"
-base64 = "0.22"
+base64 = "0.23"
 
 [dev-dependencies]
 tempfile = "3"
