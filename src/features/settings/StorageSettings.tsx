@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { normalizePathKey } from "../../platform/path-key";
 import {
   chooseStorageTarget,
   prepareStorageMove,
@@ -69,7 +70,7 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
                   <span>{size(item.bytes)}</span>
                 </dt>
                 <dd>{item.physical}</dd>
-                {item.logical.replace(/\\/g, "/").toLowerCase() !== item.physical.replace(/\\/g, "/").toLowerCase() && (
+                {normalizePathKey(item.logical) !== normalizePathKey(item.physical) && (
                   <dd className="storage-alias">已有连接通过原路径访问；内容实际保存在上方位置。</dd>
                 )}
               </div>

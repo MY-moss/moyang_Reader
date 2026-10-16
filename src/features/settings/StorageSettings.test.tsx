@@ -19,6 +19,16 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   vi.resetAllMocks();
 });
+it("does not mistake Windows casing, namespace or trailing separators for relocated data", async () => {
+  vi.mocked(storageInfo).mockResolvedValue({
+    native: true,
+    locations: [{ key: "data", label: "Data", logical: "\\\\?\\C:\\DATA\\", physical: "C:/Data", bytes: 1, files: 1 }],
+  });
+  const container = document.createElement("div");
+  root = createRoot(container);
+  await act(async () => root.render(<StorageSettings />));
+  expect(container.querySelector(".storage-alias")).toBeNull();
+});
 it("requires a checked plan and completed saves before starting a storage move", async () => {
   vi.mocked(storageInfo).mockResolvedValue({
     native: true,

@@ -199,9 +199,12 @@ try {
   if (errors.length) report.cleanup_errors = errors.map((result) => String(result.reason));
   // Only this run's isolated data, after its app and MCP clients have stopped.
   for (let n = 0; app?.exitCode === null && n < 30; n++) await pause(100);
-  if (path.dirname(temp) !== fixtureBase || !path.basename(temp).startsWith("portable-smoke-")) throw new Error("Invalid fixture cleanup path");
-  try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }); }
-  catch (error) { report.retained_test_fixture = temp; report.cleanup_note = String(error); }
+  if (path.dirname(temp) !== fixtureBase || !path.basename(temp).startsWith("portable-smoke-")) {
+    report.cleanup_note = "Unexpected fixture path retained without removal";
+  } else {
+    try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }); }
+    catch (error) { report.retained_test_fixture = temp; report.cleanup_note = String(error); }
+  }
   fs.writeFileSync("artifacts/workbench/release-smoke.json", JSON.stringify(report, null, 2));
 }
 console.log(JSON.stringify(report, null, 2));

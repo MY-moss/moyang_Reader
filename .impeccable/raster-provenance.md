@@ -38,3 +38,11 @@
 - `ai-knowledge-light.png`、`ai-knowledge-dark.png`、`ai-connections-light.png`、`ai-connections-dark.png` 为上一轮保留文件。本轮未确认原始捕获流程与数据来源，故不据此声明当前界面已验收，也不将其作为新增设计真源。
 
 后续替换截图应使用隔离资料和示例服务，记录视口、主题、浏览器或原生运行环境，并明确发布包版本。图片中的成功提示不得代替服务连接、迁移或更新功能的实际验证。
+
+## 收尾补充
+
+`artifacts/workbench/quick-open-dark.png` 来自新增维护回归，720×800、系统深色、两份虚构 TXT；字号至少 12px、语义配色、键盘与 Axe 已通过。
+
+`storage-plan-720-fixture.png` 与 `storage-result-720-fixture.png` 由 `.local/capture-storage-states.mjs` 在现有设置页截图，720×900，替换的只是存储接口模块：C:/Users/Example、D:/Moyang 和 E:/MoyangData 均为虚构路径。前者展示模型选项、迁移范围、容量和确认操作；后者展示结果、实际位置与兼容路径说明。主任务已查看两图。它们仅证明这些控件的布局，不证明原生迁移已经执行；真实迁移结果来自独立 PowerShell/MCP 测试。
+
+最终路径比较沿用 `normalizePathKey`，处理大小写、Windows命名空间与尾分隔符；此前原生图中的重复说明仍属旧证据，最终便携烟测会核对当前源码。

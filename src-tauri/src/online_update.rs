@@ -173,7 +173,7 @@ pub async fn online_update_check(
         builder
     };
     let checked = builder.build().map_err(|e| e.to_string())?.check().await;
-    let update = match checked {
+    let mut update = match checked {
         Ok(update) => update,
         Err(primary) => {
             // Isolated test failures must never fall through to a live service.
@@ -186,6 +186,11 @@ pub async fn online_update_check(
             })?
         }
     };
+    // Checking small metadata should fail promptly; downloading an application
+    // archive on a slower connection needs a separate, realistic time budget.
+    if let Some(found) = update.as_mut() {
+        found.timeout = Some(Duration::from_secs(600));
+    }
     let info = update
         .as_ref()
         .map(|u| json!({"version":u.version,"body":u.body,"currentVersion":u.current_version}));
