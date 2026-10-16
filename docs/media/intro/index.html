@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>墨阳阅读器 · 产品介绍</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Segoe UI Variable";
+        src: local("Segoe UI Variable"), local("Segoe UI");
+      }
+      @font-face {
+        font-family: "Microsoft YaHei UI";
+        src: local("Microsoft YaHei UI"), local("Microsoft YaHei");
+      }
+      :root {
+        --paper: #f5f3ee;
+        --surface: #fffefa;
+        --ink: #30352f;
+        --muted: #686e63;
+        --green: #3c6454;
+        --deep: #294d3d;
+        --soft: #e7eee4;
+        --line: #e3e3da;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        width: 1440px;
+        height: 1000px;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif;
+      }
+      #intro {
+        position: relative;
+        width: 1440px;
+        height: 1000px;
+        overflow: hidden;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        background: var(--paper);
+        overflow: hidden;
+      }
+      #reading {
+        opacity: 0;
+      }
+      #library {
+        opacity: 0;
+      }
+      #conversation {
+        opacity: 0;
+      }
+      #closing {
+        opacity: 0;
+      }
+      .scene-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        padding: 40px 64px;
+        gap: 20px;
+      }
+      .heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 30px;
+        min-height: 76px;
+      }
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+      h2 {
+        font-size: 48px;
+        line-height: 1.4;
+        font-weight: 700;
+        letter-spacing: -1px;
+      }
+      .chapter {
+        color: var(--green);
+        font-size: 20px;
+        letter-spacing: 2px;
+        white-space: nowrap;
+      }
+      .foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 28px;
+        gap: 24px;
+        font-size: 22px;
+        color: var(--muted);
+      }
+      .foot strong {
+        color: var(--deep);
+        font-weight: 600;
+      }
+      .demo {
+        font-size: 18px;
+      }
+      .screen {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: 0 20px 50px rgba(41, 77, 61, 0.08);
+      }
+      .screen img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: top;
+      }
+      .screen img:not(:first-child) {
+        opacity: 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-size: 27px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      .mark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 54px;
+        height: 54px;
+        background: var(--green);
+        color: var(--surface);
+        border-radius: 9px;
+        font:
+          700 42px Georgia,
+          serif;
+      }
+      .opening-content {
+        padding: 64px 84px;
+        justify-content: space-between;
+      }
+      .lead {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        padding: 30px 0;
+      }
+      h1 {
+        font-size: 112px;
+        line-height: 1.25;
+        font-weight: 750;
+        letter-spacing: -5px;
+      }
+      h1 span {
+        color: var(--green);
+      }
+      .lead p {
+        font-size: 30px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .path {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        font-size: 26px;
+        color: var(--deep);
+      }
+      .path i {
+        display: block;
+        width: 62px;
+        height: 1px;
+        background: var(--green);
+      }
+      .book {
+        position: absolute;
+        right: 90px;
+        top: 278px;
+        width: 285px;
+        height: 350px;
+        border: 1px solid var(--line);
+        border-radius: 6px 18px 18px 6px;
+        background: var(--surface);
+        transform: rotate(7deg);
+        box-shadow: 18px 24px 0 var(--soft);
+      }
+      .book::before {
+        content: "";
+        position: absolute;
+        left: 22px;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--line);
+      }
+      .book .book-title {
+        position: absolute;
+        top: 60px;
+        left: 50px;
+        font:
+          54px/1.5 "SimSun",
+          serif;
+        color: var(--deep);
+      }
+      .book .book-line {
+        position: absolute;
+        left: 50px;
+        right: 42px;
+        height: 2px;
+        background: var(--line);
+      }
+      .book-line.one {
+        top: 240px;
+      }
+      .book-line.two {
+        top: 267px;
+        right: 86px;
+      }
+      .section-tags {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .tag {
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        padding: 7px 20px;
+        font-size: 20px;
+        color: var(--muted);
+        background: var(--surface);
+      }
+      #knowledge-tag {
+        background: var(--soft);
+        color: var(--deep);
+        border-color: var(--green);
+      }
+      .connection {
+        position: absolute;
+        bottom: 45px;
+        right: 44px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: var(--deep);
+        color: var(--surface);
+        padding: 18px 26px;
+        border-radius: 12px;
+        font-size: 24px;
+        opacity: 0;
+      }
+      .connection .divider {
+        color: #d3e4c7;
+      }
+      .closing {
+        background: var(--deep);
+        color: var(--surface);
+      }
+      .closing .scene-content {
+        padding: 64px 84px;
+        justify-content: space-between;
+      }
+      .closing .mark {
+        background: var(--surface);
+        color: var(--deep);
+      }
+      .closing h2 {
+        font:
+          700 84px/1.45 "Microsoft YaHei UI",
+          sans-serif;
+        letter-spacing: -3px;
+      }
+      .closing h2 span {
+        display: block;
+        color: #d3e4c7;
+      }
+      .closing .outro-note {
+        font-size: 29px;
+        color: #d3e4c7;
+        line-height: 1.8;
+      }
+      .ending-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 23px;
+      }
+      .download {
+        padding: 18px 30px;
+        background: var(--surface);
+        color: var(--deep);
+        border-radius: 8px;
+        font-size: 25px;
+        font-weight: 600;
+      }
+      .rule {
+        height: 1px;
+        background: var(--line);
+        width: 100%;
+      }
+      .progress {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 1440px;
+        height: 4px;
+        background: var(--green);
+        transform-origin: left center;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="intro"
+      data-composition-id="moyang-intro"
+      data-start="0"
+      data-duration="26"
+      data-width="1440"
+      data-height="1000"
+    >
+      <section id="opening" class="scene">
+        <div class="scene-content opening-content">
+          <div class="brand">
+            <span class="mark">M</span> 墨阳阅读器
+            <span style="font-weight: 400; color: var(--muted)">Moyang Reader</span>
+          </div>
+          <div class="lead">
+            <h1>把阅读，<br />变成<span>积累。</span></h1>
+            <p>读文档、写笔记，<br />也为你的 AI 留下知识、记忆与方法。</p>
+          </div>
+          <div class="book" data-layout-ignore>
+            <div class="book-title">阅读<br />与思考</div>
+            <i class="book-line one"></i><i class="book-line two"></i>
+          </div>
+          <div class="path"><span>你的文档</span><i></i><span>你的知识</span><i></i><span>你的 AI</span></div>
+        </div>
+      </section>
+      <section id="reading" class="scene">
+        <div class="scene-content">
+          <div class="heading">
+            <h2>读文档，也写下自己的理解。</h2>
+            <span class="chapter">01 / 阅读与写作</span>
+          </div>
+          <div class="screen">
+            <img src="assets/reading.png" alt="实际阅读界面，使用示例文档" /><img
+              id="split-image"
+              src="assets/split.png"
+              alt="原文和笔记并排阅读"
+            />
+          </div>
+          <div class="foot">
+            <strong>Markdown · TXT · Word · PDF</strong><span>搜索 / 摘录 / 双窗格</span
+            ><span class="demo">真实界面 · 示例资料</span>
+          </div>
+        </div>
+      </section>
+      <section id="library" class="scene">
+        <div class="scene-content">
+          <div class="heading">
+            <h2>资料、偏好、方法，各有归处。</h2>
+            <span class="chapter">02 / AI 空间</span>
+          </div>
+          <div class="screen">
+            <img src="assets/knowledge.png" alt="知识库保存资料与出处" /><img
+              id="memory-image"
+              src="assets/memory.png"
+              alt="长期记忆保存偏好与约定"
+            /><img id="skill-image" src="assets/skill.png" alt="技能库保存可复用的操作流程" />
+          </div>
+          <div class="foot">
+            <div class="section-tags">
+              <span id="knowledge-tag" class="tag">知识：查资料</span
+              ><span id="memory-tag" class="tag">记忆：懂偏好</span><span id="skill-tag" class="tag">技能：会做事</span>
+            </div>
+            <span class="demo">与日常笔记独立 · 示例资料</span>
+          </div>
+        </div>
+      </section>
+      <section id="conversation" class="scene">
+        <div class="scene-content">
+          <div class="heading">
+            <h2>用自己的 AI，接上自己的积累。</h2>
+            <span class="chapter">03 / 聊天与 Agent</span>
+          </div>
+          <div class="screen">
+            <img src="assets/chat.png" alt="用自己的 API 围绕阅读资料讨论，回答为演示内容" />
+            <div class="connection">
+              <span>Codex / Claude Code / 其他 Agent</span><span class="divider">↔</span><strong>MCP</strong>
+            </div>
+          </div>
+          <div class="foot">
+            <strong>按需附加资料 · 确认后存入 AI 库</strong
+            ><span class="demo">虚构对话演示 · 自动沉淀需客户端授权</span>
+          </div>
+        </div>
+      </section>
+      <section id="closing" class="scene closing">
+        <div class="scene-content">
+          <div class="brand"><span class="mark">M</span> 墨阳阅读器 · Moyang Reader</div>
+          <div class="outro-copy">
+            <h2>每一次阅读，<span>都是下一次的起点。</span></h2>
+            <p class="outro-note" style="margin-top: 30px">从一个文档开始。<br />慢慢拥有自己的知识、记忆和技能。</p>
+          </div>
+          <div class="ending-actions">
+            <span>本地文档 · 可选 AI · MCP 接入</span><span class="download">下载 Windows 版 ↗</span>
+          </div>
+        </div>
+      </section>
+      <div class="progress" data-layout-ignore></div>
+    </main>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#opening .brand", { y: 14, duration: 0.55, ease: "power2.out" }, 0.12)
+        .from("#opening h1", { y: 35, duration: 0.8, ease: "power3.out" }, 0.28)
+        .from("#opening .lead p", { y: 20, opacity: 0, duration: 0.6, ease: "sine.out" }, 0.55)
+        .from("#opening .book", { x: 45, rotation: 1, opacity: 0, duration: 0.85, ease: "power2.out" }, 0.35)
+        .from("#opening .path", { y: 12, opacity: 0, duration: 0.55, ease: "sine.out" }, 0.9);
+      function enter(id, at) {
+        tl.to(id, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, at)
+          .from(id + " .heading", { y: 18, opacity: 0, duration: 0.65, ease: "power3.out" }, at + 0.16)
+          .from(id + " .screen", { y: 26, scale: 0.986, opacity: 0, duration: 0.75, ease: "power2.out" }, at + 0.2)
+          .from(id + " .foot", { y: 10, opacity: 0, duration: 0.5, ease: "sine.out" }, at + 0.45);
+      }
+      tl.to("#opening", { opacity: 0, duration: 0.3, ease: "sine.inOut" }, 2.7);
+      enter("#reading", 3);
+      tl.to("#split-image", { opacity: 1, duration: 0.6, ease: "sine.inOut" }, 5.65);
+      tl.to("#reading", { opacity: 0, duration: 0.3, ease: "sine.inOut" }, 7.7);
+      enter("#library", 8);
+      function libraryStep(image, active, old, at) {
+        tl.to(image, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, at)
+          .to(
+            old,
+            { backgroundColor: "#fffefa", color: "#686e63", borderColor: "#e3e3da", duration: 0.3, ease: "power1.out" },
+            at,
+          )
+          .to(
+            active,
+            { backgroundColor: "#e7eee4", color: "#294d3d", borderColor: "#3c6454", duration: 0.3, ease: "power2.out" },
+            at,
+          );
+      }
+      libraryStep("#memory-image", "#memory-tag", "#knowledge-tag", 10.7);
+      libraryStep("#skill-image", "#skill-tag", "#memory-tag", 12.9);
+      tl.to("#library", { opacity: 0, duration: 0.3, ease: "sine.inOut" }, 14.9);
+      enter("#conversation", 15.2);
+      tl.fromTo(".connection", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 18.8);
+      tl.to("#conversation", { opacity: 0, duration: 0.3, ease: "sine.inOut" }, 21.4);
+      tl.to("#closing", { opacity: 1, duration: 0.65, ease: "sine.inOut" }, 21.7)
+        .from("#closing .brand", { y: 12, opacity: 0, duration: 0.5, ease: "power2.out" }, 21.95)
+        .from("#closing h2", { y: 32, opacity: 0, duration: 0.75, ease: "power3.out" }, 22.1)
+        .from("#closing .outro-note", { y: 18, opacity: 0, duration: 0.65, ease: "sine.out" }, 22.35)
+        .from("#closing .ending-actions", { y: 15, opacity: 0, duration: 0.65, ease: "power2.out" }, 22.65)
+        .fromTo(".progress", { scaleX: 0 }, { scaleX: 1, duration: 26, ease: "none" }, 0);
+      window.__timelines["moyang-intro"] = tl;
+    </script>
+  </body>
+</html>

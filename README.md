@@ -6,6 +6,10 @@
 
 **[下载 Windows 版](https://github.com/MY-moss/moyang_Reader/releases/latest) · [使用指南](docs/USER-GUIDE.md) · [AI 空间](docs/AI-USER-GUIDE.md) · [问题反馈](https://github.com/MY-moss/moyang_Reader/issues)**
 
+[![墨阳阅读器功能演示：阅读与双窗格、知识记忆技能、聊天与 MCP 接入](docs/media/moyang-intro.gif)](docs/media/moyang-intro.mp4)
+
+26 秒了解墨阳：阅读与写作 → 知识、记忆与技能 → AI 聊天与 Agent 接入。[观看清晰视频](docs/media/moyang-intro.mp4) · [静态封面](docs/media/moyang-intro-poster.png)。界面使用示例资料，对话为演示内容。
+
 ## 用它解决什么问题
 
 - **资料散在很多文件夹里**：把现有文件夹加入阅读库，在同一处阅读、搜索、摘录与整理，继续使用原来的文件。
