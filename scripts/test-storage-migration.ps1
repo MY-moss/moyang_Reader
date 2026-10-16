@@ -1,5 +1,9 @@
 param([Parameter(Mandatory=$true)][string]$McpExecutable)
 $ErrorActionPreference='Stop'
+# Keep native stdin/stdout independent of the host console code page and BOM.
+$OutputEncoding = New-Object Text.UTF8Encoding($false)
+[Console]::InputEncoding = New-Object Text.UTF8Encoding($false)
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
 # Native JSON input must be UTF-8 without BOM, regardless of the runner defaults.
 $OutputEncoding=New-Object System.Text.UTF8Encoding($false)
 $fixtureBase=Join-Path (Split-Path -Parent $PSScriptRoot) '.local'
@@ -16,9 +20,11 @@ try {
     [IO.Directory]::CreateDirectory($cache) | Out-Null
     [IO.File]::WriteAllText((Join-Path $cache 'draft.txt'),'unsent draft')
     $ai=Join-Path $data 'ai-space'
-    $raw='{"kind":"memory","title":"migration evidence","body":"preserve resource and revision","source":"isolated fixture","project":"storage-test"}'
+    $chineseTitle = -join @([char]0x8FC1,[char]0x79FB,[char]0x9A8C,[char]0x8BC1)
+    $raw=@{kind='memory';title=$chineseTitle;body='preserve resource and revision';source='isolated fixture';project='storage-test'} | ConvertTo-Json -Compress
     $saved=$raw | & $McpExecutable --data-dir $ai --request save | ConvertFrom-Json
     Assert-True ($LASTEXITCODE -eq 0 -and $saved.id) 'Fixture memory must be saved'
+    Assert-True ($saved.title -eq $chineseTitle) 'Chinese text must survive native stdin and stdout'
     $recordId=$saved.id
     $planFile=Join-Path $fixture 'plan.json'
     $items=@(@{key='data';label='Data';logical=$data;physical=$data},@{key='cache';label='Webview';logical=$cache;physical=$cache})
@@ -34,6 +40,7 @@ try {
         Assert-True ($report.status -eq 'complete') ('Migration should succeed: ' + $report.message)
         $receipt=('{"id":"'+$recordId+'"}') | & $McpExecutable --data-dir $ai --request get | ConvertFrom-Json
         Assert-True ($LASTEXITCODE -eq 0 -and $receipt.id -eq $recordId) 'Existing MCP data path must still resolve the original record'
+        Assert-True ($receipt.title -eq $chineseTitle) 'Chinese content must survive migration'
         Assert-True ((Get-Content -LiteralPath (Join-Path $cache 'draft.txt') -Raw) -eq 'unsent draft') 'Browser drafts must survive'
         Assert-True (Test-Path -LiteralPath (Join-Path $data 'empty-folder') -PathType Container) 'Empty folders must survive'
         foreach($item in $items) { $item.physical=Join-Path $target $item.key; [void]$aliases.Add($item.physical) }
