@@ -62,6 +62,7 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
             Value::Null
         }
         "stats" => serde_json::to_value(s.stats()?)?,
+        "health" => serde_json::to_value(s.health(serde_json::from_value(payload)?)?)?,
         "backup" => serde_json::to_value(s.backup()?)?,
         "import" => s.import(serde_json::from_value(payload)?)?,
         "context" => s.context(serde_json::from_value(payload)?)?,

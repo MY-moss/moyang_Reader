@@ -60,6 +60,9 @@ it("never overwrites edits made while a plugin is running", async () => {
   await act(async () => h.api.execute("extension:moyang.tidy-markdown:tidy"));
   h.store.update("C:/notes/current.md", (s) => ({ ...s, draft: "later edit" }));
   await act(async () => finish({ replacement: "plugin change" }));
+  // execute also computes a native asynchronous digest; resolving the plugin alone
+  // does not mean the complete result is ready to apply on a slower runner.
+  await vi.waitFor(() => expect(h.api.run?.running).toBe(false));
   await act(async () => h.api.apply());
   expect(h.updateSource).not.toHaveBeenCalled();
   expect(h.api.run?.error).toContain("已有新修改");
@@ -69,6 +72,7 @@ it("applies through the normal document session and ignores a cancelled result",
   vi.mocked(runExtension).mockResolvedValue({ replacement: "plugin change" });
   const h = await harness();
   await act(async () => h.api.execute("extension:moyang.tidy-markdown:tidy"));
+  await vi.waitFor(() => expect(h.api.run?.running).toBe(false));
   await act(async () => h.api.apply());
   expect(h.updateSource).toHaveBeenCalledWith("plugin change", "C:/notes/current.md");
   let finish!: (r: { replacement: string }) => void;

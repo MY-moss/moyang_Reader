@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
 import { isTauriRuntime, openExternalUrl } from "../../platform/bridge";
 import type { AiFields, AiRecord } from "../../shared/ai-types";
@@ -15,16 +15,28 @@ export function AiSource({
   const [incoming, setIncoming] = useState<AiFields | null>(null),
     [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const request = useRef({ sequence: 0 });
+  useLayoutEffect(() => {
+    const epoch = request.current;
+    epoch.sequence++;
+    setIncoming(null);
+    setBusy(false);
+    return () => {
+      epoch.sequence++;
+    };
+  }, [record.id, record.revision]);
   const check = async (load: () => Promise<AiFields>) => {
+    const sequence = ++request.current.sequence;
     setBusy(true);
     try {
       const next = await load();
+      if (sequence !== request.current.sequence) return;
       if (next.snapshot?.fingerprint === record.snapshot?.fingerprint) notify("来源内容没有变化。");
       else setIncoming(next);
     } catch (e) {
-      notify(String(e), true);
+      if (sequence === request.current.sequence) notify(String(e), true);
     } finally {
-      setBusy(false);
+      if (sequence === request.current.sequence) setBusy(false);
     }
   };
   const uri = record.snapshot?.uri || record.source;
@@ -88,6 +100,7 @@ export function AiSource({
           <button
             disabled={busy}
             onClick={async () => {
+              const sequence = ++request.current.sequence;
               setBusy(true);
               try {
                 const next = await aiRequest<AiRecord>("save", {
@@ -98,13 +111,14 @@ export function AiSource({
                   expected_revision: record.revision,
                   reason: "检查差异后更新来源快照",
                 });
+                if (sequence !== request.current.sequence) return;
                 setIncoming(null);
                 onChange(next);
                 notify("来源快照已更新，旧版本保留在历史中。");
               } catch (e) {
-                notify(String(e), true);
+                notify(`来源「${record.title}」更新失败：${String(e)}`, true);
               } finally {
-                setBusy(false);
+                if (sequence === request.current.sequence) setBusy(false);
               }
             }}
           >

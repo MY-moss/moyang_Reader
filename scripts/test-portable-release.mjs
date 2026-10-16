@@ -77,6 +77,13 @@ try {
   });
   await client.call("restore_revision", { id, expected_revision: changed.revision, revision: record.revision });
   assert.equal((await client.call("get_record", { id })).body, "使用简洁中文回答");
+  const health = await client.call("library_health", { project: "" });
+  assert.equal(health.scanned, 1);
+  const context = await client.call("recall_context", { query: "简洁中文", max_chars: 1000 });
+  assert.ok(context.text.includes("使用简洁中文回答"));
+  assert.ok(context.text.includes("范围：全局"));
+  assert.ok([...context.text].length <= 1000);
+  report.memory_maintenance = "native health tool and bounded scoped recall passed";
   report.mcp = "write, recall, update, restore passed";
   await client.close();
   client = null;
@@ -119,7 +126,7 @@ try {
     env: {
       ...process.env,
       MOYANG_DATA_DIR: path.join(temp, "desktop"),
-      MOYANG_AI_DATA_DIR: path.join(temp, "desktop-ai"),
+      MOYANG_AI_DATA_DIR: path.join(temp, "ai"),
       WEBVIEW2_USER_DATA_FOLDER: path.join(temp, "webview"),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${desktopPort} --force-device-scale-factor=1.5`,
     },
@@ -152,6 +159,11 @@ try {
   assert.equal(path.resolve(info.executable), path.join(release, "moyang-ai-mcp.exe"));
   await page.screenshot({ path: "artifacts/workbench/release-desktop.png" });
   report.desktop = { rendered: true, scale: 1.5, mcp_companion: true, wdio: false };
+  await page.locator(".ai-sidebar").getByRole("button", { name: "近期活动与冲突", exact: true }).click();
+  await page.getByRole("button", { name: "资料检查", exact: true }).click();
+  await page.getByText(/检查了 1 条未归档资料/).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  report.desktop.memory_health = true;
   await page.getByRole("button", { name: "插件市场", exact: true }).click();
   await page.locator(".extension-row").filter({ hasText: "阅读概览" }).click();
   await page.getByRole("button", { name: "安装扩展", exact: true }).click();

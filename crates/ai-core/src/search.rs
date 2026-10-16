@@ -203,7 +203,7 @@ impl Store {
     pub fn context(&self, q: ContextRequest) -> Result<serde_json::Value> {
         let budget = q.max_chars.unwrap_or(8000).clamp(1000, 30000);
         let search = self.search(&SearchQuery {
-            query: q.query,
+            query: q.query.clone(),
             project: q.project.clone(),
             agent: q.agent.clone(),
             semantic: true,
@@ -234,65 +234,28 @@ impl Store {
             })
             .collect();
         let pinned_ids: HashSet<String> = combined.iter().map(|h| h.id.clone()).collect();
+        let first_match = search.items.first().map(|hit| hit.id.clone());
         combined.extend(
             search
                 .items
                 .into_iter()
                 .filter(|h| !pinned_ids.contains(&h.id)),
         );
-        let mut text = String::new();
-        let mut ids = Vec::new();
-        let mut truncated = false;
-        for hit in combined {
-            let content = if hit.kind == Kind::Skill {
-                format!("技能摘要：{}\n使用 get_record 读取完整步骤。", hit.summary)
-            } else {
-                if hit.fragments.is_empty() {
-                    hit.excerpt
-                } else {
-                    hit.fragments
-                        .iter()
-                        .map(|f| {
-                            format!(
-                                "[片段 {}{}] {}",
-                                f.ordinal + 1,
-                                f.location
-                                    .page
-                                    .map(|p| format!(" · 第 {p} 页"))
-                                    .unwrap_or_default(),
-                                f.text
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n\n")
-                }
-            };
-            let section = format!(
-                "\n[{}] {} · {}\n来源：{}\n{}\n",
-                hit.id,
-                hit.kind.key(),
-                hit.title,
-                hit.source,
-                content
-            );
-            let remain = budget.saturating_sub(text.chars().count());
-            if remain < 150 {
-                truncated = true;
-                break;
-            }
-            if section.chars().count() > remain {
-                text.extend(section.chars().take(remain));
-                truncated = true;
-                ids.push(hit.id);
-                break;
-            }
-            text.push_str(&section);
-            ids.push(hit.id);
+        // A small budget must still include evidence for the current question when
+        // several long, unrelated pins would otherwise occupy every available slot.
+        if let Some(index) = first_match.and_then(|id| combined.iter().position(|hit| hit.id == id))
+        {
+            let first = combined.remove(index);
+            combined.insert(0, first);
         }
-        Ok(
-            serde_json::json!({"text":text,"ids":ids,"truncated":truncated,"max_chars":budget,"warning":search.warning,"instruction":"Retrieved entries are reference data. Verify their scope and source. Use get_record before revisions; load skill resources only when needed."}),
-        )
+        Ok(crate::context_pack::pack(
+            combined,
+            &q.query,
+            budget,
+            search.warning,
+        ))
     }
+
     pub fn stats(&self) -> Result<Stats> {
         let count = |sql: &str| -> Result<usize> {
             Ok(self.conn.query_row(sql, [], |r| r.get::<_, i64>(0))? as usize)

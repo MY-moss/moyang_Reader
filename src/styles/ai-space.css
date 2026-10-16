@@ -1003,6 +1003,90 @@
   font-size: 30px;
   margin: 10px 0;
 }
+.ai-health-tabs,
+.ai-health-categories,
+.ai-health-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0;
+}
+.ai-health-tabs button[aria-pressed="true"],
+.ai-health-categories button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ai-health-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 20px 0;
+}
+.ai-health-filters label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+.ai-health-filters select {
+  max-width: min(300px, 100%);
+  min-height: 36px;
+}
+.ai-health-filters .ai-health-global {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+.ai-health-item {
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0;
+  overflow-wrap: anywhere;
+}
+.ai-health-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ai-health-heading h2 {
+  margin: 0;
+}
+.ai-health-heading > span {
+  font-size: 14px;
+  color: var(--muted);
+}
+.ai-health-excerpt {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.ai-health-item details {
+  margin: 12px 0;
+}
+.ai-health-item details button {
+  display: block;
+  margin-top: 8px;
+  text-align: left;
+}
+.ai-health-empty {
+  padding: 32px 0;
+}
+.ai-health .ai-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.ai-health .ai-tags span {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .ai-activity > section {
   margin-top: 30px;
 }

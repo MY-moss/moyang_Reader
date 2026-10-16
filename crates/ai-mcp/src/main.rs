@@ -1,6 +1,6 @@
 use moyang_ai_core::{
     view_record, ActivityRequest, AssetRequest, CheckpointRequest, ConcludeRequest, ContextRequest,
-    DeleteRequest, FeedbackRequest, HistoryRequest, IdRequest, MergeRequest,
+    DeleteRequest, FeedbackRequest, HealthQuery, HistoryRequest, IdRequest, MergeRequest,
     ResolveConflictRequest, RestoreRequest, Result as CoreResult, RevisionRequest, SaveRequest,
     SearchQuery, StateRequest, Store,
 };
@@ -23,11 +23,18 @@ impl MemoryService {
         T: serde::Serialize + Send + 'static,
         F: FnOnce(&mut Store) -> CoreResult<T> + Send + 'static,
     {
+        self.run_with_maintenance(f, true).await
+    }
+    async fn run_with_maintenance<T, F>(&self, f: F, maintain: bool) -> CallToolResult
+    where
+        T: serde::Serialize + Send + 'static,
+        F: FnOnce(&mut Store) -> CoreResult<T> + Send + 'static,
+    {
         let directory = self.directory.clone();
         let result = tokio::task::spawn_blocking(move || {
             let mut store = Store::open(directory.as_ref())?;
             let result = f(&mut store);
-            if result.is_ok() {
+            if maintain && result.is_ok() {
                 moyang_ai_core::maintain_semantic(directory.as_ref());
             }
             result
@@ -166,6 +173,18 @@ impl MemoryService {
     )]
     async fn library_status(&self) -> CallToolResult {
         self.run(|s| s.stats()).await
+    }
+    #[tool(
+        description = "Review active AI entries for identical bodies within the same scope, expiration, missing source fields and deleted linked entries. Read-only, no model call. Set project/agent/kind and paginate with offset/limit; include_global defaults to false. Candidates are review suggestions, not errors: inspect records and preserve scope/history before editing or archiving. No automatic cleanup.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn library_health(&self, Parameters(q): Parameters<HealthQuery>) -> CallToolResult {
+        self.run_with_maintenance(move |s| s.health(q), false).await
     }
     #[tool(
         description = "Build one batch of missing embeddings using the configured Ollama service. Repeat while remaining > 0. Basic search works without this."

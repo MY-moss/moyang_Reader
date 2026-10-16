@@ -126,6 +126,7 @@ async fn real_stdio_client_roundtrip_restart_and_cross_process_revision() {
     let tools = c.list_all_tools().await.unwrap();
     assert!(tools.iter().any(|t| t.name == "recall_context"));
     assert!(tools.iter().any(|t| t.name == "read_skill_resource"));
+    assert!(tools.iter().any(|t| t.name == "library_health"));
     let memory=call(&c,"save_record",json!({"kind":"memory","title":"写作偏好","body":"偏好简洁中文回答","project":"book","source":"用户确认"})).await;
     let id = memory["id"].as_str().unwrap();
     let found = call(&c, "search", json!({"query":"中文","project":"book"})).await;
@@ -137,6 +138,11 @@ async fn real_stdio_client_roundtrip_restart_and_cross_process_revision() {
     )
     .await;
     assert_eq!(hidden["total"], 0);
+    let health = call(&c, "library_health", json!({"project":"book"})).await;
+    assert_eq!(health["scanned"], 1);
+    assert_eq!(health["total"], 0);
+    let unrelated = call(&c, "library_health", json!({"project":"other"})).await;
+    assert_eq!(unrelated["scanned"], 0);
     let mut direct = moyang_ai_core::Store::open(dir.path()).unwrap();
     let fields = direct.get(id).unwrap().fields;
     direct

@@ -47,7 +47,7 @@ async function main() {
   const result = spawnSync(process.execPath, [path.join(root, "node_modules/@tauri-apps/cli/tauri.js"), "signer", "sign", "-f", key, archive], { cwd: root, env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || "" }, encoding: "utf8", windowsHide: true });
   if (result.status !== 0) throw new Error("Signing failed; check the local signing key and password.");
   const tag = `reader-v${version}`;
-  const feed = { version, notes: "可选聊天助手、多 API 服务、简化导航与独立签名在线更新。详见发布说明。", pub_date: new Date().toISOString(), platforms: { "windows-x86_64-portable": { signature: fs.readFileSync(archive + ".sig", "utf8").trim(), url: `https://github.com/MY-moss/moyang_Reader/releases/download/${tag}/${filename}` } } };
+  const feed = { version, notes: `Moyang Reader ${version} 已发布。新增功能和使用说明见 GitHub 发布页。`, pub_date: new Date().toISOString(), platforms: { "windows-x86_64-portable": { signature: fs.readFileSync(archive + ".sig", "utf8").trim(), url: `https://github.com/MY-moss/moyang_Reader/releases/download/${tag}/${filename}` } } };
   fs.writeFileSync(path.join(output, "reader-update.json"), JSON.stringify(feed, null, 2));
   fs.writeFileSync(path.join(output, "SHA256SUMS.txt"), `${crypto.createHash("sha256").update(bytes).digest("hex")}  ${filename}\n`);
   console.log(JSON.stringify({ output, version, tag, archiveBytes: bytes.length, modelIncluded: false }, null, 2));
