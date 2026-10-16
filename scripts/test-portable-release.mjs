@@ -195,6 +195,16 @@ try {
   await page.getByRole("button", {name:"返回聊天",exact:true}).click();
   assert.equal(await page.getByRole("combobox", {name:"API 服务",exact:true}).inputValue() !== "", true);
   report.desktop.chat_configuration = true;
+  await page.getByLabel("聊天消息", {exact:true}).fill("第一份尚未发送的原生草稿");
+  await page.getByRole("button", {name:"新对话",exact:true}).click();
+  await page.getByLabel("聊天消息", {exact:true}).fill("第二份独立的原生草稿");
+  await page.getByRole("button", {name:"历史",exact:true}).click();
+  await page.getByRole("button", {name:/未发送 · 第一份尚未发送的原生草稿/}).click();
+  await page.waitForFunction(() => document.querySelector('textarea[aria-label="聊天消息"]')?.value === "第一份尚未发送的原生草稿", null, {timeout:15000});
+  await page.getByRole("button", {name:"历史",exact:true}).click();
+  await page.getByRole("button", {name:/未发送 · 第二份独立的原生草稿/}).click();
+  await page.waitForFunction(() => document.querySelector('textarea[aria-label="聊天消息"]')?.value === "第二份独立的原生草稿", null, {timeout:15000});
+  report.desktop.independent_chat_drafts = true;
   await page.getByRole("button", {name:"设置",exact:true}).click();
   await page.getByRole("button", {name:"存储位置",exact:true}).click();
   await page.locator(".storage-locations").waitFor();

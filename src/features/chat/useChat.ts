@@ -43,6 +43,7 @@ export function useChat(assistants: ChatAssistant[]) {
     current = useRef(thread);
   const [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
+    [switching, setSwitching] = useState(false),
     [error, setError] = useState("");
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [notice, setNotice] = useState(""),
@@ -51,12 +52,15 @@ export function useChat(assistants: ChatAssistant[]) {
   const controller = useRef<AbortController | null>(null),
     running = useRef<Promise<void>>(Promise.resolve());
   const saves = useRef<Promise<void>>(Promise.resolve());
+  const transition = useRef<Promise<void> | null>(null);
   const initialAssistants = useRef(assistants);
   const put = useCallback((next: ChatThread) => {
     current.current = next;
     setThread(next);
   }, []);
-  const change = (fields: Partial<ChatThread>) => put({ ...current.current, ...fields });
+  const change = (fields: Partial<ChatThread>) => {
+    if (!transition.current) put({ ...current.current, ...fields });
+  };
   const refresh = useCallback(async () => {
     setThreads(await chatRequest("threads"));
   }, []);
@@ -117,11 +121,13 @@ export function useChat(assistants: ChatAssistant[]) {
       registerPendingWork(async () => {
         controller.current?.abort();
         await running.current;
+        await transition.current;
         await save();
       }),
     [save],
   );
   const setDraft = (value: string) => {
+    if (transition.current) return;
     setDraftState(value);
     try {
       localStorage.setItem(`moyang.chat.draft.${current.current.id}`, value);
@@ -132,38 +138,53 @@ export function useChat(assistants: ChatAssistant[]) {
       setError("草稿暂时无法保存到本机，请勿关闭窗口。");
     }
   };
-  const open = async (id?: string) => {
-    if (controller.current) return;
-    await save();
-    const next = id
-      ? await chatRequest<ChatThread | null>("thread", { id })
-      : blank(
-          providers.find((p) => p.id === localStorage.getItem("moyang.chat.default")) ?? providers[0],
-          assistants[0],
-        );
-    if (!next) throw new Error("该会话已被删除。");
-    put(next);
-    setDraftState(localStorage.getItem(`moyang.chat.draft.${next.id}`) ?? "");
-    localStorage.setItem("moyang.chat.last", next.id);
-    setError("");
-    setNotice("");
-    setUsage(null);
-  };
-  const remove = async () => {
-    if (controller.current) return;
-    const id = current.current.id;
-    await saves.current.catch(() => undefined);
-    await chatRequest("delete_thread", { id });
-    localStorage.removeItem(`moyang.chat.draft.${id}`);
-    localStorage.removeItem(`moyang.chat.session.${id}`);
-    put(blank(providers[0], assistants[0]));
-    setDraftState("");
-    setNotice("");
-    await refresh();
-    localStorage.removeItem("moyang.chat.last");
-  };
-  const generate = (text?: string, attachments: ChatSource[] = []) => {
+  const switchConversation = (action: () => Promise<void>) => {
     if (controller.current || !ready) return Promise.resolve();
+    if (transition.current) return transition.current;
+    setSwitching(true);
+    // Publish the transition before saving: queued input or a second navigation
+    // must never bind to the conversation that is about to be replaced.
+    const task = Promise.resolve()
+      .then(action)
+      .finally(() => {
+        transition.current = null;
+        setSwitching(false);
+      });
+    transition.current = task;
+    return task;
+  };
+  const open = (id?: string) =>
+    switchConversation(async () => {
+      await save();
+      const next = id
+        ? await chatRequest<ChatThread | null>("thread", { id })
+        : blank(
+            providers.find((p) => p.id === localStorage.getItem("moyang.chat.default")) ?? providers[0],
+            assistants[0],
+          );
+      if (!next) throw new Error("该会话已被删除。");
+      put(next);
+      setDraftState(localStorage.getItem(`moyang.chat.draft.${next.id}`) ?? "");
+      localStorage.setItem("moyang.chat.last", next.id);
+      setError("");
+      setNotice("");
+      setUsage(null);
+    });
+  const remove = () =>
+    switchConversation(async () => {
+      const id = current.current.id;
+      await saves.current.catch(() => undefined);
+      await chatRequest("delete_thread", { id });
+      localStorage.removeItem(`moyang.chat.draft.${id}`);
+      localStorage.removeItem(`moyang.chat.session.${id}`);
+      put(blank(providers[0], assistants[0]));
+      setDraftState("");
+      setNotice("");
+      await refresh();
+      localStorage.removeItem("moyang.chat.last");
+    });
+  const generate = (text?: string, attachments: ChatSource[] = []) => {
+    if (controller.current || transition.current || !ready) return Promise.resolve();
     const provider = providers.find((p) => p.id === current.current.providerId);
     const assistant = assistants.find((a) => a.id === current.current.assistantId);
     if (!provider || !assistant || !current.current.model.trim()) {
@@ -290,6 +311,7 @@ export function useChat(assistants: ChatAssistant[]) {
     thread,
     ready,
     busy,
+    switching,
     error,
     notice,
     usage,
