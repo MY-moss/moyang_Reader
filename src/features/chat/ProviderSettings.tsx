@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { chatModels, chatRequest, streamChat } from "../../platform/chat";
 import { isTauriRuntime } from "../../platform/bridge";
 import type { ChatProvider } from "../../shared/chat-types";
@@ -30,6 +30,13 @@ export function ProviderSettings({
   const [key, setKey] = useState(""),
     [clearKey, setClearKey] = useState(false),
     [models, setModels] = useState<string[]>([]);
+  const [savedForm, setSavedForm] = useState(form);
+  const [destination, setDestination] = useState<ChatProvider | "chat" | null>(null);
+  const keepEditing = useRef<HTMLButtonElement>(null);
+  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm) || key !== "" || clearKey;
+  useEffect(() => {
+    if (destination) keepEditing.current?.focus();
+  }, [destination]);
   const [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -38,12 +45,23 @@ export function ProviderSettings({
   const controller = useRef<AbortController | null>(null);
   const select = (p: ChatProvider) => {
     setForm(p);
+    setSavedForm(p);
     setKey("");
     setClearKey(false);
     setModels([]);
     setError("");
     setMessage("");
     setRemoving(false);
+  };
+  const navigate = (target: ChatProvider | "chat") => {
+    setDestination(null);
+    if (target === "chat") onClose();
+    else select(target);
+  };
+  const requestNavigation = (target: ChatProvider | "chat") => {
+    if (target !== "chat" && target.id === form.id) return;
+    if (dirty) setDestination(target);
+    else navigate(target);
   };
   const save = async () => {
     if (!form.name.trim()) throw new Error("请为服务填写一个便于识别的名称。");
@@ -55,6 +73,7 @@ export function ProviderSettings({
       clearKey,
     });
     setForm(saved);
+    setSavedForm(saved);
     setKey("");
     setClearKey(false);
     if (!localStorage.getItem("moyang.chat.default")) localStorage.setItem("moyang.chat.default", saved.id);
@@ -82,25 +101,50 @@ export function ProviderSettings({
           <h2>API 服务</h2>
           <p>添加自己的服务，在每次对话中选择模型。</p>
         </div>
-        <button disabled={busy} onClick={onClose}>
+        <button disabled={busy || Boolean(destination)} onClick={() => requestNavigation("chat")}>
           <Icon name="back" />
           返回聊天
         </button>
       </header>
+      {destination && (
+        <section className="chat-provider-pending" aria-label="未保存的服务配置">
+          <p>服务配置尚未保存。保存后继续，或保留当前页面继续填写。</p>
+          <div className="chat-actions">
+            <button
+              disabled={busy}
+              className="primary-action"
+              onClick={() =>
+                void run(async () => {
+                  await save();
+                  navigate(destination);
+                })
+              }
+            >
+              保存后继续
+            </button>
+            <button disabled={busy} onClick={() => navigate(destination)}>
+              放弃修改并继续
+            </button>
+            <button ref={keepEditing} disabled={busy} onClick={() => setDestination(null)}>
+              继续编辑
+            </button>
+          </div>
+        </section>
+      )}
       <div className="chat-settings-layout">
         <nav aria-label="我的 API 服务">
           {providers.map((p) => (
             <button
-              disabled={busy}
+              disabled={busy || Boolean(destination)}
               key={p.id}
               aria-current={form.id === p.id ? "page" : undefined}
-              onClick={() => select(p)}
+              onClick={() => requestNavigation(p)}
             >
               {p.name}
               <small>{p.protocol === "anthropic" ? "Anthropic" : "OpenAI 兼容"}</small>
             </button>
           ))}
-          <button disabled={busy} onClick={() => select(newProvider())}>
+          <button disabled={busy || Boolean(destination)} onClick={() => requestNavigation(newProvider())}>
             <Icon name="plus" />
             添加服务
           </button>

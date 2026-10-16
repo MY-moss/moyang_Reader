@@ -225,7 +225,7 @@ for (const narrow of [false, true])
     ).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     if (narrow) {
-      await page.getByRole("button", { name: "← 返回列表" }).click();
+      await page.getByRole("button", { name: "返回列表", exact: true }).click();
       await expect(page.getByRole("region", { name: "AI 内容列表" })).toBeVisible();
     }
   });

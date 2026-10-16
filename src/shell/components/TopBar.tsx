@@ -189,7 +189,10 @@ export function TopBar(p: TopBarProps) {
                 </div>
               </details>
             )}
-            <button className="toolbar-button settings-trigger" onClick={() => run(() => setSettingsOpen(true))}>
+            <button
+              className="toolbar-button settings-trigger"
+              onClick={() => run(() => (p.onSettingsOpen ? p.onSettingsOpen() : setSettingsOpen(true)))}
+            >
               {t("settings.title")}
               <span aria-hidden="true">↗</span>
             </button>

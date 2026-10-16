@@ -18,6 +18,7 @@ export function App({
   model,
   panes,
   settingsOpen,
+  onSettingsOpen,
   onSettingsClose,
   content,
   documentTools,
@@ -29,6 +30,7 @@ export function App({
   documentTools?: ReactNode;
   extensionActions?: import("../shared/extension-types").ExtensionActions;
   settingsOpen: boolean;
+  onSettingsOpen: () => void;
   onSettingsClose: () => void;
 }) {
   const [previewPath, setPreviewPath] = useState<string | null>(null);
@@ -97,6 +99,7 @@ export function App({
         extensionActions={extensionActions}
         model={{ ...model, rightPanelOpen, setRightPanelOpen: toggleContext }}
         settingsOpen={settingsOpen}
+        onSettingsOpen={onSettingsOpen}
         onSettingsClose={onSettingsClose}
         navigation={
           <>

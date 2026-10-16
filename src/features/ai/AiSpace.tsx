@@ -12,6 +12,7 @@ import { AiConflictPanel } from "./AiConflictPanel";
 import { useAiSpace } from "./useAiSpace";
 export default function AiSpace({
   active,
+  navigationActive = true,
   sidebarTarget,
   action,
   onNavigate,
@@ -20,6 +21,7 @@ export default function AiSpace({
   onOpenChat,
 }: {
   active: boolean;
+  navigationActive?: boolean;
   sidebarTarget?: HTMLElement | null;
   action?: { key: number; type: "search" | "skill"; id?: string } | null;
   onNavigate?: () => void;
@@ -30,7 +32,7 @@ export default function AiSpace({
   const m = useAiSpace(active);
   const handledAction = useRef<number | null>(null);
   const focusedAction = useRef<number | null>(null);
-  const { setConnections, setActivity, setKind, select } = m;
+  const { setConnections, setActivity, setKind, setSelected, setActiveDraft, select } = m;
   useEffect(() => {
     if (!active || !action || handledAction.current === action.key) return;
     handledAction.current = action.key;
@@ -39,17 +41,20 @@ export default function AiSpace({
     if (action.type === "skill" && action.id) {
       setKind("skill");
       void select(action.id);
+    } else if (action.type === "search" && window.matchMedia("(max-width: 820px)").matches) {
+      setSelected(null);
+      setActiveDraft(null);
     }
-  }, [active, action, setConnections, setActivity, setKind, select]);
+  }, [active, action, setConnections, setActivity, setKind, setSelected, setActiveDraft, select]);
   useLayoutEffect(() => {
     if (active && action?.type === "search" && !m.connections && !m.activity && focusedAction.current !== action.key) {
       const input = document.querySelector<HTMLInputElement>(".ai-search");
-      if (input) {
+      if (input && input.getClientRects().length) {
         input.focus();
         focusedAction.current = action.key;
       }
     }
-  }, [active, action, m.connections, m.activity]);
+  }, [active, action, m.connections, m.activity, m.selected, m.activeDraft]);
   const fileRef = useRef<HTMLInputElement>(null);
   const directoryRef = useRef<HTMLInputElement | null>(null);
   const [webUrl, setWebUrl] = useState<string | null>(null),
@@ -80,7 +85,7 @@ export default function AiSpace({
     >
       {chatEnabled && (
         <nav aria-label="AI 对话">
-          <button aria-current={chatActive ? "page" : undefined} onClick={onOpenChat}>
+          <button aria-current={navigationActive && chatActive ? "page" : undefined} onClick={onOpenChat}>
             <Icon name="chat" />
             <span>书房聊天</span>
           </button>
@@ -91,7 +96,11 @@ export default function AiSpace({
         {aiKinds.map((item) => (
           <button
             key={item.key}
-            aria-current={!chatActive && !m.connections && !m.activity && m.kind === item.key ? "page" : undefined}
+            aria-current={
+              navigationActive && !chatActive && !m.connections && !m.activity && m.kind === item.key
+                ? "page"
+                : undefined
+            }
             onClick={() => {
               m.setKind(item.key);
               m.setConnections(false);
@@ -108,7 +117,7 @@ export default function AiSpace({
       </nav>
       <button
         className="ai-activity-nav"
-        aria-current={!chatActive && m.activity ? "page" : undefined}
+        aria-current={navigationActive && !chatActive && m.activity ? "page" : undefined}
         onClick={() => {
           m.setConnections(false);
           m.setActivity(true);
@@ -123,7 +132,7 @@ export default function AiSpace({
           {Object.values(m.drafts).map((d) => (
             <button
               key={d.key}
-              aria-pressed={m.activeDraft === d.key}
+              aria-pressed={navigationActive && !chatActive && !m.activity && !m.connections && m.activeDraft === d.key}
               onClick={() => {
                 m.setActiveDraft(d.key!);
                 m.setConnections(false);
@@ -137,7 +146,10 @@ export default function AiSpace({
         </div>
       )}
       <div className="ai-nav-bottom">
-        <button aria-current={!chatActive && m.connections ? "page" : undefined} onClick={() => m.setConnections(true)}>
+        <button
+          aria-current={navigationActive && !chatActive && m.connections ? "page" : undefined}
+          onClick={() => m.setConnections(true)}
+        >
           <Icon name="connection" /> 接入与备份
         </button>
         <p>{isTauriRuntime() ? "本地保存 · 与日常笔记分开" : "浏览器预览 · 独立存储"}</p>
@@ -154,7 +166,7 @@ export default function AiSpace({
           <div className={`ai-notice${m.message.error ? " is-error" : ""}`} role={m.message.error ? "alert" : "status"}>
             <span>{m.message.text}</span>
             <button aria-label="关闭提示" onClick={() => m.setMessage(null)}>
-              ×
+              <Icon name="close" size={16} />
             </button>
           </div>
         )}
@@ -184,7 +196,8 @@ export default function AiSpace({
                   m.kind === "knowledge" && <button onClick={() => setWebUrl("")}>导入网页</button>
                 )}
                 <button className="ai-primary" onClick={m.newEntry}>
-                  ＋ 新建{m.kind === "knowledge" ? "知识" : m.kind === "memory" ? "记忆" : "技能"}
+                  <Icon name="plus" size={16} /> 新建
+                  {m.kind === "knowledge" ? "知识" : m.kind === "memory" ? "记忆" : "技能"}
                 </button>
               </div>
               <input
@@ -359,11 +372,25 @@ export default function AiSpace({
                   ))}
                   {!m.loading && !m.loadError && !m.search.items.length && (
                     <div className="ai-list-empty">
-                      {m.query
-                        ? "没有匹配内容。试试更短的关键词。"
+                      {m.query.trim() || m.project || m.agent || m.includeExpired
+                        ? "没有匹配内容。可以调整关键词或清除筛选。"
                         : m.archived
                           ? "没有归档内容。"
                           : "这里还没有内容。"}
+                      {(m.query.trim() || m.project || m.agent || m.archived || m.includeExpired) && (
+                        <button
+                          className="ai-reset-filters"
+                          onClick={() => {
+                            m.setQuery("");
+                            m.setProject("");
+                            m.setAgent("");
+                            m.setArchived(false);
+                            m.setIncludeExpired(false);
+                          }}
+                        >
+                          清除筛选
+                        </button>
+                      )}
                       {!m.query.trim() && !m.archived && !m.project && !m.agent && m.stats?.[m.kind] === 0 && (
                         <div className="ai-list-onboarding">
                           <p>
@@ -375,7 +402,7 @@ export default function AiSpace({
                             新建第一条{m.kind === "memory" ? "记忆" : m.kind === "skill" ? "技能" : "知识"}
                           </button>
                           <button className="ai-text-button" onClick={() => m.setConnections(true)}>
-                            连接我的 Agent →
+                            连接我的 Agent <Icon name="forward" size={16} />
                           </button>
                         </div>
                       )}
@@ -404,7 +431,7 @@ export default function AiSpace({
                     m.setSelected(null);
                   }}
                 >
-                  ← 返回列表
+                  <Icon name="back" size={16} /> 返回列表
                 </button>
                 {m.conflict && m.draft?.key === m.conflict.key && (
                   <AiConflictPanel
@@ -501,7 +528,7 @@ export default function AiSpace({
                       新建第一条{m.kind === "memory" ? "记忆" : m.kind === "skill" ? "技能" : "知识"}
                     </button>
                     <button className="ai-text-button" onClick={() => m.setConnections(true)}>
-                      连接我的 Agent →
+                      连接我的 Agent <Icon name="forward" size={16} />
                     </button>
                   </div>
                 )}

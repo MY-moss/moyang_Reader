@@ -107,6 +107,7 @@ export function useReaderApplication() {
     searchResultCount: readerState.searchResultCount,
     searchResultIndex: readerState.searchResultIndex,
     theme: readerState.theme,
+    setTheme: readerState.setTheme,
     locale: readerState.locale,
     setReadingZoom: readingLayout.setReadingZoom,
     setReaderPreferences: readingLayout.setReaderPreferences,

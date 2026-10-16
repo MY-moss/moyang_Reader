@@ -299,7 +299,7 @@ export function RootApp() {
             ).map(([value, label, icon]) => (
               <button
                 key={value}
-                aria-current={bookroom.page === value ? "page" : undefined}
+                aria-current={!marketOpen && !settingsOpen && bookroom.page === value ? "page" : undefined}
                 onClick={() => {
                   bookroom.setPage(value);
                   setNavigationOpen(false);
@@ -322,7 +322,7 @@ export function RootApp() {
               ).map(([value, label, icon]) => (
                 <button
                   key={value}
-                  aria-current={bookroom.page === value ? "page" : undefined}
+                  aria-current={!marketOpen && !settingsOpen && bookroom.page === value ? "page" : undefined}
                   onClick={() => {
                     bookroom.setPage(value);
                     setNavigationOpen(false);
@@ -399,7 +399,7 @@ export function RootApp() {
         )}
       </aside>
       <div ref={mainRef} className="workbench-main">
-        {collapsed && (space === "ai" || marketOpen) && (
+        {collapsed && !settingsOpen && (space === "ai" || marketOpen) && (
           <button
             ref={restoreNavigationRef}
             className="restore-sidebar"
@@ -415,6 +415,7 @@ export function RootApp() {
             model={shellModel}
             panes={panes}
             settingsOpen={settingsOpen}
+            onSettingsOpen={() => setSettingsOpen(true)}
             onSettingsClose={() => setSettingsOpen(false)}
             content={bookroom.page !== "document" ? <BookroomPageView bookroom={bookroom} model={model} /> : undefined}
             documentTools={
@@ -459,7 +460,8 @@ export function RootApp() {
               }
             >
               <AiSpace
-                active={space === "ai" && !marketOpen && !chatVisible}
+                active={space === "ai" && !marketOpen && !settingsOpen && !chatVisible}
+                navigationActive={space === "ai" && !marketOpen && !settingsOpen}
                 chatEnabled={assistants.length > 0}
                 chatActive={chatVisible}
                 onOpenChat={() => openChat()}

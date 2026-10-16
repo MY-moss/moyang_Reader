@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SettingsContent } from "./SettingsContent";
 import type { TopBarProps } from "./toolbar-types";
+import { Icon } from "../../shared/components/Icon";
 
 /** Preferences have their own space instead of nesting inside a tool menu. */
 export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: () => void }) {
@@ -47,7 +48,15 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
       }}
     >
       <header className="settings-dialog-header">
-        <div>
+        <div className="settings-heading">
+          <button
+            className="settings-navigation-button"
+            onClick={props.onToggleSidebar}
+            aria-label={english ? "Show navigation" : "显示导航"}
+            aria-expanded={!props.sidebarCollapsed}
+          >
+            <Icon name="sidebar" />
+          </button>
           <h2 id="settings-dialog-title">{english ? "Settings" : "设置"}</h2>
         </div>
         <button
@@ -56,7 +65,8 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
           onClick={onClose}
           aria-label={english ? "Close settings" : "关闭设置"}
         >
-          返回工作台
+          <Icon name="back" />
+          {english ? "Back to workspace" : "返回工作台"}
         </button>
       </header>
       <div className="settings-dialog-layout">

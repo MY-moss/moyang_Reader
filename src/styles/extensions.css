@@ -13,10 +13,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 26px 32px 18px;
+  padding: 24px 28px 18px;
 }
 .extension-header h1 {
-  font-size: 24px;
+  font-size: var(--page-title-size);
   line-height: 1.3;
   margin: 0 0 6px;
   font-weight: 600;
@@ -24,6 +24,7 @@
 .extension-header p {
   margin: 0;
   color: var(--muted);
+  font-size: 13px;
 }
 .extension-market button,
 .extension-result button {
@@ -63,6 +64,11 @@
   color: var(--surface-strong);
   border-color: var(--accent);
 }
+.extension-market .primary-action:hover:not(:disabled),
+.extension-result .primary-action:hover:not(:disabled) {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
 .extension-toolbar {
   display: flex;
   align-items: center;
@@ -100,7 +106,9 @@
 }
 .extension-list-pane {
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid var(--line);
   padding: 20px 18px;
 }
@@ -108,6 +116,7 @@
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
+  flex-shrink: 0;
 }
 .extension-market input,
 .extension-market select,
@@ -126,10 +135,20 @@
 .extension-market select {
   flex-shrink: 0;
 }
+.extension-market :is(input, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
 .extension-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-padding-block: 8px;
+}
+.extension-list-pane > .extension-empty {
+  overflow-y: auto;
 }
 .extension-list li + li {
   border-top: 1px solid var(--line);
@@ -183,6 +202,9 @@
 .extension-row small {
   color: var(--muted);
   font-size: 12px;
+}
+.extension-row:is([aria-pressed="true"], :hover) :is(p, small, .extension-row-title > span) {
+  color: var(--accent-deep);
 }
 .extension-detail {
   padding: 24px 28px 40px;
