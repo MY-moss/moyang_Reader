@@ -9,15 +9,19 @@ mod extension_connections;
 pub use extension_connections::configure_external_client;
 mod cancellation;
 pub use cancellation::cancel_search;
+mod activity_page;
 mod exchange;
 mod lifecycle;
+pub use activity_page::ActivityPageRequest;
 mod migration;
 mod source;
 mod source_inventory;
-pub use source_inventory::*;
 pub use lifecycle::*;
 pub use source::{fetch_web_source, install_embedding_model, local_model_status};
+pub use source_inventory::*;
+mod compact;
 mod context_pack;
+pub use compact::compact_search;
 mod health;
 mod search;
 pub use health::*;
@@ -75,10 +79,10 @@ pub fn now() -> i64 {
 #[cfg(test)]
 mod health_tests;
 #[cfg(test)]
-mod source_inventory_tests;
-#[cfg(test)]
 mod history_tests;
 #[cfg(test)]
 mod lifecycle_tests;
+#[cfg(test)]
+mod source_inventory_tests;
 #[cfg(test)]
 mod tests;

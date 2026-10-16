@@ -1,7 +1,14 @@
 import { watchAiChanges } from "./change-watch";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
-import { emptyAiFields, type AiKind, type AiRecord, type AiSearch, type AiStats } from "../../shared/ai-types";
+import {
+  emptyAiFields,
+  type AiFields,
+  type AiKind,
+  type AiRecord,
+  type AiSearch,
+  type AiStats,
+} from "../../shared/ai-types";
 import { registerPendingWork, flushLiveEditors } from "../../shared/pending-work";
 import { readAiDrafts, removeAiDraft, writeAiDraft } from "./draft-store";
 import type { AiDraft } from "./AiEditor";
@@ -20,7 +27,7 @@ export function useAiSpace(active: boolean) {
     [],
   );
   const [query, setQuery] = useState(""),
-    [project, setProject] = useState(""),
+    [project, setProject] = useState("*"),
     [agent, setAgent] = useState("");
   const [archived, setArchived] = useState(false),
     [includeExpired, setIncludeExpired] = useState(false),
@@ -105,6 +112,16 @@ export function useAiSpace(active: boolean) {
     [forget, put, setConnections, setActivity],
   );
   const draft = activeDraft ? (drafts[activeDraft] ?? null) : null;
+  const stageImport = (fields: AiFields) =>
+    setDraft({
+      fields: {
+        ...fields,
+        project: project === "*" ? "" : project,
+        agent,
+        sharing: project && project !== "*" ? "project" : "global",
+      },
+      pendingImport: true,
+    });
   useEffect(() => {
     let cancelled = false;
     void readAiDrafts()
@@ -147,7 +164,7 @@ export function useAiSpace(active: boolean) {
             request_id: requestId,
             kind,
             query,
-            project: project || null,
+            project: project === "*" ? null : project,
             agent: agent || null,
             include_global: true,
             state: archived ? "archived" : "active",
@@ -158,13 +175,13 @@ export function useAiSpace(active: boolean) {
           try {
             const [s, result] = await Promise.all([
               aiRequest<AiStats>("stats"),
-              aiRequest<AiSearch>("search", { ...q, semantic: false }),
+              panel === "library" ? aiRequest<AiSearch>("search", { ...q, semantic: false }) : Promise.resolve(null),
             ]);
             if (cancelled) return;
             setStats(s);
-            setSearch(result);
+            if (result) setSearch(result);
             setLoading(false);
-            if (query.trim() && s.semantic.enabled) {
+            if (panel === "library" && query.trim() && s.semantic.enabled) {
               setSemanticLoading(true);
               const augmented = await aiRequest<AiSearch>("search", { ...q, semantic: true });
               if (!cancelled) setSearch(augmented);
@@ -186,7 +203,7 @@ export function useAiSpace(active: boolean) {
       window.clearTimeout(timer);
       void aiRequest("cancel_search", { request_id: requestId }).catch(() => {});
     };
-  }, [active, kind, query, project, agent, archived, includeExpired, page, tick]);
+  }, [active, panel, kind, query, project, agent, archived, includeExpired, page, tick]);
   const ready = stats !== null;
   useEffect(() => {
     if (!active || !ready) return;
@@ -216,7 +233,7 @@ export function useAiSpace(active: boolean) {
   const selectedId = selected?.id;
   const selectedRevision = selected?.revision;
   useEffect(() => {
-    if (!active || !selectedId || selectedRevision == null || draft) return;
+    if (!active || panel !== "library" || !selectedId || selectedRevision == null || draft) return;
     let cancelled = false;
     void aiRequest<AiRecord | null>("get_if_changed", { id: selectedId, revision: selectedRevision })
       .then((r) => {
@@ -228,7 +245,7 @@ export function useAiSpace(active: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [active, selectedId, selectedRevision, draft, tick, notify]);
+  }, [active, panel, selectedId, selectedRevision, draft, tick, notify]);
   const save = useCallback(
     async (manual = true, override?: AiDraft) => {
       flushLiveEditors();
@@ -239,6 +256,7 @@ export function useAiSpace(active: boolean) {
       }
       const current = override ?? (activeKey.current ? all.current[activeKey.current] : null);
       if (!current) return;
+      if (!manual && current.pendingImport) return;
       const run = async () => {
         setBusy(true);
         try {
@@ -262,6 +280,7 @@ export function useAiSpace(active: boolean) {
               expected_revision: r.revision,
               baseBody: r.body,
               dirty: changed,
+              pendingImport: false,
               saveError: undefined,
             });
             if (manual && !changed) forget(current.key!);
@@ -298,6 +317,7 @@ export function useAiSpace(active: boolean) {
   useEffect(() => {
     if (
       !draft?.dirty ||
+      draft.pendingImport ||
       draft.saveError ||
       draft.merge ||
       busy ||
@@ -313,7 +333,14 @@ export function useAiSpace(active: boolean) {
     return () => window.clearTimeout(timer);
   }, [draft, busy, composing, resourceLoading, conflict, save]);
   const newEntry = () =>
-    setDraft({ fields: { ...emptyAiFields(kind), project, agent, sharing: project ? "project" : "global" } });
+    setDraft({
+      fields: {
+        ...emptyAiFields(kind),
+        project: project === "*" ? "" : project,
+        agent,
+        sharing: project && project !== "*" ? "project" : "global",
+      },
+    });
   const merge = async () => {
     try {
       const records = await Promise.all(checked.map((id) => aiRequest<AiRecord>("get", { id })));
@@ -357,6 +384,8 @@ export function useAiSpace(active: boolean) {
     await save(true, next);
   };
   return {
+    stageImport,
+    dataVersion: tick,
     kind,
     setKind,
     connections,

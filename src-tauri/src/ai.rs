@@ -44,7 +44,10 @@ pub async fn ai_request(
                 "conclude",
                 "semantic_config",
                 "semantic_resume",
-                "stats",
+                "merge",
+                "state",
+                "resolve_conflict",
+                "undo_activity",
             ]
             .contains(&operation.as_str())
         {

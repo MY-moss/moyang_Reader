@@ -167,9 +167,9 @@ impl Store {
         let bind = named_params! {":query":query,":state":state,":kind":kind,":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":time};
         let total: i64 = self.conn.query_row(&count_sql, bind, |r| r.get(0))?;
         let sql = if use_fts {
-            format!("{base}SELECT e.payload,(SELECT c.text FROM matches m JOIN chunks c ON c.id=m.chunk_id WHERE m.entry_id=e.id ORDER BY m.rank LIMIT 1), best.rank*(1+0.05*json_extract(e.payload,'$.importance')+0.3*json_extract(e.payload,'$.pinned')+0.02*COALESCE(f.score,0)) AS rank FROM best JOIN records e ON e.id=best.entry_id LEFT JOIN feedback f ON f.id=e.id ORDER BY rank,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
+            format!("{base}SELECT json_remove(e.payload,'$.assets'),(SELECT c.text FROM matches m JOIN chunks c ON c.id=m.chunk_id WHERE m.entry_id=e.id ORDER BY m.rank LIMIT 1), best.rank*(1+0.05*json_extract(e.payload,'$.importance')+0.3*json_extract(e.payload,'$.pinned')+0.02*COALESCE(f.score,0)) AS rank FROM best JOIN records e ON e.id=best.entry_id LEFT JOIN feedback f ON f.id=e.id ORDER BY rank,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
         } else {
-            format!("SELECT e.payload,substr(json_extract(e.payload,'$.body'),1,400),0 FROM records e WHERE {FILTER} AND :query=:query ORDER BY json_extract(e.payload,'$.pinned') DESC,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
+            format!("SELECT json_remove(e.payload,'$.assets'),substr(json_extract(e.payload,'$.body'),1,400),0 FROM records e WHERE {FILTER} AND :query=:query ORDER BY json_extract(e.payload,'$.pinned') DESC,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
         };
         let mut stmt = self.conn.prepare(&sql)?;
         let rows=stmt.query_map(named_params!{":query":query,":state":state,":kind":kind,":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":time,":limit":q.limit.max(1) as i64,":offset":q.offset as i64},|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,f64>(2)?)))?;

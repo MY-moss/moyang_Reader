@@ -111,6 +111,13 @@ pub fn maintain_semantic(directory: &std::path::Path) {
             if !config.enabled || store.semantic_paused()? {
                 return Ok(());
             }
+            if store.semantic_remaining(&crate::semantic::model_key(&config))? == 0 {
+                return Ok(());
+            }
+            let status = store.setting_value("semantic_background")?;
+            if status["error"].is_string() && now() - status["at"].as_i64().unwrap_or(0) < 60_000 {
+                return Ok(());
+            }
             if config.endpoint.trim_end_matches('/') == "http://127.0.0.1:11434"
                 && local_model_status(&config.endpoint)["running"] != true
             {

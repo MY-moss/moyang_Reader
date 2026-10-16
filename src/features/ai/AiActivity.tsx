@@ -22,20 +22,48 @@ type Checkpoint = {
   status: string;
   updated_at: number;
 };
-type Feed = { checkpoints: Checkpoint[]; pending: Checkpoint[]; conflicts: Conflict[]; activities: Activity[] };
-function ConflictItem({ item, act }: { item: Conflict; act: (operation: string, payload: unknown) => Promise<void> }) {
+type Feed = {
+  checkpoints: Checkpoint[];
+  pending: Checkpoint[];
+  conflicts: { id: string; title: string }[];
+  activities: Activity[];
+  has_more: boolean;
+};
+function ConflictItem({
+  item,
+  act,
+}: {
+  item: { id: string; title: string };
+  act: (operation: string, payload: unknown) => Promise<void>;
+}) {
   const [current, setCurrent] = useState<AiRecord | null>(null),
-    [body, setBody] = useState(item.proposal.body),
+    [body, setBody] = useState(""),
     [error, setError] = useState("");
+  const [opened, setOpened] = useState(false);
+  const [detail, setDetail] = useState<Conflict | null>(null);
   useEffect(() => {
-    void aiRequest<AiRecord>("get", { id: item.proposal.id })
-      .then(setCurrent)
-      .catch((e) => setError(String(e)));
-  }, [item.proposal.id]);
+    if (!opened) return;
+    let cancelled = false;
+    void (async () => {
+      const d = await aiRequest<Conflict>("conflict_detail", { id: item.id });
+      const r = await aiRequest<AiRecord>("get", { id: d.proposal.id });
+      if (!cancelled) {
+        setDetail(d);
+        setBody(d.proposal.body);
+        setCurrent(r);
+        setError("");
+      }
+    })().catch((e) => {
+      if (!cancelled) setError(String(e));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.id, opened]);
   return (
-    <details className="ai-conflict-item">
-      <summary>{item.proposal.title} · 等待判断</summary>
-      <p>依据：{item.evidence}</p>
+    <details className="ai-conflict-item" onToggle={(e) => setOpened(e.currentTarget.open)}>
+      <summary>{item.title} · 等待判断</summary>
+      <p>依据：{detail?.evidence ?? "正在读取…"}</p>
       {error && <p role="alert">{error}</p>}
       <div className="version-compare">
         <section>
@@ -44,12 +72,12 @@ function ConflictItem({ item, act }: { item: Conflict; act: (operation: string, 
         </section>
         <section>
           <h3>新提议</h3>
-          <pre>{item.proposal.body}</pre>
+          <pre>{detail?.proposal.body ?? "正在读取…"}</pre>
         </section>
       </div>
       <label>
         整理后的记忆
-        <textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} />
+        <textarea rows={5} disabled={!detail} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
       <div className="ai-inline-actions">
         <button
@@ -68,7 +96,10 @@ function ConflictItem({ item, act }: { item: Conflict; act: (operation: string, 
         <button onClick={() => void act("resolve_conflict", { id: item.id, resolution: "keep_existing" })}>
           保留现有记忆
         </button>
-        <button onClick={() => void act("resolve_conflict", { id: item.id, resolution: "save_copy", body })}>
+        <button
+          disabled={!detail}
+          onClick={() => void act("resolve_conflict", { id: item.id, resolution: "save_copy", body })}
+        >
           分别保留
         </button>
       </div>
@@ -79,20 +110,26 @@ export function AiActivity({
   onSelect,
   notify,
   stats,
+  active = true,
+  dataVersion = 0,
 }: {
   onSelect: (id: string) => void;
   notify: (text: string, error?: boolean) => void;
   stats?: AiStats | null;
+  active?: boolean;
+  dataVersion?: number;
 }) {
   const [view, setView] = useState<"activity" | "health" | "sources">("activity");
+  const [project, setProject] = useState("*");
+  const [page, setPage] = useState(0);
   const [feed, setFeed] = useState<Feed | null>(null),
     [error, setError] = useState(""),
     [tick, setTick] = useState(0),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (view !== "activity") return;
+    if (!active || view !== "activity") return;
     let cancelled = false;
-    void aiRequest<Feed>("activity")
+    void aiRequest<Feed>("activity_page", { project: project === "*" ? null : project, offset: page * 20, limit: 20 })
       .then((r) => {
         if (!cancelled) {
           setFeed(r);
@@ -105,7 +142,7 @@ export function AiActivity({
     return () => {
       cancelled = true;
     };
-  }, [tick, view]);
+  }, [tick, view, active, dataVersion, project, page]);
   const act = async (operation: string, payload: unknown) => {
     setBusy(true);
     try {
@@ -133,12 +170,30 @@ export function AiActivity({
         </button>
       </nav>
       {view === "sources" ? (
-        <AiSources stats={stats} notify={notify} />
+        <AiSources active={active} dataVersion={dataVersion} stats={stats} notify={notify} />
       ) : view === "health" ? (
-        <AiHealth stats={stats} onSelect={onSelect} notify={notify} />
+        <AiHealth active={active} dataVersion={dataVersion} stats={stats} onSelect={onSelect} notify={notify} />
       ) : (
         <>
           <p>明确结论自动留下，推测出的矛盾在这里处理。每次沉淀都可以查看依据、撤回与恢复。</p>
+          <label>
+            范围
+            <select
+              aria-label="活动项目"
+              value={project}
+              onChange={(e) => {
+                setProject(e.target.value);
+                setPage(0);
+                setFeed(null);
+              }}
+            >
+              <option value="*">全部资料</option>
+              <option value="">仅全局</option>
+              {stats?.projects.map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </select>
+          </label>
           <button onClick={() => setTick((n) => n + 1)}>刷新活动</button>
           {error && <p role="alert">{error}</p>}
           {!feed && !error && <p role="status">正在读取活动…</p>}
@@ -196,7 +251,7 @@ export function AiActivity({
                     </button>
                   </article>
                 ))}
-                {!feed.pending.length && <p className="ai-muted">所有已登记任务均已处理。</p>}
+                {!feed.pending.length && <p className="ai-muted">本页没有待处理的任务。</p>}
               </section>
               <details>
                 <summary>最近任务记录</summary>
@@ -208,6 +263,15 @@ export function AiActivity({
                   </p>
                 ))}
               </details>
+              <nav className="ai-inline-actions" aria-label="活动分页">
+                <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  上一页
+                </button>
+                <span>第 {page + 1} 页</span>
+                <button disabled={!feed.has_more} onClick={() => setPage((p) => p + 1)}>
+                  下一页
+                </button>
+              </nav>
             </>
           )}
         </>

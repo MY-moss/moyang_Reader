@@ -145,7 +145,7 @@ impl Store {
             .as_deref()
             == Some("true"))
     }
-    fn semantic_remaining(&self, key: &str) -> Result<i64> {
+    pub(crate) fn semantic_remaining(&self, key: &str) -> Result<i64> {
         Ok(self.conn.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active'", [key], |r| r.get(0))?)
     }
     pub fn configure_semantic(&self, mut c: SemanticConfig) -> Result<SemanticConfig> {

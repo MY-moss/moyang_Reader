@@ -13,7 +13,7 @@ for (const width of [1440, 720]) {
     await page
       .locator('.ai-page-header input[type="file"]')
       .setInputFiles({ name: "来源样例.txt", mimeType: "text/plain", buffer: Buffer.from("原始资料正文") });
-    await page.getByRole("button", { name: "保存内容", exact: true }).click();
+    await page.getByRole("button", { name: "确认导入", exact: true }).click();
     await expect(page.locator(".ai-document h1")).toHaveText("来源样例");
     if (width === 720) await page.keyboard.press("Control+Shift+B");
     await page.getByRole("button", { name: "近期活动与冲突", exact: true }).click();

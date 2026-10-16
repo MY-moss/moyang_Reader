@@ -23,6 +23,13 @@ impl MemoryService {
         T: serde::Serialize + Send + 'static,
         F: FnOnce(&mut Store) -> CoreResult<T> + Send + 'static,
     {
+        self.run_with_maintenance(f, false).await
+    }
+    async fn write<T, F>(&self, f: F) -> CallToolResult
+    where
+        T: serde::Serialize + Send + 'static,
+        F: FnOnce(&mut Store) -> CoreResult<T> + Send + 'static,
+    {
         self.run_with_maintenance(f, true).await
     }
     async fn run_with_maintenance<T, F>(&self, f: F, maintain: bool) -> CallToolResult
@@ -62,7 +69,8 @@ impl MemoryService {
         )
     )]
     async fn search(&self, Parameters(q): Parameters<SearchQuery>) -> CallToolResult {
-        self.run(move |s| s.search(&q)).await
+        self.run(move |s| Ok(moyang_ai_core::compact_search(s.search(&q)?)))
+            .await
     }
     #[tool(
         description = "Read a complete record before editing. Includes revision, source, linked IDs and skill resource metadata. Skill resource contents are loaded separately with read_skill_resource.",
@@ -85,7 +93,7 @@ impl MemoryService {
         )
     )]
     async fn save_record(&self, Parameters(mut q): Parameters<SaveRequest>) -> CallToolResult {
-        self.run(move|s|{
+        self.write(move|s|{
         if let Some(id)=&q.id {if q.fields.assets.is_empty(){q.fields.assets=s.get(id)?.fields.assets;}}
         let r=s.save(q)?;Ok(serde_json::json!({"id":r.id,"revision":r.revision,"title":r.fields.title,"kind":r.fields.kind,"project":r.fields.project,"agent":r.fields.agent}))
     }).await
@@ -94,7 +102,7 @@ impl MemoryService {
         description = "Archive an outdated record or restore an archived record. History is retained. Provide expected_revision from get_record."
     )]
     async fn set_record_state(&self, Parameters(q): Parameters<StateRequest>) -> CallToolResult {
-        self.run(move |s| view_record(s.change_state(q)?)).await
+        self.write(move |s| view_record(s.change_state(q)?)).await
     }
     #[tool(
         description = "Permanently forget one record and its entire revision history. Use only when deletion is intended; use set_record_state to archive reversibly. Requires current revision.",
@@ -124,13 +132,13 @@ impl MemoryService {
         description = "Restore a prior record revision as a new revision, retaining history. Requires current expected_revision."
     )]
     async fn restore_revision(&self, Parameters(q): Parameters<RestoreRequest>) -> CallToolResult {
-        self.run(move |s| view_record(s.restore(q)?)).await
+        self.write(move |s| view_record(s.restore(q)?)).await
     }
     #[tool(
         description = "Consolidate 2–20 active memories in the same scope into one carefully written summary. Supply original IDs and revisions; the originals are archived atomically and linked from the new memory."
     )]
     async fn merge_memories(&self, Parameters(q): Parameters<MergeRequest>) -> CallToolResult {
-        self.run(move |s| view_record(s.merge(q)?)).await
+        self.write(move |s| view_record(s.merge(q)?)).await
     }
     #[tool(
         description = "Mark a retrieved entry useful or not useful after applying it. Feedback gently adjusts future lexical ranking; it never deletes or invents facts."
@@ -188,10 +196,19 @@ impl MemoryService {
     }
     #[tool(
         description = "List active imported knowledge source metadata by project, with stable cursor pagination. Returns titles, URIs, fingerprints and revisions only, not bodies or attachments. No file/web access, writes or model calls. Use get_record to inspect a selected snapshot; source checking does not authorize automatic replacement. Ordinary reader notes and manually written memories are excluded.",
-        annotations(read_only_hint = true, destructive_hint = false, idempotent_hint = true, open_world_hint = false)
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
     )]
-    async fn list_knowledge_sources(&self, Parameters(q): Parameters<SourceInventoryQuery>) -> CallToolResult {
-        self.run_with_maintenance(move |s| s.source_inventory(q), false).await
+    async fn list_knowledge_sources(
+        &self,
+        Parameters(q): Parameters<SourceInventoryQuery>,
+    ) -> CallToolResult {
+        self.run_with_maintenance(move |s| s.source_inventory(q), false)
+            .await
     }
     #[tool(
         description = "Build one batch of missing embeddings using the configured Ollama service. Repeat while remaining > 0. Basic search works without this."
@@ -212,14 +229,17 @@ impl MemoryService {
         description = "Finish a task checkpoint with durable conclusions and source evidence, or decisions=[] plus reason when nothing new was learned. Save new memories with sharing=global or project; use correct with explicit_correction=true ONLY for an explicit user correction. Inferred contradictions become pending conflicts. improve_skill requires a prior skill ID/revision, concrete task evidence and outcome success/failure. All decisions commit atomically; duplicate callbacks do not repeat writes. Never store routine progress or entire transcripts."
     )]
     async fn conclude_task(&self, Parameters(q): Parameters<ConcludeRequest>) -> CallToolResult {
-        self.run(move |s| s.conclude(q)).await
+        self.write(move |s| s.conclude(q)).await
     }
     #[tool(
-        description = "Read recent memory and skill changes, evidence, pending conflicts and interrupted task checkpoints. No ordinary reader notes are accessed.",
+        description = "Read paginated activity summaries, pending conflict IDs and interrupted task checkpoints. Filter project and page with offset/limit. Conflict bodies are read on demand. Pending checkpoints are not repeated in completed history.",
         annotations(read_only_hint = true)
     )]
-    async fn recent_activity(&self) -> CallToolResult {
-        self.run(|s| s.activity_feed()).await
+    async fn recent_activity(
+        &self,
+        Parameters(q): Parameters<moyang_ai_core::ActivityPageRequest>,
+    ) -> CallToolResult {
+        self.run(move |s| s.activity_page(q)).await
     }
     #[tool(
         description = "Resolve a pending contradiction after deciding with the user. resolution=keep_existing, accept or save_copy. Accept requires the latest expected_revision, and can include an edited merged body. History and evidence are retained."
@@ -228,7 +248,7 @@ impl MemoryService {
         &self,
         Parameters(q): Parameters<ResolveConflictRequest>,
     ) -> CallToolResult {
-        self.run(move |s| s.resolve_conflict(q)).await
+        self.write(move |s| s.resolve_conflict(q)).await
     }
     #[tool(
         description = "Undo one automatic memory/skill change, or restore it with restore=true. Refuses to overwrite a newer edit; preserves full revision history."
@@ -237,7 +257,7 @@ impl MemoryService {
         &self,
         Parameters(q): Parameters<ActivityRequest>,
     ) -> CallToolResult {
-        self.run(move |s| s.undo_activity(q)).await
+        self.write(move |s| s.undo_activity(q)).await
     }
     #[tool(
         description = "Read one historical revision and its reason. Resource metadata includes fingerprints to detect changes. Use read_skill_resource with the same revision for historical resource bytes.",

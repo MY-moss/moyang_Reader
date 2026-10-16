@@ -67,7 +67,7 @@ export default function AiSpace({
     setImporting(true);
     try {
       const paths = await chooseDocumentPaths();
-      for (const path of paths) m.setDraft({ fields: await importAiPath(path, m.kind) });
+      for (const path of paths) m.stageImport(await importAiPath(path, m.kind));
     } catch (e) {
       m.notify(String(e), true);
     } finally {
@@ -176,7 +176,13 @@ export default function AiSpace({
           </div>
         )}
         {m.activity ? (
-          <AiActivity stats={m.stats} onSelect={(id) => void m.select(id)} notify={m.notify} />
+          <AiActivity
+            active={active}
+            dataVersion={m.dataVersion}
+            stats={m.stats}
+            onSelect={(id) => void m.select(id)}
+            notify={m.notify}
+          />
         ) : m.connections ? (
           <AiConnections stats={m.stats} refresh={m.refresh} notify={m.notify} />
         ) : (
@@ -211,7 +217,7 @@ export default function AiSpace({
                   if (!file) return;
                   try {
                     const fields = await importAiFile(file, m.kind);
-                    m.setDraft({ fields });
+                    m.stageImport(fields);
                     m.notify("已载入草稿，检查后保存即可。");
                   } catch (error) {
                     m.notify(String(error), true);
@@ -232,7 +238,7 @@ export default function AiSpace({
                 e.target.value = "";
                 if (!files.length) return;
                 try {
-                  m.setDraft({ fields: await importAiDirectory(files) });
+                  m.stageImport(await importAiDirectory(files));
                 } catch (error) {
                   m.notify(String(error), true);
                 }
@@ -245,7 +251,7 @@ export default function AiSpace({
                   e.preventDefault();
                   setImporting(true);
                   try {
-                    m.setDraft({ fields: await importAiWeb(webUrl) });
+                    m.stageImport(await importAiWeb(webUrl));
                     setWebUrl(null);
                   } catch (error) {
                     m.notify(String(error), true);
@@ -284,12 +290,13 @@ export default function AiSpace({
                   />
                   <details className="ai-filter-details">
                     <summary>
-                      {m.project || m.agent || m.archived || m.includeExpired ? "筛选 · 已启用" : "筛选"}
+                      {m.project !== "*" || m.agent || m.archived || m.includeExpired ? "筛选 · 已启用" : "筛选"}
                       <Icon name="chevron" size={14} />
                     </summary>
                     <div className="ai-scope-filters">
                       <select aria-label="筛选项目" value={m.project} onChange={(e) => m.setProject(e.target.value)}>
-                        <option value="">所有项目</option>
+                        <option value="*">全部资料</option>
+                        <option value="">仅全局</option>
                         {m.stats?.projects.map((p) => (
                           <option key={p}>{p}</option>
                         ))}
@@ -372,17 +379,17 @@ export default function AiSpace({
                   ))}
                   {!m.loading && !m.loadError && !m.search.items.length && (
                     <div className="ai-list-empty">
-                      {m.query.trim() || m.project || m.agent || m.includeExpired
+                      {m.query.trim() || m.project !== "*" || m.agent || m.includeExpired
                         ? "没有匹配内容。可以调整关键词或清除筛选。"
                         : m.archived
                           ? "没有归档内容。"
                           : "这里还没有内容。"}
-                      {(m.query.trim() || m.project || m.agent || m.archived || m.includeExpired) && (
+                      {(m.query.trim() || m.project !== "*" || m.agent || m.archived || m.includeExpired) && (
                         <button
                           className="ai-reset-filters"
                           onClick={() => {
                             m.setQuery("");
-                            m.setProject("");
+                            m.setProject("*");
                             m.setAgent("");
                             m.setArchived(false);
                             m.setIncludeExpired(false);
@@ -391,7 +398,7 @@ export default function AiSpace({
                           清除筛选
                         </button>
                       )}
-                      {!m.query.trim() && !m.archived && !m.project && !m.agent && m.stats?.[m.kind] === 0 && (
+                      {!m.query.trim() && !m.archived && m.project === "*" && !m.agent && m.stats?.[m.kind] === 0 && (
                         <div className="ai-list-onboarding">
                           <p>
                             从一条

@@ -8,12 +8,20 @@ async fn source_inventory_through_stdio_is_scoped_and_metadata_only() {
     let c = client(dir.path()).await;
     let imported = call(&c,"save_record",json!({"kind":"knowledge","title":"来源目录","body":"不得放入清单的完整正文","project":"sources","snapshot":{"uri":"D:/source.md","format":"markdown","fingerprint":"fingerprint","imported_at":1,"locations":[]}})).await;
     call(&c,"save_record",json!({"kind":"knowledge","title":"其他范围","body":"其他项目正文","project":"other","snapshot":{"uri":"D:/other.md","format":"markdown","fingerprint":"other","imported_at":1,"locations":[]}})).await;
-    let list = call(&c,"list_knowledge_sources",json!({"project":"sources","limit":1})).await;
-    assert_eq!(list["total"],1);
-    assert_eq!(list["items"][0]["id"],imported["id"]);
+    let list = call(
+        &c,
+        "list_knowledge_sources",
+        json!({"project":"sources","limit":1}),
+    )
+    .await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["id"], imported["id"]);
     assert!(list["items"][0].get("body").is_none());
     assert!(list["items"][0].get("assets").is_none());
-    assert_eq!(call(&c,"get_record",json!({"id":imported["id"]})).await["revision"],1);
+    assert_eq!(
+        call(&c, "get_record", json!({"id":imported["id"]})).await["revision"],
+        1
+    );
     c.cancel().await.unwrap();
 }
 

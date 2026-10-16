@@ -50,6 +50,25 @@
   font-size: 14px;
   background: var(--surface-strong);
 }
+.ai-import-destination {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-soft);
+  overflow-wrap: anywhere;
+}
+.ai-import-destination p {
+  margin: 8px 0;
+}
+.ai-import-destination label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 12px 4px 0;
+}
+.ai-import-destination input {
+  min-width: 0;
+  max-width: 100%;
+}
 .ai-space button,
 .ai-space input,
 .ai-space select,

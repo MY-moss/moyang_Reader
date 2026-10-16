@@ -63,7 +63,9 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
         }
         "stats" => serde_json::to_value(s.stats()?)?,
         "health" => serde_json::to_value(s.health(serde_json::from_value(payload)?)?)?,
-        "source_inventory" => serde_json::to_value(s.source_inventory(serde_json::from_value(payload)?)?)?,
+        "source_inventory" => {
+            serde_json::to_value(s.source_inventory(serde_json::from_value(payload)?)?)?
+        }
         "backup" => serde_json::to_value(s.backup()?)?,
         "import" => s.import(serde_json::from_value(payload)?)?,
         "context" => s.context(serde_json::from_value(payload)?)?,
@@ -78,6 +80,12 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
         "checkpoint" => s.checkpoint(serde_json::from_value(payload)?)?,
         "conclude" => serde_json::to_value(s.conclude(serde_json::from_value(payload)?)?)?,
         "activity" => s.activity_feed()?,
+        "activity_page" => s.activity_page(serde_json::from_value(payload)?)?,
+        "conflict_detail" => s.conflict_detail(
+            payload["id"]
+                .as_str()
+                .ok_or_else(|| invalid("缺少冲突编号。"))?,
+        )?,
         "fetch_web" => fetch_web_source(
             payload["uri"]
                 .as_str()
