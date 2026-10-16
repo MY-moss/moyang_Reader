@@ -19,6 +19,10 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
             )?,
         )?,
         "save" => serde_json::to_value(s.save(serde_json::from_value(payload)?)?)?,
+        "patch" => s.patch(serde_json::from_value(payload)?)?,
+        "read_context" => s.read_context(serde_json::from_value(payload)?)?,
+        "recall" => s.recall(serde_json::from_value(payload)?)?,
+        "resource_context" => s.resource_context(serde_json::from_value(payload)?)?,
         "get_if_changed" => serde_json::to_value(
             s.get_if_changed(
                 payload["id"]

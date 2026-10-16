@@ -4,10 +4,10 @@ use std::path::Path;
 
 pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -> Result<()> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if version > 2 {
+    if version > 3 {
         return Err(invalid("数据库版本更新，请使用新版程序。"));
     }
-    if version < 2 {
+    if version < 3 {
         if existing {
             snapshot(conn, directory, "upgrade")?;
         }
@@ -20,6 +20,9 @@ pub(crate) fn upgrade(conn: &mut Connection, directory: &Path, existing: bool) -
                 CREATE TABLE conflicts(id TEXT PRIMARY KEY, status TEXT NOT NULL, updated INTEGER NOT NULL, payload TEXT NOT NULL);
                 CREATE TABLE activities(id TEXT PRIMARY KEY, updated INTEGER NOT NULL, payload TEXT NOT NULL);
                 PRAGMA user_version=2;")?;
+        }
+        if version < 3 {
+            tx.execute_batch("CREATE TABLE derived_context(id TEXT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE, input_fingerprint TEXT NOT NULL, overview TEXT NOT NULL, purpose TEXT NOT NULL, generated INTEGER NOT NULL); PRAGMA user_version=3;")?;
         }
         tx.commit()?;
     }

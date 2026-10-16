@@ -15,7 +15,7 @@ fn clipped(text: &str, cap: usize) -> (String, bool) {
 }
 
 // Choose a compact query-bearing window instead of losing a late match when a chunk is shortened.
-fn evidence(text: &str, query: &str, cap: usize) -> (String, bool) {
+pub(crate) fn evidence(text: &str, query: &str, cap: usize) -> (String, bool) {
     let chars: Vec<char> = text.chars().collect();
     if chars.len() <= cap {
         return (text.into(), false);

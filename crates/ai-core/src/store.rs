@@ -19,7 +19,7 @@ impl Store {
         conn.busy_timeout(Duration::from_secs(8))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 2 {
+        if version > 3 {
             return Err(invalid("数据库版本更新，请使用新版程序。"));
         }
         if version == 0 {

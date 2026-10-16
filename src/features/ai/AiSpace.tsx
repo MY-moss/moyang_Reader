@@ -184,7 +184,13 @@ export default function AiSpace({
             notify={m.notify}
           />
         ) : m.connections ? (
-          <AiConnections stats={m.stats} refresh={m.refresh} notify={m.notify} />
+          <AiConnections
+            active={active}
+            dataVersion={m.dataVersion}
+            stats={m.stats}
+            refresh={m.refresh}
+            notify={m.notify}
+          />
         ) : (
           <>
             <header className="ai-page-header">

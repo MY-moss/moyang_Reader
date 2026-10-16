@@ -227,7 +227,7 @@ fn v1_migration_is_backed_up_and_preserves_ids_revisions_and_agent_scope() {
     let mut q = save("历史记忆", "旧版本数据");
     q.fields.agent = "codex".into();
     let r = s.save(q).unwrap();
-    s.conn.execute_batch("DROP INDEX records_sharing; ALTER TABLE records DROP COLUMN sharing; DROP TABLE checkpoints; DROP TABLE conflicts; DROP TABLE activities; UPDATE records SET payload=json_remove(payload,'$.sharing','$.snapshot'); UPDATE revisions SET payload=json_remove(payload,'$.sharing','$.snapshot'); PRAGMA user_version=1;").unwrap();
+    s.conn.execute_batch("DROP TABLE derived_context; DROP INDEX records_sharing; ALTER TABLE records DROP COLUMN sharing; DROP TABLE checkpoints; DROP TABLE conflicts; DROP TABLE activities; UPDATE records SET payload=json_remove(payload,'$.sharing','$.snapshot'); UPDATE revisions SET payload=json_remove(payload,'$.sharing','$.snapshot'); PRAGMA user_version=1;").unwrap();
     drop(s);
     let s = Store::open(d.path()).unwrap();
     let restored = s.get(&r.id).unwrap();

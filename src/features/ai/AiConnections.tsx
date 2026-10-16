@@ -6,14 +6,18 @@ import { AiClientConnections } from "./AiClientConnections";
 export const agentGuide = `开始任务时，用 recall_context 按当前项目和任务检索相关知识、记忆和技能。只读取需要的详情。
 优先沿用生命周期钩子提供的原始 checkpoint_id；没有钩子时用 task_checkpoint 建立本轮检查点。
 任务结束用 conclude_task 保存有证据的长期结论；没有新信息就提交 decisions=[] 和原因，不存整段聊天、进度或猜测。钩子补充回合继续使用原检查点。
-发现过时信息时，先 get_record 读取当前版本，再用 expected_revision 修订；不要直接覆盖其他 Agent 的更新。
-用 search(kind="skill") 发现方法，再按需读取技能和资源。使用后可用 memory_feedback 标记帮助程度。
-相近记忆经过核对后用 merge_memories 合并；不再适用的内容归档。每次任务积累有用信息，而不是反复堆积重复记录。`;
+用 read_context 按 L0 目录、L1 概览、L2 正文、L3 历史逐步读取；用 patch_record 和 expected_revision 只修改必要字段。
+用 recall_context 的 kinds=["skill"] 发现方法，再按需读取技能和资源。保留原有共享范围，不反复堆积重复记录。
+仅当已读内容仍在当前上下文时回传 receipt；上下文压缩、重启、项目切换或 Agent 交接后使用新的 context_id 并重新召回。`;
 export function AiConnections({
+  active = true,
+  dataVersion = 0,
   stats,
   refresh,
   notify,
 }: {
+  active?: boolean;
+  dataVersion?: number;
   stats: AiStats | null;
   refresh: () => void;
   notify: (message: string, error?: boolean) => void;
@@ -46,10 +50,12 @@ export function AiConnections({
       .writeText(text)
       .then(() => notify("已复制。"))
       .catch((e) => notify(String(e), true));
-  const server = info ? { command: info.executable, args: ["--data-dir", info.directory] } : null;
+  const server = info
+    ? { command: info.executable, args: ["--data-dir", info.directory, "--profile", "compact"] }
+    : null;
   const json = JSON.stringify({ mcpServers: { "moyang-ai": server } }, null, 2);
   const toml = info
-    ? `[mcp_servers.moyang-ai]\ncommand = ${JSON.stringify(info.executable)}\nargs = ["--data-dir", ${JSON.stringify(info.directory)}]`
+    ? `[mcp_servers.moyang-ai]\ncommand = ${JSON.stringify(info.executable)}\nargs = ["--data-dir", ${JSON.stringify(info.directory)}, "--profile", "compact"]`
     : "";
   async function index() {
     setBusy(true);
@@ -105,7 +111,9 @@ export function AiConnections({
               : "尚未找到 MCP 可执行文件。请在本项目运行 npm run build:mcp，再刷新此页。"
             : "浏览器预览使用独立存储。请启动桌面版，获取可用的本机连接配置。"}
         </p>
-        {info?.native && <AiClientConnections available={info.available} notify={notify} />}
+        {info?.native && (
+          <AiClientConnections active={active} dataVersion={dataVersion} available={info.available} notify={notify} />
+        )}
         {info?.native && (
           <>
             <div className="ai-config-heading">

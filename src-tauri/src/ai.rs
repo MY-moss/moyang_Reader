@@ -39,6 +39,7 @@ pub async fn ai_request(
         if result.is_ok()
             && [
                 "save",
+                "patch",
                 "import",
                 "restore",
                 "conclude",

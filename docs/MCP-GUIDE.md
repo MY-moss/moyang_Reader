@@ -1,5 +1,21 @@
 # MCP 与任务沉淀接口
 
+## 分层读取与工具模式（本轮开发版）
+
+新连接带 `--profile compact`，只展示 8 个常用工具：`recall_context`、`read_context`、`save_record`、`patch_record`、`task_checkpoint`、`conclude_task`、`read_skill_resource`、`library_status`。已有不带 profile 的连接保留完整工具和旧召回响应；接入页可切换后重连。`library_status.service` 报告正在运行的构建版本、提交、模式、工具数量与能力，不能把配置写入等同于重连成功。
+
+`read_context` 输入 `items`（1–20 条）及 `max_chars`（总 JSON 的 Unicode 字符预算，1,000–30,000）。每项 `id`、`layer`（l0 目录 / l1 默认概览 / l2 正文 / l3 历史）、可选 `revision`、`if_revision`、`section` 或 `start_line/end_line`。行号从 1 开始且含结束行；同时选择章节时，行范围相对该章节。重名标题需改用行号；围栏代码中的标题不参与导航。`continuation` 原样继续读取，固定版本和内容指纹；`next_index` 表示还未处理的批量条目。L3 不给 revision 返回历史清单，给 revision 返回指定版本正文。
+
+L0/L1 派生内容绑定原文指纹，不替换手写摘要或原文；过期时返回原文或手写摘要并标明状态。短记忆直接完整返回。检索始终覆盖原文，不等待概览整理。
+
+`patch_record` 输入 `id`、`expected_revision`、`fields` 和可选 `reason`。只更新提供的字段，数组 `[]` 表示清空，省略表示保留；不允许改变 kind。无实际变化返回 `unchanged=true`，不新增版本。未知字段报错，附件不会因省略而消失。
+
+精简召回支持 `kinds`、`layer`、`context_id`、`receipt`、`reset`。只在证据仍保留于当前上下文时回传回执。更正、归档、到期、删除会在下次召回反映；进程重启、未知或过期回执重新返回精简证据。上下文压缩、交接和项目切换后使用新 context_id。回执在内存中限量保留 30 分钟，不持久化为永久排除记录。省略项目的新式召回仅查询全局；完整模式旧调用保持原行为。
+
+`read_skill_resource` 省略 path 返回分页资源目录。文本支持行范围和 continuation；二进制在精简模式只给元数据，确需字节时显式 `include_binary=true`，结果仍受总预算限制。完整模式原有 id/path 调用保持兼容。搜索 / 召回取消会传入等待中的模型请求。
+
+活动摘要通过 `recent_activity` 按 project、offset、limit 分页；`conflict_detail`（完整模式）按需读取指定冲突正文。会话开始或恢复时给完整指南，普通轮次只给原检查点、范围和上下文编号。
+
 0.15.2 在已登记的同一程序、数据目录使用不同 Windows 路径写法时保持连接状态一致，保留原钩子定义和回执。配置成功、MCP 可读写和真实结束钩子仍分别核验；本机实测与未完成项见 [MCP 与 AI 记忆实测](VALIDATION-LIVE-AI.md)。
 
 ## 0.15 资料检查与上下文预算
