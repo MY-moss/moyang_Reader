@@ -1,5 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$McpExecutable)
 $ErrorActionPreference='Stop'
+# Native JSON input must be UTF-8 without BOM, regardless of the runner defaults.
+$OutputEncoding=New-Object System.Text.UTF8Encoding($false)
 $fixtureBase=Join-Path (Split-Path -Parent $PSScriptRoot) '.local'
 $fixture=Join-Path $fixtureBase ('storage-fixture-' + [Guid]::NewGuid().ToString())
 [IO.Directory]::CreateDirectory($fixture) | Out-Null
