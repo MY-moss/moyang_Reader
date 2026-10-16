@@ -35,6 +35,14 @@ test("clean checkout packages without local artifacts and derives version from p
     path.basename(result.destination),
   );
 });
+
+test("a release documentation allowlist leaves unrelated local drafts out of the package", (t) => {
+  const input = fixture(t);
+  fs.writeFileSync(path.join(input.root, "docs/private-draft.md"), "unrelated draft");
+  const result = assemblePortablePackage({ ...input, documentationFiles: new Set(["docs/USER-GUIDE.md"]) });
+  assert.equal(fs.existsSync(path.join(result.destination, "docs/USER-GUIDE.md")), true);
+  assert.equal(fs.existsSync(path.join(result.destination, "docs/private-draft.md")), false);
+});
 test("failed copy preserves latest pointer and both previously published executables", (t) => {
   const input = fixture(t);
   const previous = assemblePortablePackage(input);

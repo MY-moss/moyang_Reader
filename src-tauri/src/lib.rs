@@ -1,8 +1,11 @@
 mod ai;
 mod ai_model;
+mod chat;
 mod commands;
 mod data_paths;
 mod extensions;
+mod online_update;
+mod storage;
 
 use tauri::{Emitter, Url, WindowEvent};
 
@@ -43,9 +46,15 @@ fn is_allowed_app_navigation(url: &Url) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if online_update::forward_to_current() {
+        return;
+    }
     let context = tauri::generate_context!();
     let enable_updater = updater_is_configured(context.config().plugins.0.get("updater"));
     let builder = tauri::Builder::default()
+        .manage(chat::ChatRequests::default())
+        .manage(online_update::OnlineUpdate::default())
+        .manage(storage::StorageMigration::default())
         .manage(commands::AccessRegistry::default())
         .manage(commands::WorkspaceWatcher::default())
         .manage(commands::WorkspaceSearchCache::default());
@@ -108,6 +117,18 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            chat::chat_request,
+            chat::chat_models,
+            chat::chat_stream,
+            chat::chat_cancel,
+            online_update::online_update_check,
+            online_update::online_update_download,
+            online_update::online_update_activate,
+            online_update::online_update_failure,
+            storage::storage_info,
+            storage::storage_choose_target,
+            storage::storage_prepare,
+            storage::storage_start,
             commands::bookroom::bookroom_request,
             ai::ai_request,
             extensions::extension_request,

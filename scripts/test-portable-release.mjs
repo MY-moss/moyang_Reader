@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -27,9 +26,11 @@ for (const file of manifest.files)
       .digest("hex"),
     file.sha256,
   );
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-portable-"));
+const fixtureBase = path.join(root, ".local");
+fs.mkdirSync(fixtureBase, { recursive: true });
+const temp = fs.mkdtempSync(path.join(fixtureBase, "portable-smoke-"));
 const report = { timestamp: new Date().toISOString(), version: manifest.version, hashes: true };
-let client, app, browser, model;
+let client, app, browser, model, page;
 try {
   // Production single-instance identity is shared across package directories.
   // Fail before starting a test app rather than waking a user's running window.
@@ -123,7 +124,6 @@ try {
   });
   await waitForTestService(app, `${desktopUrl}/json/version`);
   browser = await chromium.connectOverCDP(desktopUrl);
-  let page;
   for (let n = 0; n < 120; n++) {
     page = browser
       .contexts()
@@ -159,6 +159,32 @@ try {
   );
   assert.ok(extensionState.installed.some((item) => item.package.id === "moyang.reading-report" && item.enabled));
   report.desktop.extension_install = true;
+  await page.locator(".extension-row").filter({ hasText: "书房聊天" }).click();
+  await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page.getByText("扩展已安装，可在下方管理。", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "开始聊天", exact: true }).click();
+  await page.getByRole("region", { name: "书房聊天", exact: true }).waitFor();
+  await page.getByRole("button", { name: "添加我的 API 服务" }).click();
+  await page.getByLabel("服务名称", {exact:true}).fill("本机验证服务");
+  await page.getByLabel("API 基础地址").fill("http://127.0.0.1:1/v1");
+  await page.getByLabel("默认模型", {exact:true}).fill("verification-only");
+  await page.getByRole("button", { name: "保存服务", exact: true }).click();
+  await page.getByRole("status").filter({hasText:"服务已保存"}).waitFor();
+  await page.getByRole("button", {name:"返回聊天",exact:true}).click();
+  assert.equal(await page.getByRole("combobox", {name:"API 服务",exact:true}).inputValue() !== "", true);
+  report.desktop.chat_configuration = true;
+  await page.getByRole("button", {name:"设置",exact:true}).click();
+  await page.getByRole("button", {name:"存储位置",exact:true}).click();
+  await page.locator(".storage-locations").waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.screenshot({path:"artifacts/workbench/release-storage.png"});
+  report.desktop.storage_locations = true;
+  await page.getByRole("button", {name:"关闭设置",exact:true}).click();
+  if (process.env.MOYANG_VERIFY_PUBLISHED_UPDATE === "1") {
+    const update = await page.evaluate(() => window.__TAURI_INTERNALS__.invoke("online_update_check"));
+    assert.equal(update, null, "Published feed must identify this build as current");
+    report.desktop.live_update_feed = true;
+  }
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("reader");
   await page.evaluate(() =>
     window.__TAURI_INTERNALS__.invoke("plugin:event|emit", { event: "close-requested", payload: null }),
@@ -166,12 +192,27 @@ try {
   for (let n = 0; n < 100 && app.exitCode === null; n++) await pause(100);
   assert.equal(app.exitCode, 0, "Final desktop did not close normally");
   report.desktop.normal_close = true;
+} catch (error) {
+  report.failure = String(error);
+  if (page && !page.isClosed()) {
+    await page.screenshot({ path: "artifacts/workbench/release-failure.png" }).catch(() => undefined);
+    report.visible_text = await page.locator("body").innerText().catch(() => "");
+  }
+  throw error;
 } finally {
   if (app?.exitCode === null) app.kill();
   model?.kill();
   const cleanup = await Promise.allSettled([client?.close(), browser?.close()]);
   const errors = cleanup.filter((result) => result.status === "rejected");
   if (errors.length) report.cleanup_errors = errors.map((result) => String(result.reason));
+  // Only this run's isolated data, after its app and MCP clients have stopped.
+  for (let n = 0; app?.exitCode === null && n < 30; n++) await pause(100);
+  if (path.dirname(temp) !== fixtureBase || !path.basename(temp).startsWith("portable-smoke-")) {
+    report.cleanup_note = "Unexpected fixture path retained without removal";
+  } else {
+    try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); }
+    catch (error) { report.retained_test_fixture = temp; report.cleanup_note = String(error); }
+  }
   fs.writeFileSync("artifacts/workbench/release-smoke.json", JSON.stringify(report, null, 2));
 }
 console.log(JSON.stringify(report, null, 2));

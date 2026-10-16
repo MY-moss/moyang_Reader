@@ -246,7 +246,7 @@ pub fn view_record(r: Record) -> Result<serde_json::Value> {
         hasher.update(a.encoding.as_bytes());
         hasher.update([0]);
         hasher.update(a.content.as_bytes());
-        serde_json::json!({"path":a.path,"encoding":a.encoding,"size":a.content.len(),"fingerprint":format!("{:x}",hasher.finalize())})
+        serde_json::json!({"path":a.path,"encoding":a.encoding,"size":a.content.len(),"fingerprint":crate::hex(hasher.finalize())})
     }).collect::<Vec<_>>();
     let mut value = serde_json::to_value(r)?;
     value.as_object_mut().unwrap().remove("assets");
@@ -275,7 +275,7 @@ pub(crate) fn fingerprint(f: &RecordFields) -> Result<String> {
     } else {
         serde_json::to_vec(&(f.kind, &f.project, f.sharing, f.body.trim(), &f.assets))?
     };
-    Ok(format!("{:x}", Sha256::digest(payload)))
+    Ok(crate::hex(Sha256::digest(payload)))
 }
 pub(crate) fn save_in(tx: &Transaction, q: SaveRequest) -> Result<Record> {
     let (id, revision, created_at, state) = if let Some(id) = q.id {

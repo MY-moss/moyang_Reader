@@ -15,11 +15,17 @@ export default function AiSpace({
   sidebarTarget,
   action,
   onNavigate,
+  chatEnabled,
+  chatActive,
+  onOpenChat,
 }: {
   active: boolean;
   sidebarTarget?: HTMLElement | null;
   action?: { key: number; type: "search" | "skill"; id?: string } | null;
   onNavigate?: () => void;
+  chatEnabled?: boolean;
+  chatActive?: boolean;
+  onOpenChat?: () => void;
 }) {
   const m = useAiSpace(active);
   const handledAction = useRef<number | null>(null);
@@ -72,19 +78,20 @@ export default function AiSpace({
         if ((event.target as Element).closest("button")) onNavigate?.();
       }}
     >
-      <div className="ai-space-title">
-        <span className="ai-mark">M</span>
-        <div>
-          <strong>AI 空间</strong>
-          <small>让每次协作有所积累</small>
-        </div>
-      </div>
+      {chatEnabled && (
+        <nav aria-label="AI 对话">
+          <button aria-current={chatActive ? "page" : undefined} onClick={onOpenChat}>
+            <Icon name="chat" />
+            <span>书房聊天</span>
+          </button>
+        </nav>
+      )}
       <div className="ai-nav-label">我的积累</div>
       <nav>
         {aiKinds.map((item) => (
           <button
             key={item.key}
-            aria-current={!m.connections && !m.activity && m.kind === item.key ? "page" : undefined}
+            aria-current={!chatActive && !m.connections && !m.activity && m.kind === item.key ? "page" : undefined}
             onClick={() => {
               m.setKind(item.key);
               m.setConnections(false);
@@ -101,7 +108,7 @@ export default function AiSpace({
       </nav>
       <button
         className="ai-activity-nav"
-        aria-current={m.activity ? "page" : undefined}
+        aria-current={!chatActive && m.activity ? "page" : undefined}
         onClick={() => {
           m.setConnections(false);
           m.setActivity(true);
@@ -130,7 +137,7 @@ export default function AiSpace({
         </div>
       )}
       <div className="ai-nav-bottom">
-        <button aria-current={m.connections ? "page" : undefined} onClick={() => m.setConnections(true)}>
+        <button aria-current={!chatActive && m.connections ? "page" : undefined} onClick={() => m.setConnections(true)}>
           <Icon name="connection" /> 接入与备份
         </button>
         <p>{isTauriRuntime() ? "本地保存 · 与日常笔记分开" : "浏览器预览 · 独立存储"}</p>
@@ -262,39 +269,45 @@ export default function AiSpace({
                     value={m.query}
                     onChange={(e) => m.setQuery(e.target.value)}
                   />
-                  <div className="ai-scope-filters">
-                    <select aria-label="筛选项目" value={m.project} onChange={(e) => m.setProject(e.target.value)}>
-                      <option value="">所有项目</option>
-                      {m.stats?.projects.map((p) => (
-                        <option key={p}>{p}</option>
-                      ))}
-                    </select>
-                    <select aria-label="筛选 Agent" value={m.agent} onChange={(e) => m.setAgent(e.target.value)}>
-                      <option value="">所有 Agent</option>
-                      {m.stats?.agents.map((a) => (
-                        <option key={a}>{a}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="ai-filter-line">
-                    <label className="ai-checkbox">
-                      <input type="checkbox" checked={m.archived} onChange={(e) => m.setArchived(e.target.checked)} />
-                      已归档
-                    </label>
-                    {m.kind === "memory" && (
+                  <details className="ai-filter-details">
+                    <summary>
+                      {m.project || m.agent || m.archived || m.includeExpired ? "筛选 · 已启用" : "筛选"}
+                      <Icon name="chevron" size={14} />
+                    </summary>
+                    <div className="ai-scope-filters">
+                      <select aria-label="筛选项目" value={m.project} onChange={(e) => m.setProject(e.target.value)}>
+                        <option value="">所有项目</option>
+                        {m.stats?.projects.map((p) => (
+                          <option key={p}>{p}</option>
+                        ))}
+                      </select>
+                      <select aria-label="筛选 Agent" value={m.agent} onChange={(e) => m.setAgent(e.target.value)}>
+                        <option value="">所有 Agent</option>
+                        {m.stats?.agents.map((a) => (
+                          <option key={a}>{a}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="ai-filter-line">
                       <label className="ai-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={m.includeExpired}
-                          onChange={(e) => m.setIncludeExpired(e.target.checked)}
-                        />
-                        含过期
+                        <input type="checkbox" checked={m.archived} onChange={(e) => m.setArchived(e.target.checked)} />
+                        已归档
                       </label>
-                    )}
-                    <button aria-label="刷新 AI 内容" onClick={m.refresh}>
-                      刷新
-                    </button>
-                  </div>
+                      {m.kind === "memory" && (
+                        <label className="ai-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={m.includeExpired}
+                            onChange={(e) => m.setIncludeExpired(e.target.checked)}
+                          />
+                          含过期
+                        </label>
+                      )}
+                      <button aria-label="刷新 AI 内容" onClick={m.refresh}>
+                        刷新
+                      </button>
+                    </div>
+                  </details>
                 </div>
                 {m.search.warning && <p className="ai-search-warning">{m.search.warning}</p>}
                 {m.loadError && (

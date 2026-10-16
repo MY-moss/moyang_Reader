@@ -5,6 +5,7 @@ import { normalizeReadingZoom, readingZoomFromScale } from "../reader/reading-zo
 export type ReaderPreferences = {
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
+  autoDownloadUpdates: boolean;
   readingScale: ReadingScale;
   readingZoom: number;
   readingWidth: ReadingWidth;
@@ -18,7 +19,8 @@ export type ReaderPreferences = {
 
 export const defaultReaderPreferences: ReaderPreferences = {
   allowRemoteResources: false,
-  startupUpdateCheck: false,
+  startupUpdateCheck: true,
+  autoDownloadUpdates: false,
   readingScale: "medium",
   readingZoom: 100,
   readingWidth: "standard",
@@ -49,6 +51,7 @@ export function loadReaderPreferences(): ReaderPreferences {
 
     return {
       ...normalizeAppearance(parsed),
+      autoDownloadUpdates: parsed.autoDownloadUpdates === true,
       allowRemoteResources:
         typeof parsed.allowRemoteResources === "boolean"
           ? parsed.allowRemoteResources

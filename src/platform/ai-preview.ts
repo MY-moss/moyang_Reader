@@ -52,6 +52,31 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "context": {
+      const results = previewRequest("search", { query: payload.query, project: payload.project ?? "", limit: 8 }) as {
+        items: AiRecord[];
+      };
+      const pinned = db.records.filter(
+        (r) =>
+          r.pinned &&
+          r.kind === "memory" &&
+          r.state === "active" &&
+          (!r.expires_at || r.expires_at > Date.now()) &&
+          (!r.project || r.project === (payload.project ?? "")),
+      );
+      const records = [...new Map([...results.items.map((r) => get(r.id)), ...pinned].map((r) => [r.id, r])).values()];
+      const limit = Math.max(200, Math.min(12000, Number(payload.max_chars) || 4000));
+      let text = "";
+      const ids: string[] = [];
+      for (const record of records) {
+        const fragment = `【${record.title} · ${record.source || record.id}】\n${record.body.slice(0, 1200)}\n\n`;
+        const available = limit - text.length;
+        if (available < 100) break;
+        text += fragment.slice(0, available);
+        ids.push(record.id);
+      }
+      return { text, ids, warning: "浏览器预览使用关键词检索；桌面版提供完整的本地召回。" };
+    }
     case "cancel_search":
       return null;
     case "get":

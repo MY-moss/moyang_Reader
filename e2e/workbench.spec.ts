@@ -10,11 +10,11 @@ test("narrow navigation contains focus, closes with Escape and restores desktop 
   const navigation = page.getByRole("dialog", { name: "工作台导航" });
   await expect(navigation).toBeVisible();
   await expect(page.locator(".workbench-main")).toHaveAttribute("inert", "");
-  await navigation.getByLabel("界面密度").focus();
+  await navigation.getByRole("button", { name: "使用帮助", exact: true }).focus();
   await page.keyboard.press("Tab");
   await expect(navigation.getByLabel("工作空间", { exact: true })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(navigation.getByLabel("界面密度")).toBeFocused();
+  await expect(navigation.getByRole("button", { name: "使用帮助", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator(".workbench-sidebar")).toBeHidden();
   await expect(opener).toBeFocused();

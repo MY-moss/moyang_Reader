@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppUpdates } from "./useAppUpdates";
 import { useDocumentExport } from "./useDocumentExport";
 import { useDocumentSession } from "./useDocumentSession";
@@ -16,6 +16,7 @@ import { useWorkspaceActions } from "./useWorkspaceActions";
 import { useWorkspaceExport } from "./useWorkspaceExport";
 import { useWorkspaceSession } from "./useWorkspaceSession";
 import { useAutoSave } from "./useAutoSave";
+import { flushPendingWork } from "../shared/pending-work";
 export function useReaderApplication() {
   const [conflictPath, setConflictPath] = useState<string | null>(null);
   const readerState = useReaderState();
@@ -23,6 +24,10 @@ export function useReaderApplication() {
   const editorHistory = useEditorHistory({ ...readerState });
   const documentTransitions = useDocumentTransitions({ ...readerState, ...editorHistory, ...readingLayout });
   const appUpdates = useAppUpdates({ ...readerState });
+  const downloadUpdate = appUpdates.installUpdate;
+  useEffect(() => {
+    if (readerState.updateStatus === "available" && readerState.preferences.autoDownloadUpdates) void downloadUpdate();
+  }, [readerState.updateStatus, readerState.preferences.autoDownloadUpdates, downloadUpdate]);
   const workspaceSession = useWorkspaceSession({ ...readerState, ...documentTransitions });
   const documentSession = useDocumentSession({
     ...readerState,
@@ -149,7 +154,23 @@ export function useReaderApplication() {
     updateProgress: readerState.updateProgress,
     updateError: readerState.updateError,
     installUpdate: appUpdates.installUpdate,
-    relaunchUpdatedApp: appUpdates.relaunchUpdatedApp,
+    prepareForRestart: async () => {
+      await flushPendingWork();
+      if (!(await documentSession.flushDocumentSaves())) throw new Error("文档尚未完成保存，请处理冲突后重试。");
+      if (!(await readingLayout.flushAppSettings())) throw new Error("设置尚未保存，请重试。");
+    },
+    relaunchUpdatedApp: async () => {
+      try {
+        await flushPendingWork();
+        if (!(await documentSession.flushDocumentSaves()))
+          throw new Error("文档尚未完成保存，请处理冲突后再安装更新。");
+        if (!(await readingLayout.flushAppSettings())) throw new Error("设置尚未保存，请稍后重试更新。");
+        await appUpdates.relaunchUpdatedApp();
+      } catch (cause) {
+        readerState.setUpdateError(String(cause));
+        readerState.setUpdateNoticeVisible(true);
+      }
+    },
     dismissUpdateNotice: appUpdates.dismissUpdateNotice,
     openTabs: readerState.openTabs,
     handleSelectTab: documentTabs.handleSelectTab,

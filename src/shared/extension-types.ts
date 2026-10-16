@@ -1,6 +1,6 @@
 import type { AiAsset } from "./ai-types";
 
-export type ExtensionKind = "reader" | "theme" | "skill" | "mcp";
+export type ExtensionKind = "reader" | "theme" | "skill" | "mcp" | "assistant";
 export type ExtensionCommand = { id: string; name: string; modifiesDocument?: boolean };
 export type McpConfiguration =
   | { command: string; args?: string[]; env?: Record<string, string> }
@@ -25,6 +25,7 @@ export type ExtensionPackage = {
   theme?: { light: Record<string, string>; dark: Record<string, string> };
   skill?: { body: string; assets: AiAsset[] };
   mcp?: McpConfiguration;
+  assistant?: { prompt: string; starters: string[] };
 };
 export type InstalledExtension = {
   package: ExtensionPackage;
@@ -54,5 +55,6 @@ export const extensionKinds: Record<ExtensionKind, string> = {
   theme: "主题",
   skill: "AI 技能",
   mcp: "MCP 服务",
+  assistant: "聊天助手",
 };
 export const emptyExtensionState = (): ExtensionState => ({ revision: 0, installed: [], catalogs: [] });

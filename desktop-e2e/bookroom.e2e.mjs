@@ -135,6 +135,7 @@ describe("Reader workbench acceptance", () => {
     await browser.waitUntil(() => fs.readFileSync(file,"utf8").includes("我的修改\n外部修改"));
     const recycleFile = path.join(root,"回收预览.md"); fs.writeFileSync(recycleFile,"# 回收预览\n\n可以在恢复前检查这段内容。");
     await invoke("delete_workspace_entry",{root,entryPath:"回收预览.md"});
+    await browser.$(".reader-manage-nav summary").click();
     await browser.$("button=恢复中心").click();
     await browser.waitUntil(() => browser.execute(() => document.querySelector(".bookroom-page")?.textContent.includes("回收预览.md")));
     await browser.execute(() => { const section=[...document.querySelectorAll(".bookroom-rows section")].find((section) => section.textContent.includes("回收预览.md")); [...section.querySelectorAll("button")].find((button)=>button.textContent==="预览").click(); });
@@ -243,6 +244,7 @@ describe("Saved search acceptance", () => {
     await browser.refresh();
     await browser.$('select[aria-label="工作空间"]').waitForExist();
     await reader();
+    await browser.$(".reader-manage-nav summary").click();
     await browser.$("button=保存的视图").click();
     const view = await browser.$("//div[@class='bookroom-rows']//button[strong[.='My saved view']]");
     await view.waitForDisplayed();

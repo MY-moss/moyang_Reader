@@ -9,6 +9,13 @@ pub fn runtime() -> Option<PathBuf> {
         if let Some(root) = exe.parent() {
             candidates.push(root.join("ollama/runtime/ollama.exe"));
             candidates.push(root.join("ollama/ollama.exe"));
+            if let Ok(bytes) = std::fs::read(root.join("online-update.json")) {
+                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                    if let Some(path) = value["runtime"].as_str() {
+                        candidates.push(PathBuf::from(path));
+                    }
+                }
+            }
         }
     }
     if let Some(local) = std::env::var_os("LOCALAPPDATA") {
@@ -44,10 +51,10 @@ pub fn local_model(
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
-        if let Some(root) = executable
-            .parent()
-            .filter(|p| p.file_name().is_some_and(|n| n == "runtime"))
-        {
+        if let Some(root) = executable.parent().filter(|p| {
+            std::env::var_os("OLLAMA_MODELS").is_none()
+                && p.file_name().is_some_and(|n| n == "runtime")
+        }) {
             command.env("OLLAMA_MODELS", root.parent().unwrap().join("models"));
         }
         #[cfg(windows)]

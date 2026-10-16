@@ -1,19 +1,20 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const temporaryBase = path.join(projectRoot, ".local", "desktop-tests");
+fs.mkdirSync(temporaryBase, { recursive: true });
 const configuredDocumentPath = process.env.MOYANG_DESKTOP_E2E_DOCUMENT;
 const fixtureRoot = configuredDocumentPath
   ? path.dirname(configuredDocumentPath)
-  : fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-"));
+  : fs.mkdtempSync(path.join(temporaryBase, "moyang-reader-desktop-e2e-"));
 const documentPath = configuredDocumentPath ?? path.join(fixtureRoot, "desktop-e2e.md");
 const wikiTargetPath = path.join(fixtureRoot, "wiki-target.md");
 const ownsWikiTarget = !fs.existsSync(wikiTargetPath);
 const workspacePath = fixtureRoot;
 const configuredExportRoot = process.env.MOYANG_DESKTOP_E2E_EXPORT_ROOT;
-const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "moyang-reader-desktop-e2e-export-"));
+const exportRoot = configuredExportRoot ?? fs.mkdtempSync(path.join(temporaryBase, "moyang-reader-desktop-e2e-export-"));
 const ownsExportRoot = !configuredExportRoot;
 const applicationPath = path.join(
   process.env.CARGO_TARGET_DIR || path.join(projectRoot, "src-tauri", "target"),
@@ -36,7 +37,7 @@ process.env.WEBVIEW2_USER_DATA_FOLDER = path.join(exportRoot, "webview");
 function cleanupFixture() {
   const removeTemporary = (directory, prefix) => {
     const resolved=path.resolve(directory);
-    if(path.dirname(resolved)!==path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith(prefix)) throw new Error(`Refusing to clean an unexpected fixture directory: ${resolved}`);
+    if(path.dirname(resolved)!==temporaryBase || !path.basename(resolved).startsWith(prefix)) throw new Error(`Refusing to clean an unexpected fixture directory: ${resolved}`);
     try { fs.rmSync(resolved,{recursive:true,force:true,maxRetries:6,retryDelay:200}); }
     catch(error) {
       // WebView2 may release its Crashpad files after WDIO's onComplete hook.
@@ -55,7 +56,7 @@ process.once("exit", cleanupFixture);
 
 export const config = {
   runner: "local",
-  specs: [[path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs"), path.join(projectRoot, "desktop-e2e", "bookroom.e2e.mjs"), path.join(projectRoot,"desktop-e2e","extensions.e2e.mjs")]],
+  specs: [[path.join(projectRoot, "desktop-e2e", "smoke.e2e.mjs"), path.join(projectRoot, "desktop-e2e", "bookroom.e2e.mjs"), path.join(projectRoot,"desktop-e2e","extensions.e2e.mjs"), path.join(projectRoot,"desktop-e2e","chat-updates.e2e.mjs")]],
   maxInstances: 1,
   capabilities: [
     {

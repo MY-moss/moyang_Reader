@@ -4,6 +4,10 @@
 
 本次根目录迁移、运行验证和清理边界见 [整合验证报告](docs/VALIDATION-CONSOLIDATION.md)。
 
+0.13.0 新增可选[聊天助手](docs/CHAT-EXTENSIONS.md)：自己的 API、多服务与模型切换、流式对话、显式引用文档和 AI 库；同时简化导航并统一图标。[在线更新](docs/ONLINE-UPDATES.md)支持启动检查、可选自动下载、保存后重启与便携版本回退。首次下载与更新包见 [GitHub Releases](https://github.com/MY-moss/moyang_Reader/releases)。
+
+在「设置 → [存储位置](docs/STORAGE-LOCATIONS.md)」查看占用，并把记忆、知识、技能、聊天、草稿和缓存迁到其他本机磁盘，模型可单独勾选。原 MCP 路径通过目录链接继续访问实际数据。
+
 最新[界面与记忆召回复核](docs/VALIDATION-USABILITY-RECALL.md)修复置顶记忆遗漏任务相关片段、窄窗导航焦点、AI 首次使用提示、帮助主题、目录失败重试及长扩展名显示。
 
 0.12.0 新增[插件市场](docs/EXTENSIONS.md)：阅读插件、主题、Agent Skills 与 MCP 连接，可安装、更新、停用和回退；同时修复全局导航与 Windows 并发备份问题。功能核对、真实测试与剩余边界见[本轮深度检查报告](docs/VALIDATION-EXTENSIONS.md)，参考项目与取舍见[扩展研究](docs/RESEARCH-EXTENSIONS.md)。
@@ -14,7 +18,7 @@
 
 ## 开始使用
 
-本轮候选版本为 0.12.0。本机可双击根目录的 **启动阅读器.cmd**，或执行 `npm start` 打开最新成功打包的应用。首次克隆源码后先执行 `npm ci`，然后 `npm run package` 生成便携包。本机生成的便携包放在 `release/<版本与构建时间>/`，`release/latest.json` 记录最新成功打包的目录。打开其中的 `Moyang Reader Next.exe`，保留同目录的 `moyang-ai-mcp.exe`；如打包时已安装本地模型，`ollama` 文件夹也一并保留。每个包内有 `使用说明.txt`。GitHub 保存源码与文档，便携包、模型和个人数据不提交到仓库。
+本轮候选版本为 0.13.0。本机可双击根目录的 **启动阅读器.cmd**，或执行 `npm start` 打开最新成功打包的应用。首次克隆源码后先执行 `npm ci`，然后 `npm run package` 生成便携包。本机生成的便携包放在 `release/<版本与构建时间>/`，`release/latest.json` 记录最新成功打包的目录。打开其中的 `Moyang Reader Next.exe`，保留同目录的 `moyang-ai-mcp.exe`；如打包时已安装本地模型，`ollama` 文件夹也一并保留。每个包内有 `使用说明.txt`。GitHub 保存源码与文档，便携包、模型和个人数据不提交到仓库。
 
 在本目录打开终端，首次执行：
 
@@ -55,17 +59,17 @@ npm run dev
 
 原规划新增能力和清理决策见 [深度重构交付清单](docs/ROADMAP-DELIVERY.md)：属性编辑、块引用与嵌入、关系图筛选、字体、命令搜索、导出模板、大目录渲染和可靠性修复。
 
-| 文档                                         | 解决的问题                                 |
-| -------------------------------------------- | ------------------------------------------ |
-| [现状提炼](docs/PROJECT-ANALYSIS.md)         | 原项目是什么、核心价值、架构问题和重构依据 |
-| [功能保留矩阵](docs/FEATURE-MATRIX.md)       | 哪些能力保留、哪些交互改变、如何验证       |
-| [架构与决策](docs/ARCHITECTURE.md)           | 各层职责、数据流、目录和技术取舍           |
-| [界面与交互规范](docs/DESIGN.md)             | 视觉规则、布局、状态和键盘交互             |
-| [开发流程](docs/DEVELOPMENT.md)              | 环境、命令、变更步骤、质量门禁与发布流程   |
-| [使用指南](docs/USER-GUIDE.md)               | 打开、阅读、编辑、保存、导出与恢复         |
-| [迁移与回滚](docs/MIGRATION.md)              | 工程归档、数据迁移和恢复保护               |
-| [最新验证报告](docs/VALIDATION-WORKBENCH.md) | 实际执行结果与尚未验证事项                 |
-| [本轮实施检查单](tasks/workbench-upgrade.md) | 依赖顺序、验收标准与当前状态               |
+| 文档                                              | 解决的问题                                 |
+| ------------------------------------------------- | ------------------------------------------ |
+| [现状提炼](docs/PROJECT-ANALYSIS.md)              | 原项目是什么、核心价值、架构问题和重构依据 |
+| [功能保留矩阵](docs/FEATURE-MATRIX.md)            | 哪些能力保留、哪些交互改变、如何验证       |
+| [架构与决策](docs/ARCHITECTURE.md)                | 各层职责、数据流、目录和技术取舍           |
+| [界面与交互规范](docs/DESIGN.md)                  | 视觉规则、布局、状态和键盘交互             |
+| [开发流程](docs/DEVELOPMENT.md)                   | 环境、命令、变更步骤、质量门禁与发布流程   |
+| [使用指南](docs/USER-GUIDE.md)                    | 打开、阅读、编辑、保存、导出与恢复         |
+| [迁移与回滚](docs/MIGRATION.md)                   | 工程归档、数据迁移和恢复保护               |
+| [最新验证报告](docs/VALIDATION-CHAT-UPDATES.md)   | 聊天、更新、存储和 GitHub 整理的实际结果   |
+| [本轮实施检查单](tasks/workbench-chat-updates.md) | 当前版本的验收与边界                       |
 
 ## 工程结构
 
@@ -102,7 +106,7 @@ npm run rust -- test --manifest-path src-tauri/Cargo.toml --lib
 npm run test:e2e:desktop
 ```
 
-本次开发版使用独立桌面标识 `com.moyang.reader.next`，保留原文档文件格式，不自动导入旧应用设置。为避免重构版被旧版更新包替换，未配置正式更新源，也未注册文件关联。发布之前应按开发指南完成安装与发布验证。
+当前版使用独立桌面标识 `com.moyang.reader.next`，保留原文档文件格式，不自动导入旧应用设置。0.13 起配置本仓库独立签名的便携更新源，不使用旧安装版渠道，也不注册文件关联。发布前按[在线更新指南](docs/ONLINE-UPDATES.md)核验产物。安全问题与下载核验见 [SECURITY.md](SECURITY.md)。
 
 ## 0.11.0 的实施依据
 

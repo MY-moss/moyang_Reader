@@ -1,5 +1,5 @@
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createBuildEnvironment, resolveSharedCargoTargetDir } from "./shared-cargo-target.mjs";
 import { assemblePortablePackage } from "./portable-package.mjs";
@@ -18,6 +18,7 @@ console.log(
     assemblePortablePackage({
       root,
       target: path.join(resolveSharedCargoTargetDir(root), "release"),
+      documentationFiles: new Set(execFileSync("git", ["ls-files", "--", "docs"], { cwd: root, encoding: "utf8", windowsHide: true }).trim().split(/\r?\n/)),
     }),
     null,
     2,

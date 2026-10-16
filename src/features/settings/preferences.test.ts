@@ -9,7 +9,7 @@ import {
 afterEach(() => localStorage.clear());
 
 describe("reader preferences", () => {
-  it("defaults to local-only resources and manual update checks", () => {
+  it("defaults to local-only resources, startup checks and manual downloads", () => {
     expect(loadReaderPreferences()).toEqual(defaultReaderPreferences);
   });
 
@@ -40,7 +40,7 @@ describe("reader preferences", () => {
     expect(loadReaderPreferences()).toEqual({
       ...defaultReaderPreferences,
       allowRemoteResources: true,
-      startupUpdateCheck: false,
+      startupUpdateCheck: true,
       readingScale: "medium",
       readingZoom: 100,
       readingWidth: "standard",

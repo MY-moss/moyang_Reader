@@ -132,6 +132,7 @@ test("shows and manages local drafts from the recovery center", async ({ page })
   });
   await page.goto("/");
 
+  await page.locator(".reader-manage-nav summary").click();
   await page.getByRole("button", { name: "恢复中心", exact: true }).click();
   const draftTrigger = page.getByRole("button", { name: "查看未保存的恢复草稿", exact: true });
   await draftTrigger.click();

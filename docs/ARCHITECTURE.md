@@ -1,5 +1,15 @@
 # 架构与决策
 
+## 0.13 聊天与更新边界
+
+`features/settings/StorageSettings` 展示真实磁盘位置，`platform/storage-management` 与原生 `storage.rs` 管理迁移计划。Windows 助手等应用退出后复制与校验完整数据目录，再以 junction 保留旧路径；因此已有 MCP、数据库和 WebView 仍保持同一身份。目标空间、目录重叠、占用进程、路径变化、文件哈希与回退集中在迁移助手验证；完整用法见 [存储迁移](STORAGE-LOCATIONS.md)。不迁移普通文档和第三方服务数据。
+
+`features/chat` 持有聊天会话、发送预算、显式来源和请求状态；`platform/chat` 处理桌面 IPC / 浏览器预览存储，`src-tauri/src/chat.rs` 保存独立 SQLite 数据并连接 API。服务公开结构只有 `hasKey`，密钥留在原生配置表。聊天记录有修订检查，保存序列只在请求开始、结束、停止和离开时写入；流式片段不反复写整份历史。关闭窗口通过共享 pending-work 注册停止并保存。
+
+`assistant` 是可选扩展类型，声明提示词与开场问题，不获得宿主 API 密钥或原生命令能力。AI 召回默认关闭，普通笔记只显式附加；上下文构建保持项目范围和字数预算，完整历史与实际发出的上下文分开。
+
+更新复用 Tauri 的签名下载；`online_update.rs` 在校验后创建独立版本目录，`activate-update.ps1` 在旧进程退出后原子切换入口并启动新程序。前端只有完成所有保存后才调用切换命令。模型和个人数据不随更新包复制。测试端点覆盖仅编译进 `wdio` 特性，正式应用使用固定的独立发布源。
+
 ## 职责关系
 
 ```mermaid

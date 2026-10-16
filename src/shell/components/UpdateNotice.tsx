@@ -15,8 +15,8 @@ type UpdateNoticeProps = {
 function titleForStatus(status: UpdateNoticeProps["status"]): string {
   if (status === "up-to-date") return "已是最新版本";
   if (status === "available") return "发现新版本";
-  if (status === "downloading") return "正在安装更新";
-  if (status === "ready") return "更新已安装";
+  if (status === "downloading") return "正在下载更新";
+  if (status === "ready") return "更新已下载并通过校验";
   return "更新没有完成";
 }
 
@@ -42,9 +42,9 @@ export function UpdateNotice({
           {version && status !== "up-to-date" ? " · v" + version.replace(/^v/i, "") : ""}
         </strong>
         {status === "up-to-date" && <span>已向 Moyang Reader 更新服务完成检查。</span>}
-        {status === "available" && <span>下载后会校验签名，并在安装完成后重启应用。</span>}
+        {status === "available" && <span>先下载并校验签名，准备好后再保存内容、重启更新。</span>}
         {status === "downloading" && <span>{progressLabel}</span>}
-        {status === "ready" && <span>应用已经更新，可以重启进入新版本。</span>}
+        {status === "ready" && <span>{error || "重启前会保存文档与对话；上一版和数据会保留。"}</span>}
         {isError && <span>{error ?? "请稍后重试。"}</span>}
         {status === "downloading" && progress !== null && (
           <div className="update-progress" aria-label={progressLabel}>
@@ -56,12 +56,12 @@ export function UpdateNotice({
       <div className="update-actions">
         {status === "available" && (
           <button type="button" className="toolbar-button primary" onClick={onInstall}>
-            下载并安装
+            下载更新
           </button>
         )}
         {status === "ready" && (
           <button type="button" className="toolbar-button primary" onClick={onRelaunch}>
-            重启应用
+            保存并重启更新
           </button>
         )}
         {status === "downloading" && (

@@ -1,23 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { rankQuickOpenItems, type QuickOpenCandidate } from "../../features/workspace/quick-open";
 import { useModalBehavior } from "../../shared/components/useModalBehavior";
+import { Icon } from "../../shared/components/Icon";
+import { translate, type Locale, type MessageKey } from "../../features/settings/i18n";
 
 type QuickOpenPaletteProps = {
+  locale?: Locale;
   items: QuickOpenCandidate[];
   onClose: () => void;
   onOpenFile: (path: string) => void;
 };
 
-function kindLabel(kind: string | undefined): string {
+function kindLabel(kind: string | undefined, name: string): string {
   if (kind === "markdown") return "MD";
   if (kind === "text") return "TXT";
   if (kind === "docx") return "DOCX";
   if (kind === "pdf") return "PDF";
   if (kind === "image") return "IMG";
+  const extension = name.split(".").at(-1)?.toLowerCase();
+  if (extension === "md" || extension === "markdown") return "MD";
+  if (["txt", "text", "log"].includes(extension ?? "")) return "TXT";
+  if (extension === "docx" || extension === "pdf") return extension.toUpperCase();
   return "FILE";
 }
 
-export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPaletteProps) {
+export function QuickOpenPalette({ items, onClose, onOpenFile, locale = "zh-CN" }: QuickOpenPaletteProps) {
+  const t = (key: MessageKey) => translate(locale, key);
   const dialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -70,28 +78,27 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
       >
         <div className="quick-open-header">
           <div>
-            <div className="quick-open-kicker">QUICK OPEN</div>
-            <h2 id="quick-open-title">快速打开</h2>
+            <h2 id="quick-open-title">{t("quick.title")}</h2>
           </div>
           <kbd>ESC</kbd>
         </div>
         <label className="quick-open-input-wrap">
-          <span aria-hidden="true">⌕</span>
+          <Icon name="search" />
           <input
             ref={inputRef}
             type="search"
-            aria-label="快速打开文档"
-            placeholder="输入文件名或路径…"
+            aria-label={t("quick.search")}
+            placeholder={t("quick.placeholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <kbd>Ctrl P</kbd>
         </label>
-        <div className="quick-open-results" role="listbox" aria-label="快速打开结果">
+        <div className="quick-open-results" role="listbox" aria-label={t("quick.results")}>
           {results.length === 0 ? (
             <div className="quick-open-empty">
-              <strong>{items.length ? "没有匹配的文档" : "还没有可打开的文档"}</strong>
-              <span>{items.length ? "换个文件名或路径试试" : "先打开文件，或添加一个阅读库文件夹"}</span>
+              <strong>{t(items.length ? "quick.noMatch" : "quick.empty")}</strong>
+              <span>{t(items.length ? "quick.tryAnother" : "quick.openFirst")}</span>
             </div>
           ) : (
             results.map((item, index) => (
@@ -104,20 +111,20 @@ export function QuickOpenPalette({ items, onClose, onOpenFile }: QuickOpenPalett
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => onOpenFile(item.path)}
               >
-                <span className="quick-open-kind">{kindLabel(item.kind)}</span>
+                <span className="quick-open-kind">{kindLabel(item.kind, item.name)}</span>
                 <span className="quick-open-copy">
                   <strong>{item.name}</strong>
                   <small>{item.relativePath || item.path}</small>
                 </span>
-                {item.isRecent && <span className="quick-open-recent">最近</span>}
+                {item.isRecent && <span className="quick-open-recent">{t("quick.recent")}</span>}
               </button>
             ))
           )}
         </div>
         <footer className="quick-open-footer">
-          <span>↑↓ 选择</span>
-          <span>Enter 打开</span>
-          <span>Esc 关闭</span>
+          <span>{t("quick.selectHint")}</span>
+          <span>{t("quick.openHint")}</span>
+          <span>{t("quick.closeHint")}</span>
         </footer>
       </section>
     </div>

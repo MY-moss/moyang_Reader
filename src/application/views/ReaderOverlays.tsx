@@ -136,6 +136,7 @@ export function ReaderOverlays({
       )}
       {quickOpen && (
         <QuickOpenPalette
+          locale={locale}
           items={quickOpenItems}
           onClose={() => setQuickOpen(false)}
           onOpenFile={(path) => {

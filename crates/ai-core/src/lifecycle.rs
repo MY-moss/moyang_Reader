@@ -174,10 +174,9 @@ impl Store {
         {
             return Err(invalid("检查点需要客户端、会话和原始任务编号。"));
         }
-        let id = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&(&q.client, &q.session, &q.turn))?)
-        );
+        let id = crate::hex(Sha256::digest(serde_json::to_vec(&(
+            &q.client, &q.session, &q.turn,
+        ))?));
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;

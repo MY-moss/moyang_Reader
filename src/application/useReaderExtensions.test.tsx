@@ -30,7 +30,11 @@ async function harness() {
   function Harness() {
     api = useReaderExtensions(
       { documentState: doc, canEdit: true, documentSessions: store, updateSource } as unknown as ReaderApplication,
-      { state: { installed: [{ package: builtInCatalog[1], enabled: true }] } } as ExtensionManager,
+      {
+        state: {
+          installed: [{ package: builtInCatalog.find((p) => p.id === "moyang.tidy-markdown")!, enabled: true }],
+        },
+      } as ExtensionManager,
     );
     return null;
   }

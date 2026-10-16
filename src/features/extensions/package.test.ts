@@ -12,12 +12,17 @@ describe("extension package interoperability", () => {
     expect(compatiblePackage(entries[1])).toBe(true);
   });
   it("rejects broken command entrypoints, duplicate IDs and themes that hide interface controls", () => {
-    expect(() => validatePackage({ ...builtInCatalog[0], files: {} })).toThrow("入口代码");
+    expect(() => validatePackage({ ...builtInCatalog.find((p) => p.kind === "reader")!, files: {} })).toThrow(
+      "入口代码",
+    );
     expect(() =>
       parseCatalog({ format: "moyang-extension-catalog", packages: [builtInCatalog[0], builtInCatalog[0]] }),
     ).toThrow("重复");
     expect(() =>
-      validatePackage({ ...builtInCatalog[2], theme: { light: { display: "none" }, dark: { "--ink": "#ffffff" } } }),
+      validatePackage({
+        ...builtInCatalog.find((p) => p.kind === "theme")!,
+        theme: { light: { display: "none" }, dark: { "--ink": "#ffffff" } },
+      }),
     ).toThrow("主题颜色");
   });
   it("rejects ambiguous MCP transports and keeps argument boundaries", () => {

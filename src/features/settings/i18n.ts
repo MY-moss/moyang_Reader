@@ -1,6 +1,18 @@
 export type Locale = "zh-CN" | "en-US";
 
 export type MessageKey =
+  | "quick.title"
+  | "quick.search"
+  | "quick.placeholder"
+  | "quick.results"
+  | "quick.noMatch"
+  | "quick.empty"
+  | "quick.tryAnother"
+  | "quick.openFirst"
+  | "quick.recent"
+  | "quick.selectHint"
+  | "quick.openHint"
+  | "quick.closeHint"
   | "brand.subtitle"
   | "document.empty"
   | "action.open"
@@ -65,6 +77,18 @@ export type MessageKey =
 
 const messages: Record<Locale, Record<MessageKey, string>> = {
   "zh-CN": {
+    "quick.title": "快速打开",
+    "quick.search": "快速打开文档",
+    "quick.placeholder": "输入文件名或路径…",
+    "quick.results": "快速打开结果",
+    "quick.noMatch": "没有匹配的文档",
+    "quick.empty": "还没有可打开的文档",
+    "quick.tryAnother": "换个文件名或路径试试",
+    "quick.openFirst": "先打开文件，或添加一个阅读库文件夹",
+    "quick.recent": "最近",
+    "quick.selectHint": "↑↓ 选择",
+    "quick.openHint": "Enter 打开",
+    "quick.closeHint": "Esc 关闭",
     "brand.subtitle": "本地阅读器",
     "document.empty": "选择一个文档开始阅读",
     "action.open": "打开",
@@ -128,6 +152,18 @@ const messages: Record<Locale, Record<MessageKey, string>> = {
     "settings.language.en": "English",
   },
   "en-US": {
+    "quick.title": "Quick open",
+    "quick.search": "Quick open document",
+    "quick.placeholder": "Search by filename or path…",
+    "quick.results": "Matching documents",
+    "quick.noMatch": "No matching documents",
+    "quick.empty": "No documents yet",
+    "quick.tryAnother": "Try another filename or path",
+    "quick.openFirst": "Open a file or add a library folder first",
+    "quick.recent": "Recent",
+    "quick.selectHint": "↑↓ Select",
+    "quick.openHint": "Enter Open",
+    "quick.closeHint": "Esc Close",
     "brand.subtitle": "LOCAL READER",
     "document.empty": "Choose a document to start reading",
     "action.open": "Open",

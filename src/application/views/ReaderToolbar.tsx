@@ -15,6 +15,7 @@ export function ReaderToolbar({
   model: Pick<
     ReaderApplication,
     | "preferences"
+    | "prepareForRestart"
     | "focusMode"
     | "sidebarCollapsed"
     | "rightPanelOpen"
@@ -167,6 +168,8 @@ export function ReaderToolbar({
         onExportMarginChange={(margin) => setReaderPreferences({ exportMargin: margin })}
         allowRemoteResources={preferences.allowRemoteResources}
         startupUpdateCheck={preferences.startupUpdateCheck}
+        autoDownloadUpdates={preferences.autoDownloadUpdates}
+        onAutoDownloadUpdatesChange={(enabled) => setReaderPreferences({ autoDownloadUpdates: enabled })}
         onAllowRemoteResourcesChange={(allowed) => setReaderPreferences({ allowRemoteResources: allowed })}
         onStartupUpdateCheckChange={(enabled) => setReaderPreferences({ startupUpdateCheck: enabled })}
         onExportSettings={() => void exportPortableSettings()}
@@ -217,9 +220,10 @@ export function ReaderToolbar({
         onExportDocx={() => void handleExportDocx()}
         onToggleSearch={() => setSearchOpen((current) => !current)}
         updateStatus={updateStatus}
+        onPrepareForRestart={model.prepareForRestart}
         updateVersion={availableUpdate?.version ?? null}
         onCheckUpdates={() => {
-          if (updateStatus === "downloading") setUpdateNoticeVisible(true);
+          if (["downloading", "ready", "available"].includes(updateStatus)) setUpdateNoticeVisible(true);
           else void checkForUpdates(true);
         }}
         onSearchQueryChange={(query) => {

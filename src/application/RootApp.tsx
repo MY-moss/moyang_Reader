@@ -1,12 +1,13 @@
 import type { SourceLocation } from "../shared/bookroom-types";
 import { ConflictDialog } from "./views/ConflictDialog";
-import { useBookroom, type BookroomPage } from "./useBookroom";
+import { useBookroom } from "./useBookroom";
 import { BookroomPageView, ExcerptComposer } from "./views/BookroomPage";
 import {
   lazy,
   Suspense,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -24,6 +25,10 @@ import { PANE_WIDTH_LIMITS } from "../features/reader/pane-layout";
 import { useExtensions } from "../features/extensions/useExtensions";
 import { useReaderExtensions } from "./useReaderExtensions";
 import { ExtensionResult } from "../features/extensions/ExtensionResult";
+import { useInterfaceDensity } from "../features/settings/interface-density";
+import type { ChatSource } from "../shared/chat-types";
+import { UpdateNotice } from "../shell/components/UpdateNotice";
+const ChatSpace = lazy(() => import("../features/chat/ChatSpace"));
 const ExtensionMarket = lazy(() => import("../features/extensions/ExtensionMarket"));
 const AiSpace = lazy(() => import("../features/ai/AiSpace"));
 export function RootApp() {
@@ -41,14 +46,47 @@ export function RootApp() {
   const [aiSidebar, setAiSidebar] = useState<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false),
+    [visitedChat, setVisitedChat] = useState(false);
+  const [chatSelection, setChatSelection] = useState<{ key: number; id: string } | null>(null);
+  const assistants = useMemo(
+    () =>
+      extensions.state.installed
+        .filter((i) => i.enabled && i.package.kind === "assistant" && i.package.assistant)
+        .map((i) => ({ id: i.package.id, name: i.package.name, ...i.package.assistant! })),
+    [extensions.state.installed],
+  );
+  const chatVisible = chatOpen && assistants.length > 0;
+  const chatAttachment = useMemo<ChatSource | null>(() => {
+    const doc = model.documentState;
+    if (!doc || !["markdown", "text", "md", "txt", "docx"].includes(doc.kind)) return null;
+    const text =
+      doc.kind === "docx"
+        ? (new DOMParser().parseFromString(doc.rendered?.html ?? "", "text/html").body.textContent ?? "")
+        : (model.sourceDraft ?? doc.source ?? "");
+    return {
+      id: doc.path,
+      title: doc.name + (text.length > 12000 ? "（前 12000 字符）" : ""),
+      source: doc.path,
+      text: text.slice(0, 12000),
+    };
+  }, [model.documentState, model.sourceDraft]);
+  const openChat = (id?: string) => {
+    setMarketOpen(false);
+    setSettingsOpen(false);
+    setSpace("ai");
+    setVisitedAi(true);
+    setVisitedChat(true);
+    setChatOpen(true);
+    setNavigationOpen(false);
+    if (id) setChatSelection((previous) => ({ key: (previous?.key ?? 0) + 1, id }));
+  };
   const [aiAction, setAiAction] = useState<{ key: number; type: "search" | "skill"; id?: string } | null>(null);
   const closeGlobalPage = () => {
     setSettingsOpen(false);
     setMarketOpen(false);
   };
-  const [density, setDensity] = useState(() =>
-    localStorage.getItem("moyang.density") === "compact" ? "compact" : "comfortable",
-  );
+  const [density] = useInterfaceDensity();
   const [narrow, setNarrow] = useState(() => window.innerWidth < 900);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationRef = useRef<HTMLElement>(null);
@@ -61,6 +99,7 @@ export function RootApp() {
         event.stopImmediatePropagation();
         setSettingsOpen(false);
         setMarketOpen(false);
+        setChatOpen(false);
         setNavigationOpen(false);
         if (document.body.dataset.activeSpace === "ai") setAiAction({ key: Date.now(), type: "search" });
         else setBookroomPage("search");
@@ -219,6 +258,7 @@ export function RootApp() {
                 bookroom.setPage("search");
                 setNavigationOpen(false);
               } else {
+                setChatOpen(false);
                 setAiAction({ key: Date.now(), type: "search" });
                 setNavigationOpen(false);
               }
@@ -252,13 +292,11 @@ export function RootApp() {
           <nav className="reader-collection-nav" aria-label="阅读内容">
             {(
               [
-                ["recent", "最近打开"],
-                ["bookmarks", "收藏"],
-                ["annotations", "摘录与批注"],
-                ["views", "保存的视图"],
-                ["recovery", "恢复中心"],
-              ] as Array<[BookroomPage, string]>
-            ).map(([value, label]) => (
+                ["recent", "最近打开", "recent"],
+                ["bookmarks", "收藏", "bookmark"],
+                ["annotations", "摘录与批注", "excerpt"],
+              ] as const
+            ).map(([value, label, icon]) => (
               <button
                 key={value}
                 aria-current={bookroom.page === value ? "page" : undefined}
@@ -267,9 +305,34 @@ export function RootApp() {
                   setNavigationOpen(false);
                 }}
               >
+                <Icon name={icon} />
                 {label}
               </button>
             ))}
+            <details className="reader-manage-nav">
+              <summary>
+                更多内容
+                <Icon name="chevron" size={14} />
+              </summary>
+              {(
+                [
+                  ["views", "保存的视图", "views"],
+                  ["recovery", "恢复中心", "history"],
+                ] as const
+              ).map(([value, label, icon]) => (
+                <button
+                  key={value}
+                  aria-current={bookroom.page === value ? "page" : undefined}
+                  onClick={() => {
+                    bookroom.setPage(value);
+                    setNavigationOpen(false);
+                  }}
+                >
+                  <Icon name={icon} />
+                  {label}
+                </button>
+              ))}
+            </details>
           </nav>
           <LibrarySidebar
             model={{
@@ -323,13 +386,6 @@ export function RootApp() {
             <Icon name="help" />
             使用帮助
           </button>
-          <label>
-            界面密度
-            <select aria-label="界面密度" value={density} onChange={(event) => setDensity(event.target.value)}>
-              <option value="comfortable">舒适</option>
-              <option value="compact">紧凑</option>
-            </select>
-          </label>
         </footer>
         {!narrow && (
           <PaneResizeHandle
@@ -393,7 +449,7 @@ export function RootApp() {
           />
         </div>
         {visitedAi && (
-          <div className="space-pane" hidden={space !== "ai" || marketOpen}>
+          <div className="space-pane" hidden={space !== "ai" || marketOpen || chatVisible}>
             <Suspense
               fallback={
                 <div className="ai-loading" role="status">
@@ -402,14 +458,31 @@ export function RootApp() {
               }
             >
               <AiSpace
-                active={space === "ai" && !marketOpen}
+                active={space === "ai" && !marketOpen && !chatVisible}
+                chatEnabled={assistants.length > 0}
+                chatActive={chatVisible}
+                onOpenChat={() => openChat()}
                 sidebarTarget={aiSidebar}
                 action={aiAction}
                 onNavigate={() => {
                   closeGlobalPage();
+                  setChatOpen(false);
                   setNavigationOpen(false);
                 }}
               />
+            </Suspense>
+          </div>
+        )}
+        {visitedChat && (
+          <div className="space-pane" hidden={space !== "ai" || marketOpen || !chatVisible}>
+            <Suspense
+              fallback={
+                <div role="status" className="ai-loading">
+                  正在打开聊天…
+                </div>
+              }
+            >
+              <ChatSpace assistants={assistants} selection={chatSelection} attachment={chatAttachment} />
             </Suspense>
           </div>
         )}
@@ -423,9 +496,11 @@ export function RootApp() {
           >
             <ExtensionMarket
               manager={extensions}
+              onOpenAssistant={openChat}
               onClose={() => setMarketOpen(false)}
               onOpenSkill={(id) => {
                 setMarketOpen(false);
+                setChatOpen(false);
                 setVisitedAi(true);
                 setSpace("ai");
                 setAiAction({ key: Date.now(), type: "skill", id });
@@ -436,6 +511,21 @@ export function RootApp() {
       </div>
       {readerExtensions.run && (
         <ExtensionResult run={readerExtensions.run} onClose={readerExtensions.close} onApply={readerExtensions.apply} />
+      )}
+      {model.updateNoticeVisible && model.updateStatus !== "idle" && model.updateStatus !== "checking" && (
+        <div className="global-update-notice">
+          <UpdateNotice
+            status={model.updateStatus}
+            version={model.availableUpdate?.version ?? null}
+            notes={model.availableUpdate?.body ?? null}
+            progress={model.updateProgress}
+            error={model.updateError}
+            onInstall={() => void model.installUpdate()}
+            onRelaunch={() => void model.relaunchUpdatedApp()}
+            onHide={() => model.setUpdateNoticeVisible(false)}
+            onDismiss={model.dismissUpdateNotice}
+          />
+        </div>
       )}
       {bookroom.notice && (
         <div className="workbench-notice" role="status">

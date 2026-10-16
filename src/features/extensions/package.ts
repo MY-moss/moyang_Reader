@@ -1,7 +1,7 @@
 import type { ExtensionPackage, McpConfiguration } from "../../shared/extension-types";
 import { contentHash } from "../documents/source-chunks";
 
-export const APP_VERSION = "0.12.0";
+export const APP_VERSION = "0.13.0";
 export const MAX_PACKAGE_BYTES = 16 * 1024 * 1024;
 export const themeTokens = [
   "--canvas",
@@ -113,6 +113,16 @@ export function validatePackage(value: unknown): ExtensionPackage {
     }
   } else if (p.kind === "mcp") {
     p.mcp = validateMcp(p.mcp);
+  } else if (p.kind === "assistant") {
+    const assistant = object(p.assistant);
+    text(assistant.prompt, "助手提示词");
+    if (
+      assistant.prompt.length > 12000 ||
+      !Array.isArray(assistant.starters) ||
+      assistant.starters.length > 8 ||
+      assistant.starters.some((s) => typeof s !== "string" || s.length > 500)
+    )
+      throw new Error("助手提示词最多 12000 字符，可提供最多 8 条简短开场问题。");
   } else throw new Error("不支持此扩展类型。");
   if (new TextEncoder().encode(JSON.stringify(p)).byteLength > MAX_PACKAGE_BYTES)
     throw new Error("扩展包超过 16 MB，请拆分大型资源。");

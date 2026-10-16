@@ -132,7 +132,7 @@ const extraGuides: Record<Locale, Record<Exclude<GuideTopic, "reader">, Pick<Gui
       ],
     },
     extensions: {
-      intro: "从侧栏底部打开“插件市场”，按需要增加阅读插件、主题、AI 技能或 MCP 服务。",
+      intro: "从侧栏底部打开“插件市场”，按需要增加聊天助手、阅读插件、主题、AI 技能或 MCP 服务。",
       steps: [
         {
           number: "01",
@@ -144,14 +144,14 @@ const extraGuides: Record<Locale, Record<Exclude<GuideTopic, "reader">, Pick<Gui
           number: "02",
           title: "找到使用入口",
           detail:
-            "阅读插件从命令面板运行；主题安装后生效；技能从详情进入 AI 技能库；MCP 服务需在详情选择客户端安装连接，并重启该客户端。",
+            "聊天助手安装后点击“开始聊天”，在“API 服务”添加自己的地址、密钥和模型，可在对话中切换。阅读插件从命令面板运行；主题安装后生效；技能进入 AI 库；MCP 需安装客户端连接。",
           shortcut: "Ctrl+Shift+P",
         },
         {
           number: "03",
           title: "更新或恢复",
           detail:
-            "在“已安装”停用或卸载；在“管理目录源”检查更新。升级后可回退上一版；技能已有修改时可保留原内容并安装副本。",
+            "在“已安装”停用或卸载，聊天历史会保留；在“管理目录源”检查扩展更新。应用本身的检查和自动下载位于“设置 → 应用更新”，保存后再重启。",
         },
       ],
     },

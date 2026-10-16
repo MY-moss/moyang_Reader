@@ -100,6 +100,7 @@ test("memories merge, archive and restore without losing the originals", async (
   await page.getByLabel("正文", { exact: true }).fill("使用简洁中文回答。");
   await page.getByRole("button", { name: "保存内容", exact: true }).click();
   await expect(page.locator(".ai-document h1")).toHaveText("整理后的记忆");
+  await page.locator(".ai-filter-details summary").click();
   await page.getByLabel("已归档", { exact: true }).check();
   await expect(page.locator(".ai-record-button")).toHaveCount(2);
   await page.locator(".ai-record-button").filter({ hasText: "语言偏好" }).click();
