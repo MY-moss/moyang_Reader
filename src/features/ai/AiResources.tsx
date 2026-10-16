@@ -1,19 +1,28 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { AiAsset } from "../../shared/ai-types";
 import { downloadAi } from "./transfers";
 import { aiRequest } from "../../platform/ai-bridge";
 type Reference = { id: string; revision: number; path: string };
 export function ResourceReference(props: Reference) {
   const [open, setOpen] = useState(false);
+  const previewId = useId();
   return (
-    <details
-      onToggle={(e) => {
-        if (e.target === e.currentTarget) setOpen(e.currentTarget.open);
-      }}
-    >
-      <summary>{props.path}</summary>
-      {open && <LazyResource {...props} />}
-    </details>
+    <div>
+      <button type="button" aria-expanded={open} aria-controls={previewId} onClick={() => setOpen(!open)}>
+        {props.path}
+      </button>
+      {open && (
+        <aside id={previewId} className="ai-resource-preview" aria-label="资源预览">
+          <div>
+            <strong>{props.path}</strong>
+            <button type="button" aria-label="关闭资源预览" onClick={() => setOpen(false)}>
+              关闭
+            </button>
+          </div>
+          <LazyResource {...props} />
+        </aside>
+      )}
+    </div>
   );
 }
 export function LazyResource({ id, revision, path }: Reference) {

@@ -88,6 +88,14 @@ try {
   assert.equal(sources.total, 0, "Ordinary memories must not be listed as imported knowledge sources");
   report.source_inventory = "production MCP metadata-only source listing passed";
   report.mcp = "write, recall, update, restore passed";
+  const service = await client.call("library_status");
+  assert.equal(service.service.build.version, manifest.version);
+  assert.equal(service.service.tool_count, 24);
+  const layered = await client.call("read_context", {items:[{id,layer:"l1"}]});
+  assert.ok(layered.items[0].content.includes("使用简洁中文回答"));
+  const unchanged = await client.call("read_context", {items:[{id,layer:"l2",if_revision:layered.items[0].revision}]});
+  assert.equal(unchanged.items[0].unchanged, true);
+  report.layered_mcp = {build:service.service.build,conditional_read:true};
   await client.close();
   client = null;
 
@@ -266,7 +274,17 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.screenshot({path:"artifacts/workbench/release-storage.png"});
   report.desktop.storage_locations = true;
+  await page.getByRole("button", {name:"AI 服务与整理",exact:true}).click();
+  await page.getByRole("region", {name:"AI 服务与整理",exact:true}).waitFor();
+  assert.equal(await page.getByLabel("整理使用的服务",{exact:true}).locator("option").count(),2);
+  assert.ok(Number(await page.getByLabel("每日 token 额度",{exact:true}).inputValue())>0);
+  await page.screenshot({path:"artifacts/workbench/release-ai-services.png"});
+  report.desktop.shared_services = true;
   await page.getByRole("button", {name:"关闭设置",exact:true}).click();
+  const chosenModels=path.join(temp,"自选模型目录");
+  const models=await page.evaluate(directory=>window.__TAURI_INTERNALS__.invoke("ai_request",{operation:"model_config",payload:{model:"qwen3-embedding:4b",directory}}),chosenModels);
+  assert.equal(models.directory,chosenModels);assert.equal(models.presets.length,3);
+  report.desktop.model_choices = {directory:models.directory,model:models.model,presets:models.presets.length,downloaded:false};
   if (process.env.MOYANG_VERIFY_PUBLISHED_UPDATE === "1") {
     const update = await page.evaluate(() => window.__TAURI_INTERNALS__.invoke("online_update_check"));
     assert.equal(update, null, "Published feed must identify this build as current");
