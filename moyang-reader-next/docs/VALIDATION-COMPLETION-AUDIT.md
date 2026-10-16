@@ -60,6 +60,12 @@
 
 旧根工程的两个工作流须分别看待：[Frontend dependency audit](https://github.com/MY-moss/moyang_Reader/actions/runs/38798880050) 因未改动的根锁文件中 13 项告警（含 3 high）失败；[旧工程 CI](https://github.com/MY-moss/moyang_Reader/actions/runs/38798880065) 的实际失败点是桌面 PDF 导出未在等待时间内产生文件（17 项通过、1 项失败），不能归因为依赖审计。新工程的对应真实导出用例已在上述同提交运行中通过。未修改旧项目实现、锁文件或降低阈值，也不将整个 PR 描述为所有检查通过。新工程生产依赖为 0 high/critical、3 moderate，详情沿用首轮报告。
 
+### 默认分支同步
+
+用户随后指出仓库首页未更新，确认需要将重构分支合入默认 `main`。文档提交 `23eed049` 的 [新工程检查](https://github.com/MY-moss/moyang_Reader/actions/runs/38833547247) 再次全部通过；[旧工程必需检查](https://github.com/MY-moss/moyang_Reader/actions/runs/38833547219) 此次通过桌面导出等功能验收后，在生产依赖审计失败。`main` 的现有保护规则要求此检查通过。
+
+为完成正常合并，在独立发布检出中更新根锁文件的间接依赖：Vue 3.5.41 → 3.5.44、source-map-js 1.2.1 → 1.2.2，以及它们要求的 Babel parser、PostCSS、nanoid 补丁版本。对应修复依据为 [Vue 公告](https://github.com/advisories/GHSA-g2v6-rqmx-r4w6) 和 [source-map-js 公告](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)。未改变原项目业务代码、直接依赖声明或检查阈值，本机原工程保持原样。更新后的生产审计通过原有 high 门槛，剩余 7 low、3 moderate；合并前须由更新提交的完整检查确认兼容性。此变更不涉及重构版源码、依赖或便携包。
+
 ## 未完成的外部验收条件
 
 Codex 桌面 MCP 的真实读写已有证据；任务结束钩子仍需客户端信任。Claude Code 配置的本地模型网关未运行，真实 Claude 全流程尚未完成。此轮代码和模拟生命周期回归不能替代这两个实际客户端验收，候选版仍不标为全部完成。
