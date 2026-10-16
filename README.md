@@ -22,7 +22,7 @@
 
 ## 下载与开始使用
 
-当前发布版本为 **0.15.1**，维护平台为 **Windows x64**。
+当前发布版本为 **0.15.2**，维护平台为 **Windows x64**。
 
 1. 在 [GitHub Releases](https://github.com/MY-moss/moyang_Reader/releases/latest) 下载 `moyang-reader-<版本>-windows-x64.zip`。
 2. 完整解压到一个可写入的本机文件夹，打开 `Moyang Reader Next.exe`。保留同目录的 `moyang-ai-mcp.exe`。
