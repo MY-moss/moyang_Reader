@@ -37,7 +37,7 @@ test("release cleanup verifies archives, reuses identical models, and preserves 
   assert.equal(await zip.file("ollama/models/unique").async("string"), "old unique model");
   assert.equal(zip.file("ollama/models/shared"), null);
   const manifest = JSON.parse(await zip.file("_archive-manifest.json").async("string"));
-  assert.equal(manifest.files.find((file) => file.path === "ollama/models/shared").reuse, path.join(root, ".local/ollama/models/shared"));
+  assert.equal(fs.realpathSync.native(manifest.files.find((file) => file.path === "ollama/models/shared").reuse), fs.realpathSync.native(path.join(root, ".local/ollama/models/shared")));
   write("release/second-old/executable", "second old");
   write("release/third-old/executable", "third old");
   execFileSync("powershell.exe", [...args, "-Apply"], { windowsHide: true, stdio: "pipe" });
