@@ -51,6 +51,7 @@ function parsePreferences(value: unknown): ReaderPreferences {
       typeof value.startupUpdateCheck === "boolean"
         ? value.startupUpdateCheck
         : defaultReaderPreferences.startupUpdateCheck,
+    autoDownloadUpdates: value.autoDownloadUpdates === true,
     readingScale,
     readingZoom: normalizeReadingZoom(value.readingZoom, readingZoomFromScale(readingScale)),
     readingWidth:

@@ -12,6 +12,7 @@ import {
   getCurrentAppVersion,
   installAppUpdate,
   relaunchApp,
+  previousUpdateFailure,
 } from "../platform/updater";
 import type { useReaderState } from "./useReaderState";
 type Input = Pick<
@@ -129,7 +130,8 @@ export function useAppUpdates({
 
   const installUpdate = useCallback(async () => {
     const pending = updateRef.current;
-    if (!pending) return;
+    if (!pending || updateCheckInFlightRef.current) return;
+    updateCheckInFlightRef.current = true;
 
     setUpdateStatus("downloading");
     setUpdateNoticeVisible(true);
@@ -153,15 +155,7 @@ export function useAppUpdates({
         }
       });
 
-      updateRef.current = null;
-      setAvailableUpdate(null);
-      await pending.close().catch(() => undefined);
       setUpdateStatus("ready");
-      try {
-        await relaunchApp();
-      } catch {
-        setUpdateError("更新已安装，但应用没有自动重启，请点击“重启应用”。");
-      }
     } catch (cause) {
       setUpdateStatus("error");
       const reason = describeUpdateError(cause);
@@ -174,15 +168,17 @@ export function useAppUpdates({
       saveUpdateRecovery(recovery);
       setUpdateError(reason);
       setUpdateNoticeVisible(true);
+    } finally {
+      updateCheckInFlightRef.current = false;
     }
   }, [
     currentVersion,
-    setAvailableUpdate,
     setUpdateError,
     setUpdateNoticeVisible,
     setUpdateProgress,
     setUpdateStatus,
     updateRef,
+    updateCheckInFlightRef,
   ]);
 
   const relaunchUpdatedApp = useCallback(async () => {
@@ -197,8 +193,7 @@ export function useAppUpdates({
 
   const dismissUpdateNotice = useCallback(() => {
     setUpdateNoticeVisible(false);
-    void closePendingUpdate();
-  }, [closePendingUpdate, setUpdateNoticeVisible]);
+  }, [setUpdateNoticeVisible]);
 
   useEffect(
     () => () => {
@@ -213,6 +208,17 @@ export function useAppUpdates({
     if (!isTauriRuntime()) return;
 
     let active = true;
+    let hasRecoveryFailure = false;
+    void previousUpdateFailure()
+      .then((failure) => {
+        if (active && failure) {
+          hasRecoveryFailure = true;
+          setUpdateStatus("error");
+          setUpdateError(failure);
+          setUpdateNoticeVisible(true);
+        }
+      })
+      .catch(() => undefined);
     void getCurrentAppVersion()
       .then((version) => {
         if (!active || !version) return;
@@ -224,6 +230,7 @@ export function useAppUpdates({
           return;
         }
         setUpdateStatus("error");
+        hasRecoveryFailure = true;
         setUpdateError(formatUpdateRecoveryNotice(recovery));
         setUpdateNoticeVisible(true);
       })
@@ -231,7 +238,7 @@ export function useAppUpdates({
 
     const timer = initialStartupUpdateCheckRef.current
       ? window.setTimeout(() => {
-          if (active) void checkForUpdates(false);
+          if (active && !hasRecoveryFailure) void checkForUpdates(false);
         }, 1_200)
       : null;
 

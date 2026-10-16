@@ -23,6 +23,8 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
         ["export", "Export layout"],
         ["general", "General & privacy"],
         ["backup", "Backup & help"],
+        ["updates", "App updates"],
+        ["storage", "Storage locations"],
       ]
     : [
         ["reading", "外观"],
@@ -30,6 +32,8 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
         ["export", "导出版式"],
         ["general", "通用与隐私"],
         ["backup", "数据恢复"],
+        ["updates", "应用更新"],
+        ["storage", "存储位置"],
       ];
   return createPortal(
     <section
@@ -44,7 +48,6 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
     >
       <header className="settings-dialog-header">
         <div>
-          <p>{english ? "YOUR READING ROOM" : "你的阅读习惯"}</p>
           <h2 id="settings-dialog-title">{english ? "Settings" : "设置"}</h2>
         </div>
         <button

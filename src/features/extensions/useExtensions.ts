@@ -133,7 +133,7 @@ export function useExtensions() {
   const toggle = (id: string) =>
     change(async (current) => {
       const target = current.installed.find((i) => i.package.id === id);
-      if (!target || !["theme", "reader"].includes(target.package.kind))
+      if (!target || !["theme", "reader", "assistant"].includes(target.package.kind))
         throw new Error("请通过技能库或 MCP 连接页管理此内容。");
       const enabled = !target.enabled;
       current.installed = current.installed.map((i) =>

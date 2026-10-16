@@ -1,22 +1,22 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createBuildEnvironment } from "./shared-cargo-target.mjs";
+import { startDesktopApiFixtures } from "./desktop-api-fixtures.mjs";
 
 const command = (name) => (process.platform === "win32" ? `${name}.cmd` : name);
 const environment = createBuildEnvironment(process.cwd(), { VITE_MOYANG_DESKTOP_E2E: "1" });
 
-function run(name, args) {
-  const result = spawnSync(command(name), args, {
+async function run(name, args) {
+  const result = spawn(command(name), args, {
     cwd: process.cwd(),
     env: environment,
     shell: process.platform === "win32",
     stdio: "inherit",
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  await new Promise((resolve, reject) => { result.on("error", reject); result.on("exit", code => code === 0 ? resolve() : reject(new Error(`${name} exited with ${code}`))); });
 }
 
-run("npm", ["run", "build:mcp"]);
-run("tauri", [
+await run("npm", ["run", "build:mcp"]);
+await run("tauri", [
   "build",
   "--debug",
   "--no-bundle",
@@ -26,4 +26,10 @@ run("tauri", [
   "--config",
   "src-tauri/tauri.wdio.conf.json",
 ]);
-run("wdio", ["run", "desktop-e2e/wdio.conf.mjs"]);
+const fixtures = await startDesktopApiFixtures();
+try {
+  environment.MOYANG_TEST_API_URL = fixtures.base;
+  environment.MOYANG_TEST_UPDATE_ENDPOINT = fixtures.base + "/reader-update.json";
+  environment.MOYANG_TEST_UPDATE_PUBKEY = fixtures.pubkey;
+  await run("wdio", ["run", "desktop-e2e/wdio.conf.mjs"]);
+} finally { await fixtures.close(); }

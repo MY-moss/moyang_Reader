@@ -12,6 +12,7 @@ import type {
   ThemeMode,
 } from "../../shared/types";
 export type TopBarProps = {
+  onPrepareForRestart?: () => Promise<void>;
   navigation?: import("react").ReactNode;
   settingsOpen?: boolean;
   onSettingsClose?: () => void;
@@ -83,6 +84,8 @@ export type TopBarProps = {
   onCheckUpdates: () => void;
   allowRemoteResources: boolean;
   startupUpdateCheck: boolean;
+  autoDownloadUpdates: boolean;
+  onAutoDownloadUpdatesChange: (enabled: boolean) => void;
   onAllowRemoteResourcesChange: (allowed: boolean) => void;
   onStartupUpdateCheckChange: (enabled: boolean) => void;
   onExportSettings: () => void;

@@ -43,7 +43,7 @@ describe("UpdateNotice", () => {
   it("keeps the normal dismiss action for an available update", () => {
     const { container, root, props } = mountNotice("available");
     const installButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("下载并安装"),
+      button.textContent?.includes("下载更新"),
     );
     const dismissButton = Array.from(container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("稍后处理"),

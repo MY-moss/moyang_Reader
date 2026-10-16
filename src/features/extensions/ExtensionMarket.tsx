@@ -12,10 +12,12 @@ export default function ExtensionMarket({
   manager: m,
   onClose,
   onOpenSkill,
+  onOpenAssistant,
 }: {
   manager: ExtensionManager;
   onClose: () => void;
   onOpenSkill: (id: string) => void;
+  onOpenAssistant?: (id: string) => void;
 }) {
   const [view, setView] = useState<"discover" | "installed" | "updates">("discover"),
     [kind, setKind] = useState<ExtensionKind | "all">("all"),
@@ -283,13 +285,15 @@ export default function ExtensionMarket({
                       >
                         <Icon
                           name={
-                            p.kind === "reader"
-                              ? "extensions"
-                              : p.kind === "theme"
-                                ? "theme"
-                                : p.kind === "skill"
-                                  ? "skill"
-                                  : "connection"
+                            p.kind === "assistant"
+                              ? "chat"
+                              : p.kind === "reader"
+                                ? "extensions"
+                                : p.kind === "theme"
+                                  ? "theme"
+                                  : p.kind === "skill"
+                                    ? "skill"
+                                    : "connection"
                           }
                         />
                         <div>
@@ -375,12 +379,17 @@ export default function ExtensionMarket({
                         : "安装扩展"}
                   </button>
                 )}
-                {installed && ["reader", "theme"].includes(pkg.kind) && (
+                {installed && ["reader", "theme", "assistant"].includes(pkg.kind) && (
                   <button disabled={busy} onClick={() => void m.toggle(pkg.id)}>
                     {installed.enabled ? "停用" : "启用"}
                   </button>
                 )}
                 {installed?.skillId && <button onClick={() => onOpenSkill(installed.skillId!)}>在技能库打开</button>}
+                {installed?.enabled && pkg.kind === "assistant" && (
+                  <button className="primary-action" onClick={() => onOpenAssistant?.(pkg.id)}>
+                    开始聊天
+                  </button>
+                )}
                 {pkg.homepage && (
                   <button onClick={() => void openExternalUrl(pkg.homepage!).catch((e) => m.setError(String(e)))}>
                     查看项目来源
@@ -402,6 +411,15 @@ export default function ExtensionMarket({
                 <p>运行时只把当前文档交给插件。修改会先展示比较结果，由你采用；请安装你信任的代码。</p>
               )}
               {pkg.readme && <div className="extension-readme">{pkg.readme}</div>}
+              {pkg.assistant && (
+                <details>
+                  <summary>助手的行为说明</summary>
+                  <div className="extension-readme">{pkg.assistant.prompt}</div>
+                  <p>
+                    API 服务和模型由你在聊天页面选择。停用或卸载此助手会保留聊天记录；重新启用任意聊天助手后可继续查看。
+                  </p>
+                </details>
+              )}
               {pkg.commands?.length ? (
                 <section>
                   <h3>可用命令</h3>

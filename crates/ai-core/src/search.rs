@@ -378,7 +378,7 @@ pub(crate) fn fragment(r: &Record, ordinal: usize, text: String, score: f64) -> 
                 .unwrap_or_else(|| r.fields.source.clone()),
             fingerprint: snapshot
                 .map(|s| s.fingerprint.clone())
-                .unwrap_or_else(|| format!("{:x}", Sha256::digest(r.fields.body.as_bytes()))),
+                .unwrap_or_else(|| crate::hex(Sha256::digest(r.fields.body.as_bytes()))),
             page: None,
             paragraph: Some(r.fields.body[..offset].split("\n\n").count()),
             quote: String::new(),

@@ -159,6 +159,25 @@ try {
   );
   assert.ok(extensionState.installed.some((item) => item.package.id === "moyang.reading-report" && item.enabled));
   report.desktop.extension_install = true;
+  await page.locator(".extension-row").filter({ hasText: "书房聊天" }).click();
+  await page.getByRole("button", { name: "安装扩展", exact: true }).click();
+  await page.getByRole("button", { name: "开始聊天", exact: true }).click();
+  await page.getByRole("button", { name: "添加我的 API 服务" }).click();
+  await page.getByLabel("服务名称", {exact:true}).fill("本机验证服务");
+  await page.getByLabel("API 基础地址").fill("http://127.0.0.1:1/v1");
+  await page.getByLabel("默认模型", {exact:true}).fill("verification-only");
+  await page.getByRole("button", { name: "保存服务", exact: true }).click();
+  await page.getByRole("status").filter({hasText:"服务已保存"}).waitFor();
+  await page.getByRole("button", {name:"返回聊天",exact:true}).click();
+  assert.equal(await page.getByRole("combobox", {name:"API 服务",exact:true}).inputValue() !== "", true);
+  report.desktop.chat_configuration = true;
+  await page.getByRole("button", {name:"设置",exact:true}).click();
+  await page.getByRole("button", {name:"存储位置",exact:true}).click();
+  await page.locator(".storage-locations").waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.screenshot({path:"artifacts/workbench/release-storage.png"});
+  report.desktop.storage_locations = true;
+  await page.getByRole("button", {name:"关闭设置",exact:true}).click();
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("reader");
   await page.evaluate(() =>
     window.__TAURI_INTERNALS__.invoke("plugin:event|emit", { event: "close-requested", payload: null }),

@@ -1,7 +1,12 @@
-import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import type { DownloadEvent } from "@tauri-apps/plugin-updater";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "./bridge";
 
 export type UpdateStatus = "idle" | "checking" | "available" | "downloading" | "ready" | "error" | "up-to-date";
+export type Update = { version: string; body?: string; close: () => Promise<void> };
+export async function previousUpdateFailure(): Promise<string | null> {
+  return isTauriRuntime() ? invoke("online_update_failure") : null;
+}
 
 export async function getCurrentAppVersion(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
@@ -13,19 +18,20 @@ export async function getCurrentAppVersion(): Promise<string | null> {
 export async function checkForAppUpdate(): Promise<Update | null> {
   if (!isTauriRuntime()) return null;
 
-  const { check } = await import("@tauri-apps/plugin-updater");
-  return check({ timeout: 8_000 });
+  const found = await invoke<{ version: string; body?: string } | null>("online_update_check");
+  return found ? { ...found, close: async () => undefined } : null;
 }
 
-export async function installAppUpdate(update: Update, onEvent: (event: DownloadEvent) => void): Promise<void> {
-  await update.downloadAndInstall(onEvent, { timeout: 10 * 60_000 });
+export async function installAppUpdate(_update: Update, onEvent: (event: DownloadEvent) => void): Promise<void> {
+  const channel = new Channel<DownloadEvent>();
+  channel.onmessage = onEvent;
+  await invoke("online_update_download", { channel });
 }
 
 export async function relaunchApp(): Promise<void> {
   if (!isTauriRuntime()) return;
 
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
+  await invoke("online_update_activate");
 }
 
 export function describeUpdateError(cause: unknown): string {

@@ -99,8 +99,8 @@ impl Store {
                     .map(|m| m.len())
                     .unwrap_or(0);
                 format!(
-                    "legacy-{:x}",
-                    Sha256::digest(format!("{session}:{len}:{prompt}"))
+                    "legacy-{}",
+                    crate::hex(Sha256::digest(format!("{session}:{len}:{prompt}")))
                 )
             });
             let checkpoint = self.checkpoint(CheckpointRequest {

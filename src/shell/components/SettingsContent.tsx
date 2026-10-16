@@ -2,8 +2,11 @@ import type { ReadingFont, EditorFont, ExportTemplate } from "../../features/set
 import { translate, type Locale, type MessageKey } from "../../features/settings/i18n";
 import type { ExportMargin, ExportOrientation, ExportPaper, ReadingWidth } from "../../shared/types";
 import type { TopBarProps } from "./toolbar-types";
+import { useInterfaceDensity } from "../../features/settings/interface-density";
+import { StorageSettings } from "../../features/settings/StorageSettings";
 
 export function SettingsContent(p: TopBarProps & { section?: string }) {
+  const [density, setDensity] = useInterfaceDensity();
   const t = (key: MessageKey) => translate(p.locale, key);
   const en = p.locale === "en-US";
   const status = p.settingsPersistenceStatus;
@@ -25,6 +28,46 @@ export function SettingsContent(p: TopBarProps & { section?: string }) {
             : "设置已保存到本机";
   return (
     <div className="settings-content">
+      {p.section === "storage" && <StorageSettings beforeRestart={p.onPrepareForRestart} />}
+      <section hidden={Boolean(p.section && p.section !== "updates")} className="settings-section">
+        <h3>{en ? "App updates" : "应用更新"}</h3>
+        <p>检查 Moyang Reader 独立发布通道。更新只替换程序，保留文档、AI 库、聊天与现有模型。</p>
+        <label className="settings-option">
+          <input
+            type="checkbox"
+            checked={p.startupUpdateCheck}
+            onChange={(e) => p.onStartupUpdateCheckChange(e.target.checked)}
+          />
+          <span>
+            <strong>启动时自动检查更新</strong>
+            <small>发现新版时提示。下载与重启由你决定。</small>
+          </span>
+        </label>
+        <label className="settings-option">
+          <input
+            type="checkbox"
+            checked={p.autoDownloadUpdates}
+            onChange={(e) => p.onAutoDownloadUpdatesChange(e.target.checked)}
+          />
+          <span>
+            <strong>发现新版后自动下载</strong>
+            <small>下载完成后提示；安装与重启仍由你决定。</small>
+          </span>
+        </label>
+        <div className="settings-actions">
+          <button className="quiet-button" disabled={p.updateStatus === "checking"} onClick={p.onCheckUpdates}>
+            {p.updateStatus === "checking" ? "正在检查…" : "检查更新"}
+          </button>
+        </div>
+        <p>
+          {p.updateStatus === "up-to-date"
+            ? "已完成检查，当前为最新版本。"
+            : p.updateVersion
+              ? `发现版本 ${p.updateVersion}，查看更新提示继续。`
+              : "离线时仍可正常阅读与编辑。"}
+        </p>
+        <small>更新包通过签名校验。上一版保留在 release / updates 目录，可按恢复手册回退。</small>
+      </section>
       <section
         hidden={Boolean(p.section && p.section !== "reading")}
         id="settings-reading"
@@ -37,6 +80,17 @@ export function SettingsContent(p: TopBarProps & { section?: string }) {
           {en ? "Theme" : "主题"}：{p.theme === "dark" ? "深色" : p.theme === "light" ? "浅色" : "跟随系统"} · 点击切换
         </button>
         <p>{en ? "Make this space comfortable for you." : "选一个舒服的字体，让每一页都适合你。"}</p>
+        <label className="settings-select-option">
+          <span>{en ? "Interface density" : "界面密度"}</span>
+          <select
+            aria-label="界面密度"
+            value={density}
+            onChange={(e) => setDensity(e.target.value as "comfortable" | "compact")}
+          >
+            <option value="comfortable">舒适</option>
+            <option value="compact">紧凑</option>
+          </select>
+        </label>
         <label className="settings-select-option">
           <span>{en ? "Reading font" : "正文字体"}</span>
           <select

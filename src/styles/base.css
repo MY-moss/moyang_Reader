@@ -152,13 +152,6 @@ body {
   padding: 18px 20px 11px;
 }
 
-.quick-open-kicker {
-  color: var(--accent-deep);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.17em;
-}
-
 .quick-open-header h2 {
   margin: 6px 0 0;
   font-family: var(--font-display);
@@ -171,10 +164,10 @@ body {
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--surface);
-  color: #4f5b53;
+  color: var(--muted);
   padding: 3px 6px;
   font-family: var(--font-ui);
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.04em;
 }
 
@@ -208,7 +201,7 @@ body {
 }
 
 .quick-open-input-wrap input::placeholder {
-  color: #4f5b53;
+  color: var(--muted);
 }
 
 .quick-open-results {
@@ -250,9 +243,9 @@ body {
   border: 1px solid var(--line);
   border-radius: 3px;
   background: var(--surface);
-  color: #16473f;
+  color: var(--accent-deep);
   padding: 3px 5px;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-align: center;
@@ -277,13 +270,13 @@ body {
 }
 
 .quick-open-copy small {
-  color: #4f5b53;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .quick-open-recent {
-  color: #8c4b32;
-  font-size: 9px;
+  color: var(--accent-deep);
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -311,8 +304,8 @@ body {
   gap: 15px;
   padding: 9px 20px 11px;
   border-top: 1px solid var(--line);
-  color: #4f5b53;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .close-confirm-backdrop {

@@ -1,4 +1,4 @@
-import type { Update } from "@tauri-apps/plugin-updater";
+import type { Update } from "../platform/updater";
 import { useRef, useState } from "react";
 import { useDocumentSessions } from "./useDocumentSessions";
 import { type ReaderContextTarget } from "../features/reader/components/ReaderContextMenu";

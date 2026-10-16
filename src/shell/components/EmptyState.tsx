@@ -16,7 +16,6 @@ export function EmptyState({
   return (
     <section className="empty-state" aria-labelledby="empty-title">
       <div className="welcome-rule" aria-hidden="true" />
-      <p className="welcome-label">你的本地书房</p>
       <h1 id="empty-title">{hasWorkspace ? "从阅读库开始阅读。" : "把文档打开，专心阅读。"}</h1>
       <p className="welcome-description">
         {hasWorkspace
