@@ -195,7 +195,7 @@
 .reading-progress-value span,
 .reading-heading-count {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .reading-progress-track {
@@ -220,7 +220,7 @@
   margin: 10px 0 0;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -243,7 +243,7 @@
   background: color-mix(in srgb, var(--surface-strong) 80%, transparent);
   color: var(--muted);
   padding: 7px 3px;
-  font-size: 10px;
+  font-size: 12px;
   transition:
     border-color 150ms ease,
     background 150ms ease,

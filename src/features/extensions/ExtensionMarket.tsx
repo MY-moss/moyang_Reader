@@ -202,13 +202,40 @@ export default function ExtensionMarket({
       )}
       {m.error && (
         <div className="extension-message" role="alert">
-          <span>{m.error}</span>
-          <button disabled={busy} onClick={() => void m.reload()}>
-            重新读取安装状态
-          </button>
+          {m.failedCatalog ? (
+            <>
+              <div>
+                <span>目录更新失败。已有安装仍可使用；请检查网络或目录地址后重试。</span>
+                <small>{m.failedCatalog.url}</small>
+                <details>
+                  <summary>查看错误详情</summary>
+                  {m.error}
+                </details>
+              </div>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  const catalog = m.failedCatalog;
+                  if (catalog) {
+                    setNotice("");
+                    void m.refreshCatalog(catalog.url, catalog.name);
+                  }
+                }}
+              >
+                重试目录更新
+              </button>
+            </>
+          ) : (
+            <>
+              <span>{m.error}</span>
+              <button disabled={busy} onClick={() => void m.reload()}>
+                重新读取安装状态
+              </button>
+            </>
+          )}
         </div>
       )}
-      {(notice || busy) && (
+      {!m.error && (notice || busy) && (
         <p className="extension-message" role="status">
           {busy ? "正在处理，请稍候…" : notice}
         </p>

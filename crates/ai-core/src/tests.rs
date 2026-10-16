@@ -293,6 +293,31 @@ fn context_is_bounded_and_skill_is_progressive() {
     assert!(text.chars().count() <= 1000);
 }
 #[test]
+fn pinned_memory_keeps_task_relevant_evidence_beyond_its_opening() {
+    let (_, mut store) = setup();
+    let body = format!(
+        "{}\n月石发布要求：完成数据库备份后，再执行桌面重启验证。",
+        "常规背景材料，不涉及本轮问题。\n".repeat(300)
+    );
+    let mut fields = request("文档维护约定", &body);
+    fields.fields.pinned = true;
+    fields.fields.project = "moonstone".into();
+    let memory = store.save(fields).unwrap();
+    let context = store
+        .context(ContextRequest {
+            query: "月石发布".into(),
+            project: Some("moonstone".into()),
+            agent: None,
+            max_chars: Some(8000),
+        })
+        .unwrap();
+    let text = context["text"].as_str().unwrap();
+    assert!(text.contains("月石发布要求：完成数据库备份后，再执行桌面重启验证。"));
+    assert!(text.contains("片段"));
+    assert_eq!(context["ids"], serde_json::json!([memory.id]));
+    assert!(text.chars().count() <= 8000);
+}
+#[test]
 fn chunking_preserves_unicode_and_finds_late_content() {
     let (_, mut s) = setup();
     let body = format!("{}\n最后的独角鲸结论", "中文😀\n".repeat(5000));

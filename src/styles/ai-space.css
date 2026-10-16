@@ -369,6 +369,9 @@
   padding: 4px 7px;
   font-size: 10px;
 }
+.ai-list-onboarding {
+  display: none;
+}
 .ai-list-empty {
   padding: 32px 16px;
   color: var(--muted);
@@ -680,6 +683,17 @@
   }
   .ai-list-panel {
     flex: 1;
+  }
+  .ai-list-onboarding {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    text-align: left;
+    color: var(--ink);
+  }
+  .ai-list-onboarding p {
+    margin: 0;
   }
   .ai-detail-panel {
     display: none;

@@ -351,20 +351,37 @@ export default function AiSpace({
                         : m.archived
                           ? "没有归档内容。"
                           : "这里还没有内容。"}
+                      {!m.query.trim() && !m.archived && !m.project && !m.agent && m.stats?.[m.kind] === 0 && (
+                        <div className="ai-list-onboarding">
+                          <p>
+                            从一条
+                            {m.kind === "memory" ? "偏好或经验" : m.kind === "skill" ? "常用流程" : "有来源的资料"}
+                            开始。日常笔记不会自动进入 AI 库。
+                          </p>
+                          <button className="ai-primary" onClick={m.newEntry}>
+                            新建第一条{m.kind === "memory" ? "记忆" : m.kind === "skill" ? "技能" : "知识"}
+                          </button>
+                          <button className="ai-text-button" onClick={() => m.setConnections(true)}>
+                            连接我的 Agent →
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-                <div className="ai-pagination">
-                  <button disabled={m.page === 0} onClick={() => m.setPage((p) => p - 1)}>
-                    上一页
-                  </button>
-                  <span>
-                    {m.page + 1} / {Math.max(1, Math.ceil(m.search.total / 30))}
-                  </span>
-                  <button disabled={(m.page + 1) * 30 >= m.search.total} onClick={() => m.setPage((p) => p + 1)}>
-                    下一页
-                  </button>
-                </div>
+                {(m.search.total > 30 || m.page > 0) && (
+                  <div className="ai-pagination">
+                    <button disabled={m.page === 0} onClick={() => m.setPage((p) => p - 1)}>
+                      上一页
+                    </button>
+                    <span>
+                      {m.page + 1} / {Math.max(1, Math.ceil(m.search.total / 30))}
+                    </span>
+                    <button disabled={(m.page + 1) * 30 >= m.search.total} onClick={() => m.setPage((p) => p + 1)}>
+                      下一页
+                    </button>
+                  </div>
+                )}
               </section>
               <main className="ai-detail-panel">
                 <button

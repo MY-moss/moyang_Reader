@@ -1112,7 +1112,7 @@ test("opens and closes the getting started guide from the empty state", async ({
   const dialog = page.getByRole("dialog", { name: "快速上手 Moyang Reader" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("添加阅读库");
-  await expect(dialog).toContainText("设置保存到本机");
+  await expect(dialog).toContainText("阅读设置保存在本机");
 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);

@@ -17,6 +17,7 @@
   --shadow-soft: 0 4px 18px #29312408;
 }
 :root[data-theme="dark"] {
+  --danger: #f3a28f;
   --canvas: #20231f;
   --surface: #262a24;
   --surface-strong: #2c3029;
@@ -30,6 +31,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+    --danger: #f3a28f;
     --canvas: #20231f;
     --surface: #262a24;
     --surface-strong: #2c3029;

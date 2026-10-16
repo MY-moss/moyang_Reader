@@ -1,6 +1,36 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("narrow navigation contains focus, closes with Escape and restores desktop controls", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "插件市场", exact: true }).click();
+  await page.setViewportSize({ width: 720, height: 900 });
+  const opener = page.getByRole("button", { name: "显示导航", exact: true });
+  await opener.click();
+  const navigation = page.getByRole("dialog", { name: "工作台导航" });
+  await expect(navigation).toBeVisible();
+  await expect(page.locator(".workbench-main")).toHaveAttribute("inert", "");
+  await navigation.getByLabel("界面密度").focus();
+  await page.keyboard.press("Tab");
+  await expect(navigation.getByLabel("工作空间", { exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(navigation.getByLabel("界面密度")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".workbench-sidebar")).toBeHidden();
+  await expect(opener).toBeFocused();
+  await expect(page.locator(".workbench-main")).not.toHaveAttribute("inert", "");
+  await opener.click();
+  await navigation.getByLabel("工作空间", { exact: true }).selectOption("ai");
+  await expect(page.locator(".ai-space")).toBeVisible();
+  await page.keyboard.press("Control+Shift+B");
+  await expect(navigation).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole("complementary", { name: "工作台导航" })).toBeVisible();
+  await expect(page.locator(".workbench-main")).not.toHaveAttribute("inert", "");
+  await page.getByRole("button", { name: "插件市场", exact: true }).click();
+  await expect(page.getByRole("region", { name: "插件市场" })).toBeVisible();
+});
+
 test("typing at a block gap keeps the text and the first heading", async ({ page }) => {
   await page.goto("/");
   await page
