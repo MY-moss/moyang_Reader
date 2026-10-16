@@ -1,4 +1,10 @@
-import { createEditorHistory, type EditorHistoryState } from "../editor/editor-history";
+import {
+  createEditorHistory,
+  editorHistoryBytes,
+  trimEditorHistory,
+  MAX_TOTAL_HISTORY_BYTES,
+  type EditorHistoryState,
+} from "../editor/editor-history";
 import { normalizePathKey } from "../../platform/path-key";
 import type { OpenDocument, ReaderMode } from "../../shared/types";
 
@@ -17,6 +23,7 @@ const valueOf = <T>(update: Update<T>, value: T): T =>
 
 /** One content owner per normalized path, independent of the pane displaying it. */
 export class DocumentSessions {
+  constructor(private historyBudget = MAX_TOTAL_HISTORY_BYTES) {}
   private state: Snapshot = { activeKey: null, sessions: new Map() };
   private writeHolds = 0;
   private composingPath: string | null = null;
@@ -53,6 +60,20 @@ export class DocumentSessions {
   get = (path: string) => this.state.sessions.get(normalizePathKey(path));
   active = () => (this.state.activeKey ? this.state.sessions.get(this.state.activeKey) : undefined);
   private publish(state: Snapshot) {
+    let total = [...state.sessions.values()].reduce((bytes, session) => bytes + editorHistoryBytes(session.history), 0);
+    if (total > this.historyBudget) {
+      const sessions = new Map(state.sessions);
+      const keys = [...sessions.keys()].sort((a, b) => Number(a === state.activeKey) - Number(b === state.activeKey));
+      for (const key of keys) {
+        if (total <= this.historyBudget) break;
+        const session = sessions.get(key)!;
+        const before = editorHistoryBytes(session.history);
+        const history = trimEditorHistory(session.history, Math.max(0, before - (total - this.historyBudget)));
+        sessions.set(key, { ...session, history });
+        total -= before - editorHistoryBytes(history);
+      }
+      state = { ...state, sessions };
+    }
     this.state = state;
     const active = this.active();
     this.documentRef.current = active?.document ?? null;

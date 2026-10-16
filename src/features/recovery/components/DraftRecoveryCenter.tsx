@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import { useModalBehavior } from "../../../shared/components/useModalBehavior";
-import { formatDraftRecoveryTime, type DraftSnapshot } from "../draft-recovery";
+import { formatDraftRecoveryTime, type DraftSummary } from "../draft-recovery";
 
 type DraftRecoveryCenterProps = {
-  snapshots: DraftSnapshot[];
+  snapshots: DraftSummary[];
   onOpen: (path: string) => void;
   onDiscard: (path: string) => void;
   onClearAll: () => void;
@@ -67,7 +67,7 @@ export function DraftRecoveryCenter({ snapshots, onOpen, onDiscard, onClearAll, 
                 <strong>{fileName(snapshot.path)}</strong>
                 <span title={snapshot.path}>{snapshot.path}</span>
                 <small>
-                  {formatDraftRecoveryTime(snapshot.savedAt)} · {draftPreview(snapshot.draft)}
+                  {formatDraftRecoveryTime(snapshot.savedAt)} · {draftPreview(snapshot.preview)}
                 </small>
               </button>
               <button
@@ -82,7 +82,7 @@ export function DraftRecoveryCenter({ snapshots, onOpen, onDiscard, onClearAll, 
           ))}
         </div>
         <footer className="quick-open-footer draft-recovery-footer">
-          <span>草稿只保存在本机浏览器存储中，不会上传正文。</span>
+          <span>草稿逐篇保存在本机，不会上传正文。</span>
           <button type="button" className="quiet-button" onClick={onClearAll}>
             清空全部
           </button>

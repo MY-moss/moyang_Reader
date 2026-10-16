@@ -104,3 +104,15 @@ Markdown 默认直接编辑，不可无损表达的结构使用源码；TXT 为�
 [React 自定义 Hooks 文档](https://react.dev/learn/reusing-logic-with-custom-hooks)说明 hooks 抽取复用逻辑，不会自动共享状态；因此本工程只创建一次会话状态。[Tauri capabilities 文档](https://v2.tauri.app/security/capabilities/)用于核对权限配置边界；运行时路径授权仍由 Rust 显式执行。
 
 新增功能必须定义目录归属、状态所有者、存储行为与验证方式。`features` 不导入 `application` 或 `shell`；`platform` 不导入应用编排。业务 UI 不直接调用 Tauri `invoke`，统一经过桥接层。
+
+## 0.13.1 阅读与闲置任务
+
+`BodyIndexer` 利用现有工作区差量保留的文件对象身份，只将新文件对象或标签变化加入串行队列。收藏、摘录与视图刷新独立；同一路径合并待处理项，工作区切换淘汰旧任务，失败保持已有索引并允许重试。书房请求与工作区搜索通过 `spawn_blocking` 运行，授权规则不变。
+
+阅读草稿类型位于 `shared/reader-draft-types`。`platform/reader-drafts` 对桌面使用 `bookroom_request` 的 `draft.*` 操作，在 `reader.sqlite/reader_drafts` 独立保存；浏览器使用 IndexedDB 的正文与摘要两张 object store。事务完成才确认成功，容量不足回滚新写入，禁止淘汰其他草稿。恢复中心仅加载摘要；完整原文与草稿按路径读取。原生保存不是向快照路径写文件，因此恢复仍走原文授权与冲突流程。
+
+恢复服务串行化写入和删除，成功保存后的删除带预期草稿内容，避免迟到的清理删除新输入。旧 localStorage 数据逐条幂等导入，全部成功后写迁移标记，保留旧副本。降级前应先保存当前文档，旧版不会读取新草稿表。存储位置迁移已覆盖 `reader.sqlite` 和 WebView 数据，因此沿用已有迁移入口。
+
+撤销仍由唯一文档会话持有。连续短输入按相邻位置和时间分组；历史预算只针对过去/未来的字符串估算，不是实际堆内存承诺。单篇 16 MiB、全局 64 MiB、最多 100 步；全局先裁剪非当前文档的旧记录，当前正文与未保存草稿不参与淘汰。
+
+`ai_changes` 使用持久只读连接比较同一连接的 SQLite `data_version`，数据改变或下一条记忆到期后才推动结果刷新。该路径不打开 `Store`，因此不做快照轮换或语义维护。前端 `watchAiChanges` 防止重叠检查，在隐藏状态暂停，恢复焦点及本机写入后立即核对；正常数据请求仍保留原有维护机制。此改动不重写数据库连接池或备份架构。

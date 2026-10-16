@@ -29,9 +29,9 @@ export function useDocumentTransitions({
   setError,
 }: Input) {
   const confirmDocumentReplacement = useCallback(
-    (nextPaths: readonly string[], _action: string) => {
+    async (nextPaths: readonly string[], _action: string) => {
       if (!shouldConfirmDocumentReplacement(documentStateRef.current, nextPaths)) return true;
-      const outcome = flushCurrentDraft();
+      const outcome = await flushCurrentDraft();
       if (outcome === "failed") return false;
       return true;
     },
@@ -39,14 +39,14 @@ export function useDocumentTransitions({
   );
 
   const confirmWorkspaceSwitch = useCallback(
-    (nextWorkspacePath: string, _action: string) => {
+    async (nextWorkspacePath: string, _action: string) => {
       const currentDocument = documentStateRef.current;
       if (
         !shouldConfirmWorkspaceSwitch(Boolean(currentDocument?.modified), workspacePathRef.current, nextWorkspacePath)
       ) {
         return true;
       }
-      const outcome = flushCurrentDraft();
+      const outcome = await flushCurrentDraft();
       if (outcome === "failed") return false;
       return true;
     },

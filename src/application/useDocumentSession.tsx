@@ -137,6 +137,7 @@ export function useDocumentSession({
           (await renderSource(path, source, {
             allowRemoteResources: preferencesRef.current.allowRemoteResources,
           }));
+        const recoveredDraft = await findDraftSnapshot(path, source);
         if (requestId !== opening.current) return false;
         const latest = documentSessions.get(path);
         if (expectedDraft !== undefined && latest && latest.draft !== expectedDraft) {
@@ -165,7 +166,7 @@ export function useDocumentSession({
         setSourceDraft(source);
         sourceDraftRef.current = source;
         resetEditorHistory(path, source);
-        setDraftRecovery(findDraftSnapshot(path, source));
+        setDraftRecovery(recoveredDraft);
         setDraftSnapshots(loadDraftSnapshots());
         setOpenTabs((current) =>
           current.some((tab) => isSameDocumentPath(tab.path, path))
@@ -342,7 +343,9 @@ export function useDocumentSession({
         if (session && !preserveMode) {
           documentSessions.activate(path);
           setExternalChangePath(session.document.externallyModified ? path : null);
-          setDraftRecovery(session.document.modified ? null : findDraftSnapshot(path, session.document.source));
+          const recovered = session.document.modified ? null : await findDraftSnapshot(path, session.document.source);
+          if (requestId !== opening.current) return false;
+          setDraftRecovery(documentSessions.get(path)?.document.modified ? null : recovered);
           setError(null);
           if (!path.startsWith("browser://")) {
             saveLastDocumentPath(path);
@@ -423,7 +426,7 @@ export function useDocumentSession({
     if (!current || !externalChangePath || !isSameDocumentPath(current.path, externalChangePath)) return;
 
     if (current.modified) {
-      const draftResult = saveDraftSnapshot({
+      const draftResult = await saveDraftSnapshot({
         path: current.path,
         draft: sourceDraftRef.current,
         baseSource: current.source,
@@ -498,7 +501,7 @@ export function useDocumentSession({
       const workspacePathToConfirm = workspacePaths.find((path) =>
         shouldConfirmWorkspaceSwitch(Boolean(documentStateRef.current?.modified), workspacePathRef.current, path),
       );
-      if (workspacePathToConfirm && !confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库")) {
+      if (workspacePathToConfirm && !(await confirmWorkspaceSwitch(workspacePathToConfirm, "切换阅读库"))) {
         return;
       }
 
@@ -507,7 +510,7 @@ export function useDocumentSession({
         ? paths.filter((entry) => entry.kind !== "document" || !isSameDocumentPath(currentModifiedPath, entry.path))
         : paths;
       const documentPaths = pathsToProcess.filter((entry) => entry.kind === "document").map((entry) => entry.path);
-      if (!confirmDocumentReplacement(documentPaths, "打开新文档")) {
+      if (!(await confirmDocumentReplacement(documentPaths, "打开新文档"))) {
         return;
       }
 
@@ -618,7 +621,7 @@ export function useDocumentSession({
             rendered: latest.draft === draft ? rendered : latest.document.rendered,
           },
         }));
-        if (documentSessions.get(path)?.draft === draft) clearDraftSnapshot(path);
+        if (documentSessions.get(path)?.draft === draft) await clearDraftSnapshot(path, draft);
         setDraftSnapshots(loadDraftSnapshots());
         if (documentStateRef.current?.path === path) {
           setDraftRecovery(null);

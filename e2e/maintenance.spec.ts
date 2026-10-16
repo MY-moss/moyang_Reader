@@ -22,6 +22,13 @@ test("quick open stays readable and keyboard usable in system and explicit theme
       const dialog = page.getByRole("dialog", { name: "快速打开", exact: true });
       await expect(dialog).toBeVisible();
       await expect(dialog.getByRole("option")).toHaveCount(2);
+      // Visibility starts before the backdrop's opacity fade completes. Audit the settled colors.
+      await dialog.evaluate(async (node) => {
+        const backdrop = node.closest(".quick-open-backdrop")!;
+        await Promise.all(
+          backdrop.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
+        );
+      });
       await expect(dialog.locator(".quick-open-kind").first()).toHaveText("TXT");
       for (const cls of [".quick-open-kind", ".quick-open-recent", ".quick-open-copy small"]) {
         expect(

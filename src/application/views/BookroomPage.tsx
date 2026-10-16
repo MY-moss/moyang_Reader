@@ -167,7 +167,7 @@ export function BookroomPageView({ bookroom: m, model }: { bookroom: Bookroom; m
               {m.indexErrors.map((error) => (
                 <p key={error}>{error}</p>
               ))}
-              <button onClick={m.refresh}>重新检查</button>
+              <button onClick={m.retryIndex}>重新检查</button>
             </details>
           )}
         </>

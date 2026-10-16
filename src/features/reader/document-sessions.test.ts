@@ -12,6 +12,17 @@ const doc = (path: string): OpenDocument => ({
   externallyModified: false,
 });
 describe("document sessions", () => {
+  it("releases inactive undo history within the shared budget while retaining drafts", () => {
+    const store = new DocumentSessions(20);
+    for (const path of ["a.md", "b.md"]) {
+      store.setDocument(doc(path));
+      store.setDraft("changed");
+      store.setHistory((h) => recordEditorChange(h, "changed"));
+    }
+    expect(store.get("a.md")?.history.past).toEqual([]);
+    expect(store.get("a.md")?.draft).toBe("changed");
+    expect(store.active()?.history.past).toEqual(["initial"]);
+  });
   it("preserves independent drafts, editing modes and undo when switching", () => {
     const store = new DocumentSessions();
     store.setDocument(doc("C:/notes/a.md"));

@@ -822,23 +822,27 @@ impl WorkspaceSearchCache {
 }
 
 #[tauri::command]
-pub fn search_workspace(
+pub async fn search_workspace(
     root: String,
     query: String,
-    access: State<'_, AccessRegistry>,
-    cache: State<'_, WorkspaceSearchCache>,
     app: AppHandle,
 ) -> Result<Vec<WorkspaceSearchResult>, String> {
-    if !access.is_read_allowed(Path::new(&root)) {
-        return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
-    }
-    let persistence_directory = crate::data_paths::cache_directory(&app).ok();
-    search_workspace_inner_with_cache_and_persistence(
-        PathBuf::from(root),
-        query,
-        &cache,
-        persistence_directory.as_deref(),
-    )
+    tauri::async_runtime::spawn_blocking(move || {
+        let access = app.state::<AccessRegistry>();
+        if !access.is_read_allowed(Path::new(&root)) {
+            return Err("拒绝读取未通过用户选择的工作区。请重新添加文件夹。".to_string());
+        }
+        let cache = app.state::<WorkspaceSearchCache>();
+        let persistence_directory = crate::data_paths::cache_directory(&app).ok();
+        search_workspace_inner_with_cache_and_persistence(
+            PathBuf::from(root),
+            query,
+            &cache,
+            persistence_directory.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

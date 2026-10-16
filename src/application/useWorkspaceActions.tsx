@@ -97,7 +97,7 @@ export function useWorkspaceActions({
         setError("请先添加一个工作区文件夹，再创建未解析链接。");
         return;
       }
-      const draftOutcome = documentState.modified ? flushCurrentDraft() : "not-needed";
+      const draftOutcome = documentState.modified ? await flushCurrentDraft() : "not-needed";
       if (
         documentState.modified &&
         (draftOutcome === "failed" ||
@@ -129,7 +129,7 @@ export function useWorkspaceActions({
   );
   const createNote = async (parentPath: string, name: string) => {
     if (!workspacePath) throw new Error("请先添加阅读库");
-    if (flushCurrentDraft() === "failed") throw new Error("当前草稿无法暂存，请先保存");
+    if ((await flushCurrentDraft()) === "failed") throw new Error("当前草稿无法暂存，请先保存");
     const path = await createWorkspaceNote(workspacePath, parentPath, name);
     await refreshWorkspaceChanges(workspacePath, [path]);
     await openPath(path);
@@ -210,6 +210,7 @@ export function useWorkspaceActions({
           return;
         const renamedPath = await renameWorkspaceEntry(root, entryPath, name, patches);
         const patchByPath = new Map(patches.map((patch) => [comparablePath(patch.path), patch]));
+        const draftMoves: Array<() => Promise<void>> = [];
         documentSessions.rebase((session) => {
           const oldPath = session.document.path;
           const path = rebaseWorkspacePath(oldPath, oldAbsolutePath, renamedPath);
@@ -220,8 +221,13 @@ export function useWorkspaceActions({
               ? rewriteRenamedLinks(session.draft, file.relativePath, files, relative, nextRelative).source
               : session.draft;
           const source = patch?.after ?? session.document.source;
-          if (path !== oldPath) clearDraftSnapshot(oldPath);
-          if (draft !== source) saveDraftSnapshot({ path, draft, baseSource: source, savedAt: Date.now() });
+          draftMoves.push(async () => {
+            if (draft !== source) {
+              const result = await saveDraftSnapshot({ path, draft, baseSource: source, savedAt: Date.now() });
+              if (!result.ok) throw new Error(result.error ?? "重命名后草稿保存失败，旧草稿仍保留");
+            }
+            if (path !== oldPath) await clearDraftSnapshot(oldPath);
+          });
           return {
             ...session,
             draft,
@@ -244,14 +250,21 @@ export function useWorkspaceActions({
             document: { ...session.document, path, name: fileNameFromPath(path), source, modified: draft !== source },
           };
         });
+        let metadataWarning = "";
+        for (const move of draftMoves) {
+          try {
+            await move();
+          } catch (cause) {
+            metadataWarning += "；草稿更新失败，旧副本仍保留：" + String(cause);
+          }
+        }
         window.dispatchEvent(
           new CustomEvent("moyang:path-renamed", { detail: { from: oldAbsolutePath, to: renamedPath } }),
         );
-        let metadataWarning = "";
         try {
           await bookroomRequest({ action: "paths.rebase", root, from: oldAbsolutePath, to: renamedPath });
         } catch (cause) {
-          metadataWarning = "；阅读记录更新失败：" + String(cause);
+          metadataWarning += "；阅读记录更新失败：" + String(cause);
         }
         documentCacheRef.current.invalidate([oldAbsolutePath, renamedPath]);
 

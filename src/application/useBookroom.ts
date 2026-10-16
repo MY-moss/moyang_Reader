@@ -1,3 +1,4 @@
+import { BodyIndexer } from "../features/workspace/body-indexer";
 import { isSameDocumentPath } from "../features/recovery/document-transition";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -15,7 +16,7 @@ import {
 } from "../features/editor/source-selection";
 import { relocatePdfSource } from "../features/reader/pdf-source-location";
 import { bookroomRequest } from "../platform/bookroom-bridge";
-import { fileMetadata, isTauriRuntime, readBinaryFile, readTextFile } from "../platform/bridge";
+import { isTauriRuntime, readBinaryFile } from "../platform/bridge";
 import { contentHash, extractSourceChunks } from "../features/documents/source-chunks";
 import type {
   Annotation,
@@ -92,71 +93,25 @@ export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
       active = false;
     };
   }, [revision]);
+  const indexer = useRef<BodyIndexer | null>(null);
   useEffect(() => {
+    setIndexProgress("");
+    setIndexErrors([]);
     if (!workspacePath || !isTauriRuntime()) return;
-    let active = true;
-    void (async () => {
-      const manifest = await bookroomRequest<Array<{ path: string; stamp: string; tags: string }>>({
-        action: "index.manifest",
-        root: workspacePath,
-      });
-      const known = new Map(manifest.map((item) => [item.path, item]));
-      const tagsByPath = new Map(workspaceIndex.map((entry) => [entry.file.path, entry.tags]));
-      const files = workspaceFiles.filter((file) => file.kind !== "image");
-      const errors: string[] = [];
-      for (let i = 0; i < files.length && active; i += 1) {
-        const file = files[i];
-        try {
-          const stamp = JSON.stringify(await fileMetadata(file.path));
-          if (!active) return;
-          const tags = tagsByPath.get(file.path) ?? [];
-          const previous = known.get(file.path);
-          if (previous?.stamp === stamp) {
-            if (previous.tags !== JSON.stringify(tags))
-              await bookroomRequest({ action: "index.attributes", path: file.path, tags });
-            continue;
-          }
-          setIndexProgress(`正在整理正文 ${i + 1}/${files.length} · ${file.name}`);
-          const source =
-            file.kind === "markdown" || file.kind === "text"
-              ? await readTextFile(file.path)
-              : await readBinaryFile(file.path);
-          const extracted = await extractSourceChunks(file.path, file.kind, source);
-          if (!active) return;
-          // Do not publish a snapshot assembled while the source was changing.
-          if (JSON.stringify(await fileMetadata(file.path)) !== stamp) {
-            errors.push(`${file.name}：内容正在变化，将在下次刷新重试`);
-            continue;
-          }
-          await bookroomRequest({
-            action: "index.replace",
-            root: workspacePath,
-            path: file.path,
-            title: file.name,
-            kind: file.kind,
-            tags,
-            stamp,
-            ...extracted,
-          });
-        } catch (cause) {
-          errors.push(`${file.name}：${String(cause)}`);
-        }
-      }
-      if (active) {
-        setIndexProgress("");
-        setIndexErrors(errors);
-        setIndexRevision((value) => value + 1);
-      }
-    })().catch((cause) => {
-      if (active) {
-        setIndexProgress("");
-        setIndexErrors([String(cause)]);
-      }
+    const worker = new BodyIndexer(workspacePath, (progress, errors, changed) => {
+      setIndexProgress(progress);
+      setIndexErrors(errors);
+      if (changed) setIndexRevision((value) => value + 1);
     });
+    indexer.current = worker;
     return () => {
-      active = false;
+      worker.dispose();
+      indexer.current = null;
     };
-  }, [workspacePath, workspaceFiles, workspaceIndex, revision]);
+  }, [workspacePath]);
+  useEffect(() => {
+    indexer.current?.update(workspaceFiles, workspaceIndex);
+  }, [workspacePath, workspaceFiles, workspaceIndex]);
   useEffect(() => {
     if (page !== "search" || !workspacePath) {
       setResults({ items: [], total: 0 });
@@ -482,6 +437,7 @@ export function useBookroom(model: ReaderApplication, panes: WorkbenchPanes) {
     indexProgress,
     indexErrors,
     refresh,
+    retryIndex: () => indexer.current?.retry(),
     navigate,
     currentLocation,
     bookmark,

@@ -1,3 +1,4 @@
+import { watchAiChanges } from "./change-watch";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
 import { emptyAiFields, type AiKind, type AiRecord, type AiSearch, type AiStats } from "../../shared/ai-types";
@@ -186,15 +187,15 @@ export function useAiSpace(active: boolean) {
       void aiRequest("cancel_search", { request_id: requestId }).catch(() => {});
     };
   }, [active, kind, query, project, agent, archived, includeExpired, page, tick]);
+  const ready = stats !== null;
   useEffect(() => {
-    if (!active) return;
-    window.addEventListener("focus", refresh);
-    const timer = window.setInterval(refresh, 12000);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      window.clearInterval(timer);
-    };
-  }, [active, refresh]);
+    if (!active || !ready) return;
+    return watchAiChanges(
+      () => aiRequest<string>("change_token"),
+      refresh,
+      (error) => setLoadError(`检查更新失败，已保留当前内容：${String(error)}`),
+    );
+  }, [active, ready, refresh]);
   const select = useCallback(
     async (id: string) => {
       const seq = ++sequence.current;
@@ -233,7 +234,8 @@ export function useAiSpace(active: boolean) {
       flushLiveEditors();
       if (saving.current) {
         await saving.current;
-        return;
+        if (!manual) return;
+        // An explicit save must finish the latest draft even if autosave started first.
       }
       const current = override ?? (activeKey.current ? all.current[activeKey.current] : null);
       if (!current) return;
