@@ -18,27 +18,6 @@ describe("native chat and signed portable updates", () => {
     await browser.saveScreenshot('.impeccable/review/chat-updates/storage-native-1280.png');
     await browser.setWindowSize(720,900);
     await browser.saveScreenshot('.impeccable/review/chat-updates/storage-native-720.png');
-      // Visual fixture only: the real copy/junction/rollback flow is exercised by
-      // test-storage-migration.ps1. Never move the desktop test runner's live profile.
-      await browser.execute((info) => {
-        const internal = window.__TAURI_INTERNALS__, original = internal.invoke;
-        window.__storageOriginalInvoke = original;
-        internal.invoke = (command, args, options) => {
-          if (command === 'storage_choose_target') return Promise.resolve('E:\\MoyangData');
-          if (command === 'storage_prepare') return Promise.resolve({target:'E:\\MoyangData',items:info.locations.filter(p=>p.key!=='models'),bytes:104857600,free:214748364800});
-          if (command === 'storage_info') return Promise.resolve({...info,report:{status:'complete',message:'迁移完成。旧路径保留为目录链接，数据实际保存在新位置。',target:'E:\\MoyangData'}});
-          return original(command,args,options);
-        };
-      },info);
-      await browser.$('button=选择新位置').click();
-      await browser.$('button=检查迁移').click();
-      await browser.$('.storage-plan').waitForDisplayed();
-      await browser.$('.storage-plan').scrollIntoView();
-      await browser.saveScreenshot('.impeccable/review/chat-updates/storage-plan-720-fixture.png');
-      await browser.$('button=刷新占用').click();
-      await browser.$('.storage-report').scrollIntoView();
-      await browser.saveScreenshot('.impeccable/review/chat-updates/storage-result-720-fixture.png');
-      await browser.execute(() => { window.__TAURI_INTERNALS__.invoke = window.__storageOriginalInvoke; delete window.__storageOriginalInvoke; });
     await browser.setWindowSize(1240,820);
     await browser.$('button[aria-label="关闭设置"]').click();
   });

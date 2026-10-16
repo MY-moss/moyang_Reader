@@ -18,6 +18,72 @@ pub struct Pending {
     stage: Option<PathBuf>,
 }
 const EXE: &str = "Moyang Reader Next.exe";
+const RELEASE_API: &str = "https://api.github.com/repos/MY-moss/moyang_Reader/releases";
+
+fn release_asset(release: &Value, name: &str) -> Result<tauri::Url, String> {
+    let value = release["assets"]
+        .as_array()
+        .and_then(|assets| {
+            assets
+                .iter()
+                .find(|item| item["name"] == name && item["state"] == "uploaded")
+        })
+        .and_then(|item| item["url"].as_str())
+        .ok_or_else(|| format!("发布中缺少 {name}"))?;
+    let id = value
+        .strip_prefix(&format!("{RELEASE_API}/assets/"))
+        .ok_or("发布资源地址无效。")?;
+    if id.is_empty() || !id.bytes().all(|c| c.is_ascii_digit()) {
+        return Err("发布资源编号无效。".into());
+    }
+    tauri::Url::parse(value).map_err(|e| e.to_string())
+}
+
+// Some networks can reach GitHub's public API while github.com downloads time
+// out. Use the same official release and the same signature, without a mirror.
+async fn check_through_release_api(app: &tauri::AppHandle) -> Result<Option<Update>, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("Moyang-Reader-Updater")
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let release: Value = client
+        .get(format!("{RELEASE_API}/latest"))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    let feed = release_asset(&release, "reader-update.json")?;
+    let mut update = app
+        .updater_builder()
+        .target("windows-x86_64-portable")
+        .timeout(Duration::from_secs(20))
+        .endpoints(vec![feed])
+        .map_err(|e| e.to_string())?
+        .header("Accept", "application/octet-stream")
+        .map_err(|e| e.to_string())?
+        .header("User-Agent", "Moyang-Reader-Updater")
+        .map_err(|e| e.to_string())?
+        .build()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Some(found) = update.as_mut() {
+        if release["tag_name"] != format!("reader-v{}", found.version) {
+            return Err("更新源与发布版本不一致。".into());
+        }
+        found.download_url = release_asset(
+            &release,
+            &format!("moyang-reader-{}-windows-x64.zip", found.version),
+        )?;
+    }
+    Ok(update)
+}
 #[tauri::command]
 pub fn online_update_failure() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
@@ -106,12 +172,20 @@ pub async fn online_update_check(
     } else {
         builder
     };
-    let update = builder
-        .build()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await
-        .map_err(|e| e.to_string())?;
+    let checked = builder.build().map_err(|e| e.to_string())?.check().await;
+    let update = match checked {
+        Ok(update) => update,
+        Err(primary) => {
+            // Isolated test failures must never fall through to a live service.
+            #[cfg(feature = "wdio")]
+            if std::env::var_os("MOYANG_TEST_UPDATE_ENDPOINT").is_some() {
+                return Err(primary.to_string());
+            }
+            check_through_release_api(&app).await.map_err(|fallback| {
+                format!("更新服务暂时不可用：{primary}；备用连接：{fallback}")
+            })?
+        }
+    };
     let info = update
         .as_ref()
         .map(|u| json!({"version":u.version,"body":u.body,"currentVersion":u.current_version}));
@@ -262,6 +336,20 @@ pub fn online_update_activate(
 mod tests {
     use super::*;
     use std::io::Write;
+    #[test]
+    fn official_release_fallback_requires_an_uploaded_asset_from_this_repository() {
+        let mut release = json!({"assets":[{"name":"reader-update.json","state":"uploaded","url":format!("{RELEASE_API}/assets/123")} ]});
+        assert!(release_asset(&release, "reader-update.json")
+            .unwrap()
+            .as_str()
+            .ends_with("/123"));
+        assert!(release_asset(&release, "other.json").is_err());
+        release["assets"][0]["state"] = json!("new");
+        assert!(release_asset(&release, "reader-update.json").is_err());
+        release["assets"][0]["state"] = json!("uploaded");
+        release["assets"][0]["url"] = json!("https://example.org/assets/123");
+        assert!(release_asset(&release, "reader-update.json").is_err());
+    }
     fn package(version: &str, complete: bool) -> Vec<u8> {
         let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
         for (name, body) in [

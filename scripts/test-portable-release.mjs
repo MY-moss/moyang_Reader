@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -27,7 +26,9 @@ for (const file of manifest.files)
       .digest("hex"),
     file.sha256,
   );
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), "moyang-portable-"));
+const fixtureBase = path.join(root, ".local");
+fs.mkdirSync(fixtureBase, { recursive: true });
+const temp = fs.mkdtempSync(path.join(fixtureBase, "portable-smoke-"));
 const report = { timestamp: new Date().toISOString(), version: manifest.version, hashes: true };
 let client, app, browser, model;
 try {
@@ -178,6 +179,11 @@ try {
   await page.screenshot({path:"artifacts/workbench/release-storage.png"});
   report.desktop.storage_locations = true;
   await page.getByRole("button", {name:"关闭设置",exact:true}).click();
+  if (process.env.MOYANG_VERIFY_PUBLISHED_UPDATE === "1") {
+    const update = await page.evaluate(() => window.__TAURI_INTERNALS__.invoke("online_update_check"));
+    assert.equal(update, null, "Published feed must identify this build as current");
+    report.desktop.live_update_feed = true;
+  }
   await page.getByRole("combobox", { name: "工作空间", exact: true }).selectOption("reader");
   await page.evaluate(() =>
     window.__TAURI_INTERNALS__.invoke("plugin:event|emit", { event: "close-requested", payload: null }),
@@ -191,6 +197,11 @@ try {
   const cleanup = await Promise.allSettled([client?.close(), browser?.close()]);
   const errors = cleanup.filter((result) => result.status === "rejected");
   if (errors.length) report.cleanup_errors = errors.map((result) => String(result.reason));
+  // Only this run's isolated data, after its app and MCP clients have stopped.
+  for (let n = 0; app?.exitCode === null && n < 30; n++) await pause(100);
+  if (path.dirname(temp) !== fixtureBase || !path.basename(temp).startsWith("portable-smoke-")) throw new Error("Invalid fixture cleanup path");
+  try { fs.rmSync(temp, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }); }
+  catch (error) { report.retained_test_fixture = temp; report.cleanup_note = String(error); }
   fs.writeFileSync("artifacts/workbench/release-smoke.json", JSON.stringify(report, null, 2));
 }
 console.log(JSON.stringify(report, null, 2));
