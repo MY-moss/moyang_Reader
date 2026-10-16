@@ -63,7 +63,7 @@ test("source checks show a comparison and update a snapshot only after choosing 
   await page
     .locator('.ai-page-header input[type="file"]')
     .setInputFiles({ name: "source.txt", mimeType: "text/plain", buffer: Buffer.from("原始资料正文") });
-  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
   const checkSource = async () => {
     const chooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "检查来源更新", exact: true }).click();
@@ -114,7 +114,7 @@ test("a source comparison belongs to its original entry when switching knowledge
   await page
     .locator('.ai-page-header input[type="file"]')
     .setInputFiles({ name: "source-a.txt", mimeType: "text/plain", buffer: Buffer.from("A 的原资料") });
-  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
   await create(page, "另一份知识", "B 保持自己的内容");
   await page.locator(".ai-record-button").filter({ hasText: "source-a" }).click();
   const chooser = page.waitForEvent("filechooser");
@@ -139,7 +139,7 @@ test("imports a portable skill and exports a real resource archive", async ({ pa
     ),
   });
   await expect(page.getByLabel("技能名称", { exact: true })).toHaveValue("weekly-review");
-  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出技能包", exact: true }).click();
   const file = await download;
@@ -161,7 +161,7 @@ test("compares same-sized skill resource changes and restores the selected versi
     mimeType: "application/zip",
     buffer: await zip.generateAsync({ type: "nodebuffer" }),
   });
-  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
   await page.getByRole("button", { name: "编辑", exact: true }).click();
   const row = page.locator(".ai-resource-row").filter({ hasText: "references/check.txt" });
   await row.getByRole("button", { name: "references/check.txt", exact: true }).click();
@@ -245,7 +245,7 @@ test("skill ZIP roundtrip preserves scripts, metadata and binary assets", async 
     mimeType: "application/zip",
     buffer: await zip.generateAsync({ type: "nodebuffer" }),
   });
-  await page.getByRole("button", { name: "保存内容", exact: true }).click();
+  await page.getByRole("button", { name: "确认导入", exact: true }).click();
   await expect(page.locator(".ai-document h1")).toHaveText("test-skill");
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出技能包" }).click();

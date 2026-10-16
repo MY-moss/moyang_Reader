@@ -7,8 +7,12 @@ export function AiHealth({
   stats,
   onSelect,
   notify,
+  active = true,
+  dataVersion = 0,
 }: {
   stats?: AiStats | null;
+  active?: boolean;
+  dataVersion?: number;
   onSelect: (id: string) => void;
   notify: (text: string, error?: boolean) => void;
 }) {
@@ -34,6 +38,7 @@ export function AiHealth({
     limit: 30,
   });
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -54,7 +59,7 @@ export function AiHealth({
     return () => {
       cancelled = true;
     };
-  }, [query, tick]);
+  }, [query, tick, active, dataVersion]);
   const report = result?.key === query ? result.report : null;
   const change = (update: () => void) => {
     update();

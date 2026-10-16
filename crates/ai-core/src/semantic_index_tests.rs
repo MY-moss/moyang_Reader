@@ -125,6 +125,7 @@ fn all_processes_share_one_batch_and_pause_survives_automatic_maintenance() {
             enabled: true,
             endpoint,
             model: "locked-fixture".into(),
+            ..Default::default()
         })
         .unwrap();
     let worker = std::thread::spawn(move || store.index_semantic().unwrap());
@@ -198,6 +199,7 @@ fn model_switch_discards_the_old_in_flight_batch() {
         enabled: true,
         endpoint,
         model: "old-model".into(),
+        ..Default::default()
     };
     store.configure_semantic(config.clone()).unwrap();
     let worker = std::thread::spawn(move || store.index_semantic().unwrap());
@@ -220,4 +222,84 @@ fn model_switch_discards_the_old_in_flight_batch() {
     release.send(()).unwrap();
     assert_eq!(worker.join().unwrap()["processed"], 16);
     server.join().unwrap();
+}
+#[test]
+fn external_embedding_api_uses_saved_key_and_never_mixes_protocol_vectors() {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let worker = std::thread::spawn(move || {
+        for _ in 0..2 {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            loop {
+                let mut bytes = [0; 4096];
+                let n = socket.read(&mut bytes).unwrap();
+                assert!(n > 0);
+                request.extend_from_slice(&bytes[..n]);
+                if let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+                    let length: usize = String::from_utf8_lossy(&request[..end])
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|s| s.trim().parse().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if request.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+            }
+            let text = String::from_utf8(request).unwrap();
+            assert!(text.starts_with("POST /v1/embeddings "));
+            assert!(text
+                .to_lowercase()
+                .contains("authorization: bearer isolated-embedding-key"));
+            let body =
+                r#"{"data":[{"index":0,"embedding":[1.0,0.0]}],"usage":{"total_tokens":12}}"#;
+            write!(socket,"HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{body}",body.len()).unwrap();
+        }
+    });
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = Store::open(dir.path()).unwrap();
+    crate::services::provider_request(&s.services_directory().unwrap(),"save_provider",serde_json::json!({"id":"embedding","name":"我的向量服务","protocol":"openai","model":"embed","baseUrl":endpoint,"apiKey":"isolated-embedding-key"})).unwrap();
+    s.save(
+        serde_json::from_value(
+            serde_json::json!({"kind":"knowledge","title":"外部嵌入","body":"中文资料与来源"}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let c = s
+        .configure_semantic(SemanticConfig {
+            enabled: true,
+            endpoint: String::new(),
+            model: "embed".into(),
+            protocol: "openai".into(),
+            provider: "embedding".into(),
+        })
+        .unwrap();
+    assert!(c.endpoint.ends_with("/v1"));
+    assert_eq!(s.index_semantic().unwrap()["remaining"], 0);
+    assert_eq!(
+        s.search(&SearchQuery {
+            query: "不同措辞".into(),
+            semantic: true,
+            ..Default::default()
+        })
+        .unwrap()
+        .total,
+        1
+    );
+    worker.join().unwrap();
+    let mut local = c.clone();
+    local.protocol = "ollama".into();
+    assert_ne!(model_key(&c), model_key(&local));
+    assert!(!serde_json::to_string(&s.backup().unwrap())
+        .unwrap()
+        .contains("isolated-embedding-key"));
 }

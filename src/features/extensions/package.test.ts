@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { builtInCatalog } from "./catalog";
 import { compatiblePackage, parseCatalog, readExtensionFile, validatePackage } from "./package";
+const version = __MOYANG_VERSION__;
 
 describe("extension package interoperability", () => {
+  it("accepts extensions requiring the version of the running application", async () => {
+    expect(compatiblePackage({ ...builtInCatalog[0], minAppVersion: version })).toBe(true);
+    const body = "---\nname: local-reading\ndescription: 阅读资料\n---\n\n方法";
+    const pkg = await readExtensionFile({ name: "SKILL.md", size: body.length, text: async () => body } as File);
+    expect(pkg.minAppVersion).toBe(version);
+  });
   it("accepts the bundled catalog and keeps future-version packages discoverable but not installable", () => {
     for (const pkg of builtInCatalog) expect(validatePackage(pkg).id).toBe(pkg.id);
     const future = { ...builtInCatalog[0], minAppVersion: "99.0.0" };

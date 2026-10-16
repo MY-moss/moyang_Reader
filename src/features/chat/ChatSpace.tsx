@@ -10,6 +10,9 @@ import { downloadAi } from "../ai/transfers";
 import { exportChat } from "./protocol";
 import { ProviderSettings } from "./ProviderSettings";
 import { useChat } from "./useChat";
+import { ContextPreview } from "./ContextPreview";
+import { AttachmentPicker } from "./AttachmentPicker";
+import { ModelPicker } from "./ModelPicker";
 
 function MessageBody({ message, streaming }: { message: ChatMessage; streaming: boolean }) {
   const [html, setHtml] = useState("");
@@ -48,12 +51,34 @@ export default function ChatSpace({
   assistants,
   selection,
   attachment,
+  onOpenAi,
 }: {
   assistants: ChatAssistant[];
   selection?: { key: number; id: string } | null;
   attachment?: ChatSource | null;
+  onOpenAi?: (id: string) => void;
 }) {
   const m = useChat(assistants);
+  const contextOptions = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !contextOptions.current?.contains(event.target) && contextOptions.current)
+        contextOptions.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && contextOptions.current?.open) {
+        contextOptions.current.open = false;
+        contextOptions.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+  const [picking, setPicking] = useState(false);
   const [settings, setSettings] = useState(false),
     [history, setHistory] = useState(false),
     [remove, setRemove] = useState(false);
@@ -100,7 +125,7 @@ export default function ChatSpace({
     }
   };
   const sent = async () => {
-    if (!m.draft.trim()) return;
+    if (!m.draft.trim() || m.busy || m.switching || m.contextLoading) return;
     follow.current = true;
     await m.generate(m.draft, attached ? [attached] : []);
     setAttached(null);
@@ -172,6 +197,11 @@ export default function ChatSpace({
           ))}
         </div>
       )}
+      {history && m.historyNext && (
+        <button disabled={m.historyLoading} onClick={() => void run(m.loadMore)}>
+          {m.historyLoading ? "正在读取…" : "更多历史对话"}
+        </button>
+      )}
       <div
         className="chat-conversation"
         ref={scroll}
@@ -212,7 +242,7 @@ export default function ChatSpace({
         ) : (
           m.thread.messages.map((message, index) => (
             <article key={message.id} className={`chat-message chat-message-${message.role}`}>
-              <header>
+              <header className={message.role === "user" ? "sr-only" : undefined}>
                 <strong>{message.role === "user" ? "我" : message.provider || "助手"}</strong>
                 <small>{message.model}</small>
               </header>
@@ -254,7 +284,7 @@ export default function ChatSpace({
                     }
                   >
                     <Icon name="copy" />
-                    复制
+                    <span className={message.role === "user" ? "sr-only" : undefined}>复制</span>
                   </button>
                   {message.role === "assistant" && (
                     <>
@@ -320,6 +350,26 @@ export default function ChatSpace({
         )}
       </div>
       <div className="chat-bottom">
+        {picking && attachment && (
+          <AttachmentPicker
+            source={attachment}
+            onClose={() => setPicking(false)}
+            onConfirm={(source) => {
+              setAttached(source);
+              setPicking(false);
+              m.closeContext();
+            }}
+          />
+        )}
+        {m.contextPreview && (
+          <ContextPreview
+            sources={m.contextPreview}
+            excluded={m.excluded}
+            toggle={m.toggleContext}
+            close={m.closeContext}
+            onOpen={onOpenAi}
+          />
+        )}
         {m.error && (
           <div role="alert" className="chat-alert">
             {m.error}
@@ -381,12 +431,12 @@ export default function ChatSpace({
                 ))}
               </select>
             </label>
-            <input
-              aria-label="本次模型"
-              placeholder="模型 ID"
+            <ModelPicker
+              key={m.thread.providerId}
+              provider={provider}
               disabled={m.busy || m.switching}
               value={m.thread.model}
-              onChange={(e) => m.change({ model: e.target.value })}
+              onChange={(model) => m.change({ model })}
             />
           </div>
           {attached && (
@@ -426,32 +476,41 @@ export default function ChatSpace({
                 type="button"
                 disabled={m.busy || m.switching || !attachment}
                 title={attachment ? "预览后随下一条消息发送" : "先在阅读空间打开文字文档"}
-                onClick={() => setAttached(attachment ?? null)}
+                onClick={() => setPicking(true)}
               >
                 <Icon name="file" />
-                附加当前文档
+                引用文档或选区
               </button>
-              <details className="chat-context-options">
+              <button
+                type="button"
+                disabled={m.busy || m.switching || m.contextLoading || !m.draft.trim()}
+                onClick={() => void m.previewContext(attached ? [attached] : [])}
+              >
+                {m.contextLoading ? "正在检索…" : "预览上下文"}
+              </button>
+              <details className="chat-context-options" ref={contextOptions}>
                 <summary>{m.thread.useMemory ? "已开启 AI 库召回" : "AI 库召回"}</summary>
-                <label className="chat-checkbox">
-                  <input
-                    disabled={m.busy || m.switching}
-                    type="checkbox"
-                    checked={m.thread.useMemory}
-                    onChange={(e) => m.change({ useMemory: e.target.checked })}
-                  />
-                  发送相关知识与记忆
-                </label>
-                <label>
-                  项目范围
-                  <input
-                    disabled={m.busy || m.switching}
-                    value={m.thread.project}
-                    placeholder="留空仅使用全局资料"
-                    onChange={(e) => m.change({ project: e.target.value })}
-                  />
-                </label>
-                <small>项目资料仅在填写对应项目时使用。普通笔记不会自动加入。</small>
+                <div className="chat-context-fields">
+                  <label className="chat-checkbox">
+                    <input
+                      disabled={m.busy || m.switching}
+                      type="checkbox"
+                      checked={m.thread.useMemory}
+                      onChange={(e) => m.change({ useMemory: e.target.checked })}
+                    />
+                    发送相关知识与记忆
+                  </label>
+                  <label>
+                    项目范围
+                    <input
+                      disabled={m.busy || m.switching}
+                      value={m.thread.project}
+                      placeholder="留空仅使用全局资料"
+                      onChange={(e) => m.change({ project: e.target.value })}
+                    />
+                  </label>
+                  <small>项目资料仅在填写对应项目时使用。普通笔记不会自动加入。</small>
+                </div>
               </details>
             </div>
             {m.busy ? (
@@ -464,7 +523,13 @@ export default function ChatSpace({
                 className="primary-action"
                 type="submit"
                 disabled={
-                  m.switching || !m.ready || !m.draft.trim() || !provider || !assistant || !m.thread.model.trim()
+                  m.switching ||
+                  m.contextLoading ||
+                  !m.ready ||
+                  !m.draft.trim() ||
+                  !provider ||
+                  !assistant ||
+                  !m.thread.model.trim()
                 }
               >
                 <Icon name="send" />

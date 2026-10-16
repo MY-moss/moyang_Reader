@@ -1,6 +1,77 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { AiAsset } from "../../shared/ai-types";
 import { downloadAi } from "./transfers";
+import { aiRequest } from "../../platform/ai-bridge";
+type Reference = { id: string; revision: number; path: string };
+export function ResourceReference(props: Reference) {
+  const [open, setOpen] = useState(false);
+  const previewId = useId();
+  return (
+    <div>
+      <button type="button" aria-expanded={open} aria-controls={previewId} onClick={() => setOpen(!open)}>
+        {props.path}
+      </button>
+      {open && (
+        <aside id={previewId} className="ai-resource-preview" aria-label="资源预览">
+          <div>
+            <strong>{props.path}</strong>
+            <button type="button" aria-label="关闭资源预览" onClick={() => setOpen(false)}>
+              关闭
+            </button>
+          </div>
+          <LazyResource {...props} />
+        </aside>
+      )}
+    </div>
+  );
+}
+export function LazyResource({ id, revision, path }: Reference) {
+  const [asset, setAsset] = useState<AiAsset | null>(null),
+    [error, setError] = useState(""),
+    [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setAsset(null);
+    setError("");
+    void aiRequest<AiAsset>("asset", { id, revision, path })
+      .then((a) => {
+        if (alive) setAsset(a);
+      })
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, revision, path, retry]);
+  if (error)
+    return (
+      <p role="alert">
+        {error} <button onClick={() => setRetry((n) => n + 1)}>重试</button>
+      </p>
+    );
+  if (!asset) return <p role="status">正在读取资源…</p>;
+  return (
+    <div>
+      <ResourcePreview asset={asset} />
+      <button
+        onClick={() => {
+          try {
+            const bytes =
+              asset.encoding === "utf8"
+                ? new TextEncoder().encode(asset.content)
+                : Uint8Array.from(atob(asset.content), (c) => c.charCodeAt(0));
+            void downloadAi(path.split("/").pop()!, bytes, "resource").catch((e) => setError(String(e)));
+          } catch (e) {
+            setError(String(e));
+          }
+        }}
+      >
+        下载此资源
+      </button>
+    </div>
+  );
+}
 export function AiResources({
   assets,
   onChange,

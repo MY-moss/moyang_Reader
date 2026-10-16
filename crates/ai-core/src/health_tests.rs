@@ -52,6 +52,7 @@ fn health_scopes_duplicates_without_models_or_mutations() {
         enabled: true,
         endpoint: "http://127.0.0.1:1".into(),
         model: "unavailable".into(),
+        ..Default::default()
     })
     .unwrap();
     let before = serde_json::to_value(s.backup().unwrap()).unwrap();

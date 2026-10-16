@@ -190,8 +190,12 @@ fn same_server_target(left: &Value, right: &Value) -> bool {
     };
     left.as_object().is_some_and(|v| v.len() == 2)
         && right.as_object().is_some_and(|v| v.len() == 2)
-        && left_args.len() == 2
-        && right_args.len() == 2
+        && [2, 4].contains(&left_args.len())
+        && [2, 4].contains(&right_args.len())
+        && (left_args.len() == 2 || left_args[2] == "--profile")
+        && (right_args.len() == 2 || right_args[2] == "--profile")
+        && left_args.get(3).and_then(Value::as_str).unwrap_or("full")
+            == right_args.get(3).and_then(Value::as_str).unwrap_or("full")
         && left_args[0] == "--data-dir"
         && right_args[0] == "--data-dir"
         && same_path(&left["command"], &right["command"])
@@ -206,13 +210,36 @@ pub fn configure_client(
     action: &str,
 ) -> Result<Value> {
     if !["codex", "claude"].contains(&client)
-        || !["status", "install", "uninstall"].contains(&action)
+        || ![
+            "status",
+            "install",
+            "uninstall",
+            "profile_compact",
+            "profile_full",
+        ]
+        .contains(&action)
     {
         return Err(invalid("未知客户端操作。"));
     }
     let data = store.path.parent().unwrap();
     let key = format!("client-install:{client}");
     let manifest = store.setting_value(&key)?;
+    let selected_profile = match action {
+        "profile_compact" => Some("compact"),
+        "profile_full" => Some("full"),
+        _ => manifest["server"]["args"][3].as_str().or_else(|| {
+            if manifest["server"].is_object() {
+                None
+            } else {
+                Some("compact")
+            }
+        }),
+    };
+    let action = if action.starts_with("profile_") {
+        "install"
+    } else {
+        action
+    };
     // Keep both completed and interrupted installations until both files are updated.
     let owned: Vec<&Value> = std::iter::once(&manifest)
         .chain(manifest["pending"].as_array().into_iter().flatten())
@@ -229,7 +256,10 @@ pub fn configure_client(
     };
     let before = read(&config_path)?;
     let hook_before = read(&hook_path)?;
-    let target = json!({"command":exe,"args":["--data-dir",data]});
+    let target = match selected_profile {
+        Some(profile) => json!({"command":exe,"args":["--data-dir",data,"--profile",profile]}),
+        None => json!({"command":exe,"args":["--data-dir",data]}),
+    };
     // Keep the exact installed spelling and hook definitions for the same files.
     // A CLI forward-slash path and the desktop's Windows path must not look like
     // a reinstall or invalidate client trust and successful connection receipts.
@@ -403,8 +433,15 @@ pub fn configure_client(
             receipts[&field] = Value::Null;
         }
     }
+    let service = store.setting_value(&format!("connection-service:{client}"))?;
+    let profile = desired["args"][3].as_str().unwrap_or("full");
+    let expected = build_identity();
+    let needs_reconnect = service["build"]["version"] != expected["version"]
+        || service["build"]["revision"] != expected["revision"]
+        || service["profile"] != profile
+        || receipts["mcp_at"].is_null();
     Ok(
-        json!({"client":client,"configured":configured,"hooks_configured":hooks_configured,"config_path":config_path,"hook_path":hook_path,"receipts":receipts,"historical_receipts":historical_receipts,"trust_hint":if client=="codex"{"在 Codex 输入 /hooks，检查并信任 Moyang 的四项钩子。"}else{"重启 Claude Code；若客户端要求确认钩子，请在客户端完成。"}}),
+        json!({"client":client,"configured":configured,"profile":profile,"service":service,"needs_reconnect":needs_reconnect,"hooks_configured":hooks_configured,"config_path":config_path,"hook_path":hook_path,"receipts":receipts,"historical_receipts":historical_receipts,"trust_hint":if client=="codex"{"在 Codex 输入 /hooks，检查并信任 Moyang 的四项钩子。"}else{"重启 Claude Code；若客户端要求确认钩子，请在客户端完成。"}}),
     )
 }
 
@@ -631,7 +668,18 @@ mod tests {
                 let r = configure_client(&s, &paths, &exe, client, "install").unwrap();
                 assert_eq!(r["configured"], true);
                 assert_eq!(r["hooks_configured"], true);
+                assert_eq!(r["profile"], "compact");
             }
+            let full = configure_client(&s, &paths, &exe, client, "profile_full").unwrap();
+            assert_eq!(full["profile"], "full");
+            assert_eq!(
+                configure_client(&s, &paths, &exe, client, "install").unwrap()["profile"],
+                "full"
+            );
+            assert_eq!(
+                configure_client(&s, &paths, &exe, client, "profile_compact").unwrap()["profile"],
+                "compact"
+            );
             configure_client(&s, &paths, &exe, client, "uninstall").unwrap();
         }
         assert!(read(&paths.codex.join("config.toml"))

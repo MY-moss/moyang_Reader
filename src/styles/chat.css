@@ -7,6 +7,51 @@
   background: var(--canvas);
   color: var(--ink);
 }
+.chat-context-preview {
+  max-height: min(45vh, 440px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.chat-context-preview header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.chat-context-preview > div {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.chat-context-preview label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-context-preview small {
+  display: block;
+}
+.chat-context-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-context-preview textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  max-height: 220px;
+  resize: vertical;
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 10px;
+}
 .chat-header,
 .chat-settings > header {
   display: flex;
@@ -75,6 +120,7 @@
 .chat-space select,
 .chat-save-panel textarea,
 .chat-settings input,
+.chat-settings textarea,
 .chat-settings select {
   min-height: 36px;
   padding: 7px 10px;
@@ -206,7 +252,25 @@
 .chat-message-user {
   background: var(--surface-strong);
   border-radius: 10px;
-  padding: 16px 20px;
+  padding: 10px 42px 10px 14px;
+  width: fit-content;
+  max-width: 85%;
+  margin-left: auto;
+  position: relative;
+}
+.chat-message-user .chat-plain {
+  line-height: 1.65;
+}
+.chat-message-user > .chat-message-actions {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  margin: 0;
+}
+.chat-message-user > .chat-message-actions button {
+  min-height: 28px;
+  width: 28px;
+  padding: 5px;
 }
 .chat-plain {
   white-space: pre-wrap;
@@ -299,7 +363,7 @@
   min-width: 100px;
 }
 .chat-model-bar select,
-.chat-model-bar > input {
+.chat-model-picker input {
   width: 100%;
   min-width: 0;
   padding: 5px 7px;
@@ -308,9 +372,22 @@
   border: 1px solid transparent;
   color: var(--muted);
 }
-.chat-model-bar > input {
+.chat-model-picker {
   flex: 1.1;
   min-width: 100px;
+  max-width: 100%;
+}
+.chat-model-picker label {
+  display: block;
+}
+.chat-model-picker input {
+  border-color: var(--line);
+  margin-top: 5px;
+}
+.chat-settings textarea {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.6;
 }
 .chat-composer textarea {
   width: 100%;
@@ -346,11 +423,11 @@
   position: relative;
   font-size: 12px;
 }
-.chat-context-options[open] {
+.chat-context-options[open] .chat-context-fields {
   position: absolute;
-  bottom: 74px;
-  left: max(24px, calc((100% - 820px) / 2));
-  width: min(340px, calc(100% - 48px));
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: min(300px, calc(100vw - 48px));
   padding: 16px;
   z-index: 11;
   border: 1px solid var(--line);

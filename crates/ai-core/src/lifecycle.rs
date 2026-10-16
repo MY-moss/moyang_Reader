@@ -114,16 +114,14 @@ fn read_payload<T: serde::de::DeserializeOwned>(
             |r| r.get(0),
         )
         .optional()?;
-    Ok(serde_json::from_str(
-        &raw.ok_or_else(|| invalid("活动或任务记录不存在。"))?,
-    )?)
+    crate::resources::decode(conn, &raw.ok_or_else(|| invalid("活动或任务记录不存在。"))?)
 }
 fn write_checkpoint(tx: &Transaction, c: &Checkpoint) -> Result<()> {
     tx.execute("INSERT INTO checkpoints(id,client,session,turn,status,updated,payload) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,updated=excluded.updated,payload=excluded.payload",params![c.id,c.client,c.session,c.turn,c.status,c.updated_at,serde_json::to_string(c)?])?;
     Ok(())
 }
 fn write_conflict(tx: &Transaction, c: &MemoryConflict) -> Result<()> {
-    tx.execute("INSERT INTO conflicts(id,status,updated,payload) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,updated=excluded.updated,payload=excluded.payload",params![c.id,c.status,c.updated_at,serde_json::to_string(c)?])?;
+    tx.execute("INSERT INTO conflicts(id,status,updated,payload) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,updated=excluded.updated,payload=excluded.payload",params![c.id,c.status,c.updated_at,crate::resources::encode(tx,c)?])?;
     Ok(())
 }
 fn write_activity(tx: &Transaction, a: &Activity) -> Result<()> {
@@ -142,7 +140,7 @@ fn apply_decision(
     } else {
         let payload:Option<String>=tx.query_row("SELECT payload FROM records WHERE fingerprint=? AND state='active' AND (expires IS NULL OR expires>?) LIMIT 1",params![crate::store::fingerprint(&q.fields)?,now()],|r|r.get(0)).optional()?;
         payload
-            .map(|s| serde_json::from_str::<Record>(&s))
+            .map(|s| crate::resources::decode::<Record>(tx, &s))
             .transpose()?
     };
     let reason = q.reason.clone();
@@ -335,7 +333,7 @@ impl Store {
             ))?;
             let rows = stmt
                 .query_map([], |r| r.get::<_, String>(0))?
-                .map(|r| Ok(serde_json::from_str(&r?)?))
+                .map(|r| crate::resources::decode(&self.conn, &r?))
                 .collect();
             rows
         };
@@ -401,7 +399,7 @@ impl Store {
                 params![current.id, revision],
                 |r| r.get(0),
             )?;
-            let old: Record = serde_json::from_str(&raw)?;
+            let old: Record = crate::resources::decode(&tx, &raw)?;
             current.fields = old.fields;
             current.state = old.state;
         } else {
@@ -436,7 +434,7 @@ impl Store {
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )?;
         Ok(Revision {
-            record: serde_json::from_str(&raw)?,
+            record: crate::resources::decode(&self.conn, &raw)?,
             reason,
             recorded_at,
         })

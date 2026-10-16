@@ -9,7 +9,7 @@ import type {
   AiRevisionSummary,
   AiRevisionView,
 } from "../../shared/ai-types";
-import { ResourcePreview } from "./AiResources";
+import { ResourcePreview, LazyResource } from "./AiResources";
 
 function ResourceChange({
   record,
@@ -70,7 +70,13 @@ function ResourceChange({
           </section>
           <section>
             <h4>当前版本</h4>
-            {currentAsset ? <ResourcePreview asset={currentAsset} /> : <p>该资源已移除。</p>}
+            {currentAsset ? (
+              <ResourcePreview asset={currentAsset} />
+            ) : current ? (
+              <LazyResource id={record.id} revision={record.revision} path={path} />
+            ) : (
+              <p>该资源已移除。</p>
+            )}
           </section>
         </div>
       )}
@@ -191,7 +197,9 @@ export function AiHistory({
   const getResources = useCallback(() => {
     const key = `${record.id}:${record.revision}`;
     if (metadata.current?.key !== key) {
-      const value = Promise.all(latest.current.assets.map(resourceMetadata));
+      const value = latest.current.resources
+        ? Promise.resolve(latest.current.resources)
+        : Promise.all(latest.current.assets.map(resourceMetadata));
       metadata.current = { key, value };
       void value.catch(() => {
         if (metadata.current?.value === value) metadata.current = null;

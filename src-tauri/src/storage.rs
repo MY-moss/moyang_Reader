@@ -36,10 +36,9 @@ fn measure(path: &Path) -> Result<(u64, u64), String> {
         {
             use std::os::windows::fs::MetadataExt;
             if metadata.file_attributes() & 0x400 != 0 {
-                return Err(format!(
-                    "目录内部含有路径链接，请先单独整理：{}",
-                    entry.path().display()
-                ));
+                // Independently moved categories remain links. Their bytes are counted at
+                // the actual category location, never recursively followed through a parent.
+                continue;
             }
         }
         if metadata.is_dir() {
@@ -81,28 +80,20 @@ fn locations(app: &tauri::AppHandle) -> Result<Vec<Location>, String> {
         .map(Ok)
         .unwrap_or_else(|| app.path().app_local_data_dir().map_err(|e| e.to_string()))?;
     candidates.push(("webview", "界面与浏览器缓存", webview));
-    if let Some(exe) = moyang_ai_core::local_model_runtime() {
-        if let Some(runtime) = exe
-            .parent()
-            .filter(|p| p.file_name().is_some_and(|n| n == "runtime"))
-        {
-            candidates.push((
-                "models",
-                "本应用的本地模型",
-                runtime.parent().unwrap().join("models"),
-            ));
-        }
-    }
+    let ai=crate::data_paths::ai_directory(app)?;
+    let store=moyang_ai_core::Store::open(&ai).map_err(|e|e.to_string())?;
+    candidates.push(("models","本应用的本地模型",store.model_directory().map_err(|e|e.to_string())?));
+    candidates.push(("snapshots","AI 自动快照",ai.join("snapshots")));
+    candidates.push(("chat","API 服务与聊天记录",crate::data_paths::config_directory(app)?.join("chat")));
+    candidates.push(("extensions","扩展安装与配置",crate::data_paths::config_directory(app)?.join("extensions")));
+    candidates.push(("downloads","应用更新与保留版本",crate::online_update::release_root(&std::env::current_exe().map_err(|e|e.to_string())?)?));
     let mut result: Vec<Location> = Vec::new();
     for (key, label, logical) in candidates {
-        if !logical.exists() {
-            continue;
-        }
+        fs::create_dir_all(&logical).map_err(|e|e.to_string())?;
         let actual = physical(&logical)?;
-        if result.iter().any(|p| actual.starts_with(&p.physical)) {
+        if result.iter().any(|p| actual==p.physical) {
             continue;
         }
-        result.retain(|p| !p.physical.starts_with(&actual));
         let (bytes, files) = measure(&actual)?;
         result.push(Location {
             key: key.into(),
@@ -187,6 +178,7 @@ pub async fn storage_prepare(
     app: tauri::AppHandle,
     state: State<'_, StorageMigration>,
     include_models: bool,
+    category: Option<String>,
 ) -> Result<Value, String> {
     let target = state
         .0
@@ -195,12 +187,18 @@ pub async fn storage_prepare(
         .clone()
         .ok_or("请先选择新的存储文件夹。")?;
     tauri::async_runtime::spawn_blocking(move || {
-        let items: Vec<_> = locations(&app)?
+        let requested=category.as_deref().filter(|s|*s!="all");
+        let all_locations=locations(&app)?;
+        let models=all_locations.iter().find(|p|p.key=="models").map(|p|p.physical.clone());
+        let candidates: Vec<_> = all_locations
             .into_iter()
-            .filter(|p| include_models || p.key != "models")
+            .filter(|p| requested.map(|key|p.key==key).unwrap_or(p.key!="downloads" && (include_models || p.key!="models")))
             .collect();
+        if candidates.is_empty(){return Err("所选存储分类不存在，请刷新后重试。".into());}
+        let items:Vec<_>=candidates.iter().filter(|p|!candidates.iter().any(|other|p.key!=other.key && p.physical.starts_with(&other.physical))).cloned().collect();
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let plan = json!({"target":target,"items":items,"executable":exe,"pid":std::process::id()});
+        let moves_models=models.is_some_and(|path|items.iter().any(|p|path.starts_with(&p.physical)));
+        let plan = json!({"target":target,"items":items,"moves_models":moves_models,"executable":exe,"pid":std::process::id()});
         let script = helper()?;
         let file = work_directory().join(format!("plan-{}.json", std::process::id()));
         fs::write(&file, serde_json::to_vec(&plan).map_err(|e| e.to_string())?)

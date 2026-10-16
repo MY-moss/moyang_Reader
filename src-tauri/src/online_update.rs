@@ -104,7 +104,7 @@ fn child(root: &Path, name: &str) -> Option<PathBuf> {
     }
     Some(root.join(name))
 }
-fn release_root(exe: &Path) -> Result<PathBuf, String> {
+pub(crate) fn release_root(exe: &Path) -> Result<PathBuf, String> {
     let directory = exe.parent().ok_or("无法定位应用目录。")?;
     let parent = directory.parent().ok_or("无法定位更新目录。")?;
     if directory.join("online-update.json").is_file()

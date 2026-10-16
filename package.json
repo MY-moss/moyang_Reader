@@ -1,6 +1,6 @@
 {
   "name": "moyang-reader-next",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -28,7 +28,9 @@
     "start": "powershell.exe -NoProfile -File scripts/start-reader.ps1",
     "package": "node scripts/package-portable.mjs",
     "clean:preview": "powershell.exe -NoProfile -File scripts/clean-workspace.ps1",
-    "clean": "powershell.exe -NoProfile -File scripts/clean-workspace.ps1 -Apply"
+    "clean": "powershell.exe -NoProfile -File scripts/clean-workspace.ps1 -Apply",
+    "archive:preview": "powershell.exe -NoProfile -File scripts/archive-releases.ps1",
+    "archive": "powershell.exe -NoProfile -File scripts/archive-releases.ps1 -Apply"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

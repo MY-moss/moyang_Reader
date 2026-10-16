@@ -109,6 +109,21 @@ pub fn run() {
         .plugin(tauri_plugin_wdio_webdriver::init());
 
     builder
+        .setup(|app| {
+            let handle=app.handle().clone();
+            std::thread::spawn(move || {
+                let initialize=|| -> Result<(),String> {
+                    let path=data_paths::ai_directory(&handle)?;
+                    let services=data_paths::config_directory(&handle)?.join("chat");
+                    let store=moyang_ai_core::Store::open(&path).map_err(|e|e.to_string())?;
+                    store.bind_services(&services).map_err(|e|e.to_string())?;
+                    moyang_ai_core::maintain_organization(&path);
+                    Ok(())
+                };
+                if let Err(error)=initialize(){let _=handle.emit("ai-background-error",error);}
+            });
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let WindowEvent::CloseRequested { api, .. } = event {

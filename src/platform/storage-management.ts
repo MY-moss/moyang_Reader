@@ -19,6 +19,6 @@ export type StoragePlan = { target: string; items: StorageLocation[]; bytes: num
 export const storageInfo = (): Promise<StorageInfo> =>
   isTauriRuntime() ? invoke("storage_info") : Promise.resolve({ native: false, locations: [] });
 export const chooseStorageTarget = (): Promise<string | null> => invoke("storage_choose_target");
-export const prepareStorageMove = (includeModels: boolean): Promise<StoragePlan> =>
-  invoke("storage_prepare", { includeModels });
+export const prepareStorageMove = (includeModels: boolean, category = "all"): Promise<StoragePlan> =>
+  invoke("storage_prepare", { includeModels, category });
 export const startStorageMove = (): Promise<void> => invoke("storage_start");

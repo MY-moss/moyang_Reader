@@ -33,9 +33,13 @@
 
 阅读插件只在调用时创建 Worker，完成、取消或 15 秒超时后释放。只读命令返回报告；修改命令先显示原文与建议，采用后经过既有撤销、草稿、自动保存和外部修改检查。运行期间文档发生变化时不能覆盖新内容。默认支持 Markdown/TXT；声明 docx 的只读命令可收到提取正文，PDF 和图片不进入文本插件。
 
+0.17 更新了「阅读概览」和「段落留白整理」至 1.0.1，可在更新列表逐项安装。阅读概览按正式 Markdown 标题生成大纲，支持下划线形式的标题，忽略嵌套代码示例；留白整理保留 Markdown 围栏代码、缩进代码和 YAML/TOML 文档属性里的空行，也保留原有换行与硬换行。
+
 ## 技能更新和 MCP
 
 技能沿用现有版本、资源与检索，不新增第二套技能库。作者新版会检查上次安装对应的修订号；你或 Agent 改进过的内容不会被覆盖，可选择保留原技能并安装副本。卸载扩展记录不会删除技能和历史，归档或删除在 AI 空间完成。整体迁移时同时备份 AI 空间。
+
+技能库和扩展安装记录分别保存。如果技能内容已经写入、安装记录随后保存失败，界面会明确说明；先点击「重新读取安装状态」，再重试安装。应用核对内容和修订后接续保存安装记录，不重复改写技能；失败后你或 Agent 再次改进过技能时，仍要求保留原技能并安装副本。
 
 直接导入没有版本字段的 SKILL.md 时，应用按本地修订递增版本，不要求手写扩展清单。中文技能名称使用稳定的独立 ID，重复导入同一名称可更新，不同中文名称不会互相覆盖。
 
@@ -70,6 +74,8 @@ JSON 包必填 `format: moyang-extension`、稳定 `id`、`name`、三段数字 
 入口必须是已经打包成单文件的 ES 模块，默认导出函数，可返回 Promise。输入字段为 `command`、`text`、`path`、`title`、`format`。输出 `{report?: string, replacement?: string}`；返回 replacement 的命令必须声明 `modifiesDocument: true`。不要引用 Obsidian/Node/Tauri API；这里没有对应运行时。Worker 保持界面响应，不能把它当成可以运行不可信代码的强安全边界。
 
 0.14 新增可选 `documentAnalysis: true`（最低宿主版本必须设为 `0.14.0`）。处理 Markdown 时，宿主在 Worker 内提供 `input.analysis`：`headings`、`tasks`、`links`、`tables`。使用正式 Markdown/GFM 解析，忽略代码块和 frontmatter；每项含 `line`（从 1 开始）、`from`/`to`（原始文字的 UTF-16 起止偏移）。标题另含 `depth,text`，任务含 `checked,text`，链接含 `text,url,image`，表格含二维 `rows`。其他格式不提供该字段，插件应声明适用格式。
+
+0.17 的分析结果另提供 `protectedRanges`，包含代码块和 YAML/TOML 属性块的原文位置，便于修改命令保留这些区域。依赖此字段的插件应声明最低宿主版本 `0.17.0`。
 
 新增输出：`findings?: {label,detail?,line,from,to}[]` 与 `files?: {name,content}[]`。前者由宿主定位原文，后者仅在用户选择后保存；支持 Markdown、TXT、CSV，同次最多 32 个、合计 16 MiB 的文本文件。文件名必须唯一且不带路径。无效位置或文件格式会显示错误，不执行文件写入。旧的 report/replacement 插件保持兼容。
 

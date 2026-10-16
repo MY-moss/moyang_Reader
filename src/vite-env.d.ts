@@ -17,3 +17,4 @@ interface Window {
 }
 
 declare const __MOYANG_DESKTOP_E2E__: boolean;
+declare const __MOYANG_VERSION__: string;

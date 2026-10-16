@@ -9,6 +9,7 @@ const Wysiwyg = lazy(() =>
 );
 const Source = lazy(() => import("../editor/components/SourceEditor").then((m) => ({ default: m.SourceEditor })));
 export type AiDraft = {
+  deferred?: boolean;
   fields: AiFields;
   id?: string;
   key?: string;
@@ -16,6 +17,7 @@ export type AiDraft = {
   baseBody?: string;
   dirty?: boolean;
   saveError?: string;
+  pendingImport?: boolean;
   merge?: { ids: string[]; revisions: number[] };
 };
 export function AiEditor({
@@ -84,19 +86,57 @@ export function AiEditor({
         }
       }}
     >
+      {draft.pendingImport && (
+        <section className="ai-import-destination" aria-label="确认导入范围">
+          <strong>导入草稿 · 尚未入库</strong>
+          <p>
+            目标：{f.sharing === "project" ? f.project || "请填写项目" : "全局资料"}
+            。确认后才开始入库和自动保存；关闭后可继续这份草稿。
+          </p>
+          <label>
+            导入范围
+            <select
+              value={f.sharing}
+              onChange={(e) =>
+                change({
+                  sharing: e.target.value as AiFields["sharing"],
+                  project: e.target.value === "global" ? "" : f.project,
+                })
+              }
+            >
+              <option value="global">仅全局</option>
+              <option value="project">具体项目</option>
+            </select>
+          </label>
+          {f.sharing === "project" && (
+            <label>
+              导入项目
+              <input required value={f.project} onChange={(e) => change({ project: e.target.value })} />
+            </label>
+          )}
+        </section>
+      )}
       <div className="ai-detail-toolbar">
         <span>
           {aiKinds.find((k) => k.key === f.kind)?.label} / {draft.merge ? "整理合并" : draft.id ? "编辑" : "新建"}
         </span>
         <div>
           <span role="status">
-            {busy ? "正在保存" : draft.saveError ? "保存未完成" : draft.dirty ? "草稿已暂存" : "已保存"}
+            {busy
+              ? "正在保存"
+              : draft.saveError
+                ? "保存未完成"
+                : draft.pendingImport
+                  ? "待确认导入"
+                  : draft.dirty
+                    ? "草稿已暂存"
+                    : "已保存"}
           </span>
           <button type="button" onClick={onCancel} disabled={busy}>
             放弃草稿
           </button>
           <button className="ai-primary" type="submit" disabled={busy || resourceLoading}>
-            保存内容
+            {draft.pendingImport ? "确认导入" : "保存内容"}
           </button>
         </div>
       </div>
@@ -141,6 +181,7 @@ export function AiEditor({
             <label>
               共享范围
               <select
+                aria-label="共享范围"
                 value={f.sharing ?? "legacy"}
                 onChange={(e) =>
                   change({

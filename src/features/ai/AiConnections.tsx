@@ -1,19 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { aiConnection, aiRequest } from "../../platform/ai-bridge";
+import { isTauriRuntime } from "../../platform/bridge";
 import type { AiConnection, AiSemantic, AiStats } from "../../shared/ai-types";
 import { exportAiBackup } from "./transfers";
 import { AiClientConnections } from "./AiClientConnections";
+import { AiModelManager } from "./AiModelManager";
+import { chatRequest } from "../../platform/chat";
+import type { ChatProvider } from "../../shared/chat-types";
 export const agentGuide = `开始任务时，用 recall_context 按当前项目和任务检索相关知识、记忆和技能。只读取需要的详情。
 优先沿用生命周期钩子提供的原始 checkpoint_id；没有钩子时用 task_checkpoint 建立本轮检查点。
 任务结束用 conclude_task 保存有证据的长期结论；没有新信息就提交 decisions=[] 和原因，不存整段聊天、进度或猜测。钩子补充回合继续使用原检查点。
-发现过时信息时，先 get_record 读取当前版本，再用 expected_revision 修订；不要直接覆盖其他 Agent 的更新。
-用 search(kind="skill") 发现方法，再按需读取技能和资源。使用后可用 memory_feedback 标记帮助程度。
-相近记忆经过核对后用 merge_memories 合并；不再适用的内容归档。每次任务积累有用信息，而不是反复堆积重复记录。`;
+用 read_context 按 L0 目录、L1 概览、L2 正文、L3 历史逐步读取；用 patch_record 和 expected_revision 只修改必要字段。
+用 recall_context 的 kinds=["skill"] 发现方法，再按需读取技能和资源。保留原有共享范围，不反复堆积重复记录。
+仅当已读内容仍在当前上下文时回传 receipt；上下文压缩、重启、项目切换或 Agent 交接后使用新的 context_id 并重新召回。`;
 export function AiConnections({
+  active = true,
+  dataVersion = 0,
   stats,
   refresh,
   notify,
 }: {
+  active?: boolean;
+  dataVersion?: number;
   stats: AiStats | null;
   refresh: () => void;
   notify: (message: string, error?: boolean) => void;
@@ -24,7 +32,7 @@ export function AiConnections({
   );
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
-  const [modelStatus, setModelStatus] = useState<{ running: boolean; model_ready: boolean } | null>(null);
+  const [providers, setProviders] = useState<ChatProvider[]>([]);
   const stop = useRef(false);
   const importRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -36,20 +44,21 @@ export function AiConnections({
     };
   }, [notify]);
   useEffect(() => {
-    if (info?.native)
-      void aiRequest<{ running: boolean; model_ready: boolean }>("local_model", { action: "status" })
-        .then(setModelStatus)
-        .catch((e) => notify(String(e), true));
-  }, [info?.native, notify]);
+    void chatRequest<ChatProvider[]>("providers")
+      .then(setProviders)
+      .catch((e) => notify(String(e), true));
+  }, [notify]);
   const copy = (text: string) =>
     void navigator.clipboard
       .writeText(text)
       .then(() => notify("已复制。"))
       .catch((e) => notify(String(e), true));
-  const server = info ? { command: info.executable, args: ["--data-dir", info.directory] } : null;
+  const server = info
+    ? { command: info.executable, args: ["--data-dir", info.directory, "--profile", "compact"] }
+    : null;
   const json = JSON.stringify({ mcpServers: { "moyang-ai": server } }, null, 2);
   const toml = info
-    ? `[mcp_servers.moyang-ai]\ncommand = ${JSON.stringify(info.executable)}\nargs = ["--data-dir", ${JSON.stringify(info.directory)}]`
+    ? `[mcp_servers.moyang-ai]\ncommand = ${JSON.stringify(info.executable)}\nargs = ["--data-dir", ${JSON.stringify(info.directory)}, "--profile", "compact"]`
     : "";
   async function index() {
     setBusy(true);
@@ -105,7 +114,9 @@ export function AiConnections({
               : "尚未找到 MCP 可执行文件。请在本项目运行 npm run build:mcp，再刷新此页。"
             : "浏览器预览使用独立存储。请启动桌面版，获取可用的本机连接配置。"}
         </p>
-        {info?.native && <AiClientConnections available={info.available} notify={notify} />}
+        {info?.native && (
+          <AiClientConnections active={active} dataVersion={dataVersion} available={info.available} notify={notify} />
+        )}
         {info?.native && (
           <>
             <div className="ai-config-heading">
@@ -138,40 +149,15 @@ export function AiConnections({
         <h2>
           语义检索 <span className="ai-muted">可选</span>
         </h2>
-        <p>基础检索无需模型。已有 Ollama 时，可建立语义索引，让不同说法也能找到相关内容。</p>
+        <p>基础检索无需模型。选择本地模型或自己的嵌入 API，让不同说法也能找到相关内容。</p>
         {info?.native && (
-          <div className="ai-model-setup">
-            <p>
-              {modelStatus?.model_ready
-                ? "本地嵌入模型已安装"
-                : modelStatus?.running
-                  ? "Ollama 已运行，等待安装嵌入模型"
-                  : "本地模型服务尚未运行"}
-            </p>
-            <button
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setProgress("正在准备本地模型，首次下载约 639 MB…");
-                try {
-                  const status = await aiRequest<{ running: boolean; model_ready: boolean }>("local_model", {
-                    action: "install",
-                  });
-                  setModelStatus(status);
-                  if (status.model_ready)
-                    setConfig({ enabled: true, endpoint: "http://127.0.0.1:11434", model: "qwen3-embedding:0.6b" });
-                  setProgress("模型已就绪，可建立或补齐索引。");
-                  refresh();
-                } catch (e) {
-                  notify(String(e), true);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {modelStatus?.model_ready ? "启动并使用本地模型" : "准备本地模型"}
-            </button>
-          </div>
+          <AiModelManager
+            onUse={(c) => {
+              setConfig(c);
+              refresh();
+            }}
+            notify={notify}
+          />
         )}
         <fieldset disabled={!info?.native || busy}>
           <label className="ai-checkbox">
@@ -180,20 +166,54 @@ export function AiConnections({
               checked={config.enabled}
               onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
             />
-            启用 Ollama 语义检索
+            启用语义检索
           </label>
           <div className="ai-form-grid">
             <label>
-              服务地址
-              <input value={config.endpoint} onChange={(e) => setConfig({ ...config, endpoint: e.target.value })} />
+              嵌入方式
+              <select
+                value={config.protocol || "ollama"}
+                onChange={(e) => setConfig({ ...config, protocol: e.target.value as "ollama" | "openai" })}
+              >
+                <option value="ollama">本地或远程 Ollama</option>
+                <option value="openai">我的嵌入 API（OpenAI 兼容）</option>
+              </select>
             </label>
+            {config.protocol === "openai" ? (
+              <label>
+                嵌入 API 服务
+                <select
+                  value={config.provider || ""}
+                  onChange={(e) => {
+                    const p = providers.find((p) => p.id === e.target.value);
+                    setConfig({ ...config, provider: e.target.value, endpoint: p?.baseUrl ?? "" });
+                  }}
+                >
+                  <option value="">请先在设置 → AI 服务与整理中添加服务</option>
+                  {providers
+                    .filter((p) => p.protocol === "openai")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ) : (
+              <label>
+                服务地址
+                <input value={config.endpoint} onChange={(e) => setConfig({ ...config, endpoint: e.target.value })} />
+              </label>
+            )}
             <label>
-              已安装的嵌入模型
+              嵌入模型名称
               <input value={config.model} onChange={(e) => setConfig({ ...config, model: e.target.value })} />
             </label>
           </div>
           <p className="ai-muted">
-            模型需先在 Ollama 中安装。服务地址指定为远程时，建立索引和检索会将相应文本发送到该地址。
+            外部 API
+            建立索引和检索会发送对应文本，并可能产生服务用量。它与聊天、后台整理分别选模型；后台整理的每日额度不包含嵌入
+            API。模型改变后使用独立索引，期间关键词检索仍可用。
           </p>
           <div className="ai-inline-actions">
             <button
@@ -253,7 +273,26 @@ export function AiConnections({
           >
             导出完整备份
           </button>
-          <button onClick={() => importRef.current?.click()}>导入备份</button>
+          <button
+            onClick={() => {
+              if (!isTauriRuntime()) {
+                importRef.current?.click();
+                return;
+              }
+              void aiRequest<{ imported: number; skipped: number; skipped_activity?: number } | null>("import_archive")
+                .then((result) => {
+                  if (result) {
+                    refresh();
+                    notify(
+                      `导入 ${result.imported} 条，跳过 ${result.skipped} 条已有记录。${result.skipped_activity ? `另有 ${result.skipped_activity} 项活动与本地版本不一致，已跳过。` : ""}`,
+                    );
+                  }
+                })
+                .catch((e) => notify(String(e), true));
+            }}
+          >
+            导入备份
+          </button>
           <input
             ref={importRef}
             type="file"

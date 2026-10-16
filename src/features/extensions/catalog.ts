@@ -116,49 +116,6 @@ export const builtInCatalog: ExtensionPackage[] = [
   },
   {
     ...base,
-    id: "moyang.reading-report",
-    formats: ["markdown", "text", "docx"],
-    name: "阅读概览",
-    kind: "reader",
-    description: "统计中文字符、英文词数、标题与阅读时间，并列出文档大纲。",
-    readme:
-      "打开一份文档，在命令面板运行“生成阅读概览”。只读取当前页，不修改内容，不联网。阅读时长按每分钟约 400 个汉字或 200 个英文词估算。",
-    entry: "main.js",
-    commands: [{ id: "report", name: "生成阅读概览" }],
-    files: {
-      "main.js": `export default function run({text,title}) {
-      const chinese=(text.match(/[\\u3400-\\u9fff]/g)||[]).length;
-      const words=(text.match(/[a-zA-Z]+(?:['’-][a-zA-Z]+)*/g)||[]).length;
-      let fenced=false; const headings=[];
-      for(const line of text.split(/\\r?\\n/)){ if(/^\\s*(\x60\x60\x60|~~~)/.test(line)){fenced=!fenced;continue;} if(!fenced && /^#{1,6}\\s/.test(line)) headings.push(line); }
-      const minutes=Math.max(1,Math.ceil(chinese/400+words/200));
-      return {report: title+'\\n\\n中文字符：'+chinese+'\\n英文词数：'+words+'\\n预计阅读：'+minutes+' 分钟\\n\\n'+(headings.length?'文档大纲\\n'+headings.join('\\n'):'未找到 Markdown 标题。')};
-    }`,
-    },
-  },
-  {
-    ...base,
-    id: "moyang.tidy-markdown",
-    name: "段落留白整理",
-    kind: "reader",
-    description: "把连续多余空行收为一个段落间隔，保留代码块、硬换行与原换行格式。",
-    readme: "运行后先显示修改前后内容，采用后可用原有撤销恢复。仅整理 Markdown/TXT 的多余空行，不重排文字或更改链接。",
-    entry: "main.js",
-    commands: [{ id: "tidy", name: "整理段落留白", modifiesDocument: true }],
-    files: {
-      "main.js": `export default function run({text}) {
-      const eol=text.includes('\\r\\n')?'\\r\\n':'\\n'; let fence='',empty=0; const out=[];
-      for(const line of text.split(/\\r?\\n/)){
-        const m=line.match(/^ {0,3}(\x60{3,}|~{3,})/);
-        if(m){if(!fence)fence=m[1];else if(m[1][0]===fence[0]&&m[1].length>=fence.length)fence='';}
-        if(fence||line.trim()){empty=0;out.push(line);}else if(++empty<=1)out.push(line);
-      }
-      return {replacement:out.join(eol),report:'已整理多余空行；代码块和 Markdown 硬换行保持原样。'};
-    }`,
-    },
-  },
-  {
-    ...base,
     id: "moyang.mist-theme",
     name: "雾青书房",
     kind: "theme",

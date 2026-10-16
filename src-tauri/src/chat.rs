@@ -1,6 +1,6 @@
-//! Optional chat extension: its history and API profiles never enter the memory database.
-use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
+//! Optional chat extension. Shared API credentials and chat history remain outside the memory database.
+use moyang_ai_core::services::{database, endpoint, load_provider, Provider};
+use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use std::{collections::HashMap, path::Path, sync::Mutex, time::Duration};
 use tauri::{ipc::Channel, State};
@@ -35,128 +35,33 @@ impl ChatRequests {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Provider {
-    id: String,
-    name: String,
-    protocol: String,
-    base_url: String,
-    model: String,
-    #[serde(default)]
-    has_key: bool,
-}
-
-fn database(path: &Path) -> Result<Connection, String> {
-    // Providers and history load concurrently. SQLite's busy timeout does not
-    // serialize the first transition to WAL; initialize before another opener.
-    static INITIALIZE: Mutex<()> = Mutex::new(());
-    let _initialize = INITIALIZE
-        .lock()
-        .map_err(|_| "聊天数据库暂时无法初始化，请重新读取。")?;
-    std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
-    let db = Connection::open(path.join("chat.sqlite")).map_err(|e| e.to_string())?;
-    db.busy_timeout(Duration::from_secs(5))
-        .map_err(|e| e.to_string())?;
-    db.execute_batch("PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS providers(id TEXT PRIMARY KEY,data TEXT NOT NULL,secret TEXT NOT NULL); CREATE TABLE IF NOT EXISTS threads(id TEXT PRIMARY KEY,data TEXT NOT NULL,revision INTEGER NOT NULL,updated INTEGER NOT NULL);").map_err(|e| e.to_string())?;
-    Ok(db)
-}
-
-fn endpoint(provider: &Provider, models: bool) -> Result<String, String> {
-    let mut url = reqwest::Url::parse(provider.base_url.trim()).map_err(|_| "API 地址无效。")?;
-    if !["http", "https"].contains(&url.scheme())
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        return Err("API 地址应为不含密钥、参数或账号的 HTTP 基础地址。".into());
-    }
-    let mut base = url.path().trim_end_matches('/').to_string();
-    for suffix in ["/chat/completions", "/messages", "/models"] {
-        if base.ends_with(suffix) {
-            base.truncate(base.len() - suffix.len());
-            break;
-        }
-    }
-    if base.is_empty() {
-        base = "/v1".into();
-    }
-    url.set_path(&format!(
-        "{base}/{}",
-        if models {
-            "models"
-        } else if provider.protocol == "anthropic" {
-            "messages"
-        } else {
-            "chat/completions"
-        }
-    ));
-    Ok(url.to_string())
-}
-
-fn load_provider(db: &Connection, id: &str) -> Result<(Provider, String), String> {
-    let (raw, key): (String, String) = db
-        .query_row("SELECT data,secret FROM providers WHERE id=?", [id], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })
-        .map_err(|_| "请先添加并保存 API 服务。")?;
-    Ok((serde_json::from_str(&raw).map_err(|e| e.to_string())?, key))
-}
-
 fn store_request(path: &Path, operation: &str, payload: Value) -> Result<Value, String> {
+    if matches!(operation, "providers" | "save_provider" | "delete_provider") {
+        return moyang_ai_core::services::provider_request(path, operation, payload);
+    }
     let mut db = database(path)?;
     let id = payload["id"].as_str().unwrap_or("");
     match operation {
-        "providers" => {
-            let mut stmt = db
-                .prepare("SELECT data,secret<>'' FROM providers ORDER BY rowid")
-                .map_err(|e| e.to_string())?;
-            let rows = stmt
-                .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, bool>(1)?)))
-                .map_err(|e| e.to_string())?;
-            let mut out = Vec::new();
-            for row in rows {
-                let (raw, has_key) = row.map_err(|e| e.to_string())?;
-                let mut provider: Provider =
-                    serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-                provider.has_key = has_key;
-                out.push(provider);
-            }
-            Ok(json!(out))
-        }
-        "save_provider" => {
-            let mut provider: Provider =
-                serde_json::from_value(payload.clone()).map_err(|e| e.to_string())?;
-            if provider.id.is_empty()
-                || provider.name.trim().is_empty()
-                || !["openai", "anthropic"].contains(&provider.protocol.as_str())
-            {
-                return Err("请填写服务名称并选择协议。".into());
-            }
-            endpoint(&provider, false)?;
-            let old = load_provider(&db, &provider.id)
-                .ok()
-                .map(|v| v.1)
-                .unwrap_or_default();
-            let key = if payload["clearKey"] == true {
-                String::new()
+        "threads_page" => {
+            let before = payload["before"]["updatedAt"].as_i64();
+            let id = payload["before"]["id"].as_str().unwrap_or("");
+            let mut stmt=db.prepare("SELECT json_remove(data,'$.messages') FROM threads WHERE ?1 IS NULL OR updated<?1 OR (updated=?1 AND id<?2) ORDER BY updated DESC,id DESC LIMIT 21").map_err(|e|e.to_string())?;
+            let mut items = stmt
+                .query_map(params![before, id], |r| r.get::<_, String>(0))
+                .map_err(|e| e.to_string())?
+                .map(|r| {
+                    serde_json::from_str::<Value>(&r.map_err(|e| e.to_string())?)
+                        .map_err(|e| e.to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let next = if items.len() > 20 {
+                items.truncate(20);
+                let last = items.last().unwrap();
+                json!({"updatedAt":last["updatedAt"],"id":last["id"]})
             } else {
-                payload["apiKey"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or(&old)
-                    .to_string()
+                Value::Null
             };
-            provider.has_key = !key.is_empty();
-            let raw = serde_json::to_string(&provider).map_err(|e| e.to_string())?;
-            db.execute("INSERT INTO providers(id,data,secret) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET data=excluded.data,secret=excluded.secret", params![provider.id,raw,key]).map_err(|e| e.to_string())?;
-            Ok(json!(provider))
-        }
-        "delete_provider" => {
-            db.execute("DELETE FROM providers WHERE id=?", [id])
-                .map_err(|e| e.to_string())?;
-            Ok(Value::Null)
+            Ok(json!({"items":items,"next":next}))
         }
         "threads" => {
             let mut stmt = db
@@ -446,6 +351,29 @@ mod tests {
             load_provider(&database(&root).unwrap(), "mine").unwrap().1,
             ""
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn history_pages_keep_equal_timestamps_distinct_and_exclude_messages() {
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let root = parent.join(format!(
+            "moyang-chat-pages-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        for n in 0..21 {
+            store_request(&root, "save_thread",json!({"id":format!("thread-{n:02}"),"title":"讨论","revision":0,"updatedAt":12,"messages":[{"role":"user","content":"正文不进目录"}]})).unwrap();
+        }
+        let first = store_request(&root, "threads_page", json!({})).unwrap();
+        assert_eq!(first["items"].as_array().unwrap().len(), 20);
+        assert!(!first.to_string().contains("正文不进目录"));
+        let second = store_request(&root, "threads_page", json!({"before":first["next"]})).unwrap();
+        assert_eq!(second["items"].as_array().unwrap().len(), 1);
+        assert_eq!(second["items"][0]["id"], "thread-00");
+        assert!(second["next"].is_null());
+        assert!(root.canonicalize().unwrap().starts_with(&parent));
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]

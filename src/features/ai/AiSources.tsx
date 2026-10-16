@@ -15,8 +15,12 @@ import {
 export function AiSources({
   stats,
   notify,
+  active = true,
+  dataVersion = 0,
 }: {
   stats?: AiStats | null;
+  active?: boolean;
+  dataVersion?: number;
   notify: (message: string, error?: boolean) => void;
 }) {
   const [project, setProject] = useState("*");
@@ -39,6 +43,7 @@ export function AiSources({
   const previewEpoch = useRef(0);
   const run = useRef({ cancelled: false });
   useEffect(() => {
+    if (!active) return;
     const lifecycle = epoch.current;
     const sequence = ++lifecycle.sequence;
     const key = JSON.stringify([project, includeGlobal]);
@@ -86,7 +91,7 @@ export function AiSources({
       lifecycle.sequence++;
       run.current.cancelled = true;
     };
-  }, [project, includeGlobal, tick]);
+  }, [project, includeGlobal, tick, active, dataVersion]);
   const start = async (items: AiSourceEntry[]) => {
     if (busy || loading || !items.length) return;
     const token = { cancelled: false };

@@ -26,6 +26,7 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
         ["backup", "Backup & help"],
         ["updates", "App updates"],
         ["storage", "Storage locations"],
+        ["services", "AI services"],
       ]
     : [
         ["reading", "外观"],
@@ -35,6 +36,7 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
         ["backup", "数据恢复"],
         ["updates", "应用更新"],
         ["storage", "存储位置"],
+        ["services", "AI 服务与整理"],
       ];
   return createPortal(
     <section

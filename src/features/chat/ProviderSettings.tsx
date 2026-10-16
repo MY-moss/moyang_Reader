@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { chatModels, chatRequest, streamChat } from "../../platform/chat";
 import { isTauriRuntime } from "../../platform/bridge";
 import type { ChatProvider } from "../../shared/chat-types";
+import { providerModels } from "../../shared/provider-models";
 import { Icon } from "../../shared/components/Icon";
 import { apiEndpoint, requestBody } from "./protocol";
 
@@ -11,6 +12,7 @@ const newProvider = (): ChatProvider => ({
   protocol: "openai",
   baseUrl: "https://api.openai.com/v1",
   model: "",
+  models: [],
   hasKey: false,
 });
 export function ProviderSettings({
@@ -18,18 +20,19 @@ export function ProviderSettings({
   selectedId,
   onSaved,
   onClose,
+  returnLabel = "返回聊天",
 }: {
   providers: ChatProvider[];
   selectedId: string;
   onSaved: () => Promise<unknown>;
   onClose: () => void;
+  returnLabel?: string;
 }) {
   const [form, setForm] = useState<ChatProvider>(
     () => providers.find((p) => p.id === selectedId) ?? providers[0] ?? newProvider(),
   );
   const [key, setKey] = useState(""),
-    [clearKey, setClearKey] = useState(false),
-    [models, setModels] = useState<string[]>([]);
+    [clearKey, setClearKey] = useState(false);
   const [savedForm, setSavedForm] = useState(form);
   const [destination, setDestination] = useState<ChatProvider | "chat" | null>(null);
   const keepEditing = useRef<HTMLButtonElement>(null);
@@ -48,7 +51,6 @@ export function ProviderSettings({
     setSavedForm(p);
     setKey("");
     setClearKey(false);
-    setModels([]);
     setError("");
     setMessage("");
     setRemoving(false);
@@ -63,11 +65,12 @@ export function ProviderSettings({
     if (dirty) setDestination(target);
     else navigate(target);
   };
-  const save = async () => {
+  const save = async (profile = form) => {
     if (!form.name.trim()) throw new Error("请为服务填写一个便于识别的名称。");
     apiEndpoint(form.baseUrl, form.protocol);
     const saved = await chatRequest<ChatProvider>("save_provider", {
-      ...form,
+      ...profile,
+      models: providerModels(profile),
       name: form.name.trim(),
       apiKey: key.trim(),
       clearKey,
@@ -99,11 +102,11 @@ export function ProviderSettings({
       <header>
         <div>
           <h2>API 服务</h2>
-          <p>添加自己的服务，在每次对话中选择模型。</p>
+          <p>添加自己的服务，供聊天、记忆整理和嵌入检索分别选择。</p>
         </div>
         <button disabled={busy || Boolean(destination)} onClick={() => requestNavigation("chat")}>
           <Icon name="back" />
-          返回聊天
+          {returnLabel}
         </button>
       </header>
       {destination && (
@@ -218,10 +221,22 @@ export function ProviderSettings({
               />
             </label>
             <datalist id="chat-provider-models">
-              {models.map((model) => (
+              {providerModels(form).map((model) => (
                 <option key={model} value={model} />
               ))}
             </datalist>
+            <small>默认模型只用于新对话；聊天时可以随时选择这个服务的其他模型。</small>
+            <label>
+              可选模型列表
+              <textarea
+                aria-label="可选模型列表"
+                rows={4}
+                value={(form.models ?? []).join("\n")}
+                onChange={(event) => setForm({ ...form, models: event.target.value.split("\n") })}
+                placeholder="每行一个模型 ID，可手动添加，也可点击下方获取模型。"
+              />
+            </label>
+            <small>模型列表随服务保存在本机。获取列表会补充新模型；可在这里移除不需要的条目。</small>
           </fieldset>
           <p className="chat-privacy">
             {isTauriRuntime()
@@ -245,10 +260,10 @@ export function ProviderSettings({
                 void run(async () => {
                   const p = await save();
                   const found = await chatModels(p);
-                  setModels(found);
+                  if (found.length) await save({ ...p, models: [...providerModels(p), ...found] });
                   setMessage(
                     found.length
-                      ? `已获取 ${found.length} 个模型，点击默认模型选择。`
+                      ? `已获取 ${found.length} 个模型并保存，可在聊天中自由选择。`
                       : "服务未提供模型列表，请手动填写模型 ID。",
                   );
                 })

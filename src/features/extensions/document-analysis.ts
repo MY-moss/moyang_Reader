@@ -18,12 +18,13 @@ function location(node: Nodes): ExtensionLocation {
 /** Parsed on demand inside the extension worker, never while typing. */
 export function analyzeDocument(text: string): ExtensionDocumentAnalysis {
   const tree = parser.parse(text);
-  const result: ExtensionDocumentAnalysis = { headings: [], tasks: [], links: [], tables: [] };
+  const result: ExtensionDocumentAnalysis = { headings: [], tasks: [], links: [], tables: [], protectedRanges: [] };
   const definitions = new Map<string, string>();
   visit(tree, "definition", (node) => {
     if (!definitions.has(node.identifier)) definitions.set(node.identifier, node.url);
   });
   visit(tree, (node) => {
+    if (["code", "yaml", "toml"].includes(node.type)) result.protectedRanges!.push(location(node));
     if (node.type === "heading") result.headings.push({ ...location(node), depth: node.depth, text: plain(node) });
     if (node.type === "listItem" && typeof node.checked === "boolean") {
       const paragraph = node.children.find((child) => child.type === "paragraph");

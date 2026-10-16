@@ -8,10 +8,20 @@ import {
   type ExtensionState,
   type InstalledExtension,
 } from "../../shared/extension-types";
-import type { AiRecord } from "../../shared/ai-types";
+import type { AiFields, AiRecord } from "../../shared/ai-types";
 import { registerPendingWork } from "../../shared/pending-work";
 import { parseCatalog, validatePackage, compareVersions, themeTokens, validateMcp, compatiblePackage } from "./package";
 import { builtInCatalog, curatedCatalogUrl } from "./catalog";
+
+function matchesSkillFields(record: AiRecord, fields: AiFields) {
+  const serialize = (value: unknown) =>
+    JSON.stringify(value, (_, child: unknown) =>
+      child && typeof child === "object" && !Array.isArray(child)
+        ? Object.fromEntries(Object.entries(child).sort(([a], [b]) => a.localeCompare(b)))
+        : child,
+    );
+  return Object.entries(fields).every(([key, value]) => serialize(record[key as keyof AiFields]) === serialize(value));
+}
 
 export function useExtensions() {
   const [state, setState] = useState<ExtensionState>(emptyExtensionState);
@@ -51,8 +61,26 @@ export function useExtensions() {
       setError("");
       const task = (async () => {
         try {
-          const updated = await operation(structuredClone(latest.current));
-          const saved = await saveExtensions(updated);
+          const before = structuredClone(latest.current);
+          const updated = await operation(before);
+          let saved: ExtensionState;
+          try {
+            saved = await saveExtensions(updated);
+          } catch (cause) {
+            const skillSaved = updated.installed.some((item) => {
+              const old = latest.current.installed.find((previous) => previous.package.id === item.package.id);
+              return (
+                item.package.kind === "skill" &&
+                (item.skillId !== old?.skillId || item.skillRevision !== old?.skillRevision)
+              );
+            });
+            if (skillSaved)
+              throw new Error(
+                `技能内容已写入 AI 技能库，但扩展安装记录未能保存。请重新读取安装状态后重试；不会覆盖技能的后续修改。\n${String(cause)}`,
+                { cause },
+              );
+            throw cause;
+          }
           latest.current = saved;
           setState(saved);
           return true;
@@ -89,6 +117,10 @@ export function useExtensions() {
       let skillId = old?.skillId,
         skillRevision = old?.skillRevision;
       if (pkg.kind === "skill" && pkg.skill) {
+        // Catch already-stale windows before writing to the independently stored AI library.
+        // A later conflict is still possible, so the retry below recognizes only our exact saved revision.
+        if ((await loadExtensions()).revision !== current.revision)
+          throw new Error("扩展状态已在其他窗口更新，请重新读取安装状态后重试。");
         const { parseSkill } = await import("../ai/transfers");
         const parsed = parseSkill(pkg.skill.body);
         const fields = {
@@ -97,12 +129,20 @@ export function useExtensions() {
           source: pkg.homepage || source,
           skill_meta: { ...parsed.skill_meta, extension_id: pkg.id, extension_version: pkg.version },
         };
+        let saved: AiRecord | undefined;
         if (skillId && !copySkill) {
           const existing = await aiRequest<AiRecord>("get", { id: skillId });
-          if (existing.revision !== skillRevision)
-            throw new Error("技能已经在本地或被 Agent 改进。请选择“保留原技能，安装副本”，或先在技能库比较版本。");
+          if (existing.revision !== skillRevision) {
+            if (
+              skillRevision !== undefined &&
+              existing.revision === skillRevision + 1 &&
+              matchesSkillFields(existing, fields)
+            )
+              saved = existing;
+            else throw new Error("技能已经在本地或被 Agent 改进。请选择“保留原技能，安装副本”，或先在技能库比较版本。");
+          }
         }
-        const saved = await aiRequest<AiRecord>("save", {
+        saved ??= await aiRequest<AiRecord>("save", {
           ...fields,
           ...(skillId && !copySkill ? { id: skillId, expected_revision: skillRevision } : {}),
           reason: `扩展市场：${pkg.name} ${pkg.version}`,

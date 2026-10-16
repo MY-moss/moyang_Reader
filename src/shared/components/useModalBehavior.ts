@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 type ModalBehaviorOptions = {
   containerRef: RefObject<HTMLElement | null>;
@@ -48,6 +48,8 @@ export function useModalBehavior({
   onClose,
 }: ModalBehaviorOptions): void {
   const onCloseRef = useRef(onClose);
+  // The opener may be remounted while a narrow navigation sheet is open.
+  const getRestoreFocus = useCallback(() => restoreFocusRef?.current, [restoreFocusRef]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -104,11 +106,10 @@ export function useModalBehavior({
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       background?.toggleAttribute("inert", wasInert);
-      const target =
-        previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : restoreFocusRef?.current;
+      const target = previousFocus?.isConnected && previousFocus !== document.body ? previousFocus : getRestoreFocus();
       if (target?.isConnected && !modalContainer?.contains(target)) {
         target.focus();
       }
     };
-  }, [containerRef, initialFocusRef, backgroundRef, restoreFocusRef, enabled]);
+  }, [containerRef, initialFocusRef, backgroundRef, getRestoreFocus, enabled]);
 }

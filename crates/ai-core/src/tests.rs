@@ -387,6 +387,7 @@ fn semantic_service_indexes_retrieves_and_falls_back() {
         enabled: true,
         endpoint: format!("http://{addr}"),
         model: "test".into(),
+        ..Default::default()
     })
     .unwrap();
     assert_eq!(s.index_semantic().unwrap()["remaining"], 0);
@@ -424,6 +425,7 @@ fn incomplete_semantic_index_preserves_keyword_results_and_pagination() {
         enabled: true,
         endpoint: "http://127.0.0.1:9".into(),
         model: "incomplete-fixture".into(),
+        ..Default::default()
     };
     s.configure_semantic(config.clone()).unwrap();
     let mut q = query("alpha bravo charlie delta echo");

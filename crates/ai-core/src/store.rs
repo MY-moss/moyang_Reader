@@ -19,7 +19,7 @@ impl Store {
         conn.busy_timeout(Duration::from_secs(8))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 2 {
+        if version > 5 {
             return Err(invalid("数据库版本更新，请使用新版程序。"));
         }
         if version == 0 {
@@ -47,6 +47,47 @@ impl Store {
     pub fn get(&self, id: &str) -> Result<Record> {
         read_record(&self.conn, id)
     }
+    pub fn view_if_changed(&self, id: &str, revision: i64) -> Result<serde_json::Value> {
+        let current: i64 = self.conn.query_row(
+            "SELECT json_extract(payload,'$.revision') FROM records WHERE id=?",
+            [id],
+            |r| r.get(0),
+        )?;
+        if current == revision {
+            return Ok(serde_json::Value::Null);
+        }
+        self.record_view(id, None)
+    }
+    pub fn record_view(&self, id: &str, revision: Option<i64>) -> Result<serde_json::Value> {
+        let raw: String = if let Some(revision) = revision {
+            self.conn.query_row(
+                "SELECT payload FROM revisions WHERE id=? AND revision=?",
+                params![id, revision],
+                |r| r.get(0),
+            )?
+        } else {
+            self.conn
+                .query_row("SELECT payload FROM records WHERE id=?", [id], |r| r.get(0))?
+        };
+        let mut value: serde_json::Value = serde_json::from_str(&raw)?;
+        let assets = value
+            .as_object_mut()
+            .unwrap()
+            .remove("assets")
+            .unwrap_or(serde_json::json!([]));
+        value["resources"] = serde_json::json!(assets.as_array().unwrap().iter().map(|a| serde_json::json!({"path":a["path"],"encoding":a["encoding"],"size":a["size"],"fingerprint":a["resource_hash"]})).collect::<Vec<_>>());
+        Ok(value)
+    }
+    pub fn revision_view(&self, id: &str, revision: i64) -> Result<serde_json::Value> {
+        let (reason, recorded): (String, i64) = self.conn.query_row(
+            "SELECT reason,recorded FROM revisions WHERE id=? AND revision=?",
+            params![id, revision],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok(
+            serde_json::json!({"record":self.record_view(id,Some(revision))?,"reason":reason,"recorded_at":recorded}),
+        )
+    }
     pub fn get_if_changed(&self, id: &str, revision: i64) -> Result<Option<Record>> {
         // The revision primary key is a covering index; unchanged polls need not
         // load or parse the potentially large body/resource JSON. One statement
@@ -56,7 +97,7 @@ impl Store {
             params![id, revision], |r| r.get(0),
         ).optional()?.ok_or_else(|| invalid("记录不存在，可能已被删除。"))?;
         payload
-            .map(|raw| serde_json::from_str(&raw).map_err(Error::from))
+            .map(|raw| crate::resources::decode(&self.conn, &raw))
             .transpose()
     }
     pub fn save(&mut self, mut request: SaveRequest) -> Result<Record> {
@@ -96,7 +137,7 @@ impl Store {
         rows.map(|row| {
             let (p, reason, recorded_at) = row?;
             Ok(Revision {
-                record: serde_json::from_str(&p)?,
+                record: crate::resources::decode(&self.conn, &p)?,
                 reason,
                 recorded_at,
             })
@@ -148,7 +189,7 @@ impl Store {
             )
             .optional()?
             .ok_or_else(|| invalid("历史版本不存在。"))?;
-        let mut old: Record = serde_json::from_str(&data)?;
+        let mut old: Record = crate::resources::decode(&tx, &data)?;
         old.revision = current.revision + 1;
         old.updated_at = now();
         persist(&tx, &old, &format!("恢复版本 {}", q.revision))?;
@@ -162,6 +203,7 @@ impl Store {
         check_revision(&read_record(&tx, id)?, Some(expected_revision))?;
         tx.execute("DELETE FROM chunks_fts WHERE entry_id=?", [id])?;
         tx.execute("DELETE FROM records WHERE id=?", [id])?;
+        crate::resources::collect_unused(&tx)?;
         // Relations are IDs in immutable history. Missing links are displayed as unavailable.
         tx.commit()?;
         Ok(())
@@ -172,15 +214,11 @@ impl Store {
         Ok(())
     }
     pub fn asset(&self, q: AssetRequest) -> Result<Asset> {
-        let r = match q.revision {
-            Some(revision) => self.revision_detail(&q.id, revision)?.record,
-            None => self.get(&q.id)?,
-        };
-        r.fields
-            .assets
-            .into_iter()
-            .find(|a| a.path == q.path)
-            .ok_or_else(|| invalid("技能资源不存在。"))
+        let raw:String=self.conn.query_row("SELECT a.value FROM revisions r,json_each(r.payload,'$.assets') a WHERE r.id=?1 AND r.revision=COALESCE(?2,(SELECT MAX(revision) FROM revisions WHERE id=?1)) AND json_extract(a.value,'$.path')=?3",params![q.id,q.revision,q.path],|r|r.get(0))?;
+        Ok(serde_json::from_value(crate::resources::hydrate_asset(
+            &self.conn,
+            serde_json::from_str(&raw)?,
+        )?)?)
     }
     pub fn merge(&mut self, q: MergeRequest) -> Result<Record> {
         if q.ids.len() < 2
@@ -257,8 +295,10 @@ pub(crate) fn read_record(conn: &Connection, id: &str) -> Result<Record> {
     let payload: Option<String> = conn
         .query_row("SELECT payload FROM records WHERE id=?", [id], |r| r.get(0))
         .optional()?;
-    serde_json::from_str(&payload.ok_or_else(|| invalid("记录不存在，可能已被删除。"))?)
-        .map_err(Into::into)
+    crate::resources::decode(
+        conn,
+        &payload.ok_or_else(|| invalid("记录不存在，可能已被删除。"))?,
+    )
 }
 pub(crate) fn check_revision(r: &Record, expected: Option<i64>) -> Result<()> {
     if expected != Some(r.revision) {
@@ -288,7 +328,7 @@ pub(crate) fn save_in(tx: &Transaction, q: SaveRequest) -> Result<Record> {
     } else {
         let duplicate:Option<String>=tx.query_row("SELECT payload FROM records WHERE fingerprint=? AND state='active' AND (expires IS NULL OR expires>?) LIMIT 1",params![fingerprint(&q.fields)?,now()],|r|r.get(0)).optional()?;
         if let Some(payload) = duplicate {
-            return Ok(serde_json::from_str(&payload)?);
+            return crate::resources::decode(tx, &payload);
         }
         (
             uuid::Uuid::new_v4().to_string(),
@@ -315,7 +355,7 @@ pub(crate) fn save_in(tx: &Transaction, q: SaveRequest) -> Result<Record> {
 }
 pub(crate) fn persist(tx: &Transaction, r: &Record, reason: &str) -> Result<()> {
     let f = &r.fields;
-    let payload = serde_json::to_string(r)?;
+    let payload = crate::resources::encode(tx, r)?;
     tx.execute("INSERT INTO records(id,kind,project,agent,state,updated,expires,fingerprint,payload,sharing) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,project=excluded.project,agent=excluded.agent,state=excluded.state,updated=excluded.updated,expires=excluded.expires,fingerprint=excluded.fingerprint,payload=excluded.payload,sharing=excluded.sharing",params![r.id,f.kind.key(),f.project,f.agent,r.state.key(),r.updated_at,f.expires_at,fingerprint(f)?,payload,f.sharing.key()])?;
     tx.execute(
         "INSERT INTO revisions(id,revision,payload,reason,recorded) VALUES(?,?,?,?,?)",
@@ -363,6 +403,7 @@ pub(crate) fn persist(tx: &Transaction, r: &Record, reason: &str) -> Result<()> 
     for id in existing.into_values().flatten() {
         tx.execute("DELETE FROM chunks WHERE id=?", [id])?;
     }
+    crate::organizer::enqueue(tx, r)?;
     Ok(())
 }
 pub(crate) fn validate(f: &mut RecordFields) -> Result<()> {

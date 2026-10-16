@@ -84,6 +84,7 @@ pub fn local_model(
                 enabled: true,
                 endpoint: endpoint.into(),
                 model: "qwen3-embedding:0.6b".into(),
+                ..Default::default()
             })
             .map_err(|e| e.to_string())?;
     }
@@ -111,7 +112,18 @@ pub fn maintain_semantic(directory: &std::path::Path) {
             if !config.enabled || store.semantic_paused()? {
                 return Ok(());
             }
-            if config.endpoint.trim_end_matches('/') == "http://127.0.0.1:11434"
+            if store.semantic_remaining(&crate::semantic::model_key(&config))? == 0 {
+                return Ok(());
+            }
+            let status = store.setting_value("semantic_background")?;
+            if status["error"].is_string() && now() - status["at"].as_i64().unwrap_or(0) < 60_000 {
+                return Ok(());
+            }
+            if config.protocol != "openai" && config.endpoint == crate::models::MANAGED_ENDPOINT {
+                store.start_managed_model()?;
+            }
+            if config.protocol != "openai"
+                && config.endpoint.trim_end_matches('/') == "http://127.0.0.1:11434"
                 && local_model_status(&config.endpoint)["running"] != true
             {
                 local_model(&mut store, "start").map_err(|e| invalid(&e))?;

@@ -26,7 +26,7 @@ function publish(file, value) {
   } else fs.writeFileSync(file, content);
 }
 const readers = loadCatalogModule(path.join(root, "src/features/extensions/builtin-readers.ts"));
-publish(path.join(root, "src/features/extensions/builtin-reader-packages.json"), readers.practicalReaders);
+publish(path.join(root, "src/features/extensions/builtin-reader-packages.json"), [...readers.practicalReaders, ...readers.basicReaders]);
 const catalog = loadCatalogModule(path.join(root, "src/features/extensions/catalog.ts"));
 const directory = path.join(root, "public/extensions");
 fs.mkdirSync(directory, { recursive: true });

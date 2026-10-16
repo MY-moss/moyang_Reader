@@ -119,7 +119,7 @@ async function clickWorkspaceExportAction(name) {
   await action.click();
 }
 
-async function waitForExport(pathname, description) {
+async function waitForExport(pathname, description, timeout = 15_000) {
   await browser.waitUntil(
     async () => {
       if (fs.existsSync(pathname)) return true;
@@ -127,10 +127,10 @@ async function waitForExport(pathname, description) {
       if (await alert.isDisplayed()) {
         throw new Error(`${description} failed: ${await alert.getText()}`);
       }
-      return false;
+      return fs.existsSync(pathname);
     },
     {
-      timeout: 15_000,
+      timeout,
       timeoutMsg: `${description} did not create an output file`,
     },
   );
@@ -509,10 +509,13 @@ describe("Moyang Reader desktop runtime", () => {
     });
   });
 
-  it("exports a real PDF and the workspace to HTML and Word", async () => {
+  it("exports a real PDF and the workspace to HTML and Word", async function () {
+    this.timeout(90_000);
     fs.rmSync(pdfExportPath, { force: true });
     await clickToolbarAction("保存 PDF");
-    await waitForExport(pdfExportPath, "the real Tauri PDF export");
+    // A fresh Windows runner may spend more than 15 seconds starting Edge's
+    // isolated print profile. Still require the actual complete PDF below.
+    await waitForExport(pdfExportPath, "the real Tauri PDF export", 45_000);
     const pdfBytes = fs.readFileSync(pdfExportPath);
     assert.ok(pdfBytes.length > 100, "the real Tauri PDF export should not be empty");
     assert.equal(pdfBytes.subarray(0, 5).toString("ascii"), "%PDF-");

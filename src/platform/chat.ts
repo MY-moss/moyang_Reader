@@ -1,15 +1,29 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "./bridge";
 import type { ChatProvider, ChatUsage } from "../shared/chat-types";
+import { providerModels } from "../shared/provider-models";
 import { apiEndpoint, streamDecoder } from "../features/chat/protocol";
 
 const keys = new Map<string, string>();
 function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("moyang-chat", 1);
+    const request = indexedDB.open("moyang-chat", 2);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore("providers", { keyPath: "id" });
-      request.result.createObjectStore("threads", { keyPath: "id" });
+      if (!request.result.objectStoreNames.contains("providers")) {
+        request.result.createObjectStore("providers", { keyPath: "id" });
+        request.result.createObjectStore("threads", { keyPath: "id" });
+      }
+      const summaries = request.result.createObjectStore("summaries", { keyPath: "id" });
+      summaries.createIndex("recent", ["updatedAt", "id"]);
+      const cursor = request.transaction!.objectStore("threads").openCursor();
+      cursor.onsuccess = () => {
+        if (cursor.result) {
+          const copy = { ...cursor.result.value };
+          delete copy.messages;
+          summaries.put(copy);
+          cursor.result.continue();
+        }
+      };
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error("无法打开聊天记录，请检查本机存储权限。"));
@@ -21,8 +35,38 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
   const db = await database(),
     providers = operation.includes("provider"),
     storeName = providers ? "providers" : "threads";
+  if (operation === "threads_page")
+    return new Promise<T>((resolve, reject) => {
+      const tx = db.transaction("summaries", "readonly"),
+        items: Record<string, unknown>[] = [];
+      const before = payload.before as { updatedAt: number; id: string } | undefined;
+      const cursor = tx
+        .objectStore("summaries")
+        .index("recent")
+        .openCursor(before ? IDBKeyRange.upperBound([before.updatedAt, before.id], true) : null, "prev");
+      let next: unknown = null;
+      cursor.onsuccess = () => {
+        const row = cursor.result;
+        if (!row) return;
+        if (items.length === 20) {
+          const last = items[19];
+          next = { id: last.id, updatedAt: last.updatedAt };
+          return;
+        }
+        items.push(row.value);
+        row.continue();
+      };
+      tx.oncomplete = () => {
+        db.close();
+        resolve({ items, next } as T);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+    });
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite"),
+    const tx = db.transaction(providers ? storeName : [storeName, "summaries"], "readwrite"),
       store = tx.objectStore(storeName);
     let result: unknown,
       error: string | null = null;
@@ -42,6 +86,7 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
       else if (operation === "thread") result = old ?? null;
       else if (operation.startsWith("delete_")) {
         store.delete(id);
+        if (!providers) tx.objectStore("summaries").delete(id);
         result = null;
       } else if (operation === "save_provider") {
         const hasKey = payload.clearKey ? false : Boolean(payload.apiKey || keys.has(id));
@@ -51,6 +96,10 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
           protocol: payload.protocol,
           baseUrl: payload.baseUrl,
           model: payload.model,
+          models: providerModels({
+            model: String(payload.model ?? ""),
+            models: (payload.models ?? old?.models) as string[] | undefined,
+          }),
           hasKey,
         };
         store.put(result);
@@ -62,6 +111,9 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
         }
         result = { ...payload, revision: Number(payload.revision ?? 0) + 1 };
         store.put(result);
+        const summary = { ...(result as Record<string, unknown>) };
+        delete summary.messages;
+        tx.objectStore("summaries").put(summary);
       } else {
         error = "未知聊天操作。";
         tx.abort();

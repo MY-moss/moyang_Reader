@@ -72,6 +72,34 @@ export function previewRequest(operation: string, payload: any): unknown {
   };
   let result: unknown;
   switch (operation) {
+    case "record_view":
+      return previewRecordView(get(payload.id));
+    case "record_view_if_changed":
+      return get(payload.id).revision === payload.revision ? null : previewRecordView(get(payload.id));
+    case "recall": {
+      const result = previewRequest("search", {
+        query: payload.query,
+        project: payload.project ?? "",
+        limit: 5,
+        include_global: true,
+      }) as { items: AiRecord[] };
+      return {
+        items: result.items.map((hit) => {
+          const r = get(hit.id);
+          return {
+            id: r.id,
+            title: r.title,
+            source: r.source,
+            content: r.body.length <= 1200 ? r.body : r.summary || r.body.slice(0, 800),
+            layer: "l1",
+            revision: r.revision,
+            scope: { project: r.project },
+          };
+        }),
+      };
+    }
+    case "merge_groups":
+      return { items: [], next_offset: null };
     case "source_inventory":
       return previewSourceInventory(db.records, payload);
     case "health":
@@ -187,6 +215,41 @@ export function previewRequest(operation: string, payload: any): unknown {
       const h = db.history.find((h) => h.record.id === payload.id && h.record.revision === payload.revision);
       if (!h) throw new Error("历史版本不存在。");
       return previewRecordView(h.record).then((record) => ({ ...h, record }));
+    }
+    case "activity_page": {
+      const limit = Math.max(1, Math.min(50, payload.limit ?? 20)),
+        offset = payload.offset ?? 0;
+      const scope = (p: string) => payload.project == null || p === payload.project || (payload.include_global && !p);
+      const all: Record<string, any[]> = {
+        checkpoints: (db.checkpoints ?? []).filter((c: any) => c.status !== "pending" && scope(c.project ?? "")),
+        pending: (db.checkpoints ?? []).filter((c: any) => c.status === "pending" && scope(c.project ?? "")),
+        conflicts: (db.conflicts ?? [])
+          .filter((c: any) => c.status === "pending" && scope(c.proposal?.project ?? ""))
+          .map((c: any) => ({ id: c.id, title: c.proposal?.title, updated_at: c.updated_at })),
+        activities: (db.activities ?? []).filter((a: any) =>
+          scope(
+            (db.checkpoints as any[])?.find((c) => c.id === a.checkpoint_id)?.project ??
+              db.records.find((r) => r.id === a.record_id)?.project ??
+              "",
+          ),
+        ),
+      };
+      return {
+        offset,
+        limit,
+        has_more: Object.values(all).some((items) => items.length > offset + limit),
+        ...Object.fromEntries(
+          Object.entries(all).map(([k, items]) => [
+            k,
+            items.sort((a, b) => b.updated_at - a.updated_at || a.id.localeCompare(b.id)).slice(offset, offset + limit),
+          ]),
+        ),
+      };
+    }
+    case "conflict_detail": {
+      const conflict = (db.conflicts as any[])?.find((c) => c.id === payload.id);
+      if (!conflict) throw new Error("冲突不存在。");
+      return conflict;
     }
     case "activity":
       return {

@@ -167,9 +167,9 @@ impl Store {
         let bind = named_params! {":query":query,":state":state,":kind":kind,":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":time};
         let total: i64 = self.conn.query_row(&count_sql, bind, |r| r.get(0))?;
         let sql = if use_fts {
-            format!("{base}SELECT e.payload,(SELECT c.text FROM matches m JOIN chunks c ON c.id=m.chunk_id WHERE m.entry_id=e.id ORDER BY m.rank LIMIT 1), best.rank*(1+0.05*json_extract(e.payload,'$.importance')+0.3*json_extract(e.payload,'$.pinned')+0.02*COALESCE(f.score,0)) AS rank FROM best JOIN records e ON e.id=best.entry_id LEFT JOIN feedback f ON f.id=e.id ORDER BY rank,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
+            format!("{base}SELECT json_remove(e.payload,'$.assets'),(SELECT c.text FROM matches m JOIN chunks c ON c.id=m.chunk_id WHERE m.entry_id=e.id ORDER BY m.rank LIMIT 1), best.rank*(1+0.05*json_extract(e.payload,'$.importance')+0.3*json_extract(e.payload,'$.pinned')+0.02*COALESCE(f.score,0)) AS rank FROM best JOIN records e ON e.id=best.entry_id LEFT JOIN feedback f ON f.id=e.id ORDER BY rank,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
         } else {
-            format!("SELECT e.payload,substr(json_extract(e.payload,'$.body'),1,400),0 FROM records e WHERE {FILTER} AND :query=:query ORDER BY json_extract(e.payload,'$.pinned') DESC,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
+            format!("SELECT json_remove(e.payload,'$.assets'),substr(json_extract(e.payload,'$.body'),1,400),0 FROM records e WHERE {FILTER} AND :query=:query ORDER BY json_extract(e.payload,'$.pinned') DESC,e.updated DESC,e.id LIMIT :limit OFFSET :offset")
         };
         let mut stmt = self.conn.prepare(&sql)?;
         let rows=stmt.query_map(named_params!{":query":query,":state":state,":kind":kind,":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":time,":limit":q.limit.max(1) as i64,":offset":q.offset as i64},|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,f64>(2)?)))?;
@@ -201,15 +201,58 @@ impl Store {
         })
     }
     pub fn context(&self, q: ContextRequest) -> Result<serde_json::Value> {
+        self.context_cancellable(q, None)
+    }
+    pub fn context_cancellable(
+        &self,
+        q: ContextRequest,
+        request_id: Option<String>,
+    ) -> Result<serde_json::Value> {
         let budget = q.max_chars.unwrap_or(8000).clamp(1000, 30000);
-        let search = self.search(&SearchQuery {
-            query: q.query.clone(),
-            project: q.project.clone(),
-            agent: q.agent.clone(),
-            semantic: true,
-            limit: 30,
-            ..Default::default()
-        })?;
+        let (combined, warning) = self.context_hits(q.clone(), request_id, &[])?;
+        Ok(crate::context_pack::pack(
+            combined, &q.query, budget, warning,
+        ))
+    }
+    pub(crate) fn context_hits(
+        &self,
+        q: ContextRequest,
+        request_id: Option<String>,
+        kinds: &[Kind],
+    ) -> Result<(Vec<Hit>, Option<String>)> {
+        let mut search = SearchResult {
+            items: vec![],
+            total: 0,
+            warning: None,
+        };
+        let kinds: Vec<Option<Kind>> = if kinds.is_empty() {
+            vec![None]
+        } else {
+            kinds.iter().copied().map(Some).collect()
+        };
+        for kind in &kinds {
+            let result = self.search(&SearchQuery {
+                request_id: request_id.clone(),
+                kind: *kind,
+                query: q.query.clone(),
+                project: q.project.clone(),
+                agent: q.agent.clone(),
+                semantic: true,
+                limit: 30,
+                ..Default::default()
+            })?;
+            search.items.extend(result.items);
+            search.total += result.total;
+            if result.warning.is_some() {
+                search.warning = result.warning;
+            }
+        }
+        if kinds.len() > 1 {
+            search
+                .items
+                .sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.id.cmp(&b.id)));
+            search.items.dedup_by(|a, b| a.id == b.id);
+        }
         // A few explicitly pinned preferences form stable session context even when the task's words differ.
         let pinned = self.lexical(&SearchQuery {
             kind: Some(Kind::Memory),
@@ -223,7 +266,7 @@ impl Store {
         let mut combined: Vec<Hit> = pinned
             .items
             .into_iter()
-            .filter(|h| h.pinned)
+            .filter(|h| h.pinned && (kinds.contains(&None) || kinds.contains(&Some(Kind::Memory))))
             .map(|pin| {
                 search
                     .items
@@ -248,12 +291,7 @@ impl Store {
             let first = combined.remove(index);
             combined.insert(0, first);
         }
-        Ok(crate::context_pack::pack(
-            combined,
-            &q.query,
-            budget,
-            search.warning,
-        ))
+        Ok((combined, search.warning))
     }
 
     pub fn stats(&self) -> Result<Stats> {
@@ -310,6 +348,7 @@ impl Store {
                 enabled: false,
                 endpoint: "http://127.0.0.1:11434".into(),
                 model: "qwen3-embedding:0.6b".into(),
+                ..Default::default()
             },
         })
     }

@@ -1,9 +1,16 @@
 import { watchAiChanges } from "./change-watch";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
-import { emptyAiFields, type AiKind, type AiRecord, type AiSearch, type AiStats } from "../../shared/ai-types";
+import {
+  emptyAiFields,
+  type AiFields,
+  type AiKind,
+  type AiRecord,
+  type AiSearch,
+  type AiStats,
+} from "../../shared/ai-types";
 import { registerPendingWork, flushLiveEditors } from "../../shared/pending-work";
-import { readAiDrafts, removeAiDraft, writeAiDraft } from "./draft-store";
+import { readAiDrafts, readAiDraft, removeAiDraft, writeAiDraft } from "./draft-store";
 import type { AiDraft } from "./AiEditor";
 
 export function useAiSpace(active: boolean) {
@@ -20,7 +27,7 @@ export function useAiSpace(active: boolean) {
     [],
   );
   const [query, setQuery] = useState(""),
-    [project, setProject] = useState(""),
+    [project, setProject] = useState("*"),
     [agent, setAgent] = useState("");
   const [archived, setArchived] = useState(false),
     [includeExpired, setIncludeExpired] = useState(false),
@@ -29,7 +36,9 @@ export function useAiSpace(active: boolean) {
     [search, setSearch] = useState<AiSearch>({ items: [], total: 0, warning: null });
   const [selected, setSelected] = useState<AiRecord | null>(null),
     [drafts, setDrafts] = useState<Record<string, AiDraft>>({}),
-    [activeDraft, setActiveDraft] = useState<string | null>(null);
+    [activeDraft, setActiveDraftState] = useState<string | null>(null);
+  const draftOpening = useRef(0);
+  const [draftLoading, setDraftLoading] = useState(false);
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [semanticLoading, setSemanticLoading] = useState(false),
@@ -50,6 +59,32 @@ export function useAiSpace(active: boolean) {
     activeKey.current = activeDraft;
   }, [activeDraft]);
   const notify = useCallback((text: string, error = false) => setMessage({ text, error }), []);
+  const setActiveDraft = useCallback(
+    (key: string | null) => {
+      const ticket = ++draftOpening.current;
+      if (!key || !all.current[key]?.deferred) {
+        setDraftLoading(false);
+        setActiveDraftState(key);
+        return;
+      }
+      setDraftLoading(true);
+      void readAiDraft(key)
+        .then((value) => {
+          if (ticket !== draftOpening.current) return;
+          if (!value) throw new Error("该草稿已不存在。");
+          all.current = { ...all.current, [key]: value };
+          setDrafts(all.current);
+          setActiveDraftState(key);
+        })
+        .catch((e) => {
+          if (ticket === draftOpening.current) notify(`草稿读取失败，原内容保留：${String(e)}`, true);
+        })
+        .finally(() => {
+          if (ticket === draftOpening.current) setDraftLoading(false);
+        });
+    },
+    [notify],
+  );
   const refresh = useCallback(() => setTick((n) => n + 1), []);
   const persist = useCallback(
     (d: AiDraft) => {
@@ -78,7 +113,7 @@ export function useAiSpace(active: boolean) {
       pending.current = work;
       void work.catch((e) => notify(String(e), true));
     },
-    [notify],
+    [notify, setActiveDraft],
   );
   const setDraft = useCallback(
     (value: AiDraft | null) => {
@@ -102,9 +137,19 @@ export function useAiSpace(active: boolean) {
       setActivity(false);
       if (d.key !== activeKey.current) setConflict(null);
     },
-    [forget, put, setConnections, setActivity],
+    [forget, put, setConnections, setActivity, setActiveDraft],
   );
   const draft = activeDraft ? (drafts[activeDraft] ?? null) : null;
+  const stageImport = (fields: AiFields) =>
+    setDraft({
+      fields: {
+        ...fields,
+        project: project === "*" ? "" : project,
+        agent,
+        sharing: project && project !== "*" ? "project" : "global",
+      },
+      pendingImport: true,
+    });
   useEffect(() => {
     let cancelled = false;
     void readAiDrafts()
@@ -113,13 +158,13 @@ export function useAiSpace(active: boolean) {
         const restored = Object.fromEntries(values.map((d) => [d.key!, d]));
         all.current = { ...restored, ...all.current };
         setDrafts(all.current);
-        if (values.length) setActiveDraft(values[0].key!);
+        if (values.length && !activeKey.current && draftOpening.current === 0) setActiveDraft(values[0].key!);
       })
       .catch((e) => notify(`读取草稿失败：${String(e)}`, true));
     return () => {
       cancelled = true;
     };
-  }, [notify]);
+  }, [notify, setActiveDraft]);
   useEffect(
     () =>
       registerPendingWork(async () => {
@@ -147,7 +192,7 @@ export function useAiSpace(active: boolean) {
             request_id: requestId,
             kind,
             query,
-            project: project || null,
+            project: project === "*" ? null : project,
             agent: agent || null,
             include_global: true,
             state: archived ? "archived" : "active",
@@ -158,13 +203,13 @@ export function useAiSpace(active: boolean) {
           try {
             const [s, result] = await Promise.all([
               aiRequest<AiStats>("stats"),
-              aiRequest<AiSearch>("search", { ...q, semantic: false }),
+              panel === "library" ? aiRequest<AiSearch>("search", { ...q, semantic: false }) : Promise.resolve(null),
             ]);
             if (cancelled) return;
             setStats(s);
-            setSearch(result);
+            if (result) setSearch(result);
             setLoading(false);
-            if (query.trim() && s.semantic.enabled) {
+            if (panel === "library" && query.trim() && s.semantic.enabled) {
               setSemanticLoading(true);
               const augmented = await aiRequest<AiSearch>("search", { ...q, semantic: true });
               if (!cancelled) setSearch(augmented);
@@ -186,7 +231,7 @@ export function useAiSpace(active: boolean) {
       window.clearTimeout(timer);
       void aiRequest("cancel_search", { request_id: requestId }).catch(() => {});
     };
-  }, [active, kind, query, project, agent, archived, includeExpired, page, tick]);
+  }, [active, panel, kind, query, project, agent, archived, includeExpired, page, tick]);
   const ready = stats !== null;
   useEffect(() => {
     if (!active || !ready) return;
@@ -200,9 +245,9 @@ export function useAiSpace(active: boolean) {
     async (id: string) => {
       const seq = ++sequence.current;
       try {
-        const r = await aiRequest<AiRecord>("get", { id });
+        const r = await aiRequest<AiRecord>("record_view", { id });
         if (seq !== sequence.current) return;
-        setSelected(r);
+        setSelected({ ...r, assets: r.assets ?? [] });
         setConnections(false);
         setActivity(false);
         setActiveDraft(Object.values(all.current).find((d) => d.id === id)?.key ?? null);
@@ -211,16 +256,16 @@ export function useAiSpace(active: boolean) {
         notify(String(e), true);
       }
     },
-    [notify, setConnections, setActivity],
+    [notify, setConnections, setActivity, setActiveDraft],
   );
   const selectedId = selected?.id;
   const selectedRevision = selected?.revision;
   useEffect(() => {
-    if (!active || !selectedId || selectedRevision == null || draft) return;
+    if (!active || panel !== "library" || !selectedId || selectedRevision == null || draft) return;
     let cancelled = false;
-    void aiRequest<AiRecord | null>("get_if_changed", { id: selectedId, revision: selectedRevision })
+    void aiRequest<AiRecord | null>("record_view_if_changed", { id: selectedId, revision: selectedRevision })
       .then((r) => {
-        if (!cancelled && r) setSelected(r);
+        if (!cancelled && r) setSelected({ ...r, assets: r.assets ?? [] });
       })
       .catch((e) => {
         if (!cancelled) notify(`更新内容失败，已保留当前页面：${String(e)}`, true);
@@ -228,7 +273,7 @@ export function useAiSpace(active: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [active, selectedId, selectedRevision, draft, tick, notify]);
+  }, [active, panel, selectedId, selectedRevision, draft, tick, notify]);
   const save = useCallback(
     async (manual = true, override?: AiDraft) => {
       flushLiveEditors();
@@ -238,7 +283,8 @@ export function useAiSpace(active: boolean) {
         // An explicit save must finish the latest draft even if autosave started first.
       }
       const current = override ?? (activeKey.current ? all.current[activeKey.current] : null);
-      if (!current) return;
+      if (!current || current.deferred) return;
+      if (!manual && current.pendingImport) return;
       const run = async () => {
         setBusy(true);
         try {
@@ -262,6 +308,7 @@ export function useAiSpace(active: boolean) {
               expected_revision: r.revision,
               baseBody: r.body,
               dirty: changed,
+              pendingImport: false,
               saveError: undefined,
             });
             if (manual && !changed) forget(current.key!);
@@ -298,6 +345,7 @@ export function useAiSpace(active: boolean) {
   useEffect(() => {
     if (
       !draft?.dirty ||
+      draft.pendingImport ||
       draft.saveError ||
       draft.merge ||
       busy ||
@@ -313,7 +361,14 @@ export function useAiSpace(active: boolean) {
     return () => window.clearTimeout(timer);
   }, [draft, busy, composing, resourceLoading, conflict, save]);
   const newEntry = () =>
-    setDraft({ fields: { ...emptyAiFields(kind), project, agent, sharing: project ? "project" : "global" } });
+    setDraft({
+      fields: {
+        ...emptyAiFields(kind),
+        project: project === "*" ? "" : project,
+        agent,
+        sharing: project && project !== "*" ? "project" : "global",
+      },
+    });
   const merge = async () => {
     try {
       const records = await Promise.all(checked.map((id) => aiRequest<AiRecord>("get", { id })));
@@ -357,6 +412,8 @@ export function useAiSpace(active: boolean) {
     await save(true, next);
   };
   return {
+    stageImport,
+    dataVersion: tick,
     kind,
     setKind,
     connections,
@@ -384,7 +441,7 @@ export function useAiSpace(active: boolean) {
     drafts,
     activeDraft,
     setActiveDraft,
-    busy,
+    busy: busy || draftLoading,
     loading,
     semanticLoading,
     loadError,
