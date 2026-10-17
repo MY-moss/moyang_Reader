@@ -1,5 +1,7 @@
 # 墨阳阅读器 · Moyang Reader
 
+本轮新增按模型预算、常用模型、长会话分段显示、统一 AI 配置、概览条件读取和可取消 PDF 导出。见 [0.18 配置与优化说明](docs/UPGRADE-018.md)。
+
 一个以本地文件为基础的阅读、写作与个人 AI 工作台。阅读 Markdown、TXT、Word 和 PDF，整理自己的知识、长期记忆与技能，也可以让外部 AI Agent 通过 MCP 使用这些积累。
 
 界面采用暖白与墨绿，支持深色模式、舒适 / 紧凑密度、文档标签和双窗格。阅读空间、AI 空间与可选聊天各有入口，切换时保留正在处理的内容。
@@ -22,7 +24,7 @@
 
 ## 下载与开始使用
 
-当前发布版本为 **0.17.0**，维护平台为 **Windows x64**。
+当前发布版本为 **0.18.0**，维护平台为 **Windows x64**。
 
 1. 在 [GitHub Releases](https://github.com/MY-moss/moyang_Reader/releases/latest) 下载 `moyang-reader-<版本>-windows-x64.zip`。
 2. 完整解压到一个可写入的本机文件夹，打开 `Moyang Reader Next.exe`。保留同目录的 `moyang-ai-mcp.exe`。
