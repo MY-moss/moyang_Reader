@@ -1,3 +1,4 @@
+import { PdfExportStatus } from "../features/export/components/PdfExportStatus";
 import { readSourceSelection } from "../features/editor/source-selection";
 import type { SourceLocation } from "../shared/bookroom-types";
 import { ConflictDialog } from "./views/ConflictDialog";
@@ -232,6 +233,7 @@ export function RootApp() {
       className={`product-shell workbench-shell${collapsed ? " workbench-sidebar-hidden" : ""}${narrow ? " workbench-narrow" : ""}`}
       style={{ "--workbench-sidebar-width": `${model.paneWidths.sidebar}px` } as CSSProperties}
     >
+      <PdfExportStatus />
       {narrow && !collapsed && (
         <button className="navigation-backdrop" aria-label="收起导航" onClick={() => setNavigationOpen(false)} />
       )}
