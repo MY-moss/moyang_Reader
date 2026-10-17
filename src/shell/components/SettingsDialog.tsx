@@ -83,6 +83,7 @@ export function SettingsDialog({ onClose, ...props }: TopBarProps & { onClose: (
         <SettingsContent
           {...props}
           section={section}
+          onSectionChange={setSection}
           onOpenGuide={() => {
             onClose();
             props.onOpenGuide();

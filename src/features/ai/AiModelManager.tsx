@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { aiRequest } from "../../platform/ai-bridge";
 import { openExternalUrl } from "../../platform/bridge";
 import type { AiSemantic } from "../../shared/ai-types";
+import { useVisiblePolling } from "../../shared/useVisiblePolling";
 type Status = {
   directory: string;
   model: string;
@@ -44,23 +45,12 @@ export function AiModelManager({
       alive = false;
     };
   }, []);
-  useEffect(() => {
-    if (status?.download.state !== "downloading") return;
-    let alive = true;
-    const timer = setInterval(() => {
-      void aiRequest<Status>("model_status")
-        .then((s) => {
-          if (alive) setStatus(s);
-        })
-        .catch((e) => {
-          if (alive) setError(String(e));
-        });
-    }, 1000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [status?.download.state]);
+  useVisiblePolling(
+    status?.download.state === "downloading" && !busy,
+    () => aiRequest<Status>("model_status"),
+    setStatus,
+    (e) => setError(String(e)),
+  );
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
     setError("");

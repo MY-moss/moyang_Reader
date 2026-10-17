@@ -1,3 +1,5 @@
+import { ModelOptions } from "./ModelOptions";
+import { modelBudget } from "./model-budget";
 import { useEffect, useRef, useState } from "react";
 import { chatModels, chatRequest, streamChat } from "../../platform/chat";
 import { isTauriRuntime } from "../../platform/bridge";
@@ -33,6 +35,8 @@ export function ProviderSettings({
   );
   const [key, setKey] = useState(""),
     [clearKey, setClearKey] = useState(false);
+  const [budgetModel, setBudgetModel] = useState("");
+  const testModel = budgetModel || form.model;
   const [savedForm, setSavedForm] = useState(form);
   const [destination, setDestination] = useState<ChatProvider | "chat" | null>(null);
   const keepEditing = useRef<HTMLButtonElement>(null);
@@ -47,6 +51,7 @@ export function ProviderSettings({
     [removing, setRemoving] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const select = (p: ChatProvider) => {
+    setBudgetModel("");
     setForm(p);
     setSavedForm(p);
     setKey("");
@@ -68,6 +73,7 @@ export function ProviderSettings({
   const save = async (profile = form) => {
     if (!form.name.trim()) throw new Error("请为服务填写一个便于识别的名称。");
     apiEndpoint(form.baseUrl, form.protocol);
+    for (const model of Object.keys(profile.modelOptions ?? {})) modelBudget(profile, model);
     const saved = await chatRequest<ChatProvider>("save_provider", {
       ...profile,
       models: providerModels(profile),
@@ -237,6 +243,17 @@ export function ProviderSettings({
               />
             </label>
             <small>模型列表随服务保存在本机。获取列表会补充新模型；可在这里移除不需要的条目。</small>
+            <label>
+              预算与测试的模型
+              <select aria-label="预算与测试的模型" value={testModel} onChange={(e) => setBudgetModel(e.target.value)}>
+                {providerModels(form).map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ModelOptions provider={form} model={testModel} onChange={setForm} />
           </fieldset>
           <p className="chat-privacy">
             {isTauriRuntime()
@@ -273,7 +290,7 @@ export function ProviderSettings({
             </button>
             <button
               type="button"
-              disabled={busy || !form.model.trim()}
+              disabled={busy || !testModel.trim()}
               onClick={() =>
                 void run(async () => {
                   const p = await save();
@@ -285,7 +302,12 @@ export function ProviderSettings({
                   try {
                     await streamChat(
                       p,
-                      requestBody(p.protocol, p.model, [{ role: "user", content: "请只回复：连接成功" }]),
+                      requestBody(
+                        p.protocol,
+                        testModel,
+                        [{ role: "user", content: "请只回复：连接成功" }],
+                        p.modelOptions?.[testModel],
+                      ),
                       abort.signal,
                       (text) => {
                         reply += text;
@@ -293,6 +315,13 @@ export function ProviderSettings({
                       () => undefined,
                     );
                     if (!reply.trim()) throw new Error("模型没有返回文字。");
+                    await save({
+                      ...p,
+                      modelOptions: {
+                        ...p.modelOptions,
+                        [testModel]: { ...p.modelOptions?.[testModel], testedAt: Date.now() },
+                      },
+                    });
                     setMessage(`连接成功：${reply.slice(0, 120)}`);
                   } finally {
                     clearTimeout(timer);

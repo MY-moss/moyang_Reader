@@ -90,6 +90,18 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
         result = null;
       } else if (operation === "save_provider") {
         const hasKey = payload.clearKey ? false : Boolean(payload.apiKey || keys.has(id));
+        const modelOptions = structuredClone(payload.modelOptions ?? old?.modelOptions ?? {}) as NonNullable<
+          ChatProvider["modelOptions"]
+        >;
+        if (
+          old &&
+          (old.baseUrl !== payload.baseUrl ||
+            old.protocol !== payload.protocol ||
+            payload.clearKey ||
+            (payload.apiKey && payload.apiKey !== keys.get(id)))
+        ) {
+          for (const option of Object.values(modelOptions)) delete option.testedAt;
+        }
         result = {
           id,
           name: payload.name,
@@ -100,6 +112,8 @@ export async function chatRequest<T>(operation: string, payload: Record<string, 
             model: String(payload.model ?? ""),
             models: (payload.models ?? old?.models) as string[] | undefined,
           }),
+          favorites: payload.favorites ?? old?.favorites ?? [],
+          modelOptions,
           hasKey,
         };
         store.put(result);
@@ -152,6 +166,14 @@ function headers(provider: ChatProvider): Record<string, string> {
 
 async function checkResponse(response: Response) {
   if (response.ok) return;
+  if ([400, 422].includes(response.status)) {
+    const detail = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (/stream_options|include_usage/i.test(String(detail?.error?.message ?? "")))
+      throw new Error(`服务拒绝 stream_options（${response.status}）`);
+  }
   throw new Error(
     response.status === 401 || response.status === 403
       ? "服务拒绝了连接，请检查 API 密钥和权限。"
@@ -174,7 +196,7 @@ export async function chatModels(provider: ChatProvider): Promise<string[]> {
   return (result.data ?? []).map((item: { id: string }) => item.id).filter((id: unknown) => typeof id === "string");
 }
 
-export async function streamChat(
+async function streamChatOnce(
   provider: ChatProvider,
   body: unknown,
   signal: AbortSignal,
@@ -233,5 +255,37 @@ export async function streamChat(
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
+  }
+}
+
+export async function streamChat(
+  provider: ChatProvider,
+  body: unknown,
+  signal: AbortSignal,
+  onText: (text: string) => void,
+  onUsage: (usage: ChatUsage) => void,
+): Promise<void> {
+  let received = false;
+  const text = (chunk: string) => {
+    received = true;
+    onText(chunk);
+  };
+  try {
+    await streamChatOnce(provider, body, signal, text, onUsage);
+  } catch (error) {
+    const options = body as Record<string, unknown>;
+    // Retry only an explicit parameter rejection before any answer, never a timeout or quota error.
+    if (
+      !signal.aborted &&
+      !received &&
+      provider.protocol === "openai" &&
+      options?.stream_options &&
+      /(?:400|422)/.test(String(error)) &&
+      /stream_options|include_usage/i.test(String(error))
+    ) {
+      const compatible = { ...options };
+      delete compatible.stream_options;
+      await streamChatOnce(provider, compatible, signal, onText, onUsage);
+    } else throw error;
   }
 }

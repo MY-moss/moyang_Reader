@@ -4,6 +4,9 @@ import { aiRequest } from "../../platform/ai-bridge";
 import { isTauriRuntime } from "../../platform/bridge";
 import { ProviderSettings } from "../chat/ProviderSettings";
 import type { ChatProvider } from "../../shared/chat-types";
+import type { AiStats } from "../../shared/ai-types";
+import { AiRetrievalSettings } from "../ai/AiRetrievalSettings";
+import { providerModels } from "../../shared/provider-models";
 
 type Config = { enabled: boolean; provider: string; model: string; daily_tokens: number; auto_merge: boolean };
 type Status = {
@@ -17,7 +20,9 @@ type Status = {
   errors: Array<{ id: string; title: string; error: string }>;
 };
 const empty: Config = { enabled: false, provider: "", model: "", daily_tokens: 0, auto_merge: true };
-export function AiServiceSettings() {
+export function AiServiceSettings({ onStorage }: { onStorage?: () => void }) {
+  const [retrieval, setRetrieval] = useState(false);
+  const [stats, setStats] = useState<AiStats | null>(null);
   const [providers, setProviders] = useState<ChatProvider[]>([]),
     [editing, setEditing] = useState(false);
   const [config, setConfig] = useState<Config>(empty),
@@ -26,6 +31,18 @@ export function AiServiceSettings() {
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const native = isTauriRuntime();
+  const notify = useCallback((text: string, failed?: boolean) => {
+    if (failed) setError(text);
+    else setMessage(text);
+  }, []);
+  const refreshRetrieval = useCallback(() => {
+    void aiRequest<AiStats>("stats")
+      .then(setStats)
+      .catch((e) => setError(String(e)));
+  }, []);
+  useEffect(() => {
+    if (retrieval) refreshRetrieval();
+  }, [retrieval, refreshRetrieval]);
   const reloadProviders = useCallback(async () => setProviders(await chatRequest<ChatProvider[]>("providers")), []);
   const refresh = useCallback(async () => {
     if (native) setStatus(await aiRequest<Status>("organization_status"));
@@ -79,6 +96,35 @@ export function AiServiceSettings() {
     <section className="settings-section ai-service-settings" aria-label="AI 服务与整理">
       <h3>AI 服务</h3>
       <p>服务配置共用，聊天、记忆整理和嵌入检索分别选模型。无需安装聊天插件，也能配置后台整理。</p>
+      <ol className="ai-setup-steps">
+        <li>
+          <strong>先选磁盘</strong>
+          <p>AI 库、聊天、配置、备份和模型可分别选择位置。下载模型前先确认目录。</p>
+          {onStorage && <button onClick={onStorage}>查看与更改存储位置</button>}
+        </li>
+        <li>
+          <strong>按用途选择</strong>
+          <p>聊天和整理使用文本生成模型；语义检索使用嵌入模型。服务中的模型列表不会自动证明它具备这些能力。</p>
+          <button onClick={() => setEditing(true)}>添加服务 / 测试聊天模型</button>
+          <button aria-expanded={retrieval} onClick={() => setRetrieval(!retrieval)}>
+            配置本地模型或嵌入 API
+          </button>
+        </li>
+        <li>
+          <strong>按需启用</strong>
+          <p>
+            聊天：在扩展市场启用“书房聊天”，每次对话独立选模型。整理：在下方选择服务、模型与每日额度。语义检索：测试连接后再建立索引。
+          </p>
+        </li>
+      </ol>
+      {retrieval &&
+        (stats ? (
+          <div className="ai-connections">
+            <AiRetrievalSettings stats={stats} native={native} refresh={refreshRetrieval} notify={notify} />
+          </div>
+        ) : (
+          <p role="status">正在读取检索配置…</p>
+        ))}
       <p>{providers.length ? `已保存 ${providers.length} 个服务` : "尚未添加 API 服务"}</p>
       <button onClick={() => setEditing(true)}>管理 API 服务</button>
       <hr />
@@ -125,8 +171,14 @@ export function AiServiceSettings() {
             required
             disabled={busy || !native}
             value={config.model}
+            list="organizer-model-catalog"
             onChange={(e) => setConfig({ ...config, model: e.target.value })}
           />
+          <datalist id="organizer-model-catalog">
+            {providerModels(providers.find((p) => p.id === config.provider)).map((id) => (
+              <option key={id} value={id} />
+            ))}
+          </datalist>
         </label>
         <label className="settings-select-option">
           <span>每日 token 额度</span>
