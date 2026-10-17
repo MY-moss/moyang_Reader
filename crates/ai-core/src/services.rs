@@ -193,13 +193,15 @@ pub fn provider_request(path: &Path, operation: &str, payload: Value) -> Result<
 
 impl crate::Store {
     pub fn bind_services(&self, directory: &Path) -> crate::Result<()> {
-        let root = self.path.parent().unwrap();
+        // A Windows storage junction may cross drives. Use its physical parent
+        // for both the temporary file and atomic rename, keeping the public alias stable.
+        let root = std::fs::canonicalize(self.path.parent().unwrap())?;
         let path = root.join("runtime-services.json");
         let data = serde_json::to_vec(&json!({"directory":directory}))?;
         if std::fs::read(&path).ok().as_deref() == Some(data.as_slice()) {
             return Ok(());
         }
-        let mut pending = tempfile::NamedTempFile::new_in(root)?;
+        let mut pending = tempfile::NamedTempFile::new_in(&root)?;
         use std::io::Write;
         pending.write_all(&data)?;
         pending.as_file().sync_all()?;
@@ -234,6 +236,57 @@ impl crate::Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn shared_services_binding_survives_a_storage_directory_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let physical = dir.path().join("physical");
+        let alias = dir.path().join("alias");
+        std::fs::create_dir(&physical).unwrap();
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            let script = dir.path().join("link.ps1");
+            std::fs::write(&script, "param([string]$Alias,[string]$Target)\n$ErrorActionPreference='Stop'\nNew-Item -ItemType Junction -Path $Alias -Target $Target | Out-Null\n").unwrap();
+            let status = std::process::Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-File"])
+                .arg(script)
+                .arg(&alias)
+                .arg(&physical)
+                .creation_flags(0x08000000)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&physical, &alias).unwrap();
+        let store = crate::Store::open(&alias).unwrap();
+        let services = dir.path().join("chat");
+        store.bind_services(&services).unwrap();
+        assert_eq!(store.services_directory().unwrap(), services);
+        let next = dir.path().join("other-chat");
+        store.bind_services(&next).unwrap();
+        assert_eq!(
+            crate::Store::open(&physical)
+                .unwrap()
+                .services_directory()
+                .unwrap(),
+            next
+        );
+        store.bind_services(&next).unwrap();
+        assert_eq!(
+            std::fs::read_dir(&physical)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with(".tmp"))
+                .count(),
+            0
+        );
+        #[cfg(windows)]
+        std::fs::remove_dir(&alias).unwrap();
+        #[cfg(unix)]
+        std::fs::remove_file(&alias).unwrap();
+    }
+
     #[test]
     fn model_catalog_roundtrips_preserving_legacy_profiles_and_credentials() {
         let dir = tempfile::tempdir().unwrap();

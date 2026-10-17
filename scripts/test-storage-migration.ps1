@@ -73,7 +73,31 @@ try {
     $report=Get-Content -LiteralPath (Join-Path $fixture 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($report.status -eq 'error') 'A locked source should stop migration'
     Assert-True ((Get-Content -LiteralPath (Join-Path $cache 'draft.txt') -Raw) -eq 'unsent draft') 'Failure must preserve source data'
+    # An Agent may recreate the stable path while rollback is trying to restore it.
+    # Simulate that race after a swap; neither writer's data may be removed.
+    $raceSource=Join-Path $fixture 'race-source'
+    [IO.Directory]::CreateDirectory($raceSource) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $raceSource 'original.txt'),'original draft')
+    $raceHelper=Join-Path $fixture 'race-helper.ps1'
+    $injection=@'
+        $swap.linked = $true
+        [IO.Directory]::Delete($source,$false)
+        [IO.Directory]::CreateDirectory($source) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $source 'recreated.txt'),'concurrent writer')
+        throw 'Simulated failure after another process recreated the source'
+'@
+    $raceCode=[IO.File]::ReadAllText($helper).Replace('        $swap.linked = $true',$injection)
+    [IO.File]::WriteAllText($raceHelper,$raceCode,(New-Object Text.UTF8Encoding($true)))
+    $plan=@{target=(Join-Path $fixture 'race-target');items=@(@{key='data';label='Race';logical=$raceSource;physical=$raceSource});pid=2147483647;executable=(Join-Path $fixture 'no-autostart.exe')}
+    [IO.File]::WriteAllText($planFile,($plan|ConvertTo-Json -Depth 8),(New-Object Text.UTF8Encoding($false)))
+    & powershell.exe -NoProfile -NonInteractive -File $raceHelper -PlanPath $planFile
+    $report=Get-Content -LiteralPath (Join-Path $fixture 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ($report.status -eq 'error' -and $report.rollback_complete -eq $false) 'Interrupted rollback must produce a final actionable report'
+    Assert-True ($report.retained.Count -eq 1) 'Original backup path must be reported'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $report.retained[0].original 'original.txt') -Raw) -eq 'original draft') 'Original must remain in retained backup'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $raceSource 'recreated.txt') -Raw) -eq 'concurrent writer') 'Concurrent writer data must survive'
     Write-Output 'Storage migration passed: two moves, independent model directory, live MCP path, drafts, empty folders, occupied/nested targets and locked-source recovery.'
+    Write-Output 'Rollback collision passed: both data copies preserved and incomplete recovery reported.'
 } finally {
     # Remove each fixture link itself; never recursively traverse a junction during cleanup.
     foreach($alias in $aliases) {
