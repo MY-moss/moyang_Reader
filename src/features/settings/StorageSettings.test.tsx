@@ -19,6 +19,28 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   vi.resetAllMocks();
 });
+it("explains incomplete rollback and keeps original recovery paths visible", async () => {
+  vi.mocked(storageInfo).mockResolvedValue({
+    native: true,
+    locations: [],
+    report: {
+      status: "error",
+      message: "迁移中断",
+      target: "D:/MoyangData",
+      rollback_complete: false,
+      rollback_errors: ["原位置被其他程序重新创建"],
+      retained: ["C:/data.moyang-moved-original"],
+    },
+  });
+  const container = document.createElement("div");
+  root = createRoot(container);
+  await act(async () => root.render(<StorageSettings />));
+  const report = container.querySelector('[role="alert"]');
+  expect(report?.textContent).toContain("不要删除这些数据");
+  expect(report?.textContent).toContain("C:/data.moyang-moved-original");
+  expect(report?.textContent).toContain("原位置被其他程序重新创建");
+  expect(report?.textContent).not.toContain("可在确认新位置可用后处理");
+});
 it("does not mistake Windows casing, namespace or trailing separators for relocated data", async () => {
   vi.mocked(storageInfo).mockResolvedValue({
     native: true,

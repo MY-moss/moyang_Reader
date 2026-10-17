@@ -94,7 +94,8 @@ try {
     $report=Get-Content -LiteralPath (Join-Path $fixture 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($report.status -eq 'error' -and $report.rollback_complete -eq $false) 'Interrupted rollback must produce a final actionable report'
     Assert-True ($report.retained.Count -eq 1) 'Original backup path must be reported'
-    Assert-True ((Get-Content -LiteralPath (Join-Path $report.retained[0].original 'original.txt') -Raw) -eq 'original draft') 'Original must remain in retained backup'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $report.retained[0] 'original.txt') -Raw) -eq 'original draft') 'Original must remain in retained backup'
+    Assert-True ($report.recovery[0].original -eq $report.retained[0]) 'Detailed recovery paths must match retained originals'
     Assert-True ((Get-Content -LiteralPath (Join-Path $raceSource 'recreated.txt') -Raw) -eq 'concurrent writer') 'Concurrent writer data must survive'
     Write-Output 'Storage migration passed: two moves, independent model directory, live MCP path, drafts, empty folders, occupied/nested targets and locked-source recovery.'
     Write-Output 'Rollback collision passed: both data copies preserved and incomplete recovery reported.'

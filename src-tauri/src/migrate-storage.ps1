@@ -164,6 +164,7 @@ try {
     if ($CheckOnly) { [Console]::Error.WriteLine($failure); exit 1 }
     $rollbackErrors = @()
     $retained = @()
+    $recovery = @()
     for ($index=$swaps.Count-1; $index -ge 0; $index--) {
         $swap=$swaps[$index]
         if (Test-Path -LiteralPath $swap.backup) {
@@ -177,12 +178,13 @@ try {
                 [IO.Directory]::Move($swap.backup, $swap.source)
             } catch {
                 $rollbackErrors += $_.Exception.Message
-                $retained += @{source=$swap.source; original=$swap.backup; copied=$swap.destination}
+                $retained += $swap.backup
+                $recovery += @{source=$swap.source; original=$swap.backup; copied=$swap.destination}
             }
         }
     }
     $restartAllowed = $rollbackErrors.Count -eq 0
-    Write-Report @{status='error'; message=$failure; target=$plan.target; rollback_complete=$restartAllowed; rollback_errors=$rollbackErrors; retained=$retained; at=[DateTime]::UtcNow.ToString('o')}
+    Write-Report @{status='error'; message=$failure; target=$plan.target; rollback_complete=$restartAllowed; rollback_errors=$rollbackErrors; retained=$retained; recovery=$recovery; at=[DateTime]::UtcNow.ToString('o')}
     # Partial copied destination is left for inspection; original data remains authoritative.
 }
 if ($restartAllowed -and (Test-Path -LiteralPath $plan.executable -PathType Leaf)) {

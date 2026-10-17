@@ -13,7 +13,14 @@ export type StorageInfo = {
   locations: StorageLocation[];
   program?: string;
   externalModels?: string;
-  report?: { status: "running" | "complete" | "error"; message: string; target: string; retained?: string[] } | null;
+  report?: {
+    status: "running" | "complete" | "error";
+    message: string;
+    target: string;
+    retained?: string[];
+    rollback_complete?: boolean;
+    rollback_errors?: string[];
+  } | null;
 };
 export type StoragePlan = { target: string; items: StorageLocation[]; bytes: number; free: number };
 export const storageInfo = (): Promise<StorageInfo> =>
