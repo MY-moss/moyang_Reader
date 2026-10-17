@@ -108,6 +108,10 @@ pub fn dispatch(s: &mut Store, operation: &str, payload: Value) -> Result<Value>
             std::path::Path::new(payload["directory"].as_str().unwrap_or("")),
         )?,
         "semantic_index" => s.index_semantic()?,
+        "semantic_test" => s.test_semantic(
+            serde_json::from_value(payload["config"].clone())?,
+            payload["request_id"].as_str(),
+        )?,
         "semantic_pause" | "semantic_resume" => {
             s.pause_semantic(operation == "semantic_pause")?;
             Value::Null

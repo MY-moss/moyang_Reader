@@ -75,7 +75,8 @@ fn layers_preserve_unicode_ranges_continuation_and_history_without_assets() {
     assert_eq!(changed["items"][0]["content"], "已明确更正");
     assert_eq!(changed["items"][1]["content"], "# 第一节\n");
     assert_eq!(
-        request(&s, json!([{"id":r.id,"if_revision":2}]), 2000)["items"][0]["unchanged"],
+        request(&s, json!([{"id":r.id,"layer":"l2","if_revision":2}]), 2000)["items"][0]
+            ["unchanged"],
         true
     );
     let history = request(&s, json!([{"id":r.id,"layer":"l3"}]), 3000);
@@ -94,6 +95,12 @@ fn stale_generated_overviews_never_override_human_summaries_or_original_search()
     let dir = tempfile::tempdir().unwrap();
     let mut s = Store::open(dir.path()).unwrap();
     let mut r=s.save(serde_json::from_value(json!({"kind":"knowledge","title":"说明","summary":"手写摘要","body":"很长的原文\n".repeat(220)})).unwrap()).unwrap();
+    let before = request(&s, json!([{"id":r.id}]), 3000);
+    let etag = before["items"][0]["etag"].clone();
+    assert_eq!(
+        request(&s, json!([{"id":r.id,"if_etag":etag}]), 3000)["items"][0]["unchanged"],
+        true
+    );
     s.conn
         .execute(
             "INSERT INTO derived_context VALUES(?,?,?,?,?)",
@@ -106,6 +113,13 @@ fn stale_generated_overviews_never_override_human_summaries_or_original_search()
             ],
         )
         .unwrap();
+    let after = request(
+        &s,
+        json!([{"id":r.id,"if_revision":1,"if_etag":etag}]),
+        3000,
+    );
+    assert_eq!(after["items"][0]["content"], "自动概览");
+    assert_ne!(after["items"][0]["etag"], etag);
     assert_eq!(
         request(&s, json!([{"id":r.id}]), 3000)["items"][0]["content"],
         "自动概览"
@@ -130,4 +144,23 @@ fn stale_generated_overviews_never_override_human_summaries_or_original_search()
         .total,
         1
     );
+}
+
+#[test]
+fn small_budget_conditional_overview_does_not_return_oversized_navigation() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = Store::open(dir.path()).unwrap();
+    let body = (0..12)
+        .map(|i| format!("# {i}{}\n{}\n", "长标题".repeat(30), "证据".repeat(30)))
+        .collect::<String>();
+    let r = s
+        .save(
+            serde_json::from_value(json!({"kind":"knowledge","title":"目录","body":body})).unwrap(),
+        )
+        .unwrap();
+    let first = request(&s, json!([{"id":r.id}]), 1000);
+    let etag = first["items"][0]["etag"].clone();
+    assert!(etag.is_string());
+    let next = request(&s, json!([{"id":r.id,"if_etag":etag}]), 1000);
+    assert_eq!(next["items"][0]["unchanged"], true, "{next}");
 }

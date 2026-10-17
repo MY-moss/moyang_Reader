@@ -48,6 +48,7 @@ pub use health::*;
 mod semantic;
 mod store;
 mod types;
+mod vector_cache;
 pub use dispatch::dispatch;
 pub use store::{view_record, Store};
 pub use types::*;

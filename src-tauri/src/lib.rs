@@ -110,17 +110,19 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            let handle=app.handle().clone();
+            let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let initialize=|| -> Result<(),String> {
-                    let path=data_paths::ai_directory(&handle)?;
-                    let services=data_paths::config_directory(&handle)?.join("chat");
-                    let store=moyang_ai_core::Store::open(&path).map_err(|e|e.to_string())?;
-                    store.bind_services(&services).map_err(|e|e.to_string())?;
+                let initialize = || -> Result<(), String> {
+                    let path = data_paths::ai_directory(&handle)?;
+                    let services = data_paths::config_directory(&handle)?.join("chat");
+                    let store = moyang_ai_core::Store::open(&path).map_err(|e| e.to_string())?;
+                    store.bind_services(&services).map_err(|e| e.to_string())?;
                     moyang_ai_core::maintain_organization(&path);
                     Ok(())
                 };
-                if let Err(error)=initialize(){let _=handle.emit("ai-background-error",error);}
+                if let Err(error) = initialize() {
+                    let _ = handle.emit("ai-background-error", error);
+                }
             });
             Ok(())
         })
@@ -169,6 +171,7 @@ pub fn run() {
             commands::files::write_binary_file,
             commands::files::write_binary_file_raw,
             commands::pdf::export_pdf_file,
+            commands::pdf::cancel_pdf_export,
             commands::entries::create_markdown_file,
             commands::entries::create_workspace_note,
             commands::entries::create_workspace_folder,

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { chatRequest } from "../../platform/chat";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openExternalUrl } from "../../platform/bridge";
 import { aiRequest } from "../../platform/ai-bridge";
 import { emptyAiFields } from "../../shared/ai-types";
@@ -14,7 +15,7 @@ import { ContextPreview } from "./ContextPreview";
 import { AttachmentPicker } from "./AttachmentPicker";
 import { ModelPicker } from "./ModelPicker";
 
-function MessageBody({ message, streaming }: { message: ChatMessage; streaming: boolean }) {
+const MessageBody = memo(function MessageBody({ message, streaming }: { message: ChatMessage; streaming: boolean }) {
   const [html, setHtml] = useState("");
   useEffect(() => {
     let active = true;
@@ -45,7 +46,7 @@ function MessageBody({ message, streaming }: { message: ChatMessage; streaming: 
   ) : (
     <div className="chat-plain">{message.content || (streaming ? "正在思考…" : "未收到文字")}</div>
   );
-}
+});
 
 export default function ChatSpace({
   assistants,
@@ -59,6 +60,17 @@ export default function ChatSpace({
   onOpenAi?: (id: string) => void;
 }) {
   const m = useChat(assistants);
+  const usage = m.usage ?? m.thread.messages.at(-1)?.usage;
+  const [windowPage, setWindowPage] = useState({ id: "", count: 40 });
+  const shown = windowPage.id === m.thread.id ? windowPage.count : 40;
+  const start = Math.max(0, m.thread.messages.length - shown);
+  const scrollAnchor = useRef<{ height: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (scrollAnchor.current && scroll.current) {
+      scroll.current.scrollTop = scrollAnchor.current.top + scroll.current.scrollHeight - scrollAnchor.current.height;
+      scrollAnchor.current = null;
+    }
+  }, [shown]);
   const contextOptions = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const outside = (event: PointerEvent) => {
@@ -102,6 +114,11 @@ export default function ChatSpace({
   const handled = useRef<number>(),
     scroll = useRef<HTMLDivElement>(null),
     follow = useRef(true);
+  useLayoutEffect(() => {
+    follow.current = true;
+    scrollAnchor.current = null;
+    scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
+  }, [m.thread.id]);
   const assistant = assistants.find((a) => a.id === m.thread.assistantId),
     provider = m.providers.find((p) => p.id === m.thread.providerId);
   useEffect(() => {
@@ -240,69 +257,86 @@ export default function ChatSpace({
             )}
           </div>
         ) : (
-          m.thread.messages.map((message, index) => (
-            <article key={message.id} className={`chat-message chat-message-${message.role}`}>
-              <header className={message.role === "user" ? "sr-only" : undefined}>
-                <strong>{message.role === "user" ? "我" : message.provider || "助手"}</strong>
-                <small>{message.model}</small>
-              </header>
-              <MessageBody
-                message={message}
-                streaming={m.busy && index === m.thread.messages.length - 1 && message.role === "assistant"}
-              />
-              {message.sources?.length ? (
-                <details className="chat-sources">
-                  <summary>本次使用的资料 · {message.sources.length}</summary>
-                  {message.sources.map((source) => (
-                    <div key={source.id}>
-                      <strong>{source.title}</strong>
-                      <small>{source.source}</small>
-                      <pre>{source.text}</pre>
-                    </div>
-                  ))}
-                </details>
-              ) : null}
-              {message.error && <p className="chat-message-error">{message.error}</p>}
-              {!message.content &&
-                !m.busy &&
-                message.role === "assistant" &&
-                index === m.thread.messages.length - 1 && (
-                  <button disabled={m.switching} onClick={() => void m.generate()}>
-                    <Icon name="retry" />
-                    重试回答
-                  </button>
-                )}
-              {message.content && !m.busy && !m.switching && (
-                <div className="chat-message-actions">
-                  <button
-                    aria-label="复制消息"
-                    onClick={() =>
-                      void run(async () => {
-                        await navigator.clipboard.writeText(message.content);
-                        m.setNotice("已复制消息。");
-                      })
-                    }
-                  >
-                    <Icon name="copy" />
-                    <span className={message.role === "user" ? "sr-only" : undefined}>复制</span>
-                  </button>
-                  {message.role === "assistant" && (
-                    <>
-                      <button onClick={() => setSaveAnswer({ message, kind: "knowledge", title: m.thread.title })}>
-                        存入 AI 库
+          <>
+            {start > 0 && (
+              <button
+                onClick={() => {
+                  if (scroll.current)
+                    scrollAnchor.current = { height: scroll.current.scrollHeight, top: scroll.current.scrollTop };
+                  follow.current = false;
+                  setWindowPage({ id: m.thread.id, count: shown + 40 });
+                }}
+              >
+                加载更早的消息（还有 {start} 条）
+              </button>
+            )}
+            {m.thread.messages.slice(start).map((message, visibleIndex) => {
+              const index = start + visibleIndex;
+              return (
+                <article key={message.id} className={`chat-message chat-message-${message.role}`}>
+                  <header className={message.role === "user" ? "sr-only" : undefined}>
+                    <strong>{message.role === "user" ? "我" : message.provider || "助手"}</strong>
+                    <small>{message.model}</small>
+                  </header>
+                  <MessageBody
+                    message={message}
+                    streaming={m.busy && index === m.thread.messages.length - 1 && message.role === "assistant"}
+                  />
+                  {message.sources?.length ? (
+                    <details className="chat-sources">
+                      <summary>本次使用的资料 · {message.sources.length}</summary>
+                      {message.sources.map((source) => (
+                        <div key={source.id}>
+                          <strong>{source.title}</strong>
+                          <small>{source.source}</small>
+                          <pre>{source.text}</pre>
+                        </div>
+                      ))}
+                    </details>
+                  ) : null}
+                  {message.error && <p className="chat-message-error">{message.error}</p>}
+                  {!message.content &&
+                    !m.busy &&
+                    message.role === "assistant" &&
+                    index === m.thread.messages.length - 1 && (
+                      <button disabled={m.switching} onClick={() => void m.generate()}>
+                        <Icon name="retry" />
+                        重试回答
                       </button>
-                      {index === m.thread.messages.length - 1 && (
-                        <button disabled={m.switching} onClick={() => void m.generate()}>
-                          <Icon name="retry" />
-                          重新回答
-                        </button>
+                    )}
+                  {message.content && !m.busy && !m.switching && (
+                    <div className="chat-message-actions">
+                      <button
+                        aria-label="复制消息"
+                        onClick={() =>
+                          void run(async () => {
+                            await navigator.clipboard.writeText(message.content);
+                            m.setNotice("已复制消息。");
+                          })
+                        }
+                      >
+                        <Icon name="copy" />
+                        <span className={message.role === "user" ? "sr-only" : undefined}>复制</span>
+                      </button>
+                      {message.role === "assistant" && (
+                        <>
+                          <button onClick={() => setSaveAnswer({ message, kind: "knowledge", title: m.thread.title })}>
+                            存入 AI 库
+                          </button>
+                          {index === m.thread.messages.length - 1 && (
+                            <button disabled={m.switching} onClick={() => void m.generate()}>
+                              <Icon name="retry" />
+                              重新回答
+                            </button>
+                          )}
+                        </>
                       )}
-                    </>
+                    </div>
                   )}
-                </div>
-              )}
-            </article>
-          ))
+                </article>
+              );
+            })}
+          </>
         )}
         {m.thread.messages.length > 0 && !m.busy && (
           <div className="chat-actions chat-history-actions">
@@ -383,9 +417,10 @@ export default function ChatSpace({
             {m.notice}
           </p>
         )}
-        {m.usage && (
+        {usage && (
           <small className="chat-usage">
-            服务报告用量：输入 {m.usage.input} · 输出 {m.usage.output} tokens
+            {usage.estimated ? "估算用量（服务未返回完整用量）" : "服务报告用量"}：输入 {usage.input} · 输出{" "}
+            {usage.output} tokens
           </small>
         )}
         <form
@@ -432,6 +467,17 @@ export default function ChatSpace({
               </select>
             </label>
             <ModelPicker
+              onFavorite={(model) =>
+                void run(async () => {
+                  if (!provider) return;
+                  const favorites = provider.favorites ?? [];
+                  await chatRequest("save_provider", {
+                    ...provider,
+                    favorites: favorites.includes(model) ? favorites.filter((m) => m !== model) : [...favorites, model],
+                  });
+                  await m.refreshProviders();
+                })
+              }
               key={m.thread.providerId}
               provider={provider}
               disabled={m.busy || m.switching}

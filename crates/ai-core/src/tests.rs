@@ -404,6 +404,20 @@ fn semantic_service_indexes_retrieves_and_falls_back() {
         fragment.location.uri == "file:///fixture.md"
             && fragment.location.fingerprint == "fixture-source-fingerprint"
     }));
+    // Same cached query embedding remains usable while this project has new pending text.
+    let mut pending = request("待处理", "quiet feline 新文档");
+    pending.fields.project = "book".into();
+    let pending = s.save(pending).unwrap();
+    q.limit = 1;
+    let first = s.search(&q).unwrap();
+    assert_eq!(first.total, 2);
+    assert_eq!(first.items[0].id, pending.id);
+    assert!(first.warning.is_some());
+    q.offset = 1;
+    let second = s.search(&q).unwrap();
+    assert_eq!(second.items[0].title, "猫咪");
+    q.offset = 0;
+    q.limit = 20;
     server.join().unwrap();
     q.query = "猫咪".into();
     let fallback = s.search(&q).unwrap();
@@ -445,6 +459,20 @@ fn incomplete_semantic_index_preserves_keyword_results_and_pagination() {
             result.items.iter().map(|h| &h.id).collect::<Vec<_>>(),
             lexical.items.iter().map(|h| &h.id).collect::<Vec<_>>()
         );
-        assert!(result.warning.unwrap().contains("尚未"));
+        assert!(result.warning.is_some());
     }
+}
+
+#[test]
+fn semantic_supplements_use_the_same_first_64_terms_as_keyword_search() {
+    let (_, mut s) = setup();
+    let first = s.save(request("match", "word0")).unwrap();
+    let last = s.save(request("supplement", "word64")).unwrap();
+    let text = (0..65)
+        .map(|i| format!("word{i}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(s.lexical_matches(&first.id, &text).unwrap());
+    assert!(!s.lexical_matches(&last.id, &text).unwrap());
+    assert_eq!(s.search(&query(&text)).unwrap().total, 1);
 }

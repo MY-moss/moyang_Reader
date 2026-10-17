@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $plan = Get-Content -LiteralPath $PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $resultFile = Join-Path $PSScriptRoot 'result.json'
 $swaps = New-Object Collections.ArrayList
+$restartAllowed = $true
 function Full-Path([string]$Value) {
     if (-not [IO.Path]::IsPathRooted($Value) -or $Value.StartsWith('\\')) { throw '请选择本机磁盘上的文件夹。' }
     return [IO.Path]::GetFullPath($Value).TrimEnd('\')
@@ -41,6 +42,17 @@ function Hash-File([string]$File) {
     $stream=[IO.File]::OpenRead($File); $sha=[Security.Cryptography.SHA256]::Create()
     try { return [BitConverter]::ToString($sha.ComputeHash($stream)) }
     finally { $stream.Dispose(); $sha.Dispose() }
+}
+function Copy-Content([string]$Source, [string]$Destination) {
+    # Copy readable bytes, not NTFS encryption/ACL attributes from another volume.
+    # The chosen destination controls its own storage attributes.
+    $inputStream=[IO.File]::OpenRead($Source)
+    try {
+        $outputStream=[IO.File]::Open($Destination,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try { $inputStream.CopyTo($outputStream,131072); $outputStream.Flush($true) }
+        finally { $outputStream.Dispose() }
+    } finally { $inputStream.Dispose() }
+    [IO.File]::SetLastWriteTimeUtc($Destination,[IO.File]::GetLastWriteTimeUtc($Source))
 }
 function Check-Plan {
     $target = Full-Path $plan.target
@@ -115,7 +127,7 @@ try {
         $before = @(Files $source)
         foreach ($file in $before) {
             $copy = Join-Path $destination $file.FullName.Substring($source.Length + 1)
-            Copy-Item -LiteralPath $file.FullName -Destination $copy -Force
+            Copy-Content $file.FullName $copy
             if ((Hash-File $file.FullName) -ne (Hash-File $copy)) { throw "文件校验失败：$($file.Name)" }
         }
         if (@(Files $source).Count -ne $before.Count) { throw '迁移期间原目录发生变化，原数据已保留。' }
@@ -150,16 +162,31 @@ try {
 } catch {
     $failure = $_.Exception.Message
     if ($CheckOnly) { [Console]::Error.WriteLine($failure); exit 1 }
+    $rollbackErrors = @()
+    $retained = @()
+    $recovery = @()
     for ($index=$swaps.Count-1; $index -ge 0; $index--) {
         $swap=$swaps[$index]
         if (Test-Path -LiteralPath $swap.backup) {
-            if ($swap.linked) { [IO.Directory]::Delete($swap.source, $false) }
-            [IO.Directory]::Move($swap.backup, $swap.source)
+            try {
+                if (Test-Path -LiteralPath $swap.source) {
+                    $current=Get-Item -LiteralPath $swap.source -Force
+                    if ($swap.linked -and $current.LinkType -eq 'Junction' -and (Full-Path ([string]$current.Target[0])) -eq (Full-Path $swap.destination)) {
+                        [IO.Directory]::Delete($swap.source, $false)
+                    } else { throw '原位置被其他程序重新创建，已保留双方数据，请关闭相关连接后恢复。' }
+                }
+                [IO.Directory]::Move($swap.backup, $swap.source)
+            } catch {
+                $rollbackErrors += $_.Exception.Message
+                $retained += $swap.backup
+                $recovery += @{source=$swap.source; original=$swap.backup; copied=$swap.destination}
+            }
         }
     }
-    Write-Report @{status='error'; message=$failure; target=$plan.target; at=[DateTime]::UtcNow.ToString('o')}
+    $restartAllowed = $rollbackErrors.Count -eq 0
+    Write-Report @{status='error'; message=$failure; target=$plan.target; rollback_complete=$restartAllowed; rollback_errors=$rollbackErrors; retained=$retained; recovery=$recovery; at=[DateTime]::UtcNow.ToString('o')}
     # Partial copied destination is left for inspection; original data remains authoritative.
 }
-if (Test-Path -LiteralPath $plan.executable -PathType Leaf) {
+if ($restartAllowed -and (Test-Path -LiteralPath $plan.executable -PathType Leaf)) {
     Start-Process -FilePath $plan.executable -WorkingDirectory (Split-Path -Parent $plan.executable) -WindowStyle Hidden
 }

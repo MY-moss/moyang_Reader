@@ -1,5 +1,7 @@
 # MCP 与任务沉淀接口
 
+本轮新增按模型预算、常用模型、长会话分段显示、统一 AI 配置、概览条件读取和可取消 PDF 导出。见 [0.18 配置与优化说明](UPGRADE-018.md)。
+
 ## 0.17 分层读取与工具模式
 
 新连接带 `--profile compact`，只展示 8 个常用工具：`recall_context`、`read_context`、`save_record`、`patch_record`、`task_checkpoint`、`conclude_task`、`read_skill_resource`、`library_status`。已有不带 profile 的连接保留完整工具和旧召回响应；接入页可切换后重连。`library_status.service` 报告正在运行的构建版本、提交、模式、工具数量与能力，不能把配置写入等同于重连成功。

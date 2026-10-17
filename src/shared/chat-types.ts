@@ -1,4 +1,11 @@
 export type ChatProtocol = "openai" | "anthropic";
+export type ChatModelOptions = {
+  contextTokens?: number;
+  outputTokens?: number;
+  outputParameter?: "max_tokens" | "max_completion_tokens";
+  streamUsage?: boolean;
+  testedAt?: number;
+};
 export type ChatProvider = {
   id: string;
   name: string;
@@ -7,6 +14,8 @@ export type ChatProvider = {
   model: string;
   /** Available model IDs; older profiles only have a default model. */
   models?: string[];
+  favorites?: string[];
+  modelOptions?: Record<string, ChatModelOptions>;
   hasKey: boolean;
 };
 export type ChatSource = {
@@ -30,6 +39,7 @@ export type ChatMessage = {
   error?: string;
   provider?: string;
   model?: string;
+  usage?: ChatUsage;
   sources?: ChatSource[];
 };
 export type ChatThread = {
@@ -47,4 +57,4 @@ export type ChatThread = {
 export type ChatThreadSummary = Omit<ChatThread, "messages">;
 export type ChatAssistant = { id: string; name: string; prompt: string; starters: string[] };
 export type ChatWireMessage = { role: "user" | "assistant" | "system"; content: string };
-export type ChatUsage = { input: number; output: number };
+export type ChatUsage = { input: number; output: number; estimated?: boolean };

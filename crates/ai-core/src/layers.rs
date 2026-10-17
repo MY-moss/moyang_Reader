@@ -22,8 +22,10 @@ pub struct ContextRead {
     pub layer: ContextLayer,
     /// Omit for current content. L3 without revision lists historical versions.
     pub revision: Option<i64>,
-    /// Return metadata only when this revision is unchanged (except history lists).
+    /// L2 only: return metadata when the record revision is unchanged.
     pub if_revision: Option<i64>,
+    /// Conditional read of any content layer, including generated overview and state.
+    pub if_etag: Option<String>,
     /// Exact Markdown heading; duplicate headings require a line range instead.
     pub section: Option<String>,
     /// One-based inclusive line range of the selected body/section.
@@ -190,7 +192,7 @@ impl Store {
     pub(crate) fn read_layer(&self, q: &ContextRead, budget: usize) -> Result<Value> {
         if let Some(revision) = q
             .if_revision
-            .filter(|_| q.layer != ContextLayer::L3 && q.offset == 0)
+            .filter(|_| q.layer == ContextLayer::L2 && q.offset == 0 && q.if_etag.is_none())
         {
             // Conditional reads project metadata in SQLite, never materializing body or resources.
             let table = if q.revision.is_some() {
@@ -211,10 +213,6 @@ impl Store {
         let r = projected_record(self, &q.id, q.revision)?;
         let f = &r.fields;
         let mut out = json!({"id":r.id,"revision":r.revision,"layer":q.layer,"kind":f.kind,"title":clip(&f.title,140),"scope":{"project":f.project,"agent":f.agent,"sharing":f.sharing},"state":r.state,"expired":f.expires_at.is_some_and(|t|t<=now())});
-        if q.if_revision == Some(r.revision) && q.layer != ContextLayer::L3 && q.offset == 0 {
-            out["unchanged"] = json!(true);
-            return Ok(out);
-        }
         if q.layer == ContextLayer::L3 && q.revision.is_none() {
             let mut history = self.history_page(HistoryRequest {
                 id: q.id.clone(),
@@ -286,6 +284,18 @@ impl Store {
             }
         };
         let fingerprint = hex(Sha256::digest(body.as_bytes()));
+        // Metadata is part of the validator: pending -> ready, expiry and scope changes
+        // matter even if the readable text itself happens to stay the same.
+        let etag = hex(Sha256::digest(serde_json::to_vec(&json!([
+            out,
+            fingerprint
+        ]))?));
+        out["etag"] = json!(etag);
+        if q.offset == 0 && q.if_etag.as_deref() == Some(&etag) {
+            out["unchanged"] = json!(true);
+            out.as_object_mut().unwrap().remove("navigation");
+            return Ok(out);
+        }
         if q.expected_fingerprint
             .as_ref()
             .is_some_and(|expected| expected != &fingerprint)
@@ -307,6 +317,7 @@ impl Store {
                 let mut next = q.clone();
                 next.revision = Some(r.revision);
                 next.if_revision = None;
+                next.if_etag = None;
                 next.offset = end;
                 next.expected_fingerprint = Some(fingerprint.clone());
                 out["continuation"] = serde_json::to_value(next)?;

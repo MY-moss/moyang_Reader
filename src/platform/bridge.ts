@@ -1,3 +1,4 @@
+import { registerPendingWork } from "../shared/pending-work";
 import { invoke } from "@tauri-apps/api/core";
 import { recordDesktopTestEvent } from "./test-diagnostics";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -65,7 +66,19 @@ export async function exportPdfFile(path: string, html: string): Promise<void> {
     throw new Error("浏览器预览模式不能直接保存 PDF 文件。");
   }
 
-  await invoke("export_pdf_file", { path, html });
+  if (pdfExportState) throw new Error("已有 PDF 正在导出，请完成或取消后重试。");
+  const requestId = crypto.randomUUID();
+  pdfExportState = { requestId, path };
+  window.dispatchEvent(new Event("moyang:pdf-export"));
+  const task = invoke<void>("export_pdf_file", { path, html, requestId });
+  const unregister = registerPendingWork(() => task.catch(() => undefined));
+  try {
+    await task;
+  } finally {
+    unregister();
+    pdfExportState = null;
+    window.dispatchEvent(new Event("moyang:pdf-export"));
+  }
 }
 
 export async function listWorkspaceFiles(root: string): Promise<WorkspaceFile[]> {
@@ -281,4 +294,12 @@ export async function subscribeToFileDrop(onPaths: (paths: string[]) => void): P
   return getCurrentWebview().onDragDropEvent((event) => {
     if (event.payload.type === "drop") onPaths(event.payload.paths);
   });
+}
+
+let pdfExportState: { requestId: string; path: string } | null = null;
+export function currentPdfExport() {
+  return pdfExportState;
+}
+export async function cancelPdfExport(requestId: string) {
+  await invoke("cancel_pdf_export", { requestId });
 }

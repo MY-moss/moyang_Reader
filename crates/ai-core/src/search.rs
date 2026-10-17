@@ -98,7 +98,28 @@ pub(crate) fn allowed(r: &Record, q: &SearchQuery) -> bool {
             }))
 }
 pub(crate) const FILTER:&str="e.state=:state AND (:kind IS NULL OR e.kind=:kind) AND (:project IS NULL OR e.project=:project OR (:global AND e.project='')) AND (e.sharing!='legacy' OR :agent IS NULL OR e.agent=:agent OR (:global AND e.agent='')) AND (:expired OR e.expires IS NULL OR e.expires>:now)";
+fn fts_expression(query: &str) -> String {
+    let mut seen = HashSet::new();
+    tokenize(query, true)
+        .into_iter()
+        .filter(|t| seen.insert(t.clone()))
+        .take(64)
+        .map(|t| format!("\"{}\"", t.replace('"', "")))
+        .collect::<Vec<_>>()
+        .join(" OR ")
+}
 impl Store {
+    pub(crate) fn lexical_matches(&self, id: &str, query: &str) -> Result<bool> {
+        let expression = fts_expression(query);
+        if expression.is_empty() {
+            return Ok(false);
+        }
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chunks_fts WHERE chunks_fts MATCH ? AND entry_id=?)",
+            rusqlite::params![expression, id],
+            |r| r.get(0),
+        )?)
+    }
     pub(crate) fn distinctive_title_terms(&self, query: &str) -> Result<HashSet<String>> {
         let records: i64 = self
             .conn
@@ -134,15 +155,7 @@ impl Store {
         self.lexical(q)
     }
     pub(crate) fn lexical(&self, q: &SearchQuery) -> Result<SearchResult> {
-        let terms = tokenize(&q.query, true);
-        let mut seen = HashSet::new();
-        let query = terms
-            .iter()
-            .filter(|t| seen.insert(t.as_str()))
-            .take(64)
-            .map(|t| format!("\"{}\"", t.replace('"', "")))
-            .collect::<Vec<_>>()
-            .join(" OR ");
+        let query = fts_expression(&q.query);
         let use_fts = !query.is_empty();
         if !q.query.trim().is_empty() && !use_fts {
             return Ok(SearchResult {

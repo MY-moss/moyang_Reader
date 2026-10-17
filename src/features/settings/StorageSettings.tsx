@@ -58,8 +58,17 @@ export function StorageSettings({ beforeRestart }: { beforeRestart?: () => Promi
             <div className="storage-report" role={info.report.status === "error" ? "alert" : "status"}>
               <strong>{info.report.message}</strong>
               <p>{info.report.target}</p>
+              {info.report.rollback_complete === false && (
+                <p>迁移未完整回退。请关闭相关 Agent 连接，核对原位置和下列保留副本后再恢复；不要删除这些数据。</p>
+              )}
+              {info.report.rollback_errors?.length ? <p>{info.report.rollback_errors.join("；")}</p> : null}
               {info.report.retained?.length ? (
-                <p>以下旧副本尚未清理，可在确认新位置可用后处理：{info.report.retained.join("；")}</p>
+                <p>
+                  {info.report.rollback_complete === false
+                    ? "需要保留的原副本："
+                    : "以下旧副本尚未清理，可在确认新位置可用后处理："}
+                  {info.report.retained.join("；")}
+                </p>
               ) : null}
             </div>
           )}

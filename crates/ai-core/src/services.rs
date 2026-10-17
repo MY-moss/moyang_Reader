@@ -18,6 +18,10 @@ pub struct Provider {
     #[serde(default)]
     pub models: Vec<String>,
     #[serde(default)]
+    pub favorites: Vec<String>,
+    #[serde(default)]
+    pub model_options: std::collections::BTreeMap<String, Value>,
+    #[serde(default)]
     pub has_key: bool,
 }
 
@@ -114,6 +118,31 @@ pub fn provider_request(path: &Path, operation: &str, payload: Value) -> Result<
                     .map(|v| v.0.models)
                     .unwrap_or_default();
             }
+            if let Ok((old, _)) = load_provider(&db, &provider.id) {
+                if payload.get("favorites").is_none() {
+                    provider.favorites = old.favorites;
+                }
+                if payload.get("modelOptions").is_none() {
+                    provider.model_options = old.model_options;
+                }
+            }
+            for options in provider.model_options.values() {
+                if !options.is_object() {
+                    return Err("模型配置应为对象。".into());
+                }
+                let context = options
+                    .get("contextTokens")
+                    .map(|v| v.as_u64())
+                    .unwrap_or(Some(16384));
+                let output = options
+                    .get("outputTokens")
+                    .map(|v| v.as_u64())
+                    .unwrap_or(Some(4096));
+                if !matches!((context, output), (Some(c),Some(o)) if (512..=2000000).contains(&c) && o>0 && o<c)
+                {
+                    return Err("模型上下文与输出预算无效。".into());
+                }
+            }
             provider.model = provider.model.trim().to_string();
             provider.models.push(provider.model.clone());
             let mut seen = std::collections::HashSet::new();
@@ -136,6 +165,18 @@ pub fn provider_request(path: &Path, operation: &str, payload: Value) -> Result<
                     .unwrap_or(&old)
                     .to_string()
             };
+            if let Ok((old, old_key)) = load_provider(&db, &provider.id) {
+                if old.base_url != provider.base_url
+                    || old.protocol != provider.protocol
+                    || old_key != key
+                {
+                    for options in provider.model_options.values_mut() {
+                        if let Some(options) = options.as_object_mut() {
+                            options.remove("testedAt");
+                        }
+                    }
+                }
+            }
             provider.has_key = !key.is_empty();
             let raw = serde_json::to_string(&provider).map_err(|e| e.to_string())?;
             db.execute("INSERT INTO providers(id,data,secret) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET data=excluded.data,secret=excluded.secret", params![provider.id,raw,key]).map_err(|e| e.to_string())?;
@@ -152,13 +193,15 @@ pub fn provider_request(path: &Path, operation: &str, payload: Value) -> Result<
 
 impl crate::Store {
     pub fn bind_services(&self, directory: &Path) -> crate::Result<()> {
-        let root = self.path.parent().unwrap();
+        // A Windows storage junction may cross drives. Use its physical parent
+        // for both the temporary file and atomic rename, keeping the public alias stable.
+        let root = std::fs::canonicalize(self.path.parent().unwrap())?;
         let path = root.join("runtime-services.json");
         let data = serde_json::to_vec(&json!({"directory":directory}))?;
         if std::fs::read(&path).ok().as_deref() == Some(data.as_slice()) {
             return Ok(());
         }
-        let mut pending = tempfile::NamedTempFile::new_in(root)?;
+        let mut pending = tempfile::NamedTempFile::new_in(&root)?;
         use std::io::Write;
         pending.write_all(&data)?;
         pending.as_file().sync_all()?;
@@ -194,6 +237,57 @@ impl crate::Store {
 mod tests {
     use super::*;
     #[test]
+    fn shared_services_binding_survives_a_storage_directory_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let physical = dir.path().join("physical");
+        let alias = dir.path().join("alias");
+        std::fs::create_dir(&physical).unwrap();
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            let script = dir.path().join("link.ps1");
+            std::fs::write(&script, "param([string]$Alias,[string]$Target)\n$ErrorActionPreference='Stop'\nNew-Item -ItemType Junction -Path $Alias -Target $Target | Out-Null\n").unwrap();
+            let status = std::process::Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-File"])
+                .arg(script)
+                .arg(&alias)
+                .arg(&physical)
+                .creation_flags(0x08000000)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&physical, &alias).unwrap();
+        let store = crate::Store::open(&alias).unwrap();
+        let services = dir.path().join("chat");
+        store.bind_services(&services).unwrap();
+        assert_eq!(store.services_directory().unwrap(), services);
+        let next = dir.path().join("other-chat");
+        store.bind_services(&next).unwrap();
+        assert_eq!(
+            crate::Store::open(&physical)
+                .unwrap()
+                .services_directory()
+                .unwrap(),
+            next
+        );
+        store.bind_services(&next).unwrap();
+        assert_eq!(
+            std::fs::read_dir(&physical)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with(".tmp"))
+                .count(),
+            0
+        );
+        #[cfg(windows)]
+        std::fs::remove_dir(&alias).unwrap();
+        #[cfg(unix)]
+        std::fs::remove_file(&alias).unwrap();
+    }
+
+    #[test]
     fn model_catalog_roundtrips_preserving_legacy_profiles_and_credentials() {
         let dir = tempfile::tempdir().unwrap();
         let mut input = json!({"id":"multi","name":"多模型服务","protocol":"openai","baseUrl":"http://localhost:7331/v1","model":"fast","apiKey":"test-secret"});
@@ -215,6 +309,33 @@ mod tests {
                 .unwrap()
                 .1,
             "test-secret"
+        );
+    }
+}
+
+#[cfg(test)]
+mod model_options_tests {
+    use super::*;
+    #[test]
+    fn budget_and_favorites_survive_old_clients_but_changed_service_clears_test_status() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = json!({"id":"multi","name":"个人服务","protocol":"openai","baseUrl":"http://localhost:7331/v1","model":"fast","favorites":["careful"],"modelOptions":{"careful":{"contextTokens":32000,"outputTokens":512,"testedAt":123}}});
+        provider_request(dir.path(), "save_provider", input.clone()).unwrap();
+        let mut legacy = input.clone();
+        legacy.as_object_mut().unwrap().remove("favorites");
+        legacy.as_object_mut().unwrap().remove("modelOptions");
+        let kept = provider_request(dir.path(), "save_provider", legacy.clone()).unwrap();
+        assert_eq!(kept["modelOptions"]["careful"]["outputTokens"], 512);
+        assert_eq!(kept["favorites"], json!(["careful"]));
+        legacy["baseUrl"] = json!("http://localhost:7332/v1");
+        let changed = provider_request(dir.path(), "save_provider", legacy).unwrap();
+        assert!(changed["modelOptions"]["careful"]["testedAt"].is_null());
+        let mut invalid = input;
+        invalid["modelOptions"]["careful"]["outputTokens"] = json!(32000);
+        assert!(provider_request(dir.path(), "save_provider", invalid).is_err());
+        assert_eq!(
+            provider_request(dir.path(), "providers", json!({})).unwrap()[0]["baseUrl"],
+            "http://localhost:7332/v1"
         );
     }
 }

@@ -95,7 +95,10 @@ try {
   assert.ok(layered.items[0].content.includes("使用简洁中文回答"));
   const unchanged = await client.call("read_context", {items:[{id,layer:"l2",if_revision:layered.items[0].revision}]});
   assert.equal(unchanged.items[0].unchanged, true);
-  report.layered_mcp = {build:service.service.build,conditional_read:true};
+  const unchangedOverview = await client.call("read_context", {items:[{id,layer:"l1",if_etag:layered.items[0].etag}]});
+  assert.equal(unchangedOverview.items[0].unchanged, true);
+  assert.equal(unchangedOverview.items[0].content, undefined);
+  report.layered_mcp = {build:service.service.build,conditional_read:true,overview_etag:true};
   await client.close();
   client = null;
 

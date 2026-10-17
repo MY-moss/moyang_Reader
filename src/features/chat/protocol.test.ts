@@ -42,7 +42,20 @@ describe("chat protocols", () => {
       messages: [messages[1]],
       max_tokens: 4096,
     });
-    expect(requestBody("openai", "custom-model", messages)).toEqual({ model: "custom-model", stream: true, messages });
+    expect(requestBody("openai", "custom-model", messages)).toMatchObject({
+      model: "custom-model",
+      stream: true,
+      messages,
+      stream_options: { include_usage: true },
+      max_tokens: 4096,
+    });
+    expect(
+      requestBody("openai", "custom-model", messages, {
+        streamUsage: false,
+        outputTokens: 512,
+        outputParameter: "max_completion_tokens",
+      }),
+    ).toEqual({ model: "custom-model", stream: true, messages, max_completion_tokens: 512 });
   });
   it("decodes arbitrarily split Chinese streams and preserves usage", () => {
     let text = "",

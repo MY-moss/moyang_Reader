@@ -269,3 +269,107 @@ test("chat and service settings fit supported widths and keyboard-accessible the
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(result.violations).toEqual([]);
 });
+
+test("models have independent budgets, searchable favorites and usage fallback", async ({ page }) => {
+  await installChat(page);
+  await configure(page);
+  await page.getByRole("button", { name: "API 服务", exact: true }).click();
+  await page.getByLabel("可选模型列表").fill("test-model\nfast\ncareful\nlocal\nlong\nshort");
+  await page.getByLabel("预算与测试的模型").selectOption("careful");
+  await page.getByText("模型预算与兼容选项 · careful", { exact: true }).click();
+  await page.getByLabel("上下文上限（tokens）").fill("32000");
+  await page.getByLabel("回答输出上限（tokens）").fill("512");
+  await page.getByRole("button", { name: "保存服务", exact: true }).click();
+  await page.getByRole("button", { name: "返回聊天", exact: true }).click();
+  await page.getByLabel("搜索模型").fill("care");
+  await page.getByLabel("本次模型", { exact: true }).selectOption({ label: "careful" });
+  await page.getByLabel("常用模型", { exact: true }).click();
+  await expect(page.getByLabel("常用模型", { exact: true })).toHaveAttribute("aria-pressed", "true");
+  let attempts = 0;
+  await page.route("http://localhost:7331/v1/chat/completions", async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.model).toBe("careful");
+    expect(body.max_tokens).toBe(512);
+    attempts++;
+    if (attempts === 1)
+      await route.fulfill({ status: 400, json: { error: { message: "unsupported stream_options" } } });
+    else {
+      expect(body.stream_options).toBeUndefined();
+      await route.fulfill({
+        contentType: "text/event-stream",
+        body: 'data: {"choices":[{"delta":{"content":"预算已应用"}}]}\n\ndata: [DONE]\n\n',
+      });
+    }
+  });
+  await page.getByLabel("聊天消息").fill("解释一下");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await expect(page.locator(".chat-message-assistant")).toContainText("预算已应用");
+  await expect(page.locator(".chat-usage")).toContainText("估算用量");
+  expect(attempts).toBe(2);
+  await page.getByRole("button", { name: "API 服务", exact: true }).click();
+  await expect(page.getByLabel("默认模型", { exact: true })).toHaveValue("test-model");
+  await page.getByLabel("预算与测试的模型").selectOption("careful");
+  await page.getByText("模型预算与兼容选项 · careful", { exact: true }).click();
+  await expect(page.getByLabel("回答输出上限（tokens）")).toHaveValue("512");
+});
+
+test("long conversation initially renders forty messages and loads earlier history without deleting it", async ({
+  page,
+}) => {
+  await installChat(page);
+  await configure(page);
+  await page.evaluate(async () => {
+    const open = indexedDB.open("moyang-chat", 2);
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      open.onsuccess = () => resolve(open.result);
+    });
+    const tx = db.transaction(["threads", "summaries"], "readwrite");
+    const messages = Array.from({ length: 46 }, (_, i) => ({
+      id: `message-${i}`,
+      role: i % 2 ? "assistant" : "user",
+      content:
+        `第${i + 1}条：正常阅读讨论。` +
+        (i < 6 && i % 2 ? "\n\n| 项目 | 内容 |\n| --- | --- |\n| 阅读 | $x^2$ |\n" : ""),
+      createdAt: i,
+      status: "complete",
+    }));
+    const thread = {
+      id: "history-fixture",
+      title: "阅读讨论",
+      revision: 1,
+      updatedAt: Date.now(),
+      providerId: "",
+      model: "test-model",
+      project: "",
+      useMemory: false,
+      assistantId: "",
+      messages,
+    };
+    tx.objectStore("threads").put(thread);
+    const { messages: _messages, ...summary } = thread;
+    void _messages;
+    tx.objectStore("summaries").put(summary);
+    await new Promise<void>((resolve) => {
+      tx.oncomplete = () => resolve();
+    });
+    db.close();
+    localStorage.setItem("moyang.chat.last", thread.id);
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "书房聊天", exact: true }).click();
+  await expect(page.locator(".chat-message")).toHaveCount(40);
+  await page.locator(".chat-conversation").evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const anchor = page.locator(".chat-message").filter({ hasText: "第7条：" });
+  const before = (await anchor.boundingBox())!.y;
+  await page.getByRole("button", { name: /加载更早的消息/ }).click();
+  await expect(page.locator(".chat-message")).toHaveCount(46);
+  await expect(page.locator(".chat-message table")).toHaveCount(3);
+  await expect.poll(async () => Math.abs((await anchor.boundingBox())!.y - before)).toBeLessThan(5);
+  await expect(page.locator(".chat-message").first()).toContainText("第1条");
+  await page.reload();
+  await page.getByRole("button", { name: "书房聊天", exact: true }).click();
+  await expect(page.locator(".chat-message")).toHaveCount(40);
+  await expect(page.getByRole("button", { name: /还有 6 条/ })).toBeVisible();
+});
