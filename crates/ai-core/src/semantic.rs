@@ -169,7 +169,7 @@ impl Store {
     pub(crate) fn semantic_remaining(&self, key: &str) -> Result<i64> {
         Ok(self.conn.query_row("SELECT COUNT(*) FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=? WHERE v.chunk_id IS NULL AND e.state='active'", [key], |r| r.get(0))?)
     }
-    pub fn configure_semantic(&self, mut c: SemanticConfig) -> Result<SemanticConfig> {
+    fn resolve_semantic(&self, mut c: SemanticConfig) -> Result<SemanticConfig> {
         if !["", "ollama", "openai"].contains(&c.protocol.as_str()) {
             return Err(invalid("请选择本地 Ollama 或兼容 OpenAI 的嵌入 API。"));
         }
@@ -198,8 +198,27 @@ impl Store {
                 return Err(invalid("服务地址需使用 http/https，并填写模型名称。"));
             }
         }
+        Ok(c)
+    }
+    pub fn configure_semantic(&self, c: SemanticConfig) -> Result<SemanticConfig> {
+        let c = self.resolve_semantic(c)?;
         self.conn.execute("INSERT INTO settings(key,value) VALUES('semantic',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[serde_json::to_string(&c)?])?;
         Ok(c)
+    }
+    pub fn test_semantic(
+        &self,
+        mut c: SemanticConfig,
+        request_id: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        c.enabled = true;
+        let c = self.resolve_semantic(c)?;
+        let vectors = embed(
+            &c,
+            &["墨阳阅读器：中文语义连接测试".into()],
+            &self.embedding_key(&c)?,
+            request_id,
+        )?;
+        Ok(serde_json::json!({"dimensions":vectors[0].len(),"model":c.model}))
     }
     fn embedding_key(&self, c: &SemanticConfig) -> Result<String> {
         if c.protocol != "openai" {
@@ -271,11 +290,6 @@ impl Store {
         // paying for a query embedding that could only produce an incomplete ranking.
         let missing: bool = self.conn.query_row(&format!("SELECT EXISTS(SELECT 1 FROM chunks c JOIN records e ON e.id=c.entry_id LEFT JOIN embeddings v ON v.chunk_id=c.id AND v.model=:model WHERE v.chunk_id IS NULL AND {})", crate::search::FILTER),
             named_params!{":model":model_key(&c),":state":q.state.key(),":kind":q.kind.map(Kind::key),":project":q.project,":agent":q.agent,":global":q.include_global,":expired":q.include_expired,":now":now()}, |r| r.get(0))?;
-        if missing {
-            let mut fallback = self.lexical(q)?;
-            fallback.warning = Some("当前范围的语义索引尚未就绪；已显示完整关键词结果。".into());
-            return Ok(fallback);
-        }
         let mut broad = q.clone();
         broad.limit = 100;
         broad.offset = 0;
@@ -290,12 +304,27 @@ impl Store {
                 fallback.warning = Some(format!("{} 已显示关键词结果。", error));
                 Ok(fallback)
             }
-            Ok((vectors, missing)) => {
-                // A write may have introduced missing chunks after the readiness check.
-                if missing {
+            Ok((vectors, late_missing)) => {
+                if missing || late_missing {
+                    // Keep the entire keyword sequence, then append ready semantic-only
+                    // matches. Unindexed records must never disappear from pagination.
                     let mut fallback = self.lexical(q)?;
-                    fallback.warning =
-                        Some("当前范围的语义索引尚未就绪；已显示完整关键词结果。".into());
+                    let mut additional = Vec::new();
+                    for hit in vectors {
+                        if !self.lexical_matches(&hit.id, &q.query)? {
+                            additional.push(hit);
+                        }
+                    }
+                    let skip = q.offset.saturating_sub(fallback.total);
+                    let room = q.limit.max(1).saturating_sub(fallback.items.len());
+                    fallback.total += additional.len();
+                    fallback
+                        .items
+                        .extend(additional.into_iter().skip(skip).take(room));
+                    fallback.warning = Some(
+                        "语义索引正在补齐；保留全部关键词结果，并在其后补充已就绪的语义结果。"
+                            .into(),
+                    );
                     return Ok(fallback);
                 }
                 let mut scores: HashMap<String, (Hit, f64)> = HashMap::new();
@@ -400,7 +429,7 @@ impl Store {
         })? {
             let (id, title, text, v,ordinal) = row?;
             crate::cancellation::check_cancelled(q.request_id.as_deref())?;
-            let vector: Vec<f64> = serde_json::from_str(&v)?;
+            let vector = crate::vector_cache::parsed(&key, &v)?;
             let Some(score) = cosine(&query, &vector) else {
                 mismatch = true;
                 continue;

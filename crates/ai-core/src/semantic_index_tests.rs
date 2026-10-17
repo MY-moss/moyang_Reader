@@ -229,7 +229,7 @@ fn external_embedding_api_uses_saved_key_and_never_mixes_protocol_vectors() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let endpoint = format!("http://{}", listener.local_addr().unwrap());
     let worker = std::thread::spawn(move || {
-        for _ in 0..2 {
+        for _ in 0..3 {
             let (mut socket, _) = listener.accept().unwrap();
             socket
                 .set_read_timeout(Some(std::time::Duration::from_secs(5)))
@@ -284,6 +284,13 @@ fn external_embedding_api_uses_saved_key_and_never_mixes_protocol_vectors() {
         })
         .unwrap();
     assert!(c.endpoint.ends_with("/v1"));
+    let before = s.semantic_config().unwrap();
+    assert_eq!(s.test_semantic(c.clone(), None).unwrap()["dimensions"], 2);
+    assert_eq!(s.stats().unwrap().embedded_chunks, 0);
+    assert_eq!(
+        serde_json::to_value(s.semantic_config().unwrap()).unwrap(),
+        serde_json::to_value(before).unwrap()
+    );
     assert_eq!(s.index_semantic().unwrap()["remaining"], 0);
     assert_eq!(
         s.search(&SearchQuery {
